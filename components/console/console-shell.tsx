@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, PanelLeft, Plus } from "lucide-react";
 import { menuItems, moduleConfigs, overviewKpis, type RowData } from "@/components/console/data";
 import { fetchNamespaces } from "@/app/lib/kubespark/projects";
 import { fetchNodes } from "@/app/lib/kubespark/nodes";
@@ -125,13 +125,18 @@ export function ConsoleShell() {
   }, [rows, search]);
 
   return (
-    <div className="min-h-screen bg-muted/30 text-foreground">
-      <div className="mx-auto grid max-w-[1500px] grid-cols-1 lg:grid-cols-[260px_1fr]">
-        <aside className="border-r bg-background/90 p-5 lg:sticky lg:top-0 lg:h-screen">
-          <div className="mb-8">
-            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">KubeSpark</div>
-            <div className="text-xl font-semibold">Console Reforged</div>
+    <div className="min-h-screen bg-zinc-100 text-zinc-900">
+      <div className="mx-auto grid max-w-[1600px] grid-cols-1 lg:grid-cols-[260px_1fr]">
+        <aside className="border-r border-zinc-200 bg-zinc-100 p-4 lg:sticky lg:top-0 lg:h-screen">
+          <div className="mb-6 flex items-center gap-2 px-2">
+            <div className="h-3 w-3 rounded-full border border-zinc-900" />
+            <div className="font-semibold">KubeSpark Inc.</div>
           </div>
+
+          <Button className="mb-4 w-full justify-start bg-zinc-900 text-zinc-50 hover:bg-zinc-800">
+            <Plus className="mr-2 h-4 w-4" /> Quick Create
+          </Button>
+
           <nav className="space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -142,8 +147,8 @@ export function ConsoleShell() {
                   key={item.path}
                   href={href}
                   className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                    active ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    active ? "bg-zinc-900 text-zinc-50" : "text-zinc-700 hover:bg-zinc-200"
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -152,48 +157,72 @@ export function ConsoleShell() {
               );
             })}
           </nav>
+
+          <div className="mt-8 border-t border-zinc-200 pt-4 text-xs text-zinc-500">黑白主题 · new-york-v4 风格</div>
         </aside>
 
-        <main className="p-4 md:p-8">
-          <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold">{currentTitle}</h1>
-              <p className="text-sm text-muted-foreground">{moduleConfig.subtitle}</p>
+        <main className="p-4 md:p-6">
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <PanelLeft className="h-4 w-4 text-zinc-500" />
+              <span className="font-medium">{currentTitle}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative hidden md:block">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input className="w-64 pl-8" placeholder="搜索当前表格..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-zinc-500" />
+                <Input
+                  className="w-64 border-zinc-300 bg-zinc-100 pl-8"
+                  placeholder="搜索当前表格..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-              <Button variant="outline" size="sm">
-                <Bell className="mr-1 h-4 w-4" />消息
+              <Button variant="outline" size="sm" className="border-zinc-300 bg-white">
+                <Bell className="mr-1 h-4 w-4" /> 消息
               </Button>
             </div>
-          </header>
+          </div>
 
-          <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <section className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {overviewKpis.map((kpi) => (
-              <Card key={kpi.label}>
-                <CardHeader className="pb-3">
-                  <CardDescription>{kpi.label}</CardDescription>
-                  <CardTitle className="text-3xl">{kpi.value}</CardTitle>
+              <Card key={kpi.label} className="border-zinc-200 bg-zinc-50 shadow-none">
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-zinc-600">{kpi.label}</CardDescription>
+                  <CardTitle className="text-4xl tracking-tight">{kpi.value}</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 text-xs text-muted-foreground">{kpi.hint}</CardContent>
+                <CardContent className="pt-0 text-xs text-zinc-500">{kpi.hint}</CardContent>
               </Card>
             ))}
           </section>
 
+          <Card className="mb-4 border-zinc-200 bg-zinc-50 shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Cluster Activity</CardTitle>
+                <CardDescription>{moduleConfig.subtitle}</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" className="bg-zinc-200 text-zinc-900">Last 3 months</Button>
+                <Button variant="ghost" size="sm" className="text-zinc-700">Last 30 days</Button>
+                <Button variant="ghost" size="sm" className="text-zinc-700">Last 7 days</Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-44 rounded-xl border border-zinc-200 bg-gradient-to-b from-zinc-200 via-zinc-100 to-zinc-50" />
+            </CardContent>
+          </Card>
+
           <section className="grid gap-4 xl:grid-cols-[2fr_1fr]">
-            <Card>
+            <Card className="border-zinc-200 bg-zinc-50 shadow-none">
               <CardHeader>
                 <CardTitle>{currentTitle}列表</CardTitle>
                 <CardDescription>projects / nodes / pods 已接入真实 API，其他模块保留重构骨架。</CardDescription>
               </CardHeader>
               <CardContent>
-                {loading && <div className="py-6 text-sm text-muted-foreground">加载中...</div>}
-                {error && <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+                {loading && <div className="py-6 text-sm text-zinc-500">加载中...</div>}
+                {error && <div className="mb-3 rounded-md border border-zinc-300 bg-zinc-200 px-3 py-2 text-sm text-zinc-800">{error}</div>}
                 {!loading && filteredRows.length === 0 ? (
-                  <div className="py-6 text-sm text-muted-foreground">暂无数据</div>
+                  <div className="py-6 text-sm text-zinc-500">暂无数据</div>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -211,7 +240,7 @@ export function ConsoleShell() {
                             const isStatus = col.key === "status";
                             const variant = statusVariantMap[value] || "outline";
                             return (
-                              <TableCell key={col.key} className={colIndex === 0 ? "font-medium" : ""}>
+                              <TableCell key={col.key} className={cn(colIndex === 0 && "font-medium")}>
                                 {isStatus ? <Badge variant={variant}>{value}</Badge> : value}
                               </TableCell>
                             );
@@ -224,14 +253,18 @@ export function ConsoleShell() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-zinc-200 bg-zinc-50 shadow-none">
               <CardHeader>
                 <CardTitle>操作面板</CardTitle>
-                <CardDescription>按模块切换常用动作入口</CardDescription>
+                <CardDescription>模块快捷动作</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {moduleConfig.actions.map((action, idx) => (
-                  <Button key={action} className="w-full" variant={idx === 0 ? "default" : idx === 1 ? "secondary" : "outline"}>
+                  <Button
+                    key={action}
+                    className={cn("w-full", idx === 0 && "bg-zinc-900 text-zinc-50 hover:bg-zinc-800")}
+                    variant={idx === 0 ? "default" : idx === 1 ? "secondary" : "outline"}
+                  >
                     {action}
                   </Button>
                 ))}
