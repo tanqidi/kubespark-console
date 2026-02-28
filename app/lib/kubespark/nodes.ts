@@ -1,53 +1,68 @@
-import { API_PROXY_BASE, fetchJsonDeduped } from "./common";
-import { parseQuantityCpu, parseQuantityMemGi } from "./utils";
+import { API_PROXY_BASE, fetchJsonDeduped } from "./common"
+import { parseQuantityCpu, parseQuantityMemGi, resolveUpdatedAt } from "./utils"
 
-export type NodeStatusKey = "ready" | "unschedulable" | "offline";
-export type NodeRoleKey = "controlPlane" | "worker" | "unknown";
+export type NodeStatusKey = "ready" | "unschedulable" | "offline"
+export type NodeRoleKey = "controlPlane" | "worker" | "unknown"
 
 export type NodeRowApi = {
-  id: string;
-  name: string;
-  ip: string;
-  status: NodeStatusKey;
-  role: NodeRoleKey;
-  cpuTotal: number;
-  memoryTotal: number;
-  podsTotal: number;
-};
+  id: string
+  name: string
+  ip: string
+  status: NodeStatusKey
+  role: NodeRoleKey
+  cpuTotal: number
+  memoryTotal: number
+  podsTotal: number
+  updatedAt: string
+}
 
 type RawNode = {
-  metadata?: { uid?: string; name?: string; labels?: Record<string, string> };
-  spec?: { unschedulable?: boolean };
+  metadata?: {
+    uid?: string
+    name?: string
+    labels?: Record<string, string>
+    creationTimestamp?: string
+    managedFields?: Array<{ time?: string }>
+  }
+  spec?: { unschedulable?: boolean }
   status?: {
-    addresses?: Array<{ type?: string; address?: string }>;
-    conditions?: Array<{ type?: string; status?: string }>;
-    capacity?: { cpu?: string; memory?: string };
-    allocatable?: { pods?: string };
-  };
-};
+    addresses?: Array<{ type?: string; address?: string }>
+    conditions?: Array<{ type?: string; status?: string; lastTransitionTime?: string }>
+    capacity?: { cpu?: string; memory?: string }
+    allocatable?: { pods?: string }
+  }
+}
 
-const NODES_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/nodes`;
+const NODES_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/nodes`
 
 function roleFromLabels(labels?: Record<string, string>): NodeRoleKey {
-  if (!labels) return "unknown";
-  if ("node-role.kubernetes.io/control-plane" in labels || "node-role.kubernetes.io/master" in labels) return "controlPlane";
-  return "worker";
+  if (!labels) return "unknown"
+  if ("node-role.kubernetes.io/control-plane" in labels || "node-role.kubernetes.io/master" in labels) {
+    return "controlPlane"
+  }
+  return "worker"
 }
 
 function statusFromNode(node: RawNode): NodeStatusKey {
-  const ready = node.status?.conditions?.find((c) => c.type === "Ready")?.status === "True";
-  if (!ready) return "offline";
-  return node.spec?.unschedulable ? "unschedulable" : "ready";
+  const ready = node.status?.conditions?.find((c) => c.type === "Ready")?.status === "True"
+  if (!ready) return "offline"
+  return node.spec?.unschedulable ? "unschedulable" : "ready"
+}
+
+function unwrapItems(payload: unknown): RawNode[] {
+  const root = (payload as { data?: unknown; items?: unknown[] } | null) ?? null
+  const container = Array.isArray(root?.items) ? root : ((root?.data ?? payload) as { items?: unknown[] })
+  return Array.isArray(container?.items) ? (container.items as RawNode[]) : []
 }
 
 export async function fetchNodes(): Promise<NodeRowApi[]> {
-  const data = await fetchJsonDeduped<{ items?: RawNode[] }>(NODES_ENDPOINT);
-  const items = Array.isArray(data?.items) ? data.items : [];
+  const payload = await fetchJsonDeduped<unknown>(NODES_ENDPOINT)
+  const items = unwrapItems(payload)
 
   return items.map((item) => {
-    const metadata = item.metadata || {};
-    const status = item.status || {};
-    const ip = status.addresses?.find((a) => a.type === "InternalIP")?.address || "-";
+    const metadata = item.metadata || {}
+    const status = item.status || {}
+    const ip = status.addresses?.find((a) => a.type === "InternalIP")?.address || "-"
 
     return {
       id: metadata.uid || metadata.name || Math.random().toString(36).slice(2),
@@ -57,7 +72,8 @@ export async function fetchNodes(): Promise<NodeRowApi[]> {
       role: roleFromLabels(metadata.labels),
       cpuTotal: parseQuantityCpu(status.capacity?.cpu),
       memoryTotal: parseQuantityMemGi(status.capacity?.memory),
-      podsTotal: Number(status.allocatable?.pods || 0)
-    };
-  });
+      podsTotal: Number(status.allocatable?.pods || 0),
+      updatedAt: resolveUpdatedAt(item),
+    }
+  })
 }

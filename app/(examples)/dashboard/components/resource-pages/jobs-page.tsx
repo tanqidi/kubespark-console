@@ -6,7 +6,7 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge } from "@/app/lib/kubespark/utils"
+import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/registry/new-york-v4/ui/tabs"
@@ -21,17 +21,19 @@ type JobRow = {
   duration: string
   retry: number
   age: string
+  updatedAt: string
   kind: "Job" | "CronJob"
 }
 
 const columns = createColumns<JobRow>({
   columns: [
-    { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
-    { key: "status", label: "状态", render: "status" },
-    { key: "namespace", label: "名称空间" },
-    { key: "duration", label: "时长", align: "right" },
-    { key: "retry", label: "重试", align: "right" },
-    { key: "age", label: "年龄" },
+    { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
+    { key: "status", label: "\u72b6\u6001", render: "status" },
+    { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
+    { key: "duration", label: "\u65f6\u957f", align: "right" },
+    { key: "retry", label: "\u91cd\u8bd5", align: "right" },
+    { key: "age", label: "\u5e74\u9f84" },
+    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
 
@@ -100,6 +102,7 @@ export function JobsPageClient() {
             duration: kind === "CronJob" ? "-" : resolveJobDuration(item),
             retry: Number(status.failed) || 0,
             age: formatAge(metadata.creationTimestamp),
+            updatedAt: resolveUpdatedAt(item),
             kind,
           }
         })
@@ -125,7 +128,7 @@ export function JobsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -156,13 +159,13 @@ export function JobsPageClient() {
       <Input
         value={namespaceQuery}
         onChange={(event) => setNamespaceQuery(event.target.value)}
-        placeholder="名称空间"
+        placeholder={"\u540d\u79f0\u7a7a\u95f4"}
         className="h-9 w-36"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder="名称"
+        placeholder={"\u540d\u79f0"}
         className="h-9 w-40"
       />
     </>

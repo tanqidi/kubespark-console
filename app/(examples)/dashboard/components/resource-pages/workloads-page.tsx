@@ -6,7 +6,7 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge } from "@/app/lib/kubespark/utils"
+import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/registry/new-york-v4/ui/tabs"
@@ -23,19 +23,21 @@ type WorkloadRow = {
   available: number
   ready: number
   age: string
+  updatedAt: string
   kind: "Deployment" | "StatefulSet" | "DaemonSet"
 }
 
 const columns = createColumns<WorkloadRow>({
   columns: [
-    { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
-    { key: "status", label: "状态", render: "status" },
-    { key: "namespace", label: "名称空间" },
-    { key: "desired", label: "期望", align: "right" },
-    { key: "updated", label: "更新", align: "right" },
-    { key: "available", label: "可用", align: "right" },
-    { key: "ready", label: "就绪", align: "right" },
-    { key: "age", label: "年龄" },
+    { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
+    { key: "status", label: "\u72b6\u6001", render: "status" },
+    { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
+    { key: "desired", label: "\u671f\u671b", align: "right" },
+    { key: "updated", label: "\u66f4\u65b0", align: "right" },
+    { key: "available", label: "\u53ef\u7528", align: "right" },
+    { key: "ready", label: "\u5c31\u7eea", align: "right" },
+    { key: "age", label: "\u5e74\u9f84" },
+    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
 
@@ -93,6 +95,7 @@ export function WorkloadsPageClient() {
             available,
             ready,
             age: formatAge(metadata.creationTimestamp),
+            updatedAt: resolveUpdatedAt(item),
             kind: resolvedKind,
           }
         })
@@ -118,7 +121,7 @@ export function WorkloadsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -150,13 +153,13 @@ export function WorkloadsPageClient() {
       <Input
         value={namespaceQuery}
         onChange={(event) => setNamespaceQuery(event.target.value)}
-        placeholder="名称空间"
+        placeholder={"\u540d\u79f0\u7a7a\u95f4"}
         className="h-9 w-36"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder="名称"
+        placeholder={"\u540d\u79f0"}
         className="h-9 w-40"
       />
     </>

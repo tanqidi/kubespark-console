@@ -6,7 +6,7 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge } from "@/app/lib/kubespark/utils"
+import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
@@ -19,15 +19,17 @@ type ConfigMapRow = {
   dataItems: number
   size: string
   age: string
+  updatedAt: string
 }
 
 const columns = createColumns<ConfigMapRow>({
   columns: [
-    { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
-    { key: "namespace", label: "名称空间" },
-    { key: "dataItems", label: "数据项", align: "right" },
-    { key: "size", label: "大小", align: "right" },
-    { key: "age", label: "年龄" },
+    { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
+    { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
+    { key: "dataItems", label: "\u6570\u636e\u9879", align: "right" },
+    { key: "size", label: "\u5927\u5c0f", align: "right" },
+    { key: "age", label: "\u5e74\u9f84" },
+    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
 
@@ -79,6 +81,7 @@ export function ConfigMapsPageClient() {
             dataItems,
             size: formatSize(sizeBytes),
             age: formatAge(metadata.creationTimestamp),
+            updatedAt: resolveUpdatedAt(item),
           }
         })
         setRows(mapped)
@@ -103,7 +106,7 @@ export function ConfigMapsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>加载失败</AlertTitle>
+          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -124,13 +127,13 @@ export function ConfigMapsPageClient() {
       <Input
         value={namespaceQuery}
         onChange={(event) => setNamespaceQuery(event.target.value)}
-        placeholder="名称空间"
+        placeholder={"\u540d\u79f0\u7a7a\u95f4"}
         className="h-9 w-36"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder="名称"
+        placeholder={"\u540d\u79f0"}
         className="h-9 w-40"
       />
     </>

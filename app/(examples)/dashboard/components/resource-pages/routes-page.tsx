@@ -6,7 +6,7 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge } from "@/app/lib/kubespark/utils"
+import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
@@ -20,6 +20,7 @@ type RouteRow = {
   path: string
   service: string
   age: string
+  updatedAt: string
 }
 
 const columns = createColumns<RouteRow>({
@@ -30,6 +31,7 @@ const columns = createColumns<RouteRow>({
     { key: "path", label: "\u8def\u5f84" },
     { key: "service", label: "\u670d\u52a1" },
     { key: "age", label: "\u5e74\u9f84" },
+    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
 
@@ -61,6 +63,7 @@ export function RoutesPageClient() {
           const spec = item?.spec || {}
           const rules: any[] = Array.isArray(spec.rules) ? spec.rules : []
           const baseId = String(metadata.uid ?? `${metadata.name || "ingress"}-${index}`)
+          const updatedAt = resolveUpdatedAt(item)
 
           if (!rules.length) {
             mapped.push({
@@ -71,6 +74,7 @@ export function RoutesPageClient() {
               path: "/",
               service: "-",
               age: formatAge(metadata.creationTimestamp),
+              updatedAt,
             })
             return
           }
@@ -87,6 +91,7 @@ export function RoutesPageClient() {
                 path: "/",
                 service: "-",
                 age: formatAge(metadata.creationTimestamp),
+                updatedAt,
               })
               return
             }
@@ -101,6 +106,7 @@ export function RoutesPageClient() {
                 path: p?.path || "/",
                 service: svcName,
                 age: formatAge(metadata.creationTimestamp),
+                updatedAt,
               })
             })
           })

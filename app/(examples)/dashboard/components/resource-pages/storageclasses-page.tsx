@@ -6,7 +6,7 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge } from "@/app/lib/kubespark/utils"
+import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 
 const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
@@ -19,16 +19,18 @@ type StorageClassRow = {
   volumeBindingMode: string
   allowExpansion: string
   age: string
+  updatedAt: string
 }
 
 const columns = createColumns<StorageClassRow>({
   columns: [
-    { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
+    { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
     { key: "provisioner", label: "Provisioner" },
-    { key: "reclaimPolicy", label: "回收策略" },
-    { key: "volumeBindingMode", label: "绑定模式" },
-    { key: "allowExpansion", label: "允许扩容" },
-    { key: "age", label: "年龄" },
+    { key: "reclaimPolicy", label: "\u56de\u6536\u7b56\u7565" },
+    { key: "volumeBindingMode", label: "\u7ed1\u5b9a\u6a21\u5f0f" },
+    { key: "allowExpansion", label: "\u5141\u8bb8\u6269\u5bb9" },
+    { key: "age", label: "\u5e74\u9f84" },
+    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
 
@@ -66,6 +68,7 @@ export function StorageClassesPageClient() {
             volumeBindingMode: item?.volumeBindingMode || "-",
             allowExpansion: formatAllowExpansion(item?.allowVolumeExpansion),
             age: formatAge(metadata.creationTimestamp),
+            updatedAt: resolveUpdatedAt(item),
           }
         })
         setRows(mapped)
@@ -85,7 +88,16 @@ export function StorageClassesPageClient() {
     }
   }, [])
   // if (loading) return <ResourceLoadingState /> // kept for potential future use
-  if (error) return <div className="px-4 lg:px-6"><Alert variant="destructive"><AlertTitle>加载失败</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>
+  if (error) {
+    return (
+      <div className="px-4 lg:px-6">
+        <Alert variant="destructive">
+          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
 
   return <DataTable data={rows} columns={columns} />
 }

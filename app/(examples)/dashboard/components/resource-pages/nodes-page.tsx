@@ -22,13 +22,14 @@ type NodeRow = {
   pods: string
   allocatedCpu: string
   allocatedMemory: string
+  updatedAt: string
 }
 
 const columns = createColumns<NodeRow>({
   columns: [
     {
       key: "name",
-      label: "名称/IP",
+      label: "\u540d\u79f0/IP",
       cellClassName: "font-medium",
       enableHiding: false,
       cell: (_, row) => (
@@ -38,13 +39,14 @@ const columns = createColumns<NodeRow>({
         </div>
       ),
     },
-    { key: "status", label: "状态", render: "status" },
-    { key: "role", label: "角色" },
-    { key: "cpuUsage", label: "CPU 使用率", align: "right" },
-    { key: "memoryUsage", label: "内存使用率", align: "right" },
+    { key: "status", label: "\u72b6\u6001", render: "status" },
+    { key: "role", label: "\u89d2\u8272" },
+    { key: "cpuUsage", label: "CPU \u4f7f\u7528\u7387", align: "right" },
+    { key: "memoryUsage", label: "\u5185\u5b58\u4f7f\u7528\u7387", align: "right" },
     { key: "pods", label: "Pods", align: "right" },
-    { key: "allocatedCpu", label: "已分配CPU", align: "right" },
-    { key: "allocatedMemory", label: "已分配内存", align: "right" },
+    { key: "allocatedCpu", label: "\u5df2\u5206\u914d CPU", align: "right" },
+    { key: "allocatedMemory", label: "\u5df2\u5206\u914d\u5185\u5b58", align: "right" },
+    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
 
@@ -54,15 +56,15 @@ function unwrapItems(payload: any): any[] {
 }
 
 function statusLabel(status: NodeRowApi["status"]): string {
-  if (status === "ready") return "就绪"
-  if (status === "unschedulable") return "不可调度"
-  return "离线"
+  if (status === "ready") return "\u5c31\u7eea"
+  if (status === "unschedulable") return "\u4e0d\u53ef\u8c03\u5ea6"
+  return "\u79bb\u7ebf"
 }
 
 function roleLabel(role: NodeRowApi["role"]): string {
-  if (role === "controlPlane") return "控制平面"
-  if (role === "worker") return "工作节点"
-  return "未知"
+  if (role === "controlPlane") return "\u63a7\u5236\u5e73\u9762"
+  if (role === "worker") return "\u5de5\u4f5c\u8282\u70b9"
+  return "\u672a\u77e5"
 }
 
 function formatCpuUsage(used: number, total: number): string {
@@ -121,6 +123,7 @@ export function NodesPageClient() {
             pods: node.podsTotal ? `${usedPods}/${node.podsTotal}` : `${usedPods}/-`,
             allocatedCpu: formatAllocated(0, node.cpuTotal, "cores"),
             allocatedMemory: formatAllocated(0, node.memoryTotal, "GiB"),
+            updatedAt: node.updatedAt,
           }
         })
 
@@ -141,7 +144,16 @@ export function NodesPageClient() {
     }
   }, [])
   // if (loading) return <ResourceLoadingState /> // kept for potential future use
-  if (error) return <div className="px-4 lg:px-6"><Alert variant="destructive"><AlertTitle>加载失败</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>
+  if (error) {
+    return (
+      <div className="px-4 lg:px-6">
+        <Alert variant="destructive">
+          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
 
   return <DataTable data={rows} columns={columns} />
 }

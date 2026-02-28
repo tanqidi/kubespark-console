@@ -6,7 +6,7 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge, formatDateTime } from "@/app/lib/kubespark/utils"
+import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
@@ -74,7 +74,7 @@ export function PodsPageClient() {
             node: String(spec.nodeName ?? status.hostIP ?? "-"),
             ip: String(status.podIP ?? "-"),
             age: formatAge(metadata.creationTimestamp),
-            updatedAt: formatDateTime(status.startTime ?? metadata.creationTimestamp),
+            updatedAt: resolveUpdatedAt(item),
           }
         })
         setRows(mapped)

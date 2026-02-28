@@ -23,6 +23,55 @@ export function formatDateTime(ts?: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+export function resolveUpdatedAt(resource: any): string {
+  const metadata = resource?.metadata || {};
+  const status = resource?.status || {};
+  const candidates: string[] = [];
+
+  const push = (value: unknown) => {
+    if (typeof value === "string" && value.length > 0) candidates.push(value);
+  };
+
+  push(metadata.creationTimestamp);
+
+  if (Array.isArray(metadata.managedFields)) {
+    metadata.managedFields.forEach((field: any) => push(field?.time));
+  }
+
+  if (Array.isArray(status.conditions)) {
+    status.conditions.forEach((condition: any) => {
+      push(condition?.lastTransitionTime);
+      push(condition?.lastUpdateTime);
+      push(condition?.lastHeartbeatTime);
+      push(condition?.lastProbeTime);
+    });
+  }
+
+  push(status.startTime);
+  push(status.completionTime);
+  push(status.lastScheduleTime);
+
+  if (Array.isArray(status.containerStatuses)) {
+    status.containerStatuses.forEach((container: any) => {
+      push(container?.state?.running?.startedAt);
+      push(container?.state?.terminated?.finishedAt);
+      push(container?.lastState?.terminated?.finishedAt);
+    });
+  }
+
+  let latest: string | undefined;
+  let latestMs = Number.NEGATIVE_INFINITY;
+  candidates.forEach((ts) => {
+    const ms = Date.parse(ts);
+    if (!Number.isNaN(ms) && ms > latestMs) {
+      latestMs = ms;
+      latest = ts;
+    }
+  });
+
+  return latest ? formatDateTime(latest) : "-";
+}
+
 export function parseQuantityCpu(q?: string): number {
   if (!q) return 0;
   if (q.endsWith("m")) return Number(q.replace("m", "")) / 1000;

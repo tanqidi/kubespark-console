@@ -5,35 +5,22 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
-import { fetchNamespaces } from "@/app/lib/kubespark/projects"
+import { fetchNamespaces, type NamespaceRow } from "@/app/lib/kubespark/projects"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 
-const columns = createColumns<{
-  id: string
-  name: string
-  status: string
-  labels: number
-  annotations: number
-  age: string
-}>({
+const columns = createColumns<NamespaceRow>({
   columns: [
-    { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
-    { key: "status", label: "状态", render: "status" },
-    { key: "labels", label: "标签", align: "right" },
-    { key: "annotations", label: "注解", align: "right" },
-    { key: "age", label: "年龄" },
+    { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
+    { key: "status", label: "\u72b6\u6001", render: "status" },
+    { key: "labels", label: "\u6807\u7b7e", align: "right" },
+    { key: "annotations", label: "\u6ce8\u89e3", align: "right" },
+    { key: "age", label: "\u5e74\u9f84" },
+    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
 
 export function ProjectsPageClient() {
-  const [rows, setRows] = React.useState<{
-    id: string
-    name: string
-    status: string
-    labels: number
-    annotations: number
-    age: string
-  }[]>([])
+  const [rows, setRows] = React.useState<NamespaceRow[]>([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -61,7 +48,16 @@ export function ProjectsPageClient() {
     }
   }, [])
   // if (loading) return <ResourceLoadingState /> // kept for potential future use
-  if (error) return <div className="px-4 lg:px-6"><Alert variant="destructive"><AlertTitle>加载失败</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>
+  if (error) {
+    return (
+      <div className="px-4 lg:px-6">
+        <Alert variant="destructive">
+          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
 
   return <DataTable data={rows} columns={columns} />
 }

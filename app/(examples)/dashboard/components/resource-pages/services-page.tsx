@@ -6,7 +6,7 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge } from "@/app/lib/kubespark/utils"
+import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
@@ -20,6 +20,7 @@ type ServiceRow = {
   clusterIp: string
   ports: string
   age: string
+  updatedAt: string
 }
 
 const columns = createColumns<ServiceRow>({
@@ -30,6 +31,7 @@ const columns = createColumns<ServiceRow>({
     { key: "clusterIp", label: "Cluster IP" },
     { key: "ports", label: "\u7aef\u53e3" },
     { key: "age", label: "\u5e74\u9f84" },
+    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
 
@@ -69,6 +71,7 @@ export function ServicesPageClient() {
             clusterIp: String(spec.clusterIP ?? "-"),
             ports,
             age: formatAge(metadata.creationTimestamp),
+            updatedAt: resolveUpdatedAt(item),
           }
         })
         setRows(mapped)
