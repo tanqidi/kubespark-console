@@ -1,5 +1,1 @@
-import { ConsoleShell } from "@/components/console/console-shell";
-
-export default function ClusterSlugPage() {
-  return <ConsoleShell />;
-}
+export { default } from "@/app/clusters/page";
