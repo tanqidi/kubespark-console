@@ -126,8 +126,8 @@ export function ConsoleShell() {
 
   return (
     <div className="min-h-screen bg-zinc-100 text-zinc-900">
-      <div className="mx-auto grid max-w-[1600px] grid-cols-1 lg:grid-cols-[260px_1fr]">
-        <aside className="border-r border-zinc-200 bg-zinc-100 p-4 lg:sticky lg:top-0 lg:h-screen">
+      <div className="grid w-full grid-cols-1 lg:grid-cols-[280px_1fr]">
+        <aside className="border-r border-zinc-200 bg-zinc-100 p-5 lg:sticky lg:top-0 lg:h-screen">
           <div className="mb-6 flex items-center gap-2 px-2">
             <div className="h-3 w-3 rounded-full border border-zinc-900" />
             <div className="font-semibold">KubeSpark Inc.</div>
@@ -161,7 +161,7 @@ export function ConsoleShell() {
           <div className="mt-8 border-t border-zinc-200 pt-4 text-xs text-zinc-500">黑白主题 · new-york-v4 风格</div>
         </aside>
 
-        <main className="p-4 md:p-6">
+        <main className="p-4 md:p-5">
           <div className="mb-4 flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
             <div className="flex items-center gap-3">
               <PanelLeft className="h-4 w-4 text-zinc-500" />
@@ -194,23 +194,6 @@ export function ConsoleShell() {
               </Card>
             ))}
           </section>
-
-          <Card className="mb-4 border-zinc-200 bg-zinc-50 shadow-none">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Cluster Activity</CardTitle>
-                <CardDescription>{moduleConfig.subtitle}</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" className="bg-zinc-200 text-zinc-900">Last 3 months</Button>
-                <Button variant="ghost" size="sm" className="text-zinc-700">Last 30 days</Button>
-                <Button variant="ghost" size="sm" className="text-zinc-700">Last 7 days</Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-44 rounded-xl border border-zinc-200 bg-gradient-to-b from-zinc-200 via-zinc-100 to-zinc-50" />
-            </CardContent>
-          </Card>
 
           <section className="grid gap-4 xl:grid-cols-[2fr_1fr]">
             <Card className="border-zinc-200 bg-zinc-50 shadow-none">
