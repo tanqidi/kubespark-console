@@ -3,18 +3,14 @@
 import * as React from "react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
 
-export type Row = {
-  id: number
-  header: string
-  type: string
-  status: string
-  target: string
-  limit: string
-  reviewer: string
+export type DynamicRow = {
+  id: string | number
+  [key: string]: string | number
 }
 
 export function unwrapItems(payload: any): any[] {
@@ -24,21 +20,14 @@ export function unwrapItems(payload: any): any[] {
 
 export function ResourcePage({
   endpoints,
+  columns,
   map,
-  headers,
 }: {
   endpoints: string[]
-  map: (items: any[]) => Row[]
-  headers: Partial<{
-    header: string
-    type: string
-    status: string
-    target: string
-    limit: string
-    reviewer: string
-  }>
+  columns: Array<{ key: string; label: string }>
+  map: (items: any[]) => DynamicRow[]
 }) {
-  const [rows, setRows] = React.useState<Row[]>([])
+  const [rows, setRows] = React.useState<DynamicRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -88,7 +77,30 @@ export function ResourcePage({
     )
   }
 
-  return <DataTable data={rows} columnHeaders={headers} />
+  const [c1, c2, c3, c4, c5, c6] = columns
+  const tableRows = rows.map((row, idx) => ({
+    id: idx + 1,
+    header: String(c1 ? row[c1.key] ?? "-" : "-"),
+    type: String(c2 ? row[c2.key] ?? "-" : "-"),
+    status: String(c3 ? row[c3.key] ?? "-" : "-"),
+    target: String(c4 ? row[c4.key] ?? "-" : "-"),
+    limit: String(c5 ? row[c5.key] ?? "-" : "-"),
+    reviewer: String(c6 ? row[c6.key] ?? "-" : "-"),
+  }))
+
+  return (
+    <DataTable
+      data={tableRows}
+      columns={createColumns({
+        header: c1?.label ?? "Header",
+        type: c2?.label ?? "Type",
+        status: c3?.label ?? "Status",
+        target: c4?.label ?? "Target",
+        limit: c5?.label ?? "Limit",
+        reviewer: c6?.label ?? "Reviewer",
+      })}
+    />
+  )
 }
 
 export const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"

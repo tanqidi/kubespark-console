@@ -1,5 +1,8 @@
+"use client"
+
 import { ChartAreaInteractive } from "@/app/(examples)/dashboard/components/chart-area-interactive"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { SectionCards } from "@/app/(examples)/dashboard/components/section-cards"
 import data from "@/app/(examples)/dashboard/data.json"
 
@@ -11,7 +14,7 @@ export default function Page() {
         <div className="px-4 lg:px-6">
           <ChartAreaInteractive />
         </div>
-        <DataTable data={data} />
+        <DataTable data={data} columns={createColumns({ header: "Header", type: "Section Type", status: "Status", target: "Target", limit: "Limit", reviewer: "Reviewer" })} />
       </div>
     </div>
   )
