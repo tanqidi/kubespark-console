@@ -28,11 +28,11 @@ body {
 
 .theme-default,
 .theme-default-scaled {
-  --primary: var(--color-neutral-600);
+  --primary: var(--color-neutral-950);
   --primary-foreground: var(--color-neutral-50);
 
   @variant dark {
-    --primary: var(--color-neutral-500);
+    --primary: var(--color-neutral-950);
     --primary-foreground: var(--color-neutral-50);
   }
 }
