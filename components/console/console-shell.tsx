@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Bell, Search } from "lucide-react";
-import { menuItems, moduleConfigs, overviewKpis } from "@/components/console/data";
+import { menuItems, moduleConfigs, overviewKpis, type RowData } from "@/components/console/data";
+import { fetchNamespaces } from "@/app/lib/kubespark/projects";
+import { fetchNodes } from "@/app/lib/kubespark/nodes";
+import { fetchPods } from "@/app/lib/kubespark/pods";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,20 +17,31 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 const statusVariantMap: Record<string, "default" | "secondary" | "outline"> = {
   Running: "default",
+  running: "default",
   Ready: "default",
+  ready: "default",
   Active: "default",
   Enabled: "default",
+  pending: "secondary",
   Pending: "secondary",
   Unschedulable: "secondary",
+  unschedulable: "secondary",
   Terminating: "secondary",
   Draft: "secondary",
   Failed: "outline",
-  Succeeded: "outline"
+  failed: "outline",
+  Succeeded: "outline",
+  succeeded: "outline",
+  offline: "outline",
+  Unknown: "outline"
 };
 
 export function ConsoleShell() {
   const pathname = usePathname();
   const [search, setSearch] = useState("");
+  const [rows, setRows] = useState<RowData[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const activePath = useMemo(() => {
     if (pathname === "/clusters") return "/overview";
@@ -37,11 +51,78 @@ export function ConsoleShell() {
   const currentTitle = menuItems.find((x) => x.path === activePath)?.title || "模块";
   const moduleConfig = moduleConfigs[activePath] || moduleConfigs["/overview"];
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setError(null);
+
+      if (!["/projects", "/nodes", "/pods"].includes(activePath)) {
+        setRows(moduleConfig.rows);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        if (activePath === "/projects") {
+          const data = await fetchNamespaces();
+          if (cancelled) return;
+          setRows(
+            data.map((x) => ({
+              name: x.name,
+              status: x.status,
+              labels: String(x.labels),
+              annotations: String(x.annotations),
+              age: x.age
+            }))
+          );
+        } else if (activePath === "/nodes") {
+          const data = await fetchNodes();
+          if (cancelled) return;
+          setRows(
+            data.map((x) => ({
+              name: x.name,
+              status: x.status,
+              role: x.role,
+              ip: x.ip,
+              cpu: `${x.cpuTotal.toFixed(1)} cores`,
+              memory: `${x.memoryTotal.toFixed(1)} GiB`
+            }))
+          );
+        } else if (activePath === "/pods") {
+          const data = await fetchPods();
+          if (cancelled) return;
+          setRows(
+            data.map((x) => ({
+              name: x.name,
+              namespace: x.namespace,
+              status: x.status,
+              node: x.node,
+              age: x.age
+            }))
+          );
+        }
+      } catch (e: unknown) {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "加载失败");
+        setRows([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [activePath, moduleConfig.rows]);
+
   const filteredRows = useMemo(() => {
-    if (!search.trim()) return moduleConfig.rows;
+    const currentRows = rows || [];
+    if (!search.trim()) return currentRows;
     const q = search.toLowerCase();
-    return moduleConfig.rows.filter((row) => Object.values(row).some((v) => v.toLowerCase().includes(q)));
-  }, [moduleConfig.rows, search]);
+    return currentRows.filter((row) => Object.values(row).some((v) => v.toLowerCase().includes(q)));
+  }, [rows, search]);
 
   return (
     <div className="min-h-screen bg-muted/30 text-foreground">
@@ -106,34 +187,40 @@ export function ConsoleShell() {
             <Card>
               <CardHeader>
                 <CardTitle>{currentTitle}列表</CardTitle>
-                <CardDescription>已按模块切换列结构，方便继续接入真实 API 数据。</CardDescription>
+                <CardDescription>projects / nodes / pods 已接入真实 API，其他模块保留重构骨架。</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {moduleConfig.columns.map((col) => (
-                        <TableHead key={col.key}>{col.label}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRows.map((row, idx) => (
-                      <TableRow key={`${row[moduleConfig.columns[0].key]}-${idx}`}>
-                        {moduleConfig.columns.map((col, colIndex) => {
-                          const value = row[col.key] ?? "-";
-                          const isStatus = col.key === "status";
-                          const variant = statusVariantMap[value] || "outline";
-                          return (
-                            <TableCell key={col.key} className={colIndex === 0 ? "font-medium" : ""}>
-                              {isStatus ? <Badge variant={variant}>{value}</Badge> : value}
-                            </TableCell>
-                          );
-                        })}
+                {loading && <div className="py-6 text-sm text-muted-foreground">加载中...</div>}
+                {error && <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+                {!loading && filteredRows.length === 0 ? (
+                  <div className="py-6 text-sm text-muted-foreground">暂无数据</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {moduleConfig.columns.map((col) => (
+                          <TableHead key={col.key}>{col.label}</TableHead>
+                        ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredRows.map((row, idx) => (
+                        <TableRow key={`${row[moduleConfig.columns[0].key] || "row"}-${idx}`}>
+                          {moduleConfig.columns.map((col, colIndex) => {
+                            const value = row[col.key] ?? "-";
+                            const isStatus = col.key === "status";
+                            const variant = statusVariantMap[value] || "outline";
+                            return (
+                              <TableCell key={col.key} className={colIndex === 0 ? "font-medium" : ""}>
+                                {isStatus ? <Badge variant={variant}>{value}</Badge> : value}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
 

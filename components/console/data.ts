@@ -1,14 +1,4 @@
-import {
-  LayoutDashboard,
-  Boxes,
-  Bot,
-  Container,
-  Network,
-  KeyRound,
-  HardDrive,
-  Settings,
-  type LucideIcon
-} from "lucide-react";
+import { LayoutDashboard, Boxes, Bot, Container, Network, KeyRound, HardDrive, Settings, type LucideIcon } from "lucide-react";
 
 export type MenuItem = { path: string; title: string; icon: LucideIcon };
 export type RowData = Record<string, string>;
@@ -31,15 +21,7 @@ export const overviewKpis = [
   { label: "CPU 使用率", value: "62%", hint: "峰值 81%" }
 ];
 
-export const moduleConfigs: Record<
-  string,
-  {
-    subtitle: string;
-    columns: { key: string; label: string }[];
-    rows: RowData[];
-    actions: string[];
-  }
-> = {
+export const moduleConfigs: Record<string, { subtitle: string; columns: { key: string; label: string }[]; rows: RowData[]; actions: string[] }> = {
   "/overview": {
     subtitle: "集群运行概况与近期波动。",
     columns: [
@@ -61,15 +43,11 @@ export const moduleConfigs: Record<
     columns: [
       { key: "name", label: "项目" },
       { key: "status", label: "状态" },
-      { key: "owner", label: "负责人" },
+      { key: "labels", label: "标签数" },
+      { key: "annotations", label: "注解数" },
       { key: "age", label: "创建时长" }
     ],
-    rows: [
-      { name: "production", status: "Active", owner: "platform", age: "210d" },
-      { name: "staging", status: "Active", owner: "release", age: "128d" },
-      { name: "devops", status: "Active", owner: "ops", age: "342d" },
-      { name: "sandbox", status: "Terminating", owner: "qa", age: "5d" }
-    ],
+    rows: [],
     actions: ["新建项目", "设置配额", "查看资源配比"]
   },
   "/nodes": {
@@ -77,15 +55,12 @@ export const moduleConfigs: Record<
     columns: [
       { key: "name", label: "节点" },
       { key: "status", label: "状态" },
-      { key: "cpu", label: "CPU" },
-      { key: "memory", label: "内存" }
+      { key: "role", label: "角色" },
+      { key: "ip", label: "IP" },
+      { key: "cpu", label: "CPU 总量" },
+      { key: "memory", label: "内存总量" }
     ],
-    rows: [
-      { name: "node-1", status: "Ready", cpu: "58%", memory: "64%" },
-      { name: "node-2", status: "Ready", cpu: "49%", memory: "52%" },
-      { name: "node-3", status: "Unschedulable", cpu: "5%", memory: "18%" },
-      { name: "node-4", status: "Ready", cpu: "76%", memory: "71%" }
-    ],
+    rows: [],
     actions: ["节点详情", "污点管理", "查看监控"]
   },
   "/pods": {
@@ -94,14 +69,10 @@ export const moduleConfigs: Record<
       { key: "name", label: "Pod" },
       { key: "namespace", label: "命名空间" },
       { key: "status", label: "状态" },
-      { key: "node", label: "节点" }
+      { key: "node", label: "节点" },
+      { key: "age", label: "运行时长" }
     ],
-    rows: [
-      { name: "api-87cdd9fbc-gv5lz", namespace: "production", status: "Running", node: "node-1" },
-      { name: "worker-6f7788d68b-k2q9h", namespace: "ops", status: "Running", node: "node-4" },
-      { name: "jobs-clean-29123", namespace: "dev", status: "Succeeded", node: "node-2" },
-      { name: "migration-temp", namespace: "staging", status: "Pending", node: "-" }
-    ],
+    rows: [],
     actions: ["重启 Pod", "查看日志", "删除异常 Pod"]
   },
   "/services": {
