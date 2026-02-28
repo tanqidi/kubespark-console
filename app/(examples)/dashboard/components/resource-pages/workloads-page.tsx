@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 
@@ -11,13 +11,44 @@ import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
 
 const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
 
+type WorkloadRow = {
+  id: string
+  name: string
+  status: string
+  namespace: string
+  desired: number
+  updated: number
+  available: number
+  ready: number
+  age: string
+}
+
+const columns = createColumns<WorkloadRow>({
+  columns: [
+    { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
+    { key: "status", label: "状态", render: "status" },
+    { key: "namespace", label: "名称空间" },
+    { key: "desired", label: "期望", align: "right" },
+    { key: "updated", label: "更新", align: "right" },
+    { key: "available", label: "可用", align: "right" },
+    { key: "ready", label: "就绪", align: "right" },
+    { key: "age", label: "年龄" },
+  ],
+})
+
 function unwrapItems(payload: any): any[] {
   const data = payload?.data ?? payload
   return Array.isArray(data?.items) ? data.items : []
 }
 
+function resolveWorkloadStatus(desired: number, updated: number, available: number, ready: number): string {
+  if (ready >= Math.max(1, desired) || available >= desired) return "Normal"
+  if (ready > 0 || updated > 0) return "Updating"
+  return "Abnormal"
+}
+
 export function WorkloadsPageClient() {
-  const [rows, setRows] = React.useState<any[]>([])
+  const [rows, setRows] = React.useState<WorkloadRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -35,18 +66,22 @@ export function WorkloadsPageClient() {
         if (cancelled) return
         const items = results.flatMap((json) => unwrapItems(json))
         const mapped = items.slice(0, 300).map((item, index) => {
+          const metadata = item?.metadata || {}
           const desired = item?.spec?.replicas ?? item?.status?.desiredNumberScheduled ?? 0
           const updated = item?.status?.updatedReplicas ?? item?.status?.updatedNumberScheduled ?? 0
           const available = item?.status?.availableReplicas ?? item?.status?.numberAvailable ?? 0
           const ready = item?.status?.readyReplicas ?? item?.status?.numberReady ?? 0
+          const name = metadata.name || "-"
           return {
-            id: index + 1,
-            header: item?.metadata?.name ?? "-",
-            type: item?.kind ?? "Workload",
-            status: ready >= Math.max(1, desired) ? "Done" : "In Process",
-            target: String(item?.metadata?.namespace ?? "default"),
-            limit: `${ready}/${desired} (u:${updated}, a:${available})`,
-            reviewer: formatAge(item?.metadata?.creationTimestamp),
+            id: String(metadata.uid ?? `${name}-${index}`),
+            name,
+            status: resolveWorkloadStatus(desired, updated, available, ready),
+            namespace: String(metadata.namespace ?? "default"),
+            desired,
+            updated,
+            available,
+            ready,
+            age: formatAge(metadata.creationTimestamp),
           }
         })
         setRows(mapped)
@@ -86,5 +121,5 @@ export function WorkloadsPageClient() {
     )
   }
 
-  return <DataTable data={rows} columns={createColumns({ header: "名称", type: "类型", status: "状态", target: "名称空间", limit: "值", reviewer: "补充信息" })} />
+  return <DataTable data={rows} columns={columns} />
 }

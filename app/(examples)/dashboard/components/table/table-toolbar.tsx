@@ -66,6 +66,7 @@ export function TableToolbar({ table }: { table: any }) {
                   column.getCanHide()
               )
               .map((column: any) => {
+                const label = column.columnDef?.meta?.label ?? column.id
                 return (
                   <DropdownMenuCheckboxItem
                     key={column.id}
@@ -73,7 +74,7 @@ export function TableToolbar({ table }: { table: any }) {
                     checked={column.getIsVisible()}
                     onCheckedChange={(value) => column.toggleVisibility(!!value)}
                   >
-                    {column.id}
+                    {label}
                   </DropdownMenuCheckboxItem>
                 )
               })}

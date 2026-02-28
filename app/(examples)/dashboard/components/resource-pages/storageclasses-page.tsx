@@ -11,23 +11,23 @@ import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
 
 const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
 
-type ServiceRow = {
+type StorageClassRow = {
   id: string
   name: string
-  type: string
-  namespace: string
-  clusterIp: string
-  ports: string
+  provisioner: string
+  reclaimPolicy: string
+  volumeBindingMode: string
+  allowExpansion: string
   age: string
 }
 
-const columns = createColumns<ServiceRow>({
+const columns = createColumns<StorageClassRow>({
   columns: [
     { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
-    { key: "type", label: "类型", render: "badge" },
-    { key: "namespace", label: "名称空间" },
-    { key: "clusterIp", label: "Cluster IP" },
-    { key: "ports", label: "端口" },
+    { key: "provisioner", label: "Provisioner" },
+    { key: "reclaimPolicy", label: "回收策略" },
+    { key: "volumeBindingMode", label: "绑定模式" },
+    { key: "allowExpansion", label: "允许扩容" },
     { key: "age", label: "年龄" },
   ],
 })
@@ -37,8 +37,13 @@ function unwrapItems(payload: any): any[] {
   return Array.isArray(data?.items) ? data.items : []
 }
 
-export function ServicesPageClient() {
-  const [rows, setRows] = React.useState<ServiceRow[]>([])
+function formatAllowExpansion(value: unknown): string {
+  if (typeof value !== "boolean") return "-"
+  return value ? "Yes" : "No"
+}
+
+export function StorageClassesPageClient() {
+  const [rows, setRows] = React.useState<StorageClassRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -47,24 +52,19 @@ export function ServicesPageClient() {
     setLoading(true)
     setError(null)
 
-    fetchJsonDeduped<any>(`${BASE}/services`)
+    fetchJsonDeduped<any>(`${BASE}/storageclasses`)
       .then((json) => {
         if (cancelled) return
         const items = unwrapItems(json)
         const mapped = items.slice(0, 300).map((item, index) => {
           const metadata = item?.metadata || {}
-          const spec = item?.spec || {}
-          const name = metadata.name || "-"
-          const ports = Array.isArray(spec.ports)
-            ? spec.ports.map((p: any) => `${p?.port}/${p?.protocol ?? "TCP"}`).join(",")
-            : "-"
           return {
-            id: String(metadata.uid ?? `${name}-${index}`),
-            name,
-            type: spec.type || "-",
-            namespace: String(metadata.namespace ?? "default"),
-            clusterIp: String(spec.clusterIP ?? "-"),
-            ports,
+            id: String(metadata.uid ?? `${metadata.name || "storageclass"}-${index}`),
+            name: metadata.name || "-",
+            provisioner: item?.provisioner || "-",
+            reclaimPolicy: item?.reclaimPolicy || "-",
+            volumeBindingMode: item?.volumeBindingMode || "-",
+            allowExpansion: formatAllowExpansion(item?.allowVolumeExpansion),
             age: formatAge(metadata.creationTimestamp),
           }
         })

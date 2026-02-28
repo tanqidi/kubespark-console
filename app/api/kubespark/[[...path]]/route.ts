@@ -2,7 +2,7 @@
 
 // Default upstream used when KUBESPARK_API_BASE is not provided.
 // If you see 502, check the returned JSON for `upstreamUrl` and ensure it is reachable.
-const DEFAULT_UPSTREAM = "http://172.31.0.88:8080";
+const DEFAULT_UPSTREAM = "http://172.31.0.99:8080";
 const upstreamBase = process.env.KUBESPARK_API_BASE || DEFAULT_UPSTREAM;
 
 function buildUpstreamUrl(req: NextRequest, pathSegments?: string[]) {

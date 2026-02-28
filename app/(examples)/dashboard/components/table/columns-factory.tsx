@@ -1,11 +1,16 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
-import { IconCircleCheckFilled, IconDotsVertical, IconGripVertical, IconLoader } from "@tabler/icons-react"
+import {
+  IconCircleCheckFilled,
+  IconDotsVertical,
+  IconGripVertical,
+  IconLoader,
+} from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
 import { type ColumnDef } from "@tanstack/react-table"
-import { z } from "zod"
 
+import { cn } from "@/lib/utils"
 import { Badge } from "@/registry/new-york-v4/ui/badge"
 import { Button } from "@/registry/new-york-v4/ui/button"
 import { Checkbox } from "@/registry/new-york-v4/ui/checkbox"
@@ -19,48 +24,141 @@ import {
 import { Input } from "@/registry/new-york-v4/ui/input"
 import { Label } from "@/registry/new-york-v4/ui/label"
 
-const schema = z.object({
-  id: z.number(),
-  header: z.string(),
-  type: z.string(),
-  status: z.string(),
-  target: z.string(),
-  limit: z.string(),
-  reviewer: z.string(),
-})
+type ColumnRender = "text" | "badge" | "status" | "input"
 
-type Row = z.infer<typeof schema>
+export type ColumnConfig<TData> = {
+  key: keyof TData & string
+  label: React.ReactNode
+  header?: React.ReactNode
+  align?: "left" | "center" | "right"
+  enableHiding?: boolean
+  enableSorting?: boolean
+  render?: ColumnRender
+  cell?: (value: unknown, row: TData) => React.ReactNode
+  headerClassName?: string
+  cellClassName?: string
+}
 
-function DragHandle({ id }: { id: number }) {
+type CreateColumnsOptions<TData> = {
+  columns: ColumnConfig<TData>[]
+  includeDrag?: boolean
+  includeSelect?: boolean
+  includeActions?: boolean
+}
+
+function DragHandle({ id }: { id: string }) {
   const { attributes, listeners } = useSortable({ id })
   return (
-    <Button {...attributes} {...listeners} variant="ghost" size="icon" className="text-muted-foreground size-7 hover:bg-transparent">
+    <Button
+      {...attributes}
+      {...listeners}
+      variant="ghost"
+      size="icon"
+      className="text-muted-foreground size-7 hover:bg-transparent"
+    >
       <IconGripVertical className="text-muted-foreground size-3" />
       <span className="sr-only">Drag to reorder</span>
     </Button>
   )
 }
 
-export function createColumns(labels: {
-  header: string
-  type: string
-  status: string
-  target: string
-  limit: string
-  reviewer: string
-}): ColumnDef<Row>[] {
-  return [
-    {
+function renderCell<TData>(
+  col: ColumnConfig<TData>,
+  value: unknown,
+  row: TData,
+  rowId: string
+) {
+  if (col.cell) return col.cell(value, row)
+
+  if (col.render === "badge") {
+    return (
+      <Badge
+        variant="outline"
+        className={cn("text-muted-foreground px-1.5", col.cellClassName)}
+      >
+        {String(value ?? "-")}
+      </Badge>
+    )
+  }
+
+  if (col.render === "status") {
+    const text = String(value ?? "-")
+    const lowered = text.toLowerCase()
+    const isDone =
+      lowered === "done" ||
+      lowered === "running" ||
+      lowered === "succeeded" ||
+      lowered === "success" ||
+      lowered === "normal" ||
+      lowered === "ready"
+    return (
+      <Badge
+        variant="outline"
+        className={cn("text-muted-foreground px-1.5", col.cellClassName)}
+      >
+        {isDone ? (
+          <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
+        ) : (
+          <IconLoader />
+        )}
+        {text}
+      </Badge>
+    )
+  }
+
+  if (col.render === "input") {
+    const inputId = `${rowId}-${col.key}`
+    return (
+      <>
+        <Label htmlFor={inputId} className="sr-only">
+          {typeof col.label === "string" ? col.label : col.key}
+        </Label>
+        <Input
+          className={cn(
+            "h-8 w-28 border-transparent bg-transparent",
+            col.cellClassName
+          )}
+          defaultValue={String(value ?? "")}
+          id={inputId}
+        />
+      </>
+    )
+  }
+
+  return (
+    <span className={cn(col.cellClassName)}>
+      {String(value ?? "-")}
+    </span>
+  )
+}
+
+export function createColumns<TData extends Record<string, unknown>>(
+  options: CreateColumnsOptions<TData>
+): ColumnDef<TData>[] {
+  const { columns, includeDrag = true, includeSelect = true, includeActions = true } = options
+
+  const defs: ColumnDef<TData>[] = []
+
+  if (includeDrag) {
+    defs.push({
       id: "drag",
       header: () => null,
-      cell: ({ row }) => <DragHandle id={row.original.id} />,
-    },
-    {
+      cell: ({ row }) => <DragHandle id={row.id} />,
+      enableSorting: false,
+      enableHiding: false,
+    })
+  }
+
+  if (includeSelect) {
+    defs.push({
       id: "select",
       header: ({ table }) => (
         <div className="flex items-center justify-center">
           <Checkbox
-            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
             onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
             aria-label="Select all"
           />
@@ -77,62 +175,43 @@ export function createColumns(labels: {
       ),
       enableSorting: false,
       enableHiding: false,
-    },
-    {
-      accessorKey: "header",
-      header: labels.header,
-      cell: ({ row }) => <span className="font-medium">{row.original.header}</span>,
-      enableHiding: false,
-    },
-    {
-      accessorKey: "type",
-      header: labels.type,
-      cell: ({ row }) => (
-        <div className="w-32">
-          <Badge variant="outline" className="text-muted-foreground px-1.5">{row.original.type}</Badge>
-        </div>
-      ),
-    },
-    {
-      accessorKey: "status",
-      header: labels.status,
-      cell: ({ row }) => (
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {row.original.status === "Done" ? <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" /> : <IconLoader />}
-          {row.original.status}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: "target",
-      header: () => <div className="w-full text-right">{labels.target}</div>,
-      cell: ({ row }) => (
-        <>
-          <Label htmlFor={`${row.original.id}-target`} className="sr-only">Target</Label>
-          <Input className="h-8 w-28 border-transparent bg-transparent text-right" defaultValue={row.original.target} id={`${row.original.id}-target`} />
-        </>
-      ),
-    },
-    {
-      accessorKey: "limit",
-      header: () => <div className="w-full text-right">{labels.limit}</div>,
-      cell: ({ row }) => (
-        <>
-          <Label htmlFor={`${row.original.id}-limit`} className="sr-only">Limit</Label>
-          <Input className="h-8 w-28 border-transparent bg-transparent text-right" defaultValue={row.original.limit} id={`${row.original.id}-limit`} />
-        </>
-      ),
-    },
-    {
-      accessorKey: "reviewer",
-      header: labels.reviewer,
-    },
-    {
+    })
+  }
+
+  defs.push(
+    ...columns.map((col) => {
+      const header = col.header ?? col.label
+      const headerNode = col.headerClassName ? (
+        <div className={cn("w-full", col.headerClassName)}>{header}</div>
+      ) : (
+        header
+      )
+
+      return {
+        accessorKey: col.key,
+        header: headerNode,
+        cell: ({ row, getValue }) =>
+          renderCell(col, getValue(), row.original, row.id),
+        enableHiding: col.enableHiding ?? true,
+        enableSorting: col.enableSorting ?? true,
+        meta: {
+          label: typeof col.label === "string" ? col.label : undefined,
+        },
+      } satisfies ColumnDef<TData>
+    })
+  )
+
+  if (includeActions) {
+    defs.push({
       id: "actions",
       cell: () => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="data-[state=open]:bg-muted text-muted-foreground flex size-8" size="icon">
+            <Button
+              variant="ghost"
+              className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+              size="icon"
+            >
               <IconDotsVertical />
               <span className="sr-only">Open menu</span>
             </Button>
@@ -145,6 +224,10 @@ export function createColumns(labels: {
           </DropdownMenuContent>
         </DropdownMenu>
       ),
-    },
-  ]
+      enableSorting: false,
+      enableHiding: false,
+    })
+  }
+
+  return defs
 }

@@ -5,30 +5,31 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
 
 const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
 
-type ServiceRow = {
+type VolumeRow = {
   id: string
   name: string
-  type: string
-  namespace: string
-  clusterIp: string
-  ports: string
-  age: string
+  capacity: string
+  storageClass: string
+  accessMode: string
+  reclaimPolicy: string
+  status: string
+  node: string
 }
 
-const columns = createColumns<ServiceRow>({
+const columns = createColumns<VolumeRow>({
   columns: [
     { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
-    { key: "type", label: "类型", render: "badge" },
-    { key: "namespace", label: "名称空间" },
-    { key: "clusterIp", label: "Cluster IP" },
-    { key: "ports", label: "端口" },
-    { key: "age", label: "年龄" },
+    { key: "capacity", label: "容量", align: "right" },
+    { key: "storageClass", label: "存储类" },
+    { key: "accessMode", label: "访问模式" },
+    { key: "reclaimPolicy", label: "回收策略" },
+    { key: "status", label: "状态", render: "status" },
+    { key: "node", label: "节点" },
   ],
 })
 
@@ -37,8 +38,8 @@ function unwrapItems(payload: any): any[] {
   return Array.isArray(data?.items) ? data.items : []
 }
 
-export function ServicesPageClient() {
-  const [rows, setRows] = React.useState<ServiceRow[]>([])
+export function VolumesPageClient() {
+  const [rows, setRows] = React.useState<VolumeRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -47,25 +48,27 @@ export function ServicesPageClient() {
     setLoading(true)
     setError(null)
 
-    fetchJsonDeduped<any>(`${BASE}/services`)
+    fetchJsonDeduped<any>(`${BASE}/persistentvolumes`)
       .then((json) => {
         if (cancelled) return
         const items = unwrapItems(json)
         const mapped = items.slice(0, 300).map((item, index) => {
           const metadata = item?.metadata || {}
           const spec = item?.spec || {}
-          const name = metadata.name || "-"
-          const ports = Array.isArray(spec.ports)
-            ? spec.ports.map((p: any) => `${p?.port}/${p?.protocol ?? "TCP"}`).join(",")
+          const status = item?.status || {}
+          const access = Array.isArray(spec.accessModes) && spec.accessModes.length
+            ? spec.accessModes.join(",")
             : "-"
+          const node = spec.nodeAffinity?.required?.nodeSelectorTerms?.[0]?.matchExpressions?.[0]?.values?.[0] || "-"
           return {
-            id: String(metadata.uid ?? `${name}-${index}`),
-            name,
-            type: spec.type || "-",
-            namespace: String(metadata.namespace ?? "default"),
-            clusterIp: String(spec.clusterIP ?? "-"),
-            ports,
-            age: formatAge(metadata.creationTimestamp),
+            id: String(metadata.uid ?? `${metadata.name || "pv"}-${index}`),
+            name: metadata.name || "-",
+            capacity: spec.capacity?.storage || "-",
+            storageClass: spec.storageClassName || "-",
+            accessMode: access,
+            reclaimPolicy: spec.persistentVolumeReclaimPolicy || "-",
+            status: status.phase || "-",
+            node,
           }
         })
         setRows(mapped)

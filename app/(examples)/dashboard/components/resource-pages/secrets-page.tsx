@@ -11,23 +11,23 @@ import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
 
 const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
 
-type ServiceRow = {
+type SecretRow = {
   id: string
   name: string
-  type: string
   namespace: string
-  clusterIp: string
-  ports: string
+  type: string
+  dataItems: number
+  size: string
   age: string
 }
 
-const columns = createColumns<ServiceRow>({
+const columns = createColumns<SecretRow>({
   columns: [
     { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
-    { key: "type", label: "类型", render: "badge" },
     { key: "namespace", label: "名称空间" },
-    { key: "clusterIp", label: "Cluster IP" },
-    { key: "ports", label: "端口" },
+    { key: "type", label: "类型", render: "badge" },
+    { key: "dataItems", label: "数据项", align: "right" },
+    { key: "size", label: "大小", align: "right" },
     { key: "age", label: "年龄" },
   ],
 })
@@ -37,8 +37,22 @@ function unwrapItems(payload: any): any[] {
   return Array.isArray(data?.items) ? data.items : []
 }
 
-export function ServicesPageClient() {
-  const [rows, setRows] = React.useState<ServiceRow[]>([])
+function byteLengthOf(obj: any): number {
+  try {
+    const encoded = new TextEncoder().encode(JSON.stringify(obj ?? {}))
+    return encoded.length
+  } catch {
+    return 0
+  }
+}
+
+function formatSize(bytes: number): string {
+  if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} Mi`
+  return `${(bytes / 1024).toFixed(1)} Ki`
+}
+
+export function SecretsPageClient() {
+  const [rows, setRows] = React.useState<SecretRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -47,24 +61,22 @@ export function ServicesPageClient() {
     setLoading(true)
     setError(null)
 
-    fetchJsonDeduped<any>(`${BASE}/services`)
+    fetchJsonDeduped<any>(`${BASE}/secrets`)
       .then((json) => {
         if (cancelled) return
         const items = unwrapItems(json)
         const mapped = items.slice(0, 300).map((item, index) => {
           const metadata = item?.metadata || {}
-          const spec = item?.spec || {}
-          const name = metadata.name || "-"
-          const ports = Array.isArray(spec.ports)
-            ? spec.ports.map((p: any) => `${p?.port}/${p?.protocol ?? "TCP"}`).join(",")
-            : "-"
+          const dataObj = item?.data || {}
+          const dataItems = Object.keys(dataObj).length
+          const sizeBytes = byteLengthOf(dataObj)
           return {
-            id: String(metadata.uid ?? `${name}-${index}`),
-            name,
-            type: spec.type || "-",
+            id: String(metadata.uid ?? `${metadata.name || "secret"}-${index}`),
+            name: metadata.name || "-",
             namespace: String(metadata.namespace ?? "default"),
-            clusterIp: String(spec.clusterIP ?? "-"),
-            ports,
+            type: item?.type || "-",
+            dataItems,
+            size: formatSize(sizeBytes),
             age: formatAge(metadata.creationTimestamp),
           }
         })

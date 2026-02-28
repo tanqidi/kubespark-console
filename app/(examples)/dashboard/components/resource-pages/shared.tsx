@@ -1,16 +1,16 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
-import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
 
 export type DynamicRow = {
-  id: string | number
-  [key: string]: string | number
+  id?: string | number
+  [key: string]: unknown
 }
 
 export function unwrapItems(payload: any): any[] {
@@ -18,16 +18,24 @@ export function unwrapItems(payload: any): any[] {
   return Array.isArray(data?.items) ? data.items : []
 }
 
-export function ResourcePage({
+export function ResourcePage<TData extends DynamicRow>({
   endpoints,
   columns,
   map,
+  getRowId,
+  columnOptions,
 }: {
   endpoints: string[]
-  columns: Array<{ key: string; label: string }>
-  map: (items: any[]) => DynamicRow[]
+  columns: ColumnConfig<TData>[]
+  map: (items: any[]) => TData[]
+  getRowId?: (row: TData, index: number) => string
+  columnOptions?: {
+    includeDrag?: boolean
+    includeSelect?: boolean
+    includeActions?: boolean
+  }
 }) {
-  const [rows, setRows] = React.useState<DynamicRow[]>([])
+  const [rows, setRows] = React.useState<TData[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -57,6 +65,11 @@ export function ResourcePage({
     }
   }, [endpoints, map])
 
+  const tableColumns = React.useMemo(
+    () => createColumns<TData>({ columns, ...(columnOptions ?? {}) }),
+    [columns, columnOptions]
+  )
+
   if (loading) {
     return (
       <div className="space-y-3 px-4 lg:px-6">
@@ -77,29 +90,8 @@ export function ResourcePage({
     )
   }
 
-  const [c1, c2, c3, c4, c5, c6] = columns
-  const tableRows = rows.map((row, idx) => ({
-    id: idx + 1,
-    header: String(c1 ? row[c1.key] ?? "-" : "-"),
-    type: String(c2 ? row[c2.key] ?? "-" : "-"),
-    status: String(c3 ? row[c3.key] ?? "-" : "-"),
-    target: String(c4 ? row[c4.key] ?? "-" : "-"),
-    limit: String(c5 ? row[c5.key] ?? "-" : "-"),
-    reviewer: String(c6 ? row[c6.key] ?? "-" : "-"),
-  }))
-
   return (
-    <DataTable
-      data={tableRows}
-      columns={createColumns({
-        header: c1?.label ?? "Header",
-        type: c2?.label ?? "Type",
-        status: c3?.label ?? "Status",
-        target: c4?.label ?? "Target",
-        limit: c5?.label ?? "Limit",
-        reviewer: c6?.label ?? "Reviewer",
-      })}
-    />
+    <DataTable data={rows} columns={tableColumns} getRowId={getRowId} />
   )
 }
 
