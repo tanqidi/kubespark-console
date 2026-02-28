@@ -1,19 +1,26 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from "next"
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+import "./globals.css"
+import { ActiveThemeProvider } from "@/components/active-theme"
+import { ThemeProvider } from "@/components/theme-provider"
 
 export const metadata: Metadata = {
-  title: "KubeSpark Console",
-  description: "KubeSpark 管理控制台（shadcn/ui 重构）"
-};
+  title: "KubeSpark Dashboard Scaffold",
+  description: "Dashboard scaffold based on shadcn/ui new-york-v4 dashboard-01",
+}
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN" className="light" style={{ colorScheme: "light" }}>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className="antialiased">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+          <ActiveThemeProvider initialTheme="default">
+            {children}
+          </ActiveThemeProvider>
+        </ThemeProvider>
+      </body>
     </html>
-  );
+  )
 }
