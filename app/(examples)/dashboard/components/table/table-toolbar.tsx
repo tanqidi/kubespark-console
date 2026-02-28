@@ -1,8 +1,10 @@
 "use client"
 
 import { IconChevronDown, IconLayoutColumns, IconPlus } from "@tabler/icons-react"
+import { type Column, type Table } from "@tanstack/react-table"
+import { type ReactNode } from "react"
 
-import { Badge } from "@/registry/new-york-v4/ui/badge"
+import { cn } from "@/lib/utils"
 import { Button } from "@/registry/new-york-v4/ui/button"
 import {
   DropdownMenu,
@@ -10,44 +12,43 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/registry/new-york-v4/ui/dropdown-menu"
-import { Label } from "@/registry/new-york-v4/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/registry/new-york-v4/ui/select"
-import { TabsList, TabsTrigger } from "@/registry/new-york-v4/ui/tabs"
 
-export function TableToolbar({ table }: { table: any }) {
+type ColumnMeta = {
+  label?: string
+}
+
+function resolveColumnLabel<TData>(column: Column<TData, unknown>): string {
+  const meta = column.columnDef.meta as ColumnMeta | undefined
+  return meta?.label ?? column.id
+}
+
+export function TableToolbar<TData>({
+  table,
+  startContent,
+  endContent,
+}: {
+  table: Table<TData>
+  startContent?: ReactNode
+  endContent?: ReactNode
+}) {
   return (
-    <div className="flex items-center justify-between px-4 lg:px-6">
-      <Label htmlFor="view-selector" className="sr-only">
-        View
-      </Label>
-      <Select defaultValue="outline">
-        <SelectTrigger className="flex w-fit @4xl/main:hidden" size="sm" id="view-selector">
-          <SelectValue placeholder="Select a view" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="outline">Outline</SelectItem>
-          <SelectItem value="past-performance">Past Performance</SelectItem>
-          <SelectItem value="key-personnel">Key Personnel</SelectItem>
-          <SelectItem value="focus-documents">Focus Documents</SelectItem>
-        </SelectContent>
-      </Select>
-      <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-        <TabsTrigger value="outline">Outline</TabsTrigger>
-        <TabsTrigger value="past-performance">
-          Past Performance <Badge variant="secondary">3</Badge>
-        </TabsTrigger>
-        <TabsTrigger value="key-personnel">
-          Key Personnel <Badge variant="secondary">2</Badge>
-        </TabsTrigger>
-        <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
-      </TabsList>
-      <div className="flex items-center gap-2">
+    <div
+      className={cn(
+        "flex items-center px-4 lg:px-6",
+        startContent || endContent ? "justify-between gap-2" : "justify-end"
+      )}
+    >
+      {startContent ? (
+        <div className="min-w-0 max-w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {startContent}
+        </div>
+      ) : null}
+      <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+        {endContent ? (
+          <div className="hidden min-w-0 items-center gap-2 lg:flex">
+            {endContent}
+          </div>
+        ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
@@ -61,12 +62,12 @@ export function TableToolbar({ table }: { table: any }) {
             {table
               .getAllColumns()
               .filter(
-                (column: any) =>
+                (column) =>
                   typeof column.accessorFn !== "undefined" &&
                   column.getCanHide()
               )
-              .map((column: any) => {
-                const label = column.columnDef?.meta?.label ?? column.id
+              .map((column) => {
+                const label = resolveColumnLabel(column)
                 return (
                   <DropdownMenuCheckboxItem
                     key={column.id}

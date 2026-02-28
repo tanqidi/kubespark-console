@@ -1,12 +1,12 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
+// import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
-import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
 
 export type DynamicRow = {
   id?: string | number
@@ -36,7 +36,7 @@ export function ResourcePage<TData extends DynamicRow>({
   }
 }) {
   const [rows, setRows] = React.useState<TData[]>([])
-  const [loading, setLoading] = React.useState(true)
+  const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
@@ -69,15 +69,9 @@ export function ResourcePage<TData extends DynamicRow>({
     () => createColumns<TData>({ columns, ...(columnOptions ?? {}) }),
     [columns, columnOptions]
   )
-
-  if (loading) {
-    return (
-      <div className="space-y-3 px-4 lg:px-6">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </div>
-    )
-  }
+  // if (loading) {
+  //   return <ResourceLoadingState />
+  // } // kept for potential future use
 
   if (error) {
     return (

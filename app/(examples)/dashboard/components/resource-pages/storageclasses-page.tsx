@@ -1,13 +1,13 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+// import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { formatAge } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
-import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
 
 const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
 
@@ -44,7 +44,7 @@ function formatAllowExpansion(value: unknown): string {
 
 export function StorageClassesPageClient() {
   const [rows, setRows] = React.useState<StorageClassRow[]>([])
-  const [loading, setLoading] = React.useState(true)
+  const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
@@ -84,8 +84,7 @@ export function StorageClassesPageClient() {
       cancelled = true
     }
   }, [])
-
-  if (loading) return <div className="space-y-3 px-4 lg:px-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>
+  // if (loading) return <ResourceLoadingState /> // kept for potential future use
   if (error) return <div className="px-4 lg:px-6"><Alert variant="destructive"><AlertTitle>加载失败</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>
 
   return <DataTable data={rows} columns={columns} />

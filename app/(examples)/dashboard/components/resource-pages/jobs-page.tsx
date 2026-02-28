@@ -1,13 +1,15 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+// import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { formatAge } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
-import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
+import { Input } from "@/registry/new-york-v4/ui/input"
+import { Tabs, TabsList, TabsTrigger } from "@/registry/new-york-v4/ui/tabs"
 
 const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
 
@@ -19,6 +21,7 @@ type JobRow = {
   duration: string
   retry: number
   age: string
+  kind: "Job" | "CronJob"
 }
 
 const columns = createColumns<JobRow>({
@@ -66,8 +69,11 @@ function resolveJobDuration(item: any): string {
 
 export function JobsPageClient() {
   const [rows, setRows] = React.useState<JobRow[]>([])
-  const [loading, setLoading] = React.useState(true)
+  const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [jobType, setJobType] = React.useState<JobRow["kind"]>("Job")
+  const [namespaceQuery, setNamespaceQuery] = React.useState("")
+  const [nameQuery, setNameQuery] = React.useState("")
 
   React.useEffect(() => {
     let cancelled = false
@@ -81,20 +87,20 @@ export function JobsPageClient() {
       .then((results) => {
         if (cancelled) return
         const items = results.flatMap((json) => unwrapItems(json))
-        const mapped = items.slice(0, 300).map((item, index) => {
+        const mapped: JobRow[] = items.slice(0, 300).map((item, index) => {
           const metadata = item?.metadata || {}
           const status = item?.status || {}
           const name = metadata.name || "-"
-          const kind = item?.kind || "Job"
-          const isCronJob = kind === "CronJob"
+          const kind = item?.kind === "CronJob" ? "CronJob" : "Job"
           return {
             id: String(metadata.uid ?? `${kind}-${name}-${index}`),
             name,
-            status: isCronJob ? resolveCronJobStatus(item) : resolveJobStatus(item),
+            status: kind === "CronJob" ? resolveCronJobStatus(item) : resolveJobStatus(item),
             namespace: String(metadata.namespace ?? "default"),
-            duration: isCronJob ? "-" : resolveJobDuration(item),
+            duration: kind === "CronJob" ? "-" : resolveJobDuration(item),
             retry: Number(status.failed) || 0,
             age: formatAge(metadata.creationTimestamp),
+            kind,
           }
         })
         setRows(mapped)
@@ -114,8 +120,60 @@ export function JobsPageClient() {
     }
   }, [])
 
-  if (loading) return <div className="space-y-3 px-4 lg:px-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>
-  if (error) return <div className="px-4 lg:px-6"><Alert variant="destructive"><AlertTitle>加载失败</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div>
+  // if (loading) return <ResourceLoadingState /> // kept for potential future use
+  if (error) {
+    return (
+      <div className="px-4 lg:px-6">
+        <Alert variant="destructive">
+          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
 
-  return <DataTable data={rows} columns={columns} />
+  const nsQuery = namespaceQuery.trim().toLowerCase()
+  const nmQuery = nameQuery.trim().toLowerCase()
+
+  const filteredRows = rows.filter((row) => {
+    if (row.kind !== jobType) return false
+    if (nsQuery && !row.namespace.toLowerCase().includes(nsQuery)) return false
+    if (nmQuery && !row.name.toLowerCase().includes(nmQuery)) return false
+    return true
+  })
+
+  const jobTabs = (
+    <Tabs value={jobType} onValueChange={(value) => setJobType(value as JobRow["kind"])} className="w-fit">
+      <TabsList>
+        <TabsTrigger value="Job">Job</TabsTrigger>
+        <TabsTrigger value="CronJob">CronJob</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  )
+
+  const jobFilters = (
+    <>
+      <Input
+        value={namespaceQuery}
+        onChange={(event) => setNamespaceQuery(event.target.value)}
+        placeholder="名称空间"
+        className="h-9 w-36"
+      />
+      <Input
+        value={nameQuery}
+        onChange={(event) => setNameQuery(event.target.value)}
+        placeholder="名称"
+        className="h-9 w-40"
+      />
+    </>
+  )
+
+  return (
+    <DataTable
+      data={filteredRows}
+      columns={columns}
+      toolbarStart={jobTabs}
+      toolbarEnd={jobFilters}
+    />
+  )
 }

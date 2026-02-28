@@ -60,12 +60,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/registry/new-york-v4/ui/table"
-import { Tabs, TabsContent } from "@/registry/new-york-v4/ui/tabs"
 
 type DataTableProps<TData> = {
   data: TData[]
   columns: ColumnDef<TData>[]
   getRowId?: (row: TData, index: number) => string
+  toolbarStart?: React.ReactNode
+  toolbarEnd?: React.ReactNode
 }
 
 function DraggableRow<TData>({ row }: { row: Row<TData> }) {
@@ -97,6 +98,8 @@ export function DataTable<TData extends Record<string, unknown>>({
   data: initialData,
   columns,
   getRowId,
+  toolbarStart,
+  toolbarEnd,
 }: DataTableProps<TData>) {
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
@@ -172,12 +175,9 @@ export function DataTable<TData extends Record<string, unknown>>({
   }
 
   return (
-    <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6">
-      <TableToolbar table={table} />
-      <TabsContent
-        value="outline"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
-      >
+    <div className="flex w-full flex-col justify-start gap-6">
+      <TableToolbar table={table} startContent={toolbarStart} endContent={toolbarEnd} />
+      <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
           <DndContext
             collisionDetection={closestCenter}
@@ -303,16 +303,7 @@ export function DataTable<TData extends Record<string, unknown>>({
             </div>
           </div>
         </div>
-      </TabsContent>
-      <TabsContent value="past-performance" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="focus-documents" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
   )
 }
