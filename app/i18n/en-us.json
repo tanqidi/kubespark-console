@@ -1,0 +1,664 @@
+{
+  "modules": {
+    "workloads": {
+      "title": "Workloads",
+      "subtitle": "Deployment / DaemonSet / StatefulSet Overview",
+      "typeTabs": [
+        {
+          "key": "deployment",
+          "value": "Deployment",
+          "label": "Deployment"
+        },
+        {
+          "key": "statefulset",
+          "value": "StatefulSet",
+          "label": "StatefulSet"
+        },
+        {
+          "key": "daemonset",
+          "value": "DaemonSet",
+          "label": "DaemonSet"
+        }
+      ],
+      "filters": {
+        "typeAriaLabel": "Workload type filter",
+        "namespacePlaceholder": "Filter namespace",
+        "namePlaceholder": "Filter name"
+      },
+      "actions": {
+        "delete": "Delete",
+        "create": "Create"
+      },
+      "alerts": {
+        "selectToDelete": "Please select workloads to delete",
+        "selectedMissing": "Selected workloads are no longer in the list",
+        "loadFailed": "Failed to load",
+        "deleteFailed": "Failed to delete"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "kind": "Kind",
+          "status": "Status",
+          "namespace": "Namespace",
+          "desired": "Desired",
+          "updated": "Updated",
+          "available": "Available",
+          "ready": "Ready",
+          "age": "Age"
+        },
+        "status": {
+          "normal": "Healthy",
+          "updating": "Updating",
+          "abnormal": "Degraded"
+        },
+        "selectAllAria": "Select all workloads"
+      },
+      "confirm": {
+        "title": "Delete workloads",
+        "descriptionWithCount": "Are you sure you want to delete these {count} workloads?",
+        "descriptionEmpty": "Are you sure you want to delete the selected workloads?",
+        "confirmLabel": "Delete",
+        "cancelLabel": "Cancel"
+      }
+    },
+    "jobs": {
+      "title": "Jobs",
+      "subtitle": "Job Execution and Status Overview",
+      "typeTabs": [
+        {
+          "key": "job",
+          "value": "Job",
+          "label": "Job"
+        },
+        {
+          "key": "cronjob",
+          "value": "CronJob",
+          "label": "CronJob"
+        }
+      ],
+      "filters": {
+        "typeAriaLabel": "Job type filter",
+        "namespacePlaceholder": "Filter namespace",
+        "namePlaceholder": "Filter name"
+      },
+      "actions": {
+        "delete": "Delete",
+        "create": "Create"
+      },
+      "alerts": {
+        "selectToDelete": "Please select jobs to delete",
+        "selectedMissing": "Selected jobs are no longer in the list",
+        "loadFailed": "Failed to load",
+        "deleteFailed": "Failed to delete"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "status": "Status",
+          "namespace": "Namespace",
+          "duration": "Duration",
+          "retry": "Retries",
+          "age": "Age"
+        },
+        "status": {
+          "succeeded": "Succeeded",
+          "running": "Running",
+          "failed": "Failed",
+          "pending": "Pending"
+        },
+        "selectAllAria": "Select all jobs"
+      },
+      "confirm": {
+        "title": "Delete jobs",
+        "descriptionWithCount": "Are you sure you want to delete these {count} jobs?",
+        "descriptionEmpty": "Are you sure you want to delete the selected jobs?",
+        "confirmLabel": "Delete",
+        "cancelLabel": "Cancel"
+      }
+    },
+    "pods": {
+      "title": "Pods",
+      "subtitle": "Pod Status and Resource Overview",
+      "filters": {
+        "statusAriaLabel": "Pod status filter",
+        "statusAll": "All statuses",
+        "namespacePlaceholder": "Filter namespace",
+        "namePlaceholder": "Filter name"
+      },
+      "actions": {
+        "delete": "Delete"
+      },
+      "alerts": {
+        "selectToDelete": "Please select pods to delete",
+        "selectedMissing": "Selected pods are no longer in the list",
+        "loadFailed": "Failed to load",
+        "deleteFailed": "Failed to delete"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "status": "Status",
+          "namespace": "Namespace",
+          "node": "Node",
+          "ip": "Pod IP",
+          "age": "Age",
+          "updatedAt": "Updated At"
+        },
+        "status": {
+          "running": "Running",
+          "pending": "Pending",
+          "failed": "Failed",
+          "succeeded": "Succeeded",
+          "unknown": "Unknown"
+        },
+        "selectAllAria": "Select all pods"
+      },
+      "confirm": {
+        "title": "Delete pods",
+        "descriptionWithCount": "Are you sure you want to delete these {count} pods?",
+        "descriptionEmpty": "Are you sure you want to delete the selected pods?",
+        "confirmLabel": "Delete",
+        "cancelLabel": "Cancel"
+      }
+    },
+    "services": {
+      "title": "Services",
+      "subtitle": "Service Entry Points and Address Info",
+      "filters": {
+        "namespacePlaceholder": "Filter namespace",
+        "namePlaceholder": "Filter name"
+      },
+      "actions": {
+        "delete": "Delete",
+        "create": "Create"
+      },
+      "alerts": {
+        "selectToDelete": "Please select services to delete",
+        "selectedMissing": "Selected services are no longer in the list",
+        "loadFailed": "Failed to load",
+        "deleteFailed": "Failed to delete"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "type": "Type",
+          "namespace": "Namespace",
+          "clusterIp": "Cluster IP",
+          "ports": "Ports",
+          "age": "Age"
+        },
+        "headlessType": "Headless",
+        "headlessClusterIp": "None (Headless)",
+        "selectAllAria": "Select all services"
+      },
+      "confirm": {
+        "title": "Delete services",
+        "descriptionWithCount": "Are you sure you want to delete these {count} services?",
+        "descriptionEmpty": "Are you sure you want to delete the selected services?",
+        "confirmLabel": "Delete",
+        "cancelLabel": "Cancel"
+      }
+    },
+    "routes": {
+      "title": "Routes",
+      "subtitle": "Ingress Rules and Backend Services",
+      "filters": {
+        "namespacePlaceholder": "Filter namespace",
+        "namePlaceholder": "Filter name"
+      },
+      "actions": {
+        "delete": "Delete",
+        "create": "Create"
+      },
+      "alerts": {
+        "selectToDelete": "Please select routes to delete",
+        "selectedMissing": "Selected routes are no longer in the list",
+        "loadFailed": "Failed to load",
+        "deleteFailed": "Failed to delete"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "namespace": "Namespace",
+          "host": "Host",
+          "path": "Path",
+          "service": "Backend Service",
+          "age": "Age"
+        },
+        "selectAllAria": "Select all routes"
+      },
+      "confirm": {
+        "title": "Delete routes",
+        "descriptionWithCount": "Are you sure you want to delete these {count} routes?",
+        "descriptionEmpty": "Are you sure you want to delete the selected routes?",
+        "confirmLabel": "Delete",
+        "cancelLabel": "Cancel"
+      }
+    },
+    "configmaps": {
+      "title": "ConfigMap",
+      "subtitle": "Configuration Data and Environment Variables",
+      "filters": {
+        "namespacePlaceholder": "Filter namespace",
+        "namePlaceholder": "Filter name"
+      },
+      "actions": {
+        "create": "Create",
+        "delete": "Delete"
+      },
+      "alerts": {
+        "selectToDelete": "Please select config maps to delete",
+        "selectedMissing": "Selected config maps are no longer in the list",
+        "loadFailed": "Failed to load",
+        "deleteFailed": "Failed to delete"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "namespace": "Namespace",
+          "dataItems": "Data Items",
+          "size": "Config Size",
+          "age": "Age"
+        },
+        "selectAllAria": "Select all config maps"
+      },
+      "confirm": {
+        "title": "Delete config maps",
+        "descriptionWithCount": "Are you sure you want to delete these {count} config maps?",
+        "descriptionEmpty": "Are you sure you want to delete the selected config maps?",
+        "confirmLabel": "Delete",
+        "cancelLabel": "Cancel"
+      }
+    },
+    "secrets": {
+      "title": "Secret",
+      "subtitle": "Sensitive Configuration and Credentials",
+      "filters": {
+        "namespacePlaceholder": "Filter namespace",
+        "namePlaceholder": "Filter name"
+      },
+      "actions": {
+        "create": "Create",
+        "delete": "Delete"
+      },
+      "alerts": {
+        "selectToDelete": "Please select secrets to delete",
+        "selectedMissing": "Selected secrets are no longer in the list",
+        "loadFailed": "Failed to load",
+        "deleteFailed": "Failed to delete"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "namespace": "Namespace",
+          "type": "Type",
+          "dataItems": "Data Items",
+          "size": "Config Size",
+          "age": "Age"
+        },
+        "selectAllAria": "Select all secrets"
+      },
+      "confirm": {
+        "title": "Delete secrets",
+        "descriptionWithCount": "Are you sure you want to delete these {count} secrets?",
+        "descriptionEmpty": "Are you sure you want to delete the selected secrets?",
+        "confirmLabel": "Delete",
+        "cancelLabel": "Cancel"
+      }
+    },
+    "nodes": {
+      "title": "Nodes",
+      "subtitle": "Node Status and Resource Overview",
+      "filters": {
+        "searchPlaceholder": "Fuzzy Search"
+      },
+      "actions": {
+        "showCharts": "Show charts",
+        "hideCharts": "Hide charts"
+      },
+      "alerts": {
+        "loadFailed": "Failed to load"
+      },
+      "table": {
+        "columns": {
+          "nameIp": "Name / IP",
+          "status": "Status",
+          "role": "Role",
+          "cpuUsage": "CPU Usage",
+          "memoryUsage": "Memory Usage",
+          "pods": "Pods",
+          "allocatedCpu": "Allocated CPU",
+          "allocatedMemory": "Allocated Memory"
+        },
+        "status": {
+          "ready": "Ready",
+          "unschedulable": "Unschedulable",
+          "offline": "Offline"
+        },
+        "roles": {
+          "controlPlane": "Control plane",
+          "worker": "Worker",
+          "unknown": "Unknown"
+        },
+        "selectAllAria": "Select all nodes"
+      },
+      "detail": {
+        "tabs": {
+          "status": "Node Details",
+          "pods": "Pods",
+          "metadata": "Metadata",
+          "monitor": "Monitor",
+          "events": "Events"
+        },
+        "pods": {
+          "title": "Recent Pods",
+          "subtitle": "Latest scheduled pods on this node",
+          "searchPlaceholder": "Search pods"
+        },
+        "statusCard": {
+          "title": "Details",
+          "fields": {
+            "status": "Status",
+            "ip": "IP Address",
+            "schedulable": "Schedulable",
+            "role": "Role",
+            "osImage": "OS Image",
+            "osType": "OS Type",
+            "kernelVersion": "Kernel Version",
+            "containerRuntime": "Container Runtime",
+            "kubeletVersion": "Kubelet Version",
+            "kubeProxyVersion": "Kube-Proxy Version",
+            "arch": "Architecture",
+            "createdAt": "Created At"
+          }
+        },
+        "metadata": {
+          "title": "Metadata",
+          "subtitle": "Node labels and taints",
+          "filters": {
+            "typeAriaLabel": "Metadata type filter",
+            "all": "All",
+            "labels": "Labels",
+            "taints": "Taints",
+            "searchPlaceholder": "Search labels or taints"
+          },
+          "actions": {
+            "delete": "Delete",
+            "create": "Create"
+          },
+          "alerts": {
+            "selectToDelete": "Please select metadata items to delete",
+            "selectedMissing": "Selected metadata items are no longer in the list",
+            "deleteUnavailable": "Delete is not implemented yet"
+          },
+          "table": {
+            "columns": {
+              "type": "Type",
+              "key": "Key",
+              "value": "Value",
+              "effect": "Effect"
+            },
+            "selectAllAria": "Select all metadata",
+            "placeholder": "-",
+            "emptyValue": "(empty)",
+            "emptyString": "(empty string)"
+          },
+          "types": {
+            "label": {
+              "title": "Label",
+              "subtitle": "-"
+            },
+            "taint": {
+              "title": "Taint",
+              "subtitle": "Taint"
+            }
+          },
+          "confirm": {
+            "title": "Delete metadata",
+            "descriptionWithCount": "Are you sure you want to delete these {count} metadata items?",
+            "descriptionEmpty": "Are you sure you want to delete the selected metadata items?",
+            "confirmLabel": "Delete",
+            "cancelLabel": "Cancel"
+          }
+        },
+        "events": {
+          "title": "Recent Events",
+          "subtitle": "Latest events for this node",
+          "filters": {
+            "reasonAriaLabel": "Event reason filter",
+            "reasonAll": "All reasons",
+            "messagePlaceholder": "Search message"
+          },
+          "table": {
+            "columns": {
+              "object": "Object",
+              "reason": "Reason",
+              "type": "Type",
+              "message": "Message",
+              "time": "Time",
+              "count": "Count"
+            },
+            "placeholder": "-"
+          },
+          "toast": {
+            "title": "Copied",
+            "body": "Event message copied to clipboard"
+          },
+          "actions": {
+            "delete": "Delete"
+          },
+          "alerts": {
+            "deleteUnavailable": "Delete is not available: {name}"
+          }
+        },
+        "schedulable": {
+          "yes": "Yes",
+          "no": "No",
+          "unknown": "Unknown"
+        },
+        "errors": {
+          "notFound": "Node not found: {name}",
+          "loadFailed": "Failed to load node details",
+          "nameEmpty": "Node name is empty",
+          "podsLoadFailed": "Failed to load pods",
+          "eventsLoadFailed": "Failed to load events"
+        }
+      },
+      "units": {
+        "cores": "cores",
+        "gib": "GiB",
+        "reserved": "Reserved"
+      }
+    },
+    "projects": {
+      "title": "Projects",
+      "subtitle": "Projects, namespaces, and resource boundaries",
+      "filters": {
+        "namePlaceholder": "Filter project/namespace"
+      },
+      "actions": {
+        "delete": "Delete",
+        "create": "Create"
+      },
+      "alerts": {
+        "selectToDelete": "Please select projects/namespaces to delete",
+        "selectedMissing": "Selected projects are no longer in the list",
+        "loadFailed": "Failed to load",
+        "deleteFailed": "Failed to delete"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "status": "Status",
+          "labels": "Labels",
+          "annotations": "Annotations",
+          "age": "Age"
+        },
+        "status": {
+          "active": "Active",
+          "terminating": "Terminating",
+          "unknown": "Unknown"
+        },
+        "selectAllAria": "Select all projects"
+      },
+      "confirm": {
+        "title": "Delete projects",
+        "descriptionWithCount": "Are you sure you want to delete these {count} projects?",
+        "descriptionEmpty": "Are you sure you want to delete the selected projects?",
+        "confirmLabel": "Delete",
+        "cancelLabel": "Cancel"
+      }
+    },
+    "storageClasses": {
+      "title": "Storage Classes",
+      "subtitle": "StorageClass and volume binding policy",
+      "filters": {
+        "namePlaceholder": "Filter name"
+      },
+      "actions": {
+        "delete": "Delete"
+      },
+      "alerts": {
+        "loadFailed": "Failed to load",
+        "deleteUnavailable": "Delete API is not implemented yet"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "provisioner": "Provisioner",
+          "reclaimPolicy": "Reclaim Policy",
+          "volumeBindingMode": "Volume Binding Mode",
+          "allowExpansion": "Allow Expansion",
+          "age": "Age"
+        },
+        "allowExpansionValues": {
+          "yes": "Yes",
+          "no": "No"
+        },
+        "selectAllAria": "Select all storage classes"
+      }
+    },
+    "pv": {
+      "title": "Persistent Volumes",
+      "subtitle": "Persistent volume overview",
+      "filters": {
+        "namePlaceholder": "Filter name",
+        "namespacePlaceholder": "Filter namespace"
+      },
+      "actions": {
+        "create": "Create",
+        "delete": "Delete"
+      },
+      "alerts": {
+        "loadFailed": "Failed to load",
+        "deleteUnavailable": "Delete API is not implemented yet"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "capacity": "Capacity",
+          "storageClass": "Storage Class",
+          "accessMode": "Access Mode",
+          "reclaimPolicy": "Reclaim Policy",
+          "status": "Status",
+          "node": "Node"
+        },
+        "selectAllAria": "Select all persistent volumes"
+      }
+    },
+    "pvc": {
+      "title": "Persistent Volume Claims",
+      "subtitle": "Persistent volume claim overview",
+      "filters": {
+        "namePlaceholder": "Filter name",
+        "namespacePlaceholder": "Filter namespace"
+      },
+      "actions": {
+        "create": "Create",
+        "delete": "Delete"
+      },
+      "alerts": {
+        "loadFailed": "Failed to load",
+        "deleteUnavailable": "Delete API is not implemented yet"
+      },
+      "table": {
+        "columns": {
+          "name": "Name",
+          "namespace": "Namespace",
+          "capacity": "Capacity",
+          "storageClass": "Storage Class",
+          "accessMode": "Access Mode",
+          "status": "Status",
+          "boundPv": "Bound PV"
+        },
+        "selectAllAria": "Select all persistent volume claims"
+      }
+    }
+  },
+  "header": {
+    "nav": {
+      "platform": "Platform",
+      "store": "App Store",
+      "pipeline": "Pipelines"
+    },
+    "userMenu": {
+      "status": "Status",
+      "profile": "Profile",
+      "feedback": "Feedback",
+      "about": "About",
+      "settings": "Settings",
+      "logout": "Logout"
+    },
+    "aria": {
+      "openUserMenu": "Open user menu"
+    }
+  },
+  "login": {
+    "title": "Sign in to your account",
+    "username": {
+      "label": "Username",
+      "placeholder": "Enter your username"
+    },
+    "password": {
+      "label": "Password",
+      "placeholder": "Enter your password",
+      "toggle": {
+        "show": "Show password",
+        "hide": "Hide password"
+      }
+    },
+    "remember": "Remember me on this device",
+    "actions": {
+      "submit": "Sign in",
+      "submitting": "Signing in..."
+    },
+    "errors": {
+      "missingToken": "Login succeeded but no token was returned",
+      "failed": "Login failed. Please check your username and password"
+    },
+    "footer": "KubeSpark Cluster Management"
+  },
+  "pagination": {
+    "itemsPerPage": "{count} / page",
+    "total": "Total {count} records"
+  },
+  "menu": {
+    "workloads": "Workloads",
+    "jobs": "Jobs",
+    "pods": "Pods",
+    "services": "Services",
+    "routes": "Routes",
+    "overview": "Overview",
+    "nodes": "Nodes",
+    "projects": "Projects",
+    "workloadsGroup": "Workloads",
+    "config": "Configuration",
+    "configmaps": "ConfigMaps",
+    "secrets": "Secrets",
+    "storage": "Storage",
+    "storageclasses": "StorageClasses",
+    "volumes": "Volumes",
+    "settings": "Cluster Settings"
+  }
+}

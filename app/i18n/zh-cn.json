@@ -1,0 +1,664 @@
+{
+  "modules": {
+    "workloads": {
+      "title": "工作负载",
+      "subtitle": "Deployment / DaemonSet / StatefulSet 运行概览",
+      "typeTabs": [
+        {
+          "key": "deployment",
+          "value": "Deployment",
+          "label": "部署"
+        },
+        {
+          "key": "statefulset",
+          "value": "StatefulSet",
+          "label": "有状态集"
+        },
+        {
+          "key": "daemonset",
+          "value": "DaemonSet",
+          "label": "守护进程集"
+        }
+      ],
+      "filters": {
+        "typeAriaLabel": "工作负载类型筛选",
+        "namespacePlaceholder": "过滤命名空间",
+        "namePlaceholder": "过滤名称"
+      },
+      "actions": {
+        "delete": "删除",
+        "create": "创建"
+      },
+      "alerts": {
+        "selectToDelete": "请先勾选要删除的工作负载",
+        "selectedMissing": "选中的工作负载已经不在当前列表中",
+        "loadFailed": "加载失败",
+        "deleteFailed": "删除失败"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "kind": "类型",
+          "status": "状态",
+          "namespace": "命名空间",
+          "desired": "期望",
+          "updated": "已更新",
+          "available": "可用",
+          "ready": "就绪",
+          "age": "创建时长"
+        },
+        "status": {
+          "normal": "正常",
+          "updating": "更新中",
+          "abnormal": "异常"
+        },
+        "selectAllAria": "全选工作负载"
+      },
+      "confirm": {
+        "title": "删除工作负载",
+        "descriptionWithCount": "确定要删除以下 {count} 个工作负载吗？",
+        "descriptionEmpty": "确定要删除选中的工作负载吗？",
+        "confirmLabel": "删除",
+        "cancelLabel": "取消"
+      }
+    },
+    "jobs": {
+      "title": "任务",
+      "subtitle": "Job 执行与状态概览",
+      "typeTabs": [
+        {
+          "key": "job",
+          "value": "Job",
+          "label": "任务"
+        },
+        {
+          "key": "cronjob",
+          "value": "CronJob",
+          "label": "定时任务"
+        }
+      ],
+      "filters": {
+        "typeAriaLabel": "任务类型筛选",
+        "namespacePlaceholder": "过滤命名空间",
+        "namePlaceholder": "过滤名称"
+      },
+      "actions": {
+        "delete": "删除",
+        "create": "创建"
+      },
+      "alerts": {
+        "selectToDelete": "请先勾选要删除的任务",
+        "selectedMissing": "选中的任务已经不在当前列表中",
+        "loadFailed": "加载失败",
+        "deleteFailed": "删除失败"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "status": "状态",
+          "namespace": "命名空间",
+          "duration": "持续时间",
+          "retry": "重试",
+          "age": "运行时长"
+        },
+        "status": {
+          "succeeded": "成功",
+          "running": "运行中",
+          "failed": "失败",
+          "pending": "等待中"
+        },
+        "selectAllAria": "全选任务"
+      },
+      "confirm": {
+        "title": "删除任务",
+        "descriptionWithCount": "确定要删除以下 {count} 个任务吗？",
+        "descriptionEmpty": "确定要删除选中的任务吗？",
+        "confirmLabel": "删除",
+        "cancelLabel": "取消"
+      }
+    },
+    "pods": {
+      "title": "容器组",
+      "subtitle": "Pod 运行状态与资源概览",
+      "filters": {
+        "statusAriaLabel": "容器组状态筛选",
+        "statusAll": "全部状态",
+        "namespacePlaceholder": "过滤命名空间",
+        "namePlaceholder": "过滤名称"
+      },
+      "actions": {
+        "delete": "删除"
+      },
+      "alerts": {
+        "selectToDelete": "请先勾选要删除的容器组",
+        "selectedMissing": "选中的容器组已经不在当前列表中",
+        "loadFailed": "加载失败",
+        "deleteFailed": "删除失败"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "status": "状态",
+          "namespace": "命名空间",
+          "node": "节点",
+          "ip": "容器组 IP 地址",
+          "age": "运行时长",
+          "updatedAt": "更新时间"
+        },
+        "status": {
+          "running": "运行中",
+          "pending": "等待中",
+          "failed": "异常",
+          "succeeded": "已完成",
+          "unknown": "未知"
+        },
+        "selectAllAria": "全选容器组"
+      },
+      "confirm": {
+        "title": "删除容器组",
+        "descriptionWithCount": "确定要删除以下 {count} 个容器组吗？",
+        "descriptionEmpty": "确定要删除选中的容器组吗？",
+        "confirmLabel": "删除",
+        "cancelLabel": "取消"
+      }
+    },
+    "services": {
+      "title": "服务",
+      "subtitle": "Service 访问入口与地址信息",
+      "filters": {
+        "namespacePlaceholder": "过滤命名空间",
+        "namePlaceholder": "过滤名称"
+      },
+      "actions": {
+        "delete": "删除",
+        "create": "创建"
+      },
+      "alerts": {
+        "selectToDelete": "请先勾选要删除的服务",
+        "selectedMissing": "选中的服务已经不在当前列表中",
+        "loadFailed": "加载失败",
+        "deleteFailed": "删除失败"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "type": "类型",
+          "namespace": "命名空间",
+          "clusterIp": "Cluster IP",
+          "ports": "端口",
+          "age": "运行时长"
+        },
+        "headlessType": "Headless",
+        "headlessClusterIp": "-",
+        "selectAllAria": "全选服务"
+      },
+      "confirm": {
+        "title": "删除服务",
+        "descriptionWithCount": "确定要删除以下 {count} 个服务吗？",
+        "descriptionEmpty": "确定要删除选中的服务吗？",
+        "confirmLabel": "删除",
+        "cancelLabel": "取消"
+      }
+    },
+    "routes": {
+      "title": "应用路由",
+      "subtitle": "Ingress 路由规则与后端服务",
+      "filters": {
+        "namespacePlaceholder": "过滤命名空间",
+        "namePlaceholder": "过滤名称"
+      },
+      "actions": {
+        "delete": "删除",
+        "create": "创建"
+      },
+      "alerts": {
+        "selectToDelete": "请先勾选要删除的应用路由",
+        "selectedMissing": "选中的应用路由已经不在当前列表中",
+        "loadFailed": "加载失败",
+        "deleteFailed": "删除失败"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "namespace": "命名空间",
+          "host": "域名",
+          "path": "路径",
+          "service": "后端服务",
+          "age": "运行时长"
+        },
+        "selectAllAria": "全选应用路由"
+      },
+      "confirm": {
+        "title": "删除应用路由",
+        "descriptionWithCount": "确定要删除以下 {count} 个应用路由吗？",
+        "descriptionEmpty": "确定要删除选中的应用路由吗？",
+        "confirmLabel": "删除",
+        "cancelLabel": "取消"
+      }
+    },
+    "configmaps": {
+      "title": "ConfigMap",
+      "subtitle": "配置数据与环境变量管理",
+      "filters": {
+        "namespacePlaceholder": "过滤命名空间",
+        "namePlaceholder": "过滤名称"
+      },
+      "actions": {
+        "create": "创建",
+        "delete": "删除"
+      },
+      "alerts": {
+        "selectToDelete": "请先勾选要删除的配置字典",
+        "selectedMissing": "选中的配置字典已经不在当前列表中",
+        "loadFailed": "加载失败",
+        "deleteFailed": "删除失败"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "namespace": "命名空间",
+          "dataItems": "数据项",
+          "size": "配置大小",
+          "age": "创建时长"
+        },
+        "selectAllAria": "全选配置字典"
+      },
+      "confirm": {
+        "title": "删除配置字典",
+        "descriptionWithCount": "确定要删除以下 {count} 个配置字典吗？",
+        "descriptionEmpty": "确定要删除选中的配置字典吗？",
+        "confirmLabel": "删除",
+        "cancelLabel": "取消"
+      }
+    },
+    "secrets": {
+      "title": "Secret",
+      "subtitle": "敏感配置与凭据管理",
+      "filters": {
+        "namespacePlaceholder": "过滤命名空间",
+        "namePlaceholder": "过滤名称"
+      },
+      "actions": {
+        "create": "创建",
+        "delete": "删除"
+      },
+      "alerts": {
+        "selectToDelete": "请先勾选要删除的保密字典",
+        "selectedMissing": "选中的保密字典已经不在当前列表中",
+        "loadFailed": "加载失败",
+        "deleteFailed": "删除失败"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "namespace": "命名空间",
+          "type": "类型",
+          "dataItems": "数据项",
+          "size": "配置大小",
+          "age": "创建时长"
+        },
+        "selectAllAria": "全选保密字典"
+      },
+      "confirm": {
+        "title": "删除保密字典",
+        "descriptionWithCount": "确定要删除以下 {count} 个保密字典吗？",
+        "descriptionEmpty": "确定要删除选中的保密字典吗？",
+        "confirmLabel": "删除",
+        "cancelLabel": "取消"
+      }
+    },
+    "nodes": {
+      "subtitle": "节点运行状态与资源概览",
+      "filters": {
+        "searchPlaceholder": "综合搜索"
+      },
+      "actions": {
+        "showCharts": "显示图表",
+        "hideCharts": "隐藏图表"
+      },
+      "alerts": {
+        "loadFailed": "加载失败"
+      },
+      "units": {
+        "gib": "GiB",
+        "cores": "核",
+        "reserved": "资源预留"
+      },
+      "table": {
+        "status": {
+          "offline": "离线",
+          "unschedulable": "无法调度",
+          "ready": "运行中"
+        },
+        "selectAllAria": "全选节点",
+        "columns": {
+          "memoryUsage": "内存用量",
+          "nameIp": "名称 / IP",
+          "pods": "容器组",
+          "cpuUsage": "CPU 用量",
+          "status": "状态",
+          "allocatedMemory": "已分配内存",
+          "role": "角色",
+          "allocatedCpu": "已分配 CPU"
+        },
+        "roles": {
+          "controlPlane": "控制平面节点",
+          "worker": "工作节点",
+          "unknown": "未知"
+        }
+      },
+      "detail": {
+        "tabs": {
+          "status": "节点详情",
+          "pods": "容器组",
+          "metadata": "元数据",
+          "monitor": "监控",
+          "events": "事件"
+        },
+        "statusCard": {
+          "title": "详情",
+          "fields": {
+            "status": "状态",
+            "ip": "IP 地址",
+            "schedulable": "可调度",
+            "role": "角色",
+            "osImage": "操作系统版本",
+            "osType": "操作系统类型",
+            "kernelVersion": "内核版本",
+            "containerRuntime": "容器运行时",
+            "kubeletVersion": "Kubelet 版本",
+            "kubeProxyVersion": "Kube-Proxy 版本",
+            "arch": "系统架构",
+            "createdAt": "创建时间"
+          }
+        },
+        "metadata": {
+          "title": "元数据",
+          "subtitle": "节点标签与污点信息",
+          "filters": {
+            "typeAriaLabel": "元数据类型筛选",
+            "all": "全部",
+            "labels": "标签",
+            "taints": "污点",
+            "searchPlaceholder": "搜索标签或污点"
+          },
+          "actions": {
+            "delete": "删除",
+            "create": "创建"
+          },
+          "alerts": {
+            "selectToDelete": "请先勾选要删除的元数据项",
+            "selectedMissing": "选中的元数据项已经不在当前列表中",
+            "deleteUnavailable": "删除接口尚未实现，待后续开发"
+          },
+          "table": {
+            "columns": {
+              "type": "类型",
+              "key": "键",
+              "value": "值",
+              "effect": "影响"
+            },
+            "selectAllAria": "全选元数据",
+            "placeholder": "-",
+            "emptyValue": "（空）",
+            "emptyString": "（空字符串）"
+          },
+          "types": {
+            "label": {
+              "title": "Label",
+              "subtitle": "-"
+            },
+            "taint": {
+              "title": "Taint",
+              "subtitle": "-"
+            }
+          },
+          "confirm": {
+            "title": "删除元数据",
+            "descriptionWithCount": "确定要删除以下 {count} 个元数据项吗？",
+            "descriptionEmpty": "确定要删除选中的元数据项吗？",
+            "confirmLabel": "删除",
+            "cancelLabel": "取消"
+          }
+        },
+        "events": {
+          "title": "最近事件",
+          "subtitle": "当前节点最新事件",
+          "filters": {
+            "reasonAriaLabel": "事件原因筛选",
+            "reasonAll": "全部原因",
+            "messagePlaceholder": "搜索消息"
+          },
+          "table": {
+            "columns": {
+              "object": "关联对象",
+              "reason": "原因",
+              "type": "类型",
+              "message": "消息",
+              "time": "时间",
+              "count": "次数"
+            },
+            "placeholder": "-"
+          },
+          "toast": {
+            "title": "复制成功",
+            "body": "消息内容已复制到剪贴板"
+          },
+          "actions": {
+            "delete": "删除"
+          },
+          "alerts": {
+            "deleteUnavailable": "删除功能待接入：{name}"
+          }
+        },
+        "pods": {
+          "title": "最近容器组",
+          "subtitle": "该节点最新调度的容器组",
+          "searchPlaceholder": "搜索容器组"
+        },
+        "schedulable": {
+          "yes": "是",
+          "no": "否",
+          "unknown": "未知"
+        },
+        "errors": {
+          "notFound": "未找到节点：{name}",
+          "loadFailed": "加载节点详情失败",
+          "nameEmpty": "节点名称为空",
+          "podsLoadFailed": "加载容器组失败",
+          "eventsLoadFailed": "加载事件失败"
+        }
+      },
+      "title": "节点"
+    },
+    "projects": {
+      "subtitle": "名称空间列表",
+      "filters": {
+        "namePlaceholder": "过滤项目/命名空间"
+      },
+      "actions": {
+        "create": "创建",
+        "delete": "删除"
+      },
+      "confirm": {
+        "title": "删除项目",
+        "descriptionEmpty": "确定要删除选中的项目吗？",
+        "confirmLabel": "删除",
+        "cancelLabel": "取消",
+        "descriptionWithCount": "确定要删除以下 {count} 个项目吗？"
+      },
+      "alerts": {
+        "selectToDelete": "请先勾选要删除的项目/Namespace",
+        "selectedMissing": "选中的项目已经不在当前列表中",
+        "loadFailed": "加载失败",
+        "deleteFailed": "删除失败"
+      },
+      "table": {
+        "status": {
+          "active": "活跃",
+          "unknown": "未知",
+          "terminating": "终止中"
+        },
+        "columns": {
+          "status": "状态",
+          "labels": "标签数",
+          "name": "名称",
+          "age": "创建时长",
+          "annotations": "注解数"
+        },
+        "selectAllAria": "全选项目"
+      },
+      "title": "项目"
+    },
+    "storageClasses": {
+      "title": "存储类",
+      "subtitle": "StorageClass 及卷绑定策略",
+      "filters": {
+        "namePlaceholder": "过滤名称"
+      },
+      "actions": {
+        "delete": "删除"
+      },
+      "alerts": {
+        "loadFailed": "加载失败",
+        "deleteUnavailable": "删除接口尚未实现，待后续开发"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "provisioner": "供应者",
+          "reclaimPolicy": "回收策略",
+          "volumeBindingMode": "绑定策略",
+          "allowExpansion": "允许扩容",
+          "age": "创建时长"
+        },
+        "allowExpansionValues": {
+          "yes": "是",
+          "no": "否"
+        },
+        "selectAllAria": "全选存储类"
+      }
+    },
+    "pv": {
+      "title": "持久卷",
+      "subtitle": "持久卷资源概览",
+      "filters": {
+        "namePlaceholder": "过滤名称",
+        "namespacePlaceholder": "过滤命名空间"
+      },
+      "actions": {
+        "create": "创建",
+        "delete": "删除"
+      },
+      "alerts": {
+        "loadFailed": "加载失败",
+        "deleteUnavailable": "删除接口尚未实现，待后续开发"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "capacity": "容量",
+          "storageClass": "存储类",
+          "accessMode": "访问模式",
+          "reclaimPolicy": "回收策略",
+          "status": "状态",
+          "node": "节点"
+        },
+        "selectAllAria": "全选持久卷"
+      }
+    },
+    "pvc": {
+      "title": "存储卷声明",
+      "subtitle": "存储卷声明资源概览",
+      "filters": {
+        "namePlaceholder": "过滤名称",
+        "namespacePlaceholder": "过滤命名空间"
+      },
+      "actions": {
+        "create": "创建",
+        "delete": "删除"
+      },
+      "alerts": {
+        "loadFailed": "加载失败",
+        "deleteUnavailable": "删除接口尚未实现，待后续开发"
+      },
+      "table": {
+        "columns": {
+          "name": "名称",
+          "namespace": "命名空间",
+          "capacity": "容量",
+          "storageClass": "存储类",
+          "accessMode": "访问模式",
+          "status": "状态",
+          "boundPv": "绑定 PV"
+        },
+        "selectAllAria": "全选存储卷声明"
+      }
+    }
+  },
+  "header": {
+    "nav": {
+      "platform": "平台管理",
+      "store": "应用商店",
+      "pipeline": "流水线"
+    },
+    "userMenu": {
+      "status": "状态",
+      "profile": "个人资料",
+      "feedback": "反馈",
+      "about": "??",
+      "settings": "设置",
+      "logout": "退出登录"
+    },
+    "aria": {
+      "openUserMenu": "打开用户菜单"
+    }
+  },
+  "login": {
+    "title": "登录到您的账户",
+    "username": {
+      "label": "用户名",
+      "placeholder": "请输入用户名"
+    },
+    "password": {
+      "label": "密码",
+      "placeholder": "请输入密码",
+      "toggle": {
+        "show": "显示密码",
+        "hide": "隐藏密码"
+      }
+    },
+    "remember": "在此设备上记住我",
+    "actions": {
+      "submit": "登录",
+      "submitting": "登录中..."
+    },
+    "errors": {
+      "missingToken": "登录成功但未返回 token",
+      "failed": "登录失败，请检查用户名和密码"
+    },
+    "footer": "KubeSpark 集群管理平台"
+  },
+  "pagination": {
+    "itemsPerPage": "{count}条/页",
+    "total": "共 {count} 条记录"
+  },
+  "menu": {
+    "workloads": "工作负载",
+    "jobs": "任务",
+    "pods": "容器组",
+    "services": "服务",
+    "routes": "应用路由",
+    "overview": "概览",
+    "nodes": "节点",
+    "projects": "项目",
+    "workloadsGroup": "工作负载",
+    "config": "配置",
+    "configmaps": "配置字典",
+    "secrets": "保密字典",
+    "storage": "存储",
+    "storageclasses": "存储类",
+    "volumes": "持久卷声明",
+    "settings": "集群设置"
+  }
+}
