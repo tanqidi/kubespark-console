@@ -1,0 +1,5 @@
+export { WorkloadsPageClient } from "./workloads-page"
+export { JobsPageClient } from "./jobs-page"
+export { PodsPageClient } from "./pods-page"
+export { ServicesPageClient } from "./services-page"
+export { RoutesPageClient } from "./routes-page"

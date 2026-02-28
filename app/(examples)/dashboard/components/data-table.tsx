@@ -136,7 +136,7 @@ function DragHandle({ id }: { id: number }) {
   )
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
+const baseColumns: ColumnDef<z.infer<typeof schema>>[] = [
   {
     id: "drag",
     header: () => null,
@@ -338,8 +338,17 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
 
 export function DataTable({
   data: initialData,
+  columnHeaders,
 }: {
   data: z.infer<typeof schema>[]
+  columnHeaders?: Partial<{
+    header: string
+    type: string
+    status: string
+    target: string
+    limit: string
+    reviewer: string
+  }>
 }) {
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
@@ -364,6 +373,41 @@ export function DataTable({
     () => data?.map(({ id }) => id) || [],
     [data]
   )
+
+  const columns = React.useMemo<ColumnDef<z.infer<typeof schema>>[]>(() => {
+    return baseColumns.map((column) => {
+      const col = column as any
+      if (col.accessorKey === "header") {
+        return { ...column, header: columnHeaders?.header ?? "Header" }
+      }
+      if (col.accessorKey === "type") {
+        return { ...column, header: columnHeaders?.type ?? "Section Type" }
+      }
+      if (col.accessorKey === "status") {
+        return { ...column, header: columnHeaders?.status ?? "Status" }
+      }
+      if (col.accessorKey === "target") {
+        return {
+          ...column,
+          header: () => (
+            <div className="w-full text-right">{columnHeaders?.target ?? "Target"}</div>
+          ),
+        }
+      }
+      if (col.accessorKey === "limit") {
+        return {
+          ...column,
+          header: () => (
+            <div className="w-full text-right">{columnHeaders?.limit ?? "Limit"}</div>
+          ),
+        }
+      }
+      if (col.accessorKey === "reviewer") {
+        return { ...column, header: columnHeaders?.reviewer ?? "Reviewer" }
+      }
+      return column
+    }) as ColumnDef<z.infer<typeof schema>>[]
+  }, [columnHeaders])
 
   const table = useReactTable({
     data,
