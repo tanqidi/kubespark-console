@@ -10,8 +10,6 @@
 !.yarn/releases
 !.yarn/versions
 
-workspace.xml
-
 # testing
 /coverage
 
@@ -41,3 +39,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+/.idea/
