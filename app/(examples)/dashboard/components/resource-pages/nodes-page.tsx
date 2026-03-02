@@ -20,8 +20,6 @@ type NodeRow = {
   cpuUsage: string
   memoryUsage: string
   pods: string
-  allocatedCpu: string
-  allocatedMemory: string
   updatedAt: string
 }
 
@@ -43,9 +41,7 @@ const columns = createColumns<NodeRow>({
     { key: "role", label: "\u89d2\u8272" },
     { key: "cpuUsage", label: "CPU \u4f7f\u7528\u7387", align: "right" },
     { key: "memoryUsage", label: "\u5185\u5b58\u4f7f\u7528\u7387", align: "right" },
-    { key: "pods", label: "Pods", align: "right" },
-    { key: "allocatedCpu", label: "\u5df2\u5206\u914d CPU", align: "right" },
-    { key: "allocatedMemory", label: "\u5df2\u5206\u914d\u5185\u5b58", align: "right" },
+    { key: "pods", label: "\u5bb9\u5668\u7ec4", align: "right" },
     { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
@@ -77,12 +73,6 @@ function formatMemUsage(used: number, total: number): string {
   if (!total) return "-"
   const percent = Math.round((used / total) * 100)
   return `${percent}% (${used.toFixed(2)}/${total.toFixed(2)} GiB)`
-}
-
-function formatAllocated(used: number, total: number, unit: string): string {
-  if (!total) return "-"
-  const percent = Math.round((used / total) * 100)
-  return `${used.toFixed(2)} ${unit} (${percent}%)`
 }
 
 export function NodesPageClient() {
@@ -121,8 +111,6 @@ export function NodesPageClient() {
             cpuUsage: formatCpuUsage(0, node.cpuTotal),
             memoryUsage: formatMemUsage(0, node.memoryTotal),
             pods: node.podsTotal ? `${usedPods}/${node.podsTotal}` : `${usedPods}/-`,
-            allocatedCpu: formatAllocated(0, node.cpuTotal, "cores"),
-            allocatedMemory: formatAllocated(0, node.memoryTotal, "GiB"),
             updatedAt: node.updatedAt,
           }
         })

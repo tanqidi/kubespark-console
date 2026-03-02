@@ -53,8 +53,8 @@ export function TableToolbar<TData>({
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
               <IconLayoutColumns />
-              <span className="hidden lg:inline">Customize Columns</span>
-              <span className="lg:hidden">Columns</span>
+              <span className="hidden lg:inline">自定义列</span>
+              <span className="lg:hidden">自定义列</span>
               <IconChevronDown />
             </Button>
           </DropdownMenuTrigger>
@@ -83,7 +83,7 @@ export function TableToolbar<TData>({
         </DropdownMenu>
         <Button variant="outline" size="sm">
           <IconPlus />
-          <span className="hidden lg:inline">Add Section</span>
+          <span className="hidden lg:inline">创建</span>
         </Button>
       </div>
     </div>

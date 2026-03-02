@@ -14,7 +14,7 @@ const columns = createColumns<NamespaceRow>({
     { key: "status", label: "\u72b6\u6001", render: "status" },
     { key: "labels", label: "\u6807\u7b7e", align: "right" },
     { key: "annotations", label: "\u6ce8\u89e3", align: "right" },
-    { key: "age", label: "\u5e74\u9f84" },
+    { key: "age", label: "运行时间" },
     { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })

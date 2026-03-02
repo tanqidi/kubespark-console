@@ -30,7 +30,7 @@ const columns = createColumns<StorageClassRow>({
     { key: "reclaimPolicy", label: "\u56de\u6536\u7b56\u7565" },
     { key: "volumeBindingMode", label: "\u7ed1\u5b9a\u6a21\u5f0f" },
     { key: "allowExpansion", label: "\u5141\u8bb8\u6269\u5bb9" },
-    { key: "age", label: "\u5e74\u9f84" },
+    { key: "age", label: "运行时间" },
     { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })

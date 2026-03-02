@@ -36,7 +36,7 @@ const columns = createColumns<WorkloadRow>({
     { key: "updated", label: "\u66f4\u65b0", align: "right" },
     { key: "available", label: "\u53ef\u7528", align: "right" },
     { key: "ready", label: "\u5c31\u7eea", align: "right" },
-    { key: "age", label: "\u5e74\u9f84" },
+    { key: "age", label: "运行时间" },
     { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })

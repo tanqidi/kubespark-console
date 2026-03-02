@@ -32,7 +32,7 @@ const columns = createColumns<JobRow>({
     { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
     { key: "duration", label: "\u65f6\u957f", align: "right" },
     { key: "retry", label: "\u91cd\u8bd5", align: "right" },
-    { key: "age", label: "\u5e74\u9f84" },
+    { key: "age", label: "运行时间" },
     { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })

@@ -30,7 +30,7 @@ const columns = createColumns<SecretRow>({
     { key: "type", label: "\u7c7b\u578b", render: "badge" },
     { key: "dataItems", label: "\u6570\u636e\u9879", align: "right" },
     { key: "size", label: "\u5927\u5c0f", align: "right" },
-    { key: "age", label: "\u5e74\u9f84" },
+    { key: "age", label: "运行时间" },
     { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })

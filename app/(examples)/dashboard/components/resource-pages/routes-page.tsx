@@ -30,7 +30,7 @@ const columns = createColumns<RouteRow>({
     { key: "host", label: "\u57df\u540d" },
     { key: "path", label: "\u8def\u5f84" },
     { key: "service", label: "\u670d\u52a1" },
-    { key: "age", label: "\u5e74\u9f84" },
+    { key: "age", label: "运行时间" },
     { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
