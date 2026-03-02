@@ -5,18 +5,8 @@ import { type Column, type Table } from "@tanstack/react-table"
 import { type ReactNode } from "react"
 
 import { cn } from "@/lib/utils"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -117,28 +107,20 @@ export function TableToolbar<TData>({
         )}
         aria-hidden={!showDelete}
       >
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
+        <ConfirmDialog
+          trigger={
             <Button variant="destructive" size="sm">
               <IconTrash />
               <span className="hidden lg:inline">删除</span>
             </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>批量删除容器组</AlertDialogTitle>
-              <AlertDialogDescription>
-                此操作不可撤销，将删除已选中的 {selectedCount} 条数据。
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>取消</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" onClick={onDeleteSelected}>
-                删除
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+          }
+          title="批量删除容器组"
+          description={`此操作不可撤销，将删除已选中的 ${selectedCount} 条数据。`}
+          cancelText="取消"
+          confirmText="删除"
+          confirmVariant="destructive"
+          onConfirm={onDeleteSelected}
+        />
       </div>
     </div>
   )
