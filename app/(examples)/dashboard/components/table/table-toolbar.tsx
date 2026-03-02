@@ -5,7 +5,18 @@ import { type Column, type Table } from "@tanstack/react-table"
 import { type ReactNode } from "react"
 
 import { cn } from "@/lib/utils"
-import { Button } from "@/registry/new-york-v4/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -40,7 +51,7 @@ export function TableToolbar<TData>({
     <div className="relative min-h-9">
       <div
         className={cn(
-          "flex items-center px-4 lg:px-6 transition-none",
+          "flex items-center px-4 lg:px-6",
           startContent || endContent ? "justify-between gap-2" : "justify-end",
           showDelete ? "invisible pointer-events-none" : ""
         )}
@@ -51,6 +62,7 @@ export function TableToolbar<TData>({
             {startContent}
           </div>
         ) : null}
+
         <div className="ml-auto flex min-w-0 shrink items-center gap-2">
           {endContent ? (
             <div className="hidden min-w-0 items-center gap-2 lg:flex">
@@ -60,7 +72,7 @@ export function TableToolbar<TData>({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="transition-none">
+              <Button variant="outline" size="sm">
                 <IconLayoutColumns />
                 <span className="hidden lg:inline">自定义列</span>
                 <span className="lg:hidden">自定义列</span>
@@ -91,7 +103,7 @@ export function TableToolbar<TData>({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" size="sm" className="transition-none">
+          <Button variant="outline" size="sm">
             <IconPlus />
             <span className="hidden lg:inline">创建</span>
           </Button>
@@ -100,20 +112,33 @@ export function TableToolbar<TData>({
 
       <div
         className={cn(
-          "absolute inset-0 flex items-center justify-end px-4 lg:px-6 transition-none",
+          "absolute inset-0 flex items-center justify-end px-4 lg:px-6",
           showDelete ? "" : "invisible pointer-events-none"
         )}
         aria-hidden={!showDelete}
       >
-        <Button
-          variant="destructive"
-          size="sm"
-          className="transition-none"
-          onClick={onDeleteSelected}
-        >
-          <IconTrash />
-          <span className="hidden lg:inline">删除</span>
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm">
+              <IconTrash />
+              <span className="hidden lg:inline">删除</span>
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>批量删除容器组</AlertDialogTitle>
+              <AlertDialogDescription>
+                此操作不可撤销，将删除已选中的 {selectedCount} 条数据。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={onDeleteSelected}>
+                删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )
