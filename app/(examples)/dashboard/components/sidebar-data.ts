@@ -24,39 +24,39 @@ export type SidebarMenuItem = {
 }
 
 export const kubesparkSidebarMenu: SidebarMenuItem[] = [
-  { title: "Overview", labelKey: "overview", path: "/overview", icon: IconLayoutDashboard },
-  { title: "Nodes", labelKey: "nodes", path: "/nodes", icon: IconServer },
-  { title: "Projects", labelKey: "projects", path: "/projects", icon: IconBox },
+  { title: "概览", labelKey: "overview", path: "/overview", icon: IconLayoutDashboard },
+  { title: "节点", labelKey: "nodes", path: "/nodes", icon: IconServer },
+  { title: "项目", labelKey: "projects", path: "/projects", icon: IconBox },
   {
-    title: "Workloads",
+    title: "应用负载",
     labelKey: "workloadsGroup",
     icon: IconTopologyStar3,
     children: [
-      { title: "Workloads", labelKey: "workloads", path: "/workloads", icon: IconStack2 },
-      { title: "Jobs", labelKey: "jobs", path: "/jobs", icon: IconBraces },
-      { title: "Pods", labelKey: "pods", path: "/pods", icon: IconTopologyRing3 },
-      { title: "Services", labelKey: "services", path: "/services", icon: IconNetwork },
-      { title: "Routes", labelKey: "routes", path: "/routes", icon: IconRoute },
+      { title: "工作负载", labelKey: "workloads", path: "/workloads", icon: IconStack2 },
+      { title: "任务", labelKey: "jobs", path: "/jobs", icon: IconBraces },
+      { title: "容器组", labelKey: "pods", path: "/pods", icon: IconTopologyRing3 },
+      { title: "服务", labelKey: "services", path: "/services", icon: IconNetwork },
+      { title: "应用路由", labelKey: "routes", path: "/routes", icon: IconRoute },
     ],
   },
   {
-    title: "Configuration",
+    title: "配置",
     labelKey: "config",
     icon: IconSettings,
     children: [
-      { title: "ConfigMaps", labelKey: "configmaps", path: "/configmaps" },
-      { title: "Secrets", labelKey: "secrets", path: "/secrets" },
+      { title: "配置字典", labelKey: "configmaps", path: "/configmaps" },
+      { title: "保密字典", labelKey: "secrets", path: "/secrets" },
     ],
   },
   {
-    title: "Storage",
+    title: "存储",
     labelKey: "storage",
     icon: IconDatabase,
     children: [
-      { title: "Volumes", labelKey: "volumes", path: "/volumes" },
-      { title: "StorageClasses", labelKey: "storageclasses", path: "/storageclasses" },
+      { title: "持久卷声明", labelKey: "volumes", path: "/volumes" },
+      { title: "存储类", labelKey: "storageclasses", path: "/storageclasses" },
     ],
   },
-  { title: "Cluster Settings", labelKey: "settings", path: "/settings", icon: IconAdjustments },
-  { title: "About", labelKey: "about", path: "/about", icon: IconInfoCircle },
+  { title: "集群设置", labelKey: "settings", path: "/settings", icon: IconAdjustments },
+  { title: "关于", labelKey: "about", path: "/about", icon: IconInfoCircle },
 ]

@@ -141,9 +141,9 @@ export function WorkloadsPageClient() {
   const workloadTabs = (
     <Tabs value={typeFilter} onValueChange={(value) => setTypeFilter(value as WorkloadRow["kind"])} className="w-fit">
       <TabsList>
-        <TabsTrigger value="Deployment">Deployment</TabsTrigger>
-        <TabsTrigger value="StatefulSet">StatefulSet</TabsTrigger>
-        <TabsTrigger value="DaemonSet">DaemonSet</TabsTrigger>
+        <TabsTrigger value="Deployment">部署</TabsTrigger>
+        <TabsTrigger value="StatefulSet">有状态副本集</TabsTrigger>
+        <TabsTrigger value="DaemonSet">守护进程集</TabsTrigger>
       </TabsList>
     </Tabs>
   )

@@ -18,7 +18,7 @@ import {
 
 const data = {
   user: {
-    name: "KubeSpark Admin",
+    name: "KubeSpark 管理员",
     email: "admin@kubespark.local",
     avatar: "/avatars/shadcn.jpg",
   },

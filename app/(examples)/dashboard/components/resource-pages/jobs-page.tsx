@@ -148,8 +148,8 @@ export function JobsPageClient() {
   const jobTabs = (
     <Tabs value={jobType} onValueChange={(value) => setJobType(value as JobRow["kind"])} className="w-fit">
       <TabsList>
-        <TabsTrigger value="Job">Job</TabsTrigger>
-        <TabsTrigger value="CronJob">CronJob</TabsTrigger>
+        <TabsTrigger value="Job">任务</TabsTrigger>
+        <TabsTrigger value="CronJob">定时任务</TabsTrigger>
       </TabsList>
     </Tabs>
   )

@@ -8,6 +8,7 @@ import { createColumns } from "@/app/(examples)/dashboard/components/table/colum
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
+import { Input } from "@/registry/new-york-v4/ui/input"
 
 const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
 
@@ -48,6 +49,7 @@ export function StorageClassesPageClient() {
   const [rows, setRows] = React.useState<StorageClassRow[]>([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
 
   React.useEffect(() => {
     let cancelled = false
@@ -99,5 +101,21 @@ export function StorageClassesPageClient() {
     )
   }
 
-  return <DataTable data={rows} columns={columns} />
+  const query = searchQuery.trim().toLowerCase()
+
+  const filteredRows = rows.filter((row) => {
+    if (!query) return true
+    return row.name.toLowerCase().includes(query)
+  })
+
+  const storageClassFilters = (
+    <Input
+      value={searchQuery}
+      onChange={(event) => setSearchQuery(event.target.value)}
+      placeholder={"名称"}
+      className="h-9 w-56"
+    />
+  )
+
+  return <DataTable data={filteredRows} columns={columns} toolbarEnd={storageClassFilters} />
 }

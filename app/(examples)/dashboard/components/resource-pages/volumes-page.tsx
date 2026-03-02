@@ -221,8 +221,8 @@ export function VolumesPageClient() {
   const volumeTabs = (
     <Tabs value={view} onValueChange={(value) => setView(value as "PVC" | "PV")} className="w-fit">
       <TabsList>
-        <TabsTrigger value="PVC">PVC</TabsTrigger>
-        <TabsTrigger value="PV">PV</TabsTrigger>
+        <TabsTrigger value="PVC">持久卷声明</TabsTrigger>
+        <TabsTrigger value="PV">持久卷</TabsTrigger>
       </TabsList>
     </Tabs>
   )

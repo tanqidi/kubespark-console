@@ -1,195 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="AutoImportSettings">
-    <option name="autoReloadType" value="SELECTIVE" />
-  </component>
   <component name="ChangeListManager">
-    <list default="true" id="858adf29-1bba-4e99-a582-daa961b849c7" name="Changes" comment="update">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/configmaps-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/configmaps-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/jobs-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/jobs-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/nodes-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/nodes-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/pods-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/pods-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/projects-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/projects-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/routes-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/routes-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/secrets-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/secrets-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/services-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/services-page.tsx" afterDir="false" />
+    <list default="true" id="4e01db53-33f2-467a-a1ef-99c15edf25b4" name="Changes" comment="update">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/data-table.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/data-table.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/storageclasses-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/storageclasses-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/volumes-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/volumes-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/workloads-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(examples)/dashboard/components/resource-pages/workloads-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/kubespark/nodes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/kubespark/nodes.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/kubespark/projects.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/kubespark/projects.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/lib/kubespark/utils.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/lib/kubespark/utils.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="CopilotPersistence">
-    <persistenceIdMap>
-      <entry key="_F:/桌面/vuecode/kubespark-react-shadcn" value="3AHzW4mq1KurtfpmKOHlNNh0XOe" />
-    </persistenceIdMap>
-  </component>
-  <component name="Git.Settings">
-    <option name="RECENT_BRANCH_BY_REPOSITORY">
-      <map>
-        <entry key="$PROJECT_DIR$" value="master" />
-      </map>
-    </option>
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
-  </component>
-  <component name="ProjectColorInfo">{
-  &quot;associatedIndex&quot;: 2
-}</component>
-  <component name="ProjectId" id="3AHzW4mq1KurtfpmKOHlNNh0XOe" />
   <component name="ProjectLevelVcsManager">
     <ConfirmationsSetting value="2" id="Add" />
   </component>
-  <component name="ProjectViewState">
-    <option name="hideEmptyMiddlePackages" value="true" />
-    <option name="showLibraryContents" value="true" />
-  </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_ADD_EXTERNAL_FILES&quot;: &quot;true&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;js.debugger.nextJs.config.created.client&quot;: &quot;true&quot;,
-    &quot;js.debugger.nextJs.config.created.server&quot;: &quot;true&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/code/kubespark-react-shadcn&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;E:\\code\\vuecode\\kubespark-react-shadcn\\node_modules\\typescript\\lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "git-widget-placeholder": "dev",
+    "javascript.preferred.runtime.type.id": "node"
   }
-}</component>
-  <component name="RdControllerToolWindowsLayoutState" isNewUi="true">
-    <layout>
-      <window_info id="Bookmarks" side_tool="true" />
-      <window_info id="Merge Requests" />
-      <window_info id="Backup and Sync History" />
-      <window_info id="npm" side_tool="true" />
-      <window_info id="Pull Requests" />
-      <window_info id="Learn" show_stripe_button="false" />
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.34651434" />
-      <window_info id="Commit" order="1" weight="0.34651434" />
-      <window_info id="Structure" order="2" side_tool="true" weight="0.25" />
-      <window_info anchor="bottom" id="Database Changes" />
-      <window_info anchor="bottom" id="TypeScript" />
-      <window_info anchor="bottom" id="Profiler" />
-      <window_info anchor="bottom" id="TODO" />
-      <window_info anchor="bottom" id="File Transfer" />
-      <window_info anchor="bottom" id="Find" />
-      <window_info anchor="bottom" id="Version Control" order="0" />
-      <window_info anchor="bottom" id="Problems" order="1" />
-      <window_info anchor="bottom" id="Problems View" order="2" />
-      <window_info anchor="bottom" id="Terminal" order="3" weight="0.33023" />
-      <window_info anchor="bottom" id="Services" order="4" />
-      <window_info anchor="bottom" id="GitHub Copilot MCP Log" order="5" />
-      <window_info anchor="right" id="Code Provenance" side_tool="true" />
-      <window_info anchor="right" id="Endpoints" />
-      <window_info anchor="right" id="Coverage" side_tool="true" />
-      <window_info anchor="right" content_ui="combo" id="Notifications" order="0" weight="0.25" />
-      <window_info anchor="right" id="AIAssistant" order="1" weight="0.25" />
-      <window_info anchor="right" id="Database" order="2" weight="0.25" />
-      <window_info anchor="right" id="Gradle" order="3" weight="0.25" />
-      <window_info anchor="right" id="Maven" order="4" weight="0.25" />
-      <window_info anchor="right" id="github.copilotToolWindow" order="5" />
-      <window_info anchor="right" id="GitHub Copilot Chat" order="6" />
-      <window_info anchor="right" id="GitHub Coding Agent Jobs" order="7" />
-    </layout>
-  </component>
-  <component name="RunManager" selected="npm.Next.js: server-side">
-    <configuration name="Next.js: debug client-side" type="JavascriptDebugType" uri="http://localhost:3000/">
-      <method v="2" />
-    </configuration>
-    <configuration name="Next.js: server-side" type="js.build_tools.npm">
-      <package-json value="$PROJECT_DIR$/package.json" />
-      <command value="run" />
-      <scripts>
-        <script value="dev" />
-      </scripts>
-      <node-interpreter value="project" />
-      <envs />
-      <method v="2" />
-    </configuration>
-  </component>
-  <component name="SharedIndexes">
-    <attachedChunks>
-      <set>
-        <option value="bundled-js-predefined-1d06a55b98c1-0b3e54e931b4-JavaScript-WS-241.17890.13" />
-      </set>
-    </attachedChunks>
-  </component>
-  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+}]]></component>
   <component name="TaskManager">
-    <task active="true" id="Default" summary="Default task">
-      <changelist id="858adf29-1bba-4e99-a582-daa961b849c7" name="Changes" comment="" />
-      <created>1772264312924</created>
-      <option name="number" value="Default" />
-      <option name="presentableId" value="Default" />
-      <updated>1772264312924</updated>
-      <workItem from="1772264314437" duration="35000" />
-      <workItem from="1772269756411" duration="4639000" />
-      <workItem from="1772274701735" duration="2754000" />
-      <workItem from="1772290782307" duration="465000" />
-      <workItem from="1772291467543" duration="2576000" />
-    </task>
-    <task id="LOCAL-00001" summary="update">
-      <option name="closed" value="true" />
-      <created>1772271760635</created>
-      <option name="number" value="00001" />
-      <option name="presentableId" value="LOCAL-00001" />
-      <option name="project" value="LOCAL" />
-      <updated>1772271760635</updated>
-    </task>
-    <task id="LOCAL-00002" summary="update">
-      <option name="closed" value="true" />
-      <created>1772273856298</created>
-      <option name="number" value="00002" />
-      <option name="presentableId" value="LOCAL-00002" />
-      <option name="project" value="LOCAL" />
-      <updated>1772273856298</updated>
-    </task>
-    <task id="LOCAL-00003" summary="update">
-      <option name="closed" value="true" />
-      <created>1772295590810</created>
-      <option name="number" value="00003" />
-      <option name="presentableId" value="LOCAL-00003" />
-      <option name="project" value="LOCAL" />
-      <updated>1772295590810</updated>
-    </task>
-    <option name="localTasksCounter" value="4" />
     <servers />
-  </component>
-  <component name="TypeScriptGeneratedFilesManager">
-    <option name="version" value="3" />
-  </component>
-  <component name="VcsManagerConfiguration">
-    <option name="CHECK_NEW_TODO" value="false" />
-    <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
-    <MESSAGE value="update" />
-    <option name="LAST_COMMIT_MESSAGE" value="update" />
-  </component>
-  <component name="XSLT-Support.FileAssociations.UIState">
-    <expand />
-    <select />
-  </component>
-  <component name="github-copilot-workspace">
-    <instructionFileLocations>
-      <option value=".github/instructions" />
-    </instructionFileLocations>
-    <promptFileLocations>
-      <option value=".github/prompts" />
-    </promptFileLocations>
   </component>
 </project>

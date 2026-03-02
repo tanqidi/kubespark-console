@@ -36,7 +36,7 @@ export function NavMain({
             <SidebarMenuButton asChild className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground">
               <Link href="/dashboard">
                 <IconCloudBolt />
-                <span>KubeSpark Console</span>
+                <span>KubeSpark 控制台</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
