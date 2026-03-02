@@ -62,7 +62,7 @@ export function TableToolbar<TData>({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="transition-none">
                 <IconLayoutColumns />
                 <span className="hidden lg:inline">自定义列</span>
                 <span className="lg:hidden">自定义列</span>
@@ -93,7 +93,7 @@ export function TableToolbar<TData>({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="transition-none">
             <IconPlus />
             <span className="hidden lg:inline">创建</span>
           </Button>
@@ -109,7 +109,7 @@ export function TableToolbar<TData>({
       >
         <ConfirmDialog
           trigger={
-            <Button variant="destructive" size="sm">
+            <Button variant="destructive" size="sm" className="transition-none">
               <IconTrash />
               <span className="hidden lg:inline">删除</span>
             </Button>
