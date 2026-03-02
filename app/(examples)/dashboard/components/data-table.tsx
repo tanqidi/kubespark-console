@@ -165,6 +165,18 @@ export function DataTable<TData extends Record<string, unknown>>({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
 
+  const handleDeleteSelected = React.useCallback(() => {
+    const selectedIds = new Set(
+      table.getFilteredSelectedRowModel().rows.map((row) => row.id)
+    )
+    if (selectedIds.size === 0) return
+
+    setData((current) =>
+      current.filter((row, index) => !selectedIds.has(resolveRowId(row, index)))
+    )
+    setRowSelection({})
+  }, [resolveRowId, table])
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!active || !over || active.id === over.id) return
@@ -176,7 +188,12 @@ export function DataTable<TData extends Record<string, unknown>>({
 
   return (
     <div className="flex w-full flex-col justify-start gap-6">
-      <TableToolbar table={table} startContent={toolbarStart} endContent={toolbarEnd} />
+      <TableToolbar
+        table={table}
+        startContent={toolbarStart}
+        endContent={toolbarEnd}
+        onDeleteSelected={handleDeleteSelected}
+      />
       <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
           <DndContext
