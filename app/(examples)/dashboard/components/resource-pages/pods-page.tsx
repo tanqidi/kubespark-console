@@ -7,7 +7,6 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
-  buildNamespacedPodEndpoint,
   fetchNamespacedPodYaml,
   fetchPodResourceRows,
   type PodResourceRow,
@@ -37,10 +36,9 @@ export function PodsPageClient() {
     setYamlContent("")
 
     void fetchNamespacedPodYaml(row.namespace, row.name)
-      .then(({ requestUrl, payload, text }) => {
+      .then(({ payload, text }) => {
         setYamlContent(text)
         console.log("[Pods] view yaml response", {
-          requestUrl,
           pod: { name: row.name, namespace: row.namespace },
           result: payload,
         })
@@ -49,7 +47,6 @@ export function PodsPageClient() {
         const message = e instanceof Error ? e.message : "加载 YAML 失败"
         setYamlError(message)
         console.error("[Pods] view yaml request failed", {
-          requestUrl: buildNamespacedPodEndpoint(row.namespace, row.name),
           pod: { name: row.name, namespace: row.namespace },
           error: e,
         })
@@ -183,6 +180,7 @@ export function PodsPageClient() {
   return (
     <>
       <MonacoViewerDialog
+        title="查看YAML"
         open={yamlOpen}
         onOpenChange={setYamlOpen}
         value={yamlContent}

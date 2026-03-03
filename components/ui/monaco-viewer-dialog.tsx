@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
@@ -23,6 +23,7 @@ type MonacoViewerDialogProps = {
   title?: string
   value: string
   language?: string
+  theme?: EditorProps["theme"]
   loading?: boolean
   error?: string | null
   className?: string
@@ -30,57 +31,44 @@ type MonacoViewerDialogProps = {
 }
 
 const defaultOptions: EditorProps["options"] = {
-  automaticLayout: true,
-  fontSize: 13,
-  minimap: { enabled: false },
-  readOnly: true,
-  scrollBeyondLastLine: false,
-  wordWrap: "on",
+  // automaticLayout: true,
+  // fontSize: 13,
+  // minimap: { enabled: false },
+  // readOnly: true,
+  // scrollBeyondLastLine: false,
+  stickyScroll: { enabled: false },
+  // wordWrap: "on",
 }
 
 export function MonacoViewerDialog({
   open,
   onOpenChange,
-  title = "\u67e5\u770b YAML",
+  title,
   value,
   language = "yaml",
-  loading = false,
-  error = null,
+  theme = "vs-dark",
   className,
   editorOptions,
 }: MonacoViewerDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        showCloseButton={false}
         className={cn(
-          "h-[80vh] max-h-[80vh] w-[80vw] max-w-[80vw] sm:max-w-[80vw] gap-0 p-0 flex flex-col overflow-hidden",
+          "h-[90vh] max-h-[90vh] sm:max-w-[90vw] flex flex-col",
           className
         )}
       >
-        <DialogHeader className="h-full gap-0 p-0 text-left">
-          <DialogTitle className="border-b px-6 py-4">{title}</DialogTitle>
-          <DialogDescription asChild className="m-0 flex-1">
-            <div className="min-h-0 flex-1 overflow-hidden rounded-b-lg">
-              {loading ? (
-                <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                  {"\u6b63\u5728\u52a0\u8f7d..."}
-                </div>
-              ) : error ? (
-                <div className="text-destructive flex h-full items-center justify-center px-6 text-sm">
-                  {error}
-                </div>
-              ) : (
-                <MonacoEditor
-                  height="100%"
-                  language={language}
-                  value={value}
-                  options={{ ...defaultOptions, ...(editorOptions ?? {}) }}
-                />
-              )}
-            </div>
-          </DialogDescription>
+        <DialogHeader>
+          {title ? <DialogTitle>{title}</DialogTitle> : null}
         </DialogHeader>
+        <DialogDescription asChild>
+          <MonacoEditor
+            language={language}
+            theme={theme}
+            value={value}
+            options={{ ...defaultOptions, ...(editorOptions ?? {}) }}
+          />
+        </DialogDescription>
       </DialogContent>
     </Dialog>
   )
