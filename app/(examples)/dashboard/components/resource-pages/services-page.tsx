@@ -5,7 +5,7 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
-import { PresetSelector } from "@/components/ui/preset-selector"
+import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
@@ -122,15 +122,13 @@ export function ServicesPageClient() {
 
   const serviceFilters = (
     <>
-      <PresetSelector
-        presets={namespaceOptions}
+      <FilterCombobox
+        options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
         placeholder={"\u540d\u79f0\u7a7a\u95f4"}
-        searchPlaceholder={"\u641c\u7d22\u540d\u79f0\u7a7a\u95f4..."}
         emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
-        groupLabel={"\u540d\u79f0\u7a7a\u95f4"}
-        triggerClassName="h-9 w-40 justify-between"
+        className="w-40"
       />
       <Input
         value={nameQuery}
