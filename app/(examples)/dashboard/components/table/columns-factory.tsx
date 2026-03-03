@@ -44,6 +44,13 @@ type CreateColumnsOptions<TData> = {
   includeDrag?: boolean
   includeSelect?: boolean
   includeActions?: boolean
+  actionItems?: ActionMenuItem[]
+}
+
+export type ActionMenuItem = {
+  label: React.ReactNode
+  variant?: "default" | "destructive"
+  withSeparator?: boolean
 }
 
 function DragHandle({ id }: { id: string }) {
@@ -135,7 +142,14 @@ function renderCell<TData>(
 export function createColumns<TData extends Record<string, unknown>>(
   options: CreateColumnsOptions<TData>
 ): ColumnDef<TData>[] {
-  const { columns, includeDrag = true, includeSelect = true, includeActions = true } = options
+  const {
+    columns,
+    includeDrag = true,
+    includeSelect = true,
+    includeActions = true,
+    actionItems,
+  } = options
+  const visibleActionItems = actionItems?.filter((item) => Boolean(item.label)) ?? []
 
   const defs: ColumnDef<TData>[] = []
 
@@ -204,26 +218,40 @@ export function createColumns<TData extends Record<string, unknown>>(
   if (includeActions) {
     defs.push({
       id: "actions",
-      cell: () => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-              size="icon"
-            >
-              <IconDotsVertical />
-              <span className="sr-only">Open menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-32">
-            <DropdownMenuItem>Edit</DropdownMenuItem>
-            <DropdownMenuItem>Copy</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      cell: () =>
+        visibleActionItems.length === 0 ? (
+          <Button
+            variant="ghost"
+            className="flex size-8 text-muted-foreground opacity-0 pointer-events-none"
+            size="icon"
+            tabIndex={-1}
+            aria-hidden
+          >
+            <IconDotsVertical />
+            <span className="sr-only">Open menu</span>
+          </Button>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="flex size-8 text-muted-foreground data-[state=open]:bg-muted focus-visible:ring-0 focus-visible:border-transparent"
+                size="icon"
+              >
+                <IconDotsVertical />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-32">
+              {visibleActionItems.map((item, index) => (
+                <React.Fragment key={`action-${index}`}>
+                  {item.withSeparator ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuItem variant={item.variant}>{item.label}</DropdownMenuItem>
+                </React.Fragment>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
       enableSorting: false,
       enableHiding: false,
     })

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
@@ -33,6 +34,26 @@ const columns = createColumns<PodRow>({
     { key: "ip", label: "IP" },
     { key: "age", label: "运行时间" },
     { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
+  ],
+  actionItems: [
+    {
+      label: (
+        <>
+          <IconEye className="size-4" />
+          {"\u67e5\u770b YAML"}
+        </>
+      ),
+    },
+    {
+      label: (
+        <>
+          <IconTrash className="size-4" />
+          {"\u5220\u9664"}
+        </>
+      ),
+      variant: "destructive",
+      withSeparator: true,
+    },
   ],
 })
 
