@@ -8,6 +8,7 @@ import { createColumns } from "@/app/(examples)/dashboard/components/table/colum
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { fetchNodes, type NodeRowApi } from "@/app/lib/kubespark/nodes"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
+import { Input } from "@/registry/new-york-v4/ui/input"
 
 const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
 
@@ -79,6 +80,7 @@ export function NodesPageClient() {
   const [rows, setRows] = React.useState<NodeRow[]>([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [nameQuery, setNameQuery] = React.useState("")
 
   React.useEffect(() => {
     let cancelled = false
@@ -143,5 +145,20 @@ export function NodesPageClient() {
     )
   }
 
-  return <DataTable data={rows} columns={columns} />
+  const query = nameQuery.trim().toLowerCase()
+  const filteredRows = rows.filter((row) => {
+    if (!query) return true
+    return row.name.toLowerCase().includes(query)
+  })
+
+  const nodeFilters = (
+    <Input
+      value={nameQuery}
+      onChange={(event) => setNameQuery(event.target.value)}
+      placeholder={"\u540d\u79f0"}
+      className="h-9 w-40"
+    />
+  )
+
+  return <DataTable data={filteredRows} columns={columns} toolbarEnd={nodeFilters} />
 }

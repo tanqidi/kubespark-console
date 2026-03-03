@@ -113,7 +113,7 @@ export function StorageClassesPageClient() {
       value={searchQuery}
       onChange={(event) => setSearchQuery(event.target.value)}
       placeholder={"名称"}
-      className="h-9 w-56"
+      className="h-9 w-40"
     />
   )
 

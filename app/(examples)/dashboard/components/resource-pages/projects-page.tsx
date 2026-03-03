@@ -7,6 +7,7 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchNamespaces, type NamespaceRow } from "@/app/lib/kubespark/projects"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
+import { Input } from "@/registry/new-york-v4/ui/input"
 
 const columns = createColumns<NamespaceRow>({
   columns: [
@@ -23,6 +24,7 @@ export function ProjectsPageClient() {
   const [rows, setRows] = React.useState<NamespaceRow[]>([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [nameQuery, setNameQuery] = React.useState("")
 
   React.useEffect(() => {
     let cancelled = false
@@ -59,5 +61,20 @@ export function ProjectsPageClient() {
     )
   }
 
-  return <DataTable data={rows} columns={columns} />
+  const query = nameQuery.trim().toLowerCase()
+  const filteredRows = rows.filter((row) => {
+    if (!query) return true
+    return row.name.toLowerCase().includes(query)
+  })
+
+  const projectFilters = (
+    <Input
+      value={nameQuery}
+      onChange={(event) => setNameQuery(event.target.value)}
+      placeholder={"\u540d\u79f0"}
+      className="h-9 w-40"
+    />
+  )
+
+  return <DataTable data={filteredRows} columns={columns} toolbarEnd={projectFilters} />
 }
