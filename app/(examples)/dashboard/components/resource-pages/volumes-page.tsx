@@ -5,6 +5,7 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { PresetSelector } from "@/components/ui/preset-selector"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
@@ -206,6 +207,13 @@ export function VolumesPageClient() {
   // if (loading) {
   //   return <ResourceLoadingState />
   // } // kept for potential future use
+  const pvcNamespaceOptions = React.useMemo(
+    () =>
+      Array.from(new Set(persistentVolumeClaims.map((row) => row.namespace)))
+        .sort((a, b) => a.localeCompare(b))
+        .map((namespace) => ({ id: namespace, name: namespace })),
+    [persistentVolumeClaims]
+  )
 
   if (error) {
     return (
@@ -232,7 +240,7 @@ export function VolumesPageClient() {
   const pvNmQuery = pvNameQuery.trim().toLowerCase()
 
   const filteredPvcRows = persistentVolumeClaims.filter((row) => {
-    if (pvcNsQuery && !row.namespace.toLowerCase().includes(pvcNsQuery)) return false
+    if (pvcNsQuery && row.namespace.toLowerCase() !== pvcNsQuery) return false
     if (pvcNmQuery && !row.name.toLowerCase().includes(pvcNmQuery)) return false
     return true
   })
@@ -244,11 +252,18 @@ export function VolumesPageClient() {
 
   const volumeFilters = view === "PVC" ? (
     <>
-      <Input
+      <PresetSelector
+        presets={pvcNamespaceOptions}
         value={pvcNamespaceQuery}
-        onChange={(event) => setPvcNamespaceQuery(event.target.value)}
+        onValueChange={setPvcNamespaceQuery}
         placeholder={"\u540d\u79f0\u7a7a\u95f4"}
-        className="h-9 w-36"
+        searchPlaceholder={"\u641c\u7d22\u540d\u79f0\u7a7a\u95f4..."}
+        emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
+        groupLabel={"\u540d\u79f0\u7a7a\u95f4"}
+        showClear
+        clearText={"\u5168\u90e8\u540d\u79f0\u7a7a\u95f4"}
+        triggerClassName="h-9 w-36 justify-between"
+        popoverClassName="w-[320px] p-0"
       />
       <Input
         value={pvcNameQuery}
@@ -259,12 +274,13 @@ export function VolumesPageClient() {
     </>
   ) : (
     <>
-      <Input
+      <PresetSelector
+        presets={[]}
         value=""
-        readOnly
-        disabled
         placeholder={"\u540d\u79f0\u7a7a\u95f4"}
-        className="h-9 w-36"
+        triggerClassName="h-9 w-36 justify-between"
+        popoverClassName="w-[320px] p-0"
+        disabled
       />
       <Input
         value={pvNameQuery}

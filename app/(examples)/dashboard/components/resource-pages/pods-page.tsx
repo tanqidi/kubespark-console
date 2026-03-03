@@ -5,6 +5,7 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { PresetSelector } from "@/components/ui/preset-selector"
 import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
 import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
@@ -94,6 +95,14 @@ export function PodsPageClient() {
     }
   }, [])
 
+  const namespaceOptions = React.useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => row.namespace)))
+        .sort((a, b) => a.localeCompare(b))
+        .map((namespace) => ({ id: namespace, name: namespace })),
+    [rows]
+  )
+
   // if (loading) return <ResourceLoadingState /> // kept for potential future use
   if (error) {
     return (
@@ -108,20 +117,26 @@ export function PodsPageClient() {
 
   const nsQuery = namespaceQuery.trim().toLowerCase()
   const nmQuery = nameQuery.trim().toLowerCase()
-
   const filteredRows = rows.filter((row) => {
-    if (nsQuery && !row.namespace.toLowerCase().includes(nsQuery)) return false
+    if (nsQuery && row.namespace.toLowerCase() !== nsQuery) return false
     if (nmQuery && !row.name.toLowerCase().includes(nmQuery)) return false
     return true
   })
 
   const podFilters = (
     <>
-      <Input
+      <PresetSelector
+        presets={namespaceOptions}
         value={namespaceQuery}
-        onChange={(event) => setNamespaceQuery(event.target.value)}
+        onValueChange={setNamespaceQuery}
         placeholder={"\u540d\u79f0\u7a7a\u95f4"}
-        className="h-9 w-36"
+        searchPlaceholder={"\u641c\u7d22\u540d\u79f0\u7a7a\u95f4..."}
+        emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
+        groupLabel={"\u540d\u79f0\u7a7a\u95f4"}
+        showClear
+        clearText={"\u5168\u90e8\u540d\u79f0\u7a7a\u95f4"}
+        triggerClassName="h-9 w-36 justify-between"
+        popoverClassName="w-[320px] p-0"
       />
       <Input
         value={nameQuery}
