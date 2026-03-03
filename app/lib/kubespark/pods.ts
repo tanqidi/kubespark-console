@@ -1,4 +1,5 @@
-﻿import { API_PROXY_BASE, fetchJsonDeduped } from "./common"
+import { API_PROXY_BASE, fetchJsonDeduped } from "./common"
+import { buildResourceDocument } from "./resource-document"
 import { formatAge, resolveUpdatedAt } from "./utils"
 
 export type PodStatusKey = "running" | "pending" | "failed" | "succeeded" | "unknown"
@@ -80,9 +81,11 @@ function phaseToStatusLabel(phase?: string): string {
 }
 
 export function podPayloadToEditorText(payload: unknown): string {
-  if (typeof payload === "string") return payload
-  if (payload && typeof payload === "object") return JSON.stringify(payload, null, 2)
-  return String(payload ?? "")
+  return buildResourceDocument({
+    type: "pod",
+    payload,
+    output: "yaml",
+  }).text
 }
 
 export function buildNamespacedPodEndpoint(namespace: string, name: string): string {
