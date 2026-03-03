@@ -25,6 +25,28 @@ type PodRow = {
   updatedAt: string
 }
 
+function buildNamespacedPodEndpoint(row: PodRow) {
+  return `${BASE}/namespaces/${encodeURIComponent(row.namespace)}/pods/${encodeURIComponent(row.name)}`
+}
+
+async function logPodYaml(row: PodRow) {
+  const requestUrl = buildNamespacedPodEndpoint(row)
+  try {
+    const result = await fetchJsonDeduped<unknown>(requestUrl)
+    console.log("[Pods] view yaml response", {
+      requestUrl,
+      pod: { name: row.name, namespace: row.namespace },
+      result,
+    })
+  } catch (error) {
+    console.error("[Pods] view yaml request failed", {
+      requestUrl,
+      pod: { name: row.name, namespace: row.namespace },
+      error,
+    })
+  }
+}
+
 const columns = createColumns<PodRow>({
   columns: [
     { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
@@ -43,6 +65,9 @@ const columns = createColumns<PodRow>({
           {"\u67e5\u770b YAML"}
         </>
       ),
+      onSelect: (row) => {
+        void logPodYaml(row)
+      },
     },
     {
       label: (
@@ -53,6 +78,11 @@ const columns = createColumns<PodRow>({
       ),
       variant: "destructive",
       withSeparator: true,
+      onSelect: (row) => {
+        console.log("[Pods] delete clicked", {
+          pod: { name: row.name, namespace: row.namespace },
+        })
+      },
     },
   ],
 })

@@ -44,13 +44,14 @@ type CreateColumnsOptions<TData> = {
   includeDrag?: boolean
   includeSelect?: boolean
   includeActions?: boolean
-  actionItems?: ActionMenuItem[]
+  actionItems?: ActionMenuItem<TData>[]
 }
 
-export type ActionMenuItem = {
+export type ActionMenuItem<TData> = {
   label: React.ReactNode
   variant?: "default" | "destructive"
   withSeparator?: boolean
+  onSelect?: (row: TData) => void
 }
 
 function DragHandle({ id }: { id: string }) {
@@ -218,7 +219,7 @@ export function createColumns<TData extends Record<string, unknown>>(
   if (includeActions) {
     defs.push({
       id: "actions",
-      cell: () =>
+      cell: ({ row }) =>
         visibleActionItems.length === 0 ? (
           <Button
             variant="ghost"
@@ -246,7 +247,12 @@ export function createColumns<TData extends Record<string, unknown>>(
               {visibleActionItems.map((item, index) => (
                 <React.Fragment key={`action-${index}`}>
                   {item.withSeparator ? <DropdownMenuSeparator /> : null}
-                  <DropdownMenuItem variant={item.variant}>{item.label}</DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant={item.variant}
+                    onSelect={() => item.onSelect?.(row.original)}
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
                 </React.Fragment>
               ))}
             </DropdownMenuContent>
