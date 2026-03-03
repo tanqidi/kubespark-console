@@ -149,9 +149,9 @@ export function WorkloadsPageClient() {
   const workloadTabs = (
     <Tabs value={typeFilter} onValueChange={(value) => setTypeFilter(value as WorkloadRow["kind"])} className="w-fit">
       <TabsList>
-        <TabsTrigger value="Deployment">部署</TabsTrigger>
-        <TabsTrigger value="StatefulSet">有状态副本集</TabsTrigger>
-        <TabsTrigger value="DaemonSet">守护进程集</TabsTrigger>
+        <TabsTrigger value="Deployment">{"\u90e8\u7f72"}</TabsTrigger>
+        <TabsTrigger value="StatefulSet">{"\u6709\u72b6\u6001\u526f\u672c\u96c6"}</TabsTrigger>
+        <TabsTrigger value="DaemonSet">{"\u5b88\u62a4\u8fdb\u7a0b\u96c6"}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -166,10 +166,7 @@ export function WorkloadsPageClient() {
         searchPlaceholder={"\u641c\u7d22\u540d\u79f0\u7a7a\u95f4..."}
         emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
         groupLabel={"\u540d\u79f0\u7a7a\u95f4"}
-        showClear
-        clearText={"\u5168\u90e8\u540d\u79f0\u7a7a\u95f4"}
-        triggerClassName="h-9 w-36 justify-between"
-        popoverClassName="w-[320px] p-0"
+        triggerClassName="h-9 w-40 justify-between"
       />
       <Input
         value={nameQuery}

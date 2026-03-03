@@ -229,8 +229,8 @@ export function VolumesPageClient() {
   const volumeTabs = (
     <Tabs value={view} onValueChange={(value) => setView(value as "PVC" | "PV")} className="w-fit">
       <TabsList>
-        <TabsTrigger value="PVC">持久卷声明</TabsTrigger>
-        <TabsTrigger value="PV">持久卷</TabsTrigger>
+        <TabsTrigger value="PVC">{"\u6301\u4e45\u5377\u58f0\u660e"}</TabsTrigger>
+        <TabsTrigger value="PV">{"\u6301\u4e45\u5377"}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -260,10 +260,7 @@ export function VolumesPageClient() {
         searchPlaceholder={"\u641c\u7d22\u540d\u79f0\u7a7a\u95f4..."}
         emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
         groupLabel={"\u540d\u79f0\u7a7a\u95f4"}
-        showClear
-        clearText={"\u5168\u90e8\u540d\u79f0\u7a7a\u95f4"}
-        triggerClassName="h-9 w-36 justify-between"
-        popoverClassName="w-[320px] p-0"
+        triggerClassName="h-9 w-40 justify-between"
       />
       <Input
         value={pvcNameQuery}
@@ -278,8 +275,7 @@ export function VolumesPageClient() {
         presets={[]}
         value=""
         placeholder={"\u540d\u79f0\u7a7a\u95f4"}
-        triggerClassName="h-9 w-36 justify-between"
-        popoverClassName="w-[320px] p-0"
+        triggerClassName="h-9 w-40 justify-between"
         disabled
       />
       <Input

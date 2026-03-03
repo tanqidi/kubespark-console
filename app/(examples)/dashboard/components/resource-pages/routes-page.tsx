@@ -168,10 +168,7 @@ export function RoutesPageClient() {
         searchPlaceholder={"\u641c\u7d22\u540d\u79f0\u7a7a\u95f4..."}
         emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
         groupLabel={"\u540d\u79f0\u7a7a\u95f4"}
-        showClear
-        clearText={"\u5168\u90e8\u540d\u79f0\u7a7a\u95f4"}
-        triggerClassName="h-9 w-36 justify-between"
-        popoverClassName="w-[320px] p-0"
+        triggerClassName="h-9 w-40 justify-between"
       />
       <Input
         value={nameQuery}

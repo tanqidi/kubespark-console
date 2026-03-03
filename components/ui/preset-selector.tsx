@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check, ChevronsUpDown, X } from "lucide-react"
 import type { Popover as PopoverPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
@@ -42,6 +42,8 @@ interface PresetSelectorProps
   triggerClassName?: string
   popoverClassName?: string
   disabled?: boolean
+  showClearButton?: boolean
+  clearButtonAriaLabel?: string
 }
 
 export function PresetSelector({
@@ -59,6 +61,8 @@ export function PresetSelector({
   triggerClassName,
   popoverClassName,
   disabled = false,
+  showClearButton = true,
+  clearButtonAriaLabel = "Clear selected item",
   ...props
 }: PresetSelectorProps) {
   const [open, setOpen] = React.useState(false)
@@ -79,6 +83,8 @@ export function PresetSelector({
     [isControlled, onValueChange]
   )
 
+  const canClearInTrigger = showClearButton && !disabled && Boolean(currentPresetId)
+
   return (
     <Popover open={open} onOpenChange={setOpen} {...props}>
       <PopoverTrigger asChild>
@@ -89,15 +95,38 @@ export function PresetSelector({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            "flex-1 justify-between md:max-w-[200px] lg:max-w-[300px]",
+            "w-full min-w-0 justify-between md:max-w-[200px] lg:max-w-[300px]",
             triggerClassName
           )}
         >
-          {selectedPreset ? selectedPreset.name : placeholder}
-          <ChevronsUpDown className="opacity-50" />
+          <span className="truncate">{selectedPreset ? selectedPreset.name : placeholder}</span>
+          <span className="ml-2 flex shrink-0 items-center gap-1">
+            {canClearInTrigger ? (
+              <span
+                role="button"
+                aria-label={clearButtonAriaLabel}
+                className="inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                }}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  updateValue("")
+                }}
+              >
+                <X className="size-3.5" />
+              </span>
+            ) : (
+              <ChevronsUpDown className="opacity-50" />
+            )}
+          </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className={cn("w-[300px] p-0", popoverClassName)}>
+      <PopoverContent
+        className={cn("w-[var(--radix-popover-trigger-width)] p-0", popoverClassName)}
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
