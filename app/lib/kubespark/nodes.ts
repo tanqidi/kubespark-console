@@ -16,6 +16,18 @@ export type NodeRowApi = {
   updatedAt: string
 }
 
+export type NodeResourceRow = {
+  id: string
+  name: string
+  ip: string
+  status: string
+  role: string
+  cpuUsage: string
+  memoryUsage: string
+  pods: string
+  updatedAt: string
+}
+
 type RawNode = {
   metadata?: {
     uid?: string
@@ -34,6 +46,7 @@ type RawNode = {
 }
 
 const NODES_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/nodes`
+const PODS_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/pods`
 
 function roleFromLabels(labels?: Record<string, string>): NodeRoleKey {
   if (!labels) return "unknown"
@@ -55,6 +68,38 @@ function unwrapItems(payload: unknown): RawNode[] {
   return Array.isArray(container?.items) ? (container.items as RawNode[]) : []
 }
 
+function unwrapPodItems(payload: unknown): Array<{ spec?: { nodeName?: string }; status?: { hostIP?: string } }> {
+  const root = (payload as { data?: unknown; items?: unknown[] } | null) ?? null
+  const container = Array.isArray(root?.items) ? root : ((root?.data ?? payload) as { items?: unknown[] })
+  return Array.isArray(container?.items)
+    ? (container.items as Array<{ spec?: { nodeName?: string }; status?: { hostIP?: string } }>)
+    : []
+}
+
+function statusLabel(status: NodeRowApi["status"]): string {
+  if (status === "ready") return "就绪"
+  if (status === "unschedulable") return "不可调度"
+  return "离线"
+}
+
+function roleLabel(role: NodeRowApi["role"]): string {
+  if (role === "controlPlane") return "控制平面"
+  if (role === "worker") return "工作节点"
+  return "未知"
+}
+
+function formatCpuUsage(used: number, total: number): string {
+  if (!total) return "-"
+  const percent = Math.round((used / total) * 100)
+  return `${percent}% (${used.toFixed(2)}/${total.toFixed(2)} cores)`
+}
+
+function formatMemUsage(used: number, total: number): string {
+  if (!total) return "-"
+  const percent = Math.round((used / total) * 100)
+  return `${percent}% (${used.toFixed(2)}/${total.toFixed(2)} GiB)`
+}
+
 export async function fetchNodes(): Promise<NodeRowApi[]> {
   const payload = await fetchJsonDeduped<unknown>(NODES_ENDPOINT)
   const items = unwrapItems(payload)
@@ -74,6 +119,37 @@ export async function fetchNodes(): Promise<NodeRowApi[]> {
       memoryTotal: parseQuantityMemGi(status.capacity?.memory),
       podsTotal: Number(status.allocatable?.pods || 0),
       updatedAt: resolveUpdatedAt(item),
+    }
+  })
+}
+
+export async function fetchNodeResourceRows(): Promise<NodeResourceRow[]> {
+  const [nodes, podsPayload] = await Promise.all([
+    fetchNodes(),
+    fetchJsonDeduped<unknown>(PODS_ENDPOINT),
+  ])
+
+  const usedMap = new Map<string, number>()
+  const podItems = unwrapPodItems(podsPayload)
+
+  podItems.forEach((item) => {
+    const nodeKey = item.spec?.nodeName || item.status?.hostIP
+    if (!nodeKey) return
+    usedMap.set(nodeKey, (usedMap.get(nodeKey) || 0) + 1)
+  })
+
+  return nodes.map((node) => {
+    const usedPods = usedMap.get(node.name) || usedMap.get(node.ip) || 0
+    return {
+      id: node.id,
+      name: node.name,
+      ip: node.ip,
+      status: statusLabel(node.status),
+      role: roleLabel(node.role),
+      cpuUsage: formatCpuUsage(0, node.cpuTotal),
+      memoryUsage: formatMemUsage(0, node.memoryTotal),
+      pods: node.podsTotal ? `${usedPods}/${node.podsTotal}` : `${usedPods}/-`,
+      updatedAt: node.updatedAt,
     }
   })
 }

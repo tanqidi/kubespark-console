@@ -5,24 +5,15 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  fetchServiceRows,
+  type ServiceResourceRow,
+} from "@/app/lib/kubespark/resource-rows"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
-import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
-const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
-
-type ServiceRow = {
-  id: string
-  name: string
-  type: string
-  namespace: string
-  clusterIp: string
-  ports: string
-  age: string
-  updatedAt: string
-}
+type ServiceRow = ServiceResourceRow
 
 const columns = createColumns<ServiceRow>({
   columns: [
@@ -36,11 +27,6 @@ const columns = createColumns<ServiceRow>({
   ],
 })
 
-function unwrapItems(payload: any): any[] {
-  const data = payload?.data ?? payload
-  return Array.isArray(data?.items) ? data.items : []
-}
-
 export function ServicesPageClient() {
   const [rows, setRows] = React.useState<ServiceRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -53,34 +39,15 @@ export function ServicesPageClient() {
     setLoading(true)
     setError(null)
 
-    fetchJsonDeduped<any>(`${BASE}/services`)
-      .then((json) => {
+    fetchServiceRows()
+      .then((mapped) => {
         if (cancelled) return
-        const items = unwrapItems(json)
-        const mapped = items.slice(0, 300).map((item, index) => {
-          const metadata = item?.metadata || {}
-          const spec = item?.spec || {}
-          const name = metadata.name || "-"
-          const ports = Array.isArray(spec.ports)
-            ? spec.ports.map((p: any) => `${p?.port}/${p?.protocol ?? "TCP"}`).join(",")
-            : "-"
-          return {
-            id: String(metadata.uid ?? `${name}-${index}`),
-            name,
-            type: spec.type || "-",
-            namespace: String(metadata.namespace ?? "default"),
-            clusterIp: String(spec.clusterIP ?? "-"),
-            ports,
-            age: formatAge(metadata.creationTimestamp),
-            updatedAt: resolveUpdatedAt(item),
-          }
-        })
         setRows(mapped)
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         if (!cancelled) {
           setRows([])
-          setError(e?.message || "API request failed")
+          setError(e instanceof Error ? e.message : "API request failed")
         }
       })
       .finally(() => {

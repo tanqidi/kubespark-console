@@ -5,24 +5,11 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
-import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { fetchNodes, type NodeRowApi } from "@/app/lib/kubespark/nodes"
+import { fetchNodeResourceRows, type NodeResourceRow } from "@/app/lib/kubespark/nodes"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
-const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
-
-type NodeRow = {
-  id: string
-  name: string
-  ip: string
-  status: string
-  role: string
-  cpuUsage: string
-  memoryUsage: string
-  pods: string
-  updatedAt: string
-}
+type NodeRow = NodeResourceRow
 
 const columns = createColumns<NodeRow>({
   columns: [
@@ -47,35 +34,6 @@ const columns = createColumns<NodeRow>({
   ],
 })
 
-function unwrapItems(payload: any): any[] {
-  const data = payload?.data ?? payload
-  return Array.isArray(data?.items) ? data.items : []
-}
-
-function statusLabel(status: NodeRowApi["status"]): string {
-  if (status === "ready") return "\u5c31\u7eea"
-  if (status === "unschedulable") return "\u4e0d\u53ef\u8c03\u5ea6"
-  return "\u79bb\u7ebf"
-}
-
-function roleLabel(role: NodeRowApi["role"]): string {
-  if (role === "controlPlane") return "\u63a7\u5236\u5e73\u9762"
-  if (role === "worker") return "\u5de5\u4f5c\u8282\u70b9"
-  return "\u672a\u77e5"
-}
-
-function formatCpuUsage(used: number, total: number): string {
-  if (!total) return "-"
-  const percent = Math.round((used / total) * 100)
-  return `${percent}% (${used.toFixed(2)}/${total.toFixed(2)} cores)`
-}
-
-function formatMemUsage(used: number, total: number): string {
-  if (!total) return "-"
-  const percent = Math.round((used / total) * 100)
-  return `${percent}% (${used.toFixed(2)}/${total.toFixed(2)} GiB)`
-}
-
 export function NodesPageClient() {
   const [rows, setRows] = React.useState<NodeRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -87,42 +45,15 @@ export function NodesPageClient() {
     setLoading(true)
     setError(null)
 
-    Promise.all([
-      fetchNodes(),
-      fetchJsonDeduped<any>(`${BASE}/pods`),
-    ])
-      .then(([nodes, podsJson]) => {
+    fetchNodeResourceRows()
+      .then((mapped) => {
         if (cancelled) return
-        const podItems = unwrapItems(podsJson)
-        const usedMap = new Map<string, number>()
-
-        podItems.forEach((item) => {
-          const nodeKey = item?.spec?.nodeName || item?.status?.hostIP
-          if (!nodeKey) return
-          usedMap.set(nodeKey, (usedMap.get(nodeKey) || 0) + 1)
-        })
-
-        const mapped = nodes.map((node) => {
-          const usedPods = usedMap.get(node.name) || usedMap.get(node.ip) || 0
-          return {
-            id: node.id,
-            name: node.name,
-            ip: node.ip,
-            status: statusLabel(node.status),
-            role: roleLabel(node.role),
-            cpuUsage: formatCpuUsage(0, node.cpuTotal),
-            memoryUsage: formatMemUsage(0, node.memoryTotal),
-            pods: node.podsTotal ? `${usedPods}/${node.podsTotal}` : `${usedPods}/-`,
-            updatedAt: node.updatedAt,
-          }
-        })
-
         setRows(mapped)
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         if (!cancelled) {
           setRows([])
-          setError(e?.message || "API request failed")
+          setError(e instanceof Error ? e.message : "API request failed")
         }
       })
       .finally(() => {

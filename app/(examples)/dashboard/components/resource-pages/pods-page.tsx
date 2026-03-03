@@ -6,100 +6,18 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  buildNamespacedPodEndpoint,
+  fetchNamespacedPodYaml,
+  fetchPodResourceRows,
+  type PodResourceRow,
+} from "@/app/lib/kubespark/pods"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
-import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
-const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
-
-type PodRow = {
-  id: string
-  name: string
-  status: string
-  namespace: string
-  node: string
-  ip: string
-  age: string
-  updatedAt: string
-}
-
-function buildNamespacedPodEndpoint(row: PodRow) {
-  return `${BASE}/namespaces/${encodeURIComponent(row.namespace)}/pods/${encodeURIComponent(row.name)}`
-}
-
-function getToken() {
-  if (typeof window === "undefined") return null
-  return localStorage.getItem("kubespark_token") || sessionStorage.getItem("kubespark_token")
-}
-
-function toEditorText(payload: unknown): string {
-  if (typeof payload === "string") return payload
-  if (payload && typeof payload === "object") return JSON.stringify(payload, null, 2)
-  return String(payload ?? "")
-}
-
-async function fetchPodYaml(row: PodRow): Promise<string> {
-  const requestUrl = buildNamespacedPodEndpoint(row)
-  const headers = new Headers()
-  const token = getToken()
-  if (token) headers.set("Authorization", `Bearer ${token}`)
-
-  const res = await fetch(requestUrl, {
-    method: "GET",
-    cache: "no-store",
-    headers,
-  })
-
-  const rawText = await res.text()
-  let parsed: unknown = rawText
-
-  if (rawText) {
-    try {
-      parsed = JSON.parse(rawText)
-    } catch {
-      parsed = rawText
-    }
-  }
-
-  if (!res.ok) {
-    const detail = rawText ? `: ${rawText.slice(0, 300)}` : ""
-    throw new Error(`请求失败，状态码 ${res.status}${detail}`)
-  }
-
-  let payload: unknown = parsed
-  if (parsed && typeof parsed === "object") {
-    const maybeData = (parsed as { data?: unknown }).data
-    if (typeof maybeData !== "undefined") payload = maybeData
-  }
-
-  console.log("[Pods] view yaml response", {
-    requestUrl,
-    pod: { name: row.name, namespace: row.namespace },
-    result: payload,
-  })
-
-  return toEditorText(payload)
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
-}
-
-function unwrapItems(payload: unknown): unknown[] {
-  const envelope = asRecord(payload)
-  const data = typeof envelope.data !== "undefined" ? envelope.data : payload
-  const dataRecord = asRecord(data)
-  const items = dataRecord.items
-  return Array.isArray(items) ? items : []
-}
-
-function resolvePodStatus(phase?: string): string {
-  if (!phase) return "Unknown"
-  return phase
-}
+type PodRow = PodResourceRow
 
 export function PodsPageClient() {
   const [rows, setRows] = React.useState<PodRow[]>([])
@@ -118,15 +36,20 @@ export function PodsPageClient() {
     setYamlLoading(true)
     setYamlContent("")
 
-    void fetchPodYaml(row)
-      .then((content) => {
-        setYamlContent(content)
+    void fetchNamespacedPodYaml(row.namespace, row.name)
+      .then(({ requestUrl, payload, text }) => {
+        setYamlContent(text)
+        console.log("[Pods] view yaml response", {
+          requestUrl,
+          pod: { name: row.name, namespace: row.namespace },
+          result: payload,
+        })
       })
       .catch((e: unknown) => {
         const message = e instanceof Error ? e.message : "加载 YAML 失败"
         setYamlError(message)
         console.error("[Pods] view yaml request failed", {
-          requestUrl: buildNamespacedPodEndpoint(row),
+          requestUrl: buildNamespacedPodEndpoint(row.namespace, row.name),
           pod: { name: row.name, namespace: row.namespace },
           error: e,
         })
@@ -190,33 +113,9 @@ export function PodsPageClient() {
     setLoading(true)
     setError(null)
 
-    fetchJsonDeduped<unknown>(`${BASE}/pods`)
-      .then((json) => {
+    fetchPodResourceRows()
+      .then((mapped) => {
         if (cancelled) return
-        const items = unwrapItems(json)
-        const mapped = items.slice(0, 300).map((item, index) => {
-          const resource = asRecord(item)
-          const metadata = asRecord(resource.metadata)
-          const status = asRecord(resource.status)
-          const spec = asRecord(resource.spec)
-          const name = String(metadata.name ?? "-")
-          return {
-            id: String(metadata.uid ?? `${name}-${index}`),
-            name,
-            status: resolvePodStatus(
-              typeof status.phase === "string" ? status.phase : undefined
-            ),
-            namespace: String(metadata.namespace ?? "default"),
-            node: String(spec.nodeName ?? status.hostIP ?? "-"),
-            ip: String(status.podIP ?? "-"),
-            age: formatAge(
-              typeof metadata.creationTimestamp === "string"
-                ? metadata.creationTimestamp
-                : undefined
-            ),
-            updatedAt: resolveUpdatedAt(item),
-          }
-        })
         setRows(mapped)
       })
       .catch((e: unknown) => {

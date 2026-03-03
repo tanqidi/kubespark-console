@@ -5,24 +5,15 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  fetchSecretRows,
+  type SecretResourceRow,
+} from "@/app/lib/kubespark/resource-rows"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
-import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
-const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
-
-type SecretRow = {
-  id: string
-  name: string
-  namespace: string
-  type: string
-  dataItems: number
-  size: string
-  age: string
-  updatedAt: string
-}
+type SecretRow = SecretResourceRow
 
 const columns = createColumns<SecretRow>({
   columns: [
@@ -36,25 +27,6 @@ const columns = createColumns<SecretRow>({
   ],
 })
 
-function unwrapItems(payload: any): any[] {
-  const data = payload?.data ?? payload
-  return Array.isArray(data?.items) ? data.items : []
-}
-
-function byteLengthOf(obj: any): number {
-  try {
-    const encoded = new TextEncoder().encode(JSON.stringify(obj ?? {}))
-    return encoded.length
-  } catch {
-    return 0
-  }
-}
-
-function formatSize(bytes: number): string {
-  if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} Mi`
-  return `${(bytes / 1024).toFixed(1)} Ki`
-}
-
 export function SecretsPageClient() {
   const [rows, setRows] = React.useState<SecretRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -67,32 +39,15 @@ export function SecretsPageClient() {
     setLoading(true)
     setError(null)
 
-    fetchJsonDeduped<any>(`${BASE}/secrets`)
-      .then((json) => {
+    fetchSecretRows()
+      .then((mapped) => {
         if (cancelled) return
-        const items = unwrapItems(json)
-        const mapped = items.slice(0, 300).map((item, index) => {
-          const metadata = item?.metadata || {}
-          const dataObj = item?.data || {}
-          const dataItems = Object.keys(dataObj).length
-          const sizeBytes = byteLengthOf(dataObj)
-          return {
-            id: String(metadata.uid ?? `${metadata.name || "secret"}-${index}`),
-            name: metadata.name || "-",
-            namespace: String(metadata.namespace ?? "default"),
-            type: item?.type || "-",
-            dataItems,
-            size: formatSize(sizeBytes),
-            age: formatAge(metadata.creationTimestamp),
-            updatedAt: resolveUpdatedAt(item),
-          }
-        })
         setRows(mapped)
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         if (!cancelled) {
           setRows([])
-          setError(e?.message || "API request failed")
+          setError(e instanceof Error ? e.message : "API request failed")
         }
       })
       .finally(() => {

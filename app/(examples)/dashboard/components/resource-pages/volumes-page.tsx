@@ -5,40 +5,18 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  fetchVolumeRows,
+  type PersistentVolumeClaimResourceRow,
+  type PersistentVolumeResourceRow,
+} from "@/app/lib/kubespark/resource-rows"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
-import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/registry/new-york-v4/ui/tabs"
 
-const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
-
-type JsonObject = Record<string, unknown>
-
-type PersistentVolumeRow = {
-  id: string
-  name: string
-  capacity: string
-  storageClass: string
-  accessMode: string
-  reclaimPolicy: string
-  status: string
-  node: string
-  updatedAt: string
-}
-
-type PersistentVolumeClaimRow = {
-  id: string
-  name: string
-  namespace: string
-  capacity: string
-  storageClass: string
-  accessMode: string
-  status: string
-  boundPV: string
-  updatedAt: string
-}
+type PersistentVolumeRow = PersistentVolumeResourceRow
+type PersistentVolumeClaimRow = PersistentVolumeClaimResourceRow
 
 const persistentVolumeColumns = createColumns<PersistentVolumeRow>({
   columns: [
@@ -66,101 +44,12 @@ const persistentVolumeClaimColumns = createColumns<PersistentVolumeClaimRow>({
   ],
 })
 
-function isObject(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function asObject(value: unknown): JsonObject {
-  return isObject(value) ? value : {}
-}
-
-function asString(value: unknown, fallback = "-"): string {
-  return typeof value === "string" && value.length > 0 ? value : fallback
-}
-
-function asStringList(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
-}
-
-function unwrapItems(payload: unknown): unknown[] {
-  const root = asObject(payload)
-  const container = root.data ?? payload
-  const items = asObject(container).items
-  return Array.isArray(items) ? items : []
-}
-
 function resolveErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message
-  if (isObject(error) && typeof error.message === "string") return error.message
+  if (typeof error === "object" && error !== null && "message" in error && typeof error.message === "string") {
+    return error.message
+  }
   return "API request failed"
-}
-
-function mapPersistentVolumes(items: unknown[]): PersistentVolumeRow[] {
-  return items.slice(0, 300).map((item, index) => {
-    const resource = asObject(item)
-    const metadata = asObject(resource.metadata)
-    const spec = asObject(resource.spec)
-    const status = asObject(resource.status)
-
-    const accessModes = asStringList(spec.accessModes)
-    const accessMode = accessModes.length ? accessModes.join(",") : "-"
-
-    const nodeAffinity = asObject(spec.nodeAffinity)
-    const required = asObject(nodeAffinity.required)
-    const selectorTerms = Array.isArray(required.nodeSelectorTerms) ? required.nodeSelectorTerms : []
-    const firstTerm = selectorTerms[0]
-    const matchExpressions = Array.isArray(asObject(firstTerm).matchExpressions)
-      ? (asObject(firstTerm).matchExpressions as unknown[])
-      : []
-    const firstExpression = matchExpressions[0]
-    const values = asStringList(asObject(firstExpression).values)
-    const node = values[0] ?? "-"
-
-    const capacity = asObject(spec.capacity)
-
-    return {
-      id: asString(metadata.uid, `${asString(metadata.name, "pv")}-${index}`),
-      name: asString(metadata.name),
-      capacity: asString(capacity.storage),
-      storageClass: asString(spec.storageClassName),
-      accessMode,
-      reclaimPolicy: asString(spec.persistentVolumeReclaimPolicy),
-      status: asString(status.phase),
-      node,
-      updatedAt: resolveUpdatedAt(resource),
-    }
-  })
-}
-
-function mapPersistentVolumeClaims(items: unknown[]): PersistentVolumeClaimRow[] {
-  return items.slice(0, 300).map((item, index) => {
-    const resource = asObject(item)
-    const metadata = asObject(resource.metadata)
-    const spec = asObject(resource.spec)
-    const status = asObject(resource.status)
-
-    const accessModes = asStringList(spec.accessModes)
-    const accessMode = accessModes.length ? accessModes.join(",") : "-"
-
-    const specResources = asObject(spec.resources)
-    const requests = asObject(specResources.requests)
-    const capacity = asString(asObject(status.capacity).storage, asString(requests.storage))
-
-    return {
-      id: asString(
-        metadata.uid,
-        `${asString(metadata.namespace, "default")}-${asString(metadata.name, "pvc")}-${index}`
-      ),
-      name: asString(metadata.name),
-      namespace: asString(metadata.namespace, "default"),
-      capacity,
-      storageClass: asString(spec.storageClassName),
-      accessMode,
-      status: asString(status.phase),
-      boundPV: asString(spec.volumeName),
-      updatedAt: resolveUpdatedAt(resource),
-    }
-  })
 }
 
 export function VolumesPageClient() {
@@ -180,14 +69,11 @@ export function VolumesPageClient() {
     setLoading(true)
     setError(null)
 
-    Promise.all([
-      fetchJsonDeduped<unknown>(`${BASE}/persistentvolumeclaims`),
-      fetchJsonDeduped<unknown>(`${BASE}/persistentvolumes`),
-    ])
-      .then(([pvcJson, pvJson]) => {
+    fetchVolumeRows()
+      .then(({ persistentVolumeClaims: pvcRows, persistentVolumes: pvRows }) => {
         if (cancelled) return
-        setPersistentVolumeClaims(mapPersistentVolumeClaims(unwrapItems(pvcJson)))
-        setPersistentVolumes(mapPersistentVolumes(unwrapItems(pvJson)))
+        setPersistentVolumeClaims(pvcRows)
+        setPersistentVolumes(pvRows)
       })
       .catch((error: unknown) => {
         if (!cancelled) {

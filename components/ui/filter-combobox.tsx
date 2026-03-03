@@ -50,7 +50,7 @@ export function FilterCombobox({
       disabled={disabled}
     >
       <ComboboxInput placeholder={placeholder} className={className} disabled={disabled} />
-      <ComboboxContent>
+      <ComboboxContent className="duration-0 data-open:animate-none data-closed:animate-none">
         <ComboboxEmpty>{emptyText}</ComboboxEmpty>
         <ComboboxList>
           {(item) => (

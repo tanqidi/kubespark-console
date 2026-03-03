@@ -5,23 +5,14 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
-import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
+import {
+  fetchStorageClassRows,
+  type StorageClassResourceRow,
+} from "@/app/lib/kubespark/resource-rows"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
-const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
-
-type StorageClassRow = {
-  id: string
-  name: string
-  provisioner: string
-  reclaimPolicy: string
-  volumeBindingMode: string
-  allowExpansion: string
-  age: string
-  updatedAt: string
-}
+type StorageClassRow = StorageClassResourceRow
 
 const columns = createColumns<StorageClassRow>({
   columns: [
@@ -35,16 +26,6 @@ const columns = createColumns<StorageClassRow>({
   ],
 })
 
-function unwrapItems(payload: any): any[] {
-  const data = payload?.data ?? payload
-  return Array.isArray(data?.items) ? data.items : []
-}
-
-function formatAllowExpansion(value: unknown): string {
-  if (typeof value !== "boolean") return "-"
-  return value ? "Yes" : "No"
-}
-
 export function StorageClassesPageClient() {
   const [rows, setRows] = React.useState<StorageClassRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -56,29 +37,15 @@ export function StorageClassesPageClient() {
     setLoading(true)
     setError(null)
 
-    fetchJsonDeduped<any>(`${BASE}/storageclasses`)
-      .then((json) => {
+    fetchStorageClassRows()
+      .then((mapped) => {
         if (cancelled) return
-        const items = unwrapItems(json)
-        const mapped = items.slice(0, 300).map((item, index) => {
-          const metadata = item?.metadata || {}
-          return {
-            id: String(metadata.uid ?? `${metadata.name || "storageclass"}-${index}`),
-            name: metadata.name || "-",
-            provisioner: item?.provisioner || "-",
-            reclaimPolicy: item?.reclaimPolicy || "-",
-            volumeBindingMode: item?.volumeBindingMode || "-",
-            allowExpansion: formatAllowExpansion(item?.allowVolumeExpansion),
-            age: formatAge(metadata.creationTimestamp),
-            updatedAt: resolveUpdatedAt(item),
-          }
-        })
         setRows(mapped)
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         if (!cancelled) {
           setRows([])
-          setError(e?.message || "API request failed")
+          setError(e instanceof Error ? e.message : "API request failed")
         }
       })
       .finally(() => {

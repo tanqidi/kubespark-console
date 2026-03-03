@@ -5,24 +5,15 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  fetchRouteRows,
+  type RouteResourceRow,
+} from "@/app/lib/kubespark/resource-rows"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
-import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
-const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
-
-type RouteRow = {
-  id: string
-  name: string
-  namespace: string
-  host: string
-  path: string
-  service: string
-  age: string
-  updatedAt: string
-}
+type RouteRow = RouteResourceRow
 
 const columns = createColumns<RouteRow>({
   columns: [
@@ -36,11 +27,6 @@ const columns = createColumns<RouteRow>({
   ],
 })
 
-function unwrapItems(payload: any): any[] {
-  const data = payload?.data ?? payload
-  return Array.isArray(data?.items) ? data.items : []
-}
-
 export function RoutesPageClient() {
   const [rows, setRows] = React.useState<RouteRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -53,72 +39,15 @@ export function RoutesPageClient() {
     setLoading(true)
     setError(null)
 
-    fetchJsonDeduped<any>(`${BASE}/ingresses`)
-      .then((json) => {
+    fetchRouteRows()
+      .then((mapped) => {
         if (cancelled) return
-        const items = unwrapItems(json)
-        const mapped: RouteRow[] = []
-
-        items.slice(0, 300).forEach((item, index) => {
-          const metadata = item?.metadata || {}
-          const spec = item?.spec || {}
-          const rules: any[] = Array.isArray(spec.rules) ? spec.rules : []
-          const baseId = String(metadata.uid ?? `${metadata.name || "ingress"}-${index}`)
-          const updatedAt = resolveUpdatedAt(item)
-
-          if (!rules.length) {
-            mapped.push({
-              id: `${baseId}-0`,
-              name: metadata.name || "-",
-              namespace: String(metadata.namespace ?? "default"),
-              host: "-",
-              path: "/",
-              service: "-",
-              age: formatAge(metadata.creationTimestamp),
-              updatedAt,
-            })
-            return
-          }
-
-          rules.forEach((rule, ruleIndex) => {
-            const host = rule?.host ?? "-"
-            const paths: any[] = rule?.http?.paths || []
-            if (!paths.length) {
-              mapped.push({
-                id: `${baseId}-${ruleIndex}`,
-                name: metadata.name || "-",
-                namespace: String(metadata.namespace ?? "default"),
-                host,
-                path: "/",
-                service: "-",
-                age: formatAge(metadata.creationTimestamp),
-                updatedAt,
-              })
-              return
-            }
-            paths.forEach((p, pathIndex) => {
-              const backend = p?.backend?.service
-              const svcName = backend?.name || backend?.serviceName || "-"
-              mapped.push({
-                id: `${baseId}-${ruleIndex}-${pathIndex}`,
-                name: metadata.name || "-",
-                namespace: String(metadata.namespace ?? "default"),
-                host,
-                path: p?.path || "/",
-                service: svcName,
-                age: formatAge(metadata.creationTimestamp),
-                updatedAt,
-              })
-            })
-          })
-        })
-
         setRows(mapped)
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         if (!cancelled) {
           setRows([])
-          setError(e?.message || "API request failed")
+          setError(e instanceof Error ? e.message : "API request failed")
         }
       })
       .finally(() => {

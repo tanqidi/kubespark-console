@@ -5,28 +5,16 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  fetchWorkloadRows,
+  type WorkloadResourceRow,
+} from "@/app/lib/kubespark/resource-rows"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
-import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/registry/new-york-v4/ui/tabs"
 
-const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
-
-type WorkloadRow = {
-  id: string
-  name: string
-  status: string
-  namespace: string
-  desired: number
-  updated: number
-  available: number
-  ready: number
-  age: string
-  updatedAt: string
-  kind: "Deployment" | "StatefulSet" | "DaemonSet"
-}
+type WorkloadRow = WorkloadResourceRow
 
 const columns = createColumns<WorkloadRow>({
   columns: [
@@ -42,17 +30,6 @@ const columns = createColumns<WorkloadRow>({
   ],
 })
 
-function unwrapItems(payload: any): any[] {
-  const data = payload?.data ?? payload
-  return Array.isArray(data?.items) ? data.items : []
-}
-
-function resolveWorkloadStatus(desired: number, updated: number, available: number, ready: number): string {
-  if (ready >= Math.max(1, desired) || available >= desired) return "Normal"
-  if (ready > 0 || updated > 0) return "Updating"
-  return "Abnormal"
-}
-
 export function WorkloadsPageClient() {
   const [rows, setRows] = React.useState<WorkloadRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -66,46 +43,15 @@ export function WorkloadsPageClient() {
     setLoading(true)
     setError(null)
 
-    Promise.all([
-      fetchJsonDeduped<any>(`${BASE}/deployments`),
-      fetchJsonDeduped<any>(`${BASE}/daemonsets`),
-      fetchJsonDeduped<any>(`${BASE}/statefulsets`),
-    ])
-      .then((results) => {
+    fetchWorkloadRows()
+      .then((mapped) => {
         if (cancelled) return
-        const items = results.flatMap((json) => unwrapItems(json))
-        const mapped: WorkloadRow[] = items.slice(0, 300).map((item, index) => {
-          const metadata = item?.metadata || {}
-          const kind = item?.kind as WorkloadRow["kind"] | undefined
-          const resolvedKind =
-            kind === "DaemonSet" || kind === "StatefulSet" || kind === "Deployment"
-              ? kind
-              : "Deployment"
-          const desired = item?.spec?.replicas ?? item?.status?.desiredNumberScheduled ?? 0
-          const updated = item?.status?.updatedReplicas ?? item?.status?.updatedNumberScheduled ?? 0
-          const available = item?.status?.availableReplicas ?? item?.status?.numberAvailable ?? 0
-          const ready = item?.status?.readyReplicas ?? item?.status?.numberReady ?? 0
-          const name = metadata.name || "-"
-          return {
-            id: String(metadata.uid ?? `${name}-${index}`),
-            name,
-            status: resolveWorkloadStatus(desired, updated, available, ready),
-            namespace: String(metadata.namespace ?? "default"),
-            desired,
-            updated,
-            available,
-            ready,
-            age: formatAge(metadata.creationTimestamp),
-            updatedAt: resolveUpdatedAt(item),
-            kind: resolvedKind,
-          }
-        })
         setRows(mapped)
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         if (!cancelled) {
           setRows([])
-          setError(e?.message || "API request failed")
+          setError(e instanceof Error ? e.message : "API request failed")
         }
       })
       .finally(() => {

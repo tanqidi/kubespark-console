@@ -5,26 +5,13 @@ import * as React from "react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { fetchJobRows, type JobResourceRow } from "@/app/lib/kubespark/resource-rows"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
-import { fetchJsonDeduped } from "@/app/lib/kubespark/common"
-import { formatAge, resolveUpdatedAt } from "@/app/lib/kubespark/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/registry/new-york-v4/ui/tabs"
 
-const BASE = "/api/kubespark/kapis/resources.kubespark.io/v1alpha1"
-
-type JobRow = {
-  id: string
-  name: string
-  status: string
-  namespace: string
-  duration: string
-  retry: number
-  age: string
-  updatedAt: string
-  kind: "Job" | "CronJob"
-}
+type JobRow = JobResourceRow
 
 const columns = createColumns<JobRow>({
   columns: [
@@ -37,38 +24,6 @@ const columns = createColumns<JobRow>({
     { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
   ],
 })
-
-function unwrapItems(payload: any): any[] {
-  const data = payload?.data ?? payload
-  return Array.isArray(data?.items) ? data.items : []
-}
-
-function resolveJobStatus(item: any): string {
-  const status = item?.status || {}
-  if (status.succeeded && status.succeeded > 0) return "Succeeded"
-  if (status.active && status.active > 0) return "Running"
-  if (status.failed && status.failed > 0) return "Failed"
-  return "Pending"
-}
-
-function resolveCronJobStatus(item: any): string {
-  const status = item?.status || {}
-  const activeJobs = Array.isArray(status.active) ? status.active.length : 0
-  if (activeJobs > 0) return "Running"
-  if (status.lastScheduleTime) return "Succeeded"
-  return "Pending"
-}
-
-function resolveJobDuration(item: any): string {
-  const status = item?.status || {}
-  const start = Date.parse(status.startTime ?? "")
-  const end = Date.parse(status.completionTime ?? "")
-  if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
-    const sec = Math.max(1, Math.round((end - start) / 1000))
-    return `${sec}s`
-  }
-  return "-"
-}
 
 export function JobsPageClient() {
   const [rows, setRows] = React.useState<JobRow[]>([])
@@ -83,36 +38,15 @@ export function JobsPageClient() {
     setLoading(true)
     setError(null)
 
-    Promise.all([
-      fetchJsonDeduped<any>(`${BASE}/jobs`),
-      fetchJsonDeduped<any>(`${BASE}/cronjobs`),
-    ])
-      .then((results) => {
+    fetchJobRows()
+      .then((mapped) => {
         if (cancelled) return
-        const items = results.flatMap((json) => unwrapItems(json))
-        const mapped: JobRow[] = items.slice(0, 300).map((item, index) => {
-          const metadata = item?.metadata || {}
-          const status = item?.status || {}
-          const name = metadata.name || "-"
-          const kind = item?.kind === "CronJob" ? "CronJob" : "Job"
-          return {
-            id: String(metadata.uid ?? `${kind}-${name}-${index}`),
-            name,
-            status: kind === "CronJob" ? resolveCronJobStatus(item) : resolveJobStatus(item),
-            namespace: String(metadata.namespace ?? "default"),
-            duration: kind === "CronJob" ? "-" : resolveJobDuration(item),
-            retry: Number(status.failed) || 0,
-            age: formatAge(metadata.creationTimestamp),
-            updatedAt: resolveUpdatedAt(item),
-            kind,
-          }
-        })
         setRows(mapped)
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
         if (!cancelled) {
           setRows([])
-          setError(e?.message || "API request failed")
+          setError(e instanceof Error ? e.message : "API request failed")
         }
       })
       .finally(() => {

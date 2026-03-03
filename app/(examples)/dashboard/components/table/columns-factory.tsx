@@ -8,7 +8,7 @@ import {
   IconLoader,
 } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
-import { type ColumnDef } from "@tanstack/react-table"
+import { type ColumnDef, type HeaderContext } from "@tanstack/react-table"
 
 import { cn } from "@/lib/utils"
 import { Badge } from "@/registry/new-york-v4/ui/badge"
@@ -195,16 +195,28 @@ export function createColumns<TData extends Record<string, unknown>>(
 
   defs.push(
     ...columns.map((col) => {
-      const header = col.header ?? col.label
-      const headerNode = col.headerClassName ? (
-        <div className={cn("w-full", col.headerClassName)}>{header}</div>
-      ) : (
-        header
-      )
+      const rawHeader = col.header ?? col.label
+      const normalizedHeader =
+        rawHeader === null ||
+        typeof rawHeader === "undefined" ||
+        typeof rawHeader === "boolean"
+          ? ""
+          : rawHeader
+      const headerTemplate: ColumnDef<TData>["header"] =
+        typeof normalizedHeader === "string"
+          ? normalizedHeader
+          : (_ctx: HeaderContext<TData, unknown>) =>
+              col.headerClassName ? (
+                <div className={cn("w-full", col.headerClassName)}>
+                  {normalizedHeader}
+                </div>
+              ) : (
+                <>{normalizedHeader}</>
+              )
 
       return {
         accessorKey: col.key,
-        header: headerNode,
+        header: headerTemplate,
         cell: ({ row, getValue }) =>
           renderCell(col, getValue(), row.original, row.id),
         enableHiding: col.enableHiding ?? true,
