@@ -1,34 +1,41 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
+import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   fetchWorkloadRows,
   type WorkloadResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
+import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/registry/new-york-v4/ui/tabs"
 
 type WorkloadRow = WorkloadResourceRow
 
-const columns = createColumns<WorkloadRow>({
-  columns: [
-    { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
-    { key: "status", label: "\u72b6\u6001", render: "status" },
-    { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
-    { key: "desired", label: "\u671f\u671b", align: "right" },
-    { key: "updated", label: "\u66f4\u65b0", align: "right" },
-    { key: "available", label: "\u53ef\u7528", align: "right" },
-    { key: "ready", label: "\u5c31\u7eea", align: "right" },
-    { key: "age", label: "运行时间" },
-    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
-  ],
-})
+const workloadColumns: ColumnConfig<WorkloadRow>[] = [
+  { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
+  { key: "status", label: "\u72b6\u6001", render: "status" as const },
+  { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
+  { key: "desired", label: "\u671f\u671b", align: "right" as const },
+  { key: "updated", label: "\u66f4\u65b0", align: "right" as const },
+  { key: "available", label: "\u53ef\u7528", align: "right" as const },
+  { key: "ready", label: "\u5c31\u7eea", align: "right" as const },
+  { key: "age", label: "杩愯鏃堕棿" },
+  { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
+]
+
+const WORKLOAD_RESOURCE_BY_KIND: Record<WorkloadRow["kind"], string> = {
+  Deployment: "deployments",
+  StatefulSet: "statefulsets",
+  DaemonSet: "daemonsets",
+}
 
 export function WorkloadsPageClient() {
   const [rows, setRows] = React.useState<WorkloadRow[]>([])
@@ -37,6 +44,80 @@ export function WorkloadsPageClient() {
   const [typeFilter, setTypeFilter] = React.useState<WorkloadRow["kind"]>("Deployment")
   const [namespaceQuery, setNamespaceQuery] = React.useState("")
   const [nameQuery, setNameQuery] = React.useState("")
+  const [yamlOpen, setYamlOpen] = React.useState(false)
+  const [yamlContent, setYamlContent] = React.useState("")
+  const [yamlLoading, setYamlLoading] = React.useState(false)
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
+
+  const handleViewYaml = React.useCallback((row: WorkloadRow) => {
+    const resource = WORKLOAD_RESOURCE_BY_KIND[row.kind]
+    setYamlOpen(true)
+    setYamlError(null)
+    setYamlLoading(true)
+    setYamlContent("")
+
+    void fetchNamespacedResourceYaml(resource, row.namespace, row.name)
+      .then(({ payload, text }) => {
+        setYamlContent(text)
+        console.log("[Workloads] view yaml response", {
+          kind: row.kind,
+          resource,
+          workload: { name: row.name, namespace: row.namespace },
+          result: payload,
+        })
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        setYamlError(message)
+        console.error("[Workloads] view yaml request failed", {
+          kind: row.kind,
+          resource,
+          workload: { name: row.name, namespace: row.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setYamlLoading(false)
+      })
+  }, [])
+
+  const columns = React.useMemo(
+    () =>
+      createColumns<WorkloadRow>({
+        columns: workloadColumns,
+        actionItems: [
+          {
+            label: (
+              <>
+                <IconEye className="size-4" />
+                {"\u67e5\u770b YAML"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewYaml(row)
+            },
+          },
+          {
+            label: (
+              <>
+                <IconTrash className="size-4" />
+                {"\u5220\u9664"}
+              </>
+            ),
+            variant: "destructive",
+            withSeparator: true,
+            onSelect: (row) => {
+              console.log("[Workloads] delete clicked", {
+                kind: row.kind,
+                resource: WORKLOAD_RESOURCE_BY_KIND[row.kind],
+                workload: { name: row.name, namespace: row.namespace },
+              })
+            },
+          },
+        ],
+      }),
+    [handleViewYaml]
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -122,11 +203,22 @@ export function WorkloadsPageClient() {
   )
 
   return (
-    <DataTable
-      data={filteredRows}
-      columns={columns}
-      toolbarStart={workloadTabs}
-      toolbarEnd={workloadFilters}
-    />
+    <>
+      <MonacoViewerDialog
+        title="查看YAML"
+        open={yamlOpen}
+        onOpenChange={setYamlOpen}
+        value={yamlContent}
+        language="yaml"
+        loading={yamlLoading}
+        error={yamlError}
+      />
+      <DataTable
+        data={filteredRows}
+        columns={columns}
+        toolbarStart={workloadTabs}
+        toolbarEnd={workloadFilters}
+      />
+    </>
   )
 }

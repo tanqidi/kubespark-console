@@ -1,31 +1,32 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
+import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   fetchServiceRows,
   type ServiceResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
+import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
 type ServiceRow = ServiceResourceRow
 
-const columns = createColumns<ServiceRow>({
-  columns: [
-    { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
-    { key: "type", label: "\u7c7b\u578b", render: "badge" },
-    { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
-    { key: "clusterIp", label: "Cluster IP" },
-    { key: "ports", label: "\u7aef\u53e3" },
-    { key: "age", label: "运行时间" },
-    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
-  ],
-})
+const serviceColumns: ColumnConfig<ServiceRow>[] = [
+  { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
+  { key: "type", label: "\u7c7b\u578b", render: "badge" as const },
+  { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
+  { key: "clusterIp", label: "Cluster IP" },
+  { key: "ports", label: "\u7aef\u53e3" },
+  { key: "age", label: "杩愯鏃堕棿" },
+  { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
+]
 
 export function ServicesPageClient() {
   const [rows, setRows] = React.useState<ServiceRow[]>([])
@@ -33,6 +34,74 @@ export function ServicesPageClient() {
   const [error, setError] = React.useState<string | null>(null)
   const [namespaceQuery, setNamespaceQuery] = React.useState("")
   const [nameQuery, setNameQuery] = React.useState("")
+  const [yamlOpen, setYamlOpen] = React.useState(false)
+  const [yamlContent, setYamlContent] = React.useState("")
+  const [yamlLoading, setYamlLoading] = React.useState(false)
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
+
+  const handleViewYaml = React.useCallback((row: ServiceRow) => {
+    setYamlOpen(true)
+    setYamlError(null)
+    setYamlLoading(true)
+    setYamlContent("")
+
+    void fetchNamespacedResourceYaml("services", row.namespace, row.name)
+      .then(({ payload, text }) => {
+        setYamlContent(text)
+        console.log("[Services] view yaml response", {
+          service: { name: row.name, namespace: row.namespace },
+          result: payload,
+        })
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        setYamlError(message)
+        console.error("[Services] view yaml request failed", {
+          service: { name: row.name, namespace: row.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setYamlLoading(false)
+      })
+  }, [])
+
+  const columns = React.useMemo(
+    () =>
+      createColumns<ServiceRow>({
+        columns: serviceColumns,
+        actionItems: [
+          {
+            label: (
+              <>
+                <IconEye className="size-4" />
+                {"\u67e5\u770b YAML"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewYaml(row)
+            },
+          },
+          {
+            label: (
+              <>
+                <IconTrash className="size-4" />
+                {"\u5220\u9664"}
+              </>
+            ),
+            variant: "destructive",
+            withSeparator: true,
+            onSelect: (row) => {
+              console.log("[Services] delete clicked", {
+                resource: "services",
+                service: { name: row.name, namespace: row.namespace },
+              })
+            },
+          },
+        ],
+      }),
+    [handleViewYaml]
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -106,5 +175,18 @@ export function ServicesPageClient() {
     </>
   )
 
-  return <DataTable data={filteredRows} columns={columns} toolbarEnd={serviceFilters} />
+  return (
+    <>
+      <MonacoViewerDialog
+        title="查看YAML"
+        open={yamlOpen}
+        onOpenChange={setYamlOpen}
+        value={yamlContent}
+        language="yaml"
+        loading={yamlLoading}
+        error={yamlError}
+      />
+      <DataTable data={filteredRows} columns={columns} toolbarEnd={serviceFilters} />
+    </>
+  )
 }

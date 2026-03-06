@@ -1,31 +1,32 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
+import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   fetchRouteRows,
   type RouteResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
+import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
 type RouteRow = RouteResourceRow
 
-const columns = createColumns<RouteRow>({
-  columns: [
-    { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
-    { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
-    { key: "host", label: "\u57df\u540d" },
-    { key: "path", label: "\u8def\u5f84" },
-    { key: "service", label: "\u670d\u52a1" },
-    { key: "age", label: "运行时间" },
-    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
-  ],
-})
+const routeColumns: ColumnConfig<RouteRow>[] = [
+  { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
+  { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
+  { key: "host", label: "\u57df\u540d" },
+  { key: "path", label: "\u8def\u5f84" },
+  { key: "service", label: "\u670d\u52a1" },
+  { key: "age", label: "杩愯鏃堕棿" },
+  { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
+]
 
 export function RoutesPageClient() {
   const [rows, setRows] = React.useState<RouteRow[]>([])
@@ -33,6 +34,74 @@ export function RoutesPageClient() {
   const [error, setError] = React.useState<string | null>(null)
   const [namespaceQuery, setNamespaceQuery] = React.useState("")
   const [nameQuery, setNameQuery] = React.useState("")
+  const [yamlOpen, setYamlOpen] = React.useState(false)
+  const [yamlContent, setYamlContent] = React.useState("")
+  const [yamlLoading, setYamlLoading] = React.useState(false)
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
+
+  const handleViewYaml = React.useCallback((row: RouteRow) => {
+    setYamlOpen(true)
+    setYamlError(null)
+    setYamlLoading(true)
+    setYamlContent("")
+
+    void fetchNamespacedResourceYaml("ingresses", row.namespace, row.name)
+      .then(({ payload, text }) => {
+        setYamlContent(text)
+        console.log("[Routes] view yaml response", {
+          ingress: { name: row.name, namespace: row.namespace },
+          result: payload,
+        })
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        setYamlError(message)
+        console.error("[Routes] view yaml request failed", {
+          ingress: { name: row.name, namespace: row.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setYamlLoading(false)
+      })
+  }, [])
+
+  const columns = React.useMemo(
+    () =>
+      createColumns<RouteRow>({
+        columns: routeColumns,
+        actionItems: [
+          {
+            label: (
+              <>
+                <IconEye className="size-4" />
+                {"\u67e5\u770b YAML"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewYaml(row)
+            },
+          },
+          {
+            label: (
+              <>
+                <IconTrash className="size-4" />
+                {"\u5220\u9664"}
+              </>
+            ),
+            variant: "destructive",
+            withSeparator: true,
+            onSelect: (row) => {
+              console.log("[Routes] delete clicked", {
+                resource: "ingresses",
+                ingress: { name: row.name, namespace: row.namespace },
+              })
+            },
+          },
+        ],
+      }),
+    [handleViewYaml]
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -106,5 +175,18 @@ export function RoutesPageClient() {
     </>
   )
 
-  return <DataTable data={filteredRows} columns={columns} toolbarEnd={routeFilters} />
+  return (
+    <>
+      <MonacoViewerDialog
+        title="查看YAML"
+        open={yamlOpen}
+        onOpenChange={setYamlOpen}
+        value={yamlContent}
+        language="yaml"
+        loading={yamlLoading}
+        error={yamlError}
+      />
+      <DataTable data={filteredRows} columns={columns} toolbarEnd={routeFilters} />
+    </>
+  )
 }
