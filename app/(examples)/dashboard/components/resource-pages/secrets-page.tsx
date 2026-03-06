@@ -49,7 +49,9 @@ export function SecretsPageClient() {
     setYamlLoading(true)
     setYamlContent("")
 
-    void fetchNamespacedResourceYaml("secrets", row.namespace, row.name)
+    void fetchNamespacedResourceYaml("secrets", row.namespace, row.name, {
+      documentType: "secret",
+    })
       .then(({ payload, text }) => {
         setYamlContent(text)
         console.log("[Secrets] view yaml response", {

@@ -48,7 +48,9 @@ export function ConfigMapsPageClient() {
     setYamlLoading(true)
     setYamlContent("")
 
-    void fetchNamespacedResourceYaml("configmaps", row.namespace, row.name)
+    void fetchNamespacedResourceYaml("configmaps", row.namespace, row.name, {
+      documentType: "configmap",
+    })
       .then(({ payload, text }) => {
         setYamlContent(text)
         console.log("[ConfigMaps] view yaml response", {
