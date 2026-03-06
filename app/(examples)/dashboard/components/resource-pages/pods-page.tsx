@@ -7,10 +7,12 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
+  deletePod,
   fetchNamespacedPodYaml,
   fetchPodResourceRows,
   type PodResourceRow,
 } from "@/app/lib/kubespark/pods"
+import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
@@ -28,6 +30,8 @@ export function PodsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PodRow | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
 
   const handleViewYaml = React.useCallback((row: PodRow) => {
     setYamlOpen(true)
@@ -55,6 +59,32 @@ export function PodsPageClient() {
         setYamlLoading(false)
       })
   }, [])
+
+  const requestDelete = React.useCallback((row: PodRow) => {
+    setPendingDeleteRow(row)
+  }, [])
+
+  const handleConfirmDelete = React.useCallback(() => {
+    if (!pendingDeleteRow || deleting) return
+    setDeleting(true)
+
+    void deletePod(pendingDeleteRow.namespace, pendingDeleteRow.name)
+      .then(() => {
+        setRows((prev) => prev.filter((item) => item.id !== pendingDeleteRow.id))
+        setPendingDeleteRow(null)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "删除失败"
+        setError(message)
+        console.error("[Pods] delete request failed", {
+          pod: { name: pendingDeleteRow.name, namespace: pendingDeleteRow.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setDeleting(false)
+      })
+  }, [deleting, pendingDeleteRow])
 
   const columns = React.useMemo(
     () =>
@@ -95,14 +125,12 @@ export function PodsPageClient() {
             variant: "destructive",
             withSeparator: true,
             onSelect: (row) => {
-              console.log("[Pods] delete clicked", {
-                pod: { name: row.name, namespace: row.namespace },
-              })
+              requestDelete(row)
             },
           },
         ],
       }),
-    [handleViewYaml]
+    [handleViewYaml, requestDelete]
   )
 
   React.useEffect(() => {
@@ -187,6 +215,20 @@ export function PodsPageClient() {
         language="yaml"
         loading={yamlLoading}
         error={yamlError}
+      />
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeleteRow)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDeleteRow(null)
+        }}
+        title="删除容器组"
+        description={
+          pendingDeleteRow
+            ? `确定删除容器组 ${pendingDeleteRow.name} 吗？`
+            : ""
+        }
+        deleting={deleting}
+        onConfirm={handleConfirmDelete}
       />
       <DataTable data={filteredRows} columns={columns} toolbarEnd={podFilters} />
     </>

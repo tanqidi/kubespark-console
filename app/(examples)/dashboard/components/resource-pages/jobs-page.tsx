@@ -6,7 +6,9 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { fetchJobRows, type JobResourceRow } from "@/app/lib/kubespark/resource-rows"
+import { deleteJob } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
@@ -42,6 +44,8 @@ export function JobsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [pendingDeleteRow, setPendingDeleteRow] = React.useState<JobRow | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
 
   const handleViewYaml = React.useCallback((row: JobRow) => {
     const resource = JOB_RESOURCE_BY_KIND[row.kind]
@@ -75,6 +79,33 @@ export function JobsPageClient() {
       })
   }, [])
 
+  const requestDelete = React.useCallback((row: JobRow) => {
+    setPendingDeleteRow(row)
+  }, [])
+
+  const handleConfirmDelete = React.useCallback(() => {
+    if (!pendingDeleteRow || deleting) return
+    setDeleting(true)
+
+    void deleteJob(pendingDeleteRow.kind, pendingDeleteRow.namespace, pendingDeleteRow.name)
+      .then(() => {
+        setRows((prev) => prev.filter((item) => item.id !== pendingDeleteRow.id))
+        setPendingDeleteRow(null)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "删除失败"
+        setError(message)
+        console.error("[Jobs] delete request failed", {
+          kind: pendingDeleteRow.kind,
+          job: { name: pendingDeleteRow.name, namespace: pendingDeleteRow.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setDeleting(false)
+      })
+  }, [deleting, pendingDeleteRow])
+
   const columns = React.useMemo(
     () =>
       createColumns<JobRow>({
@@ -101,16 +132,12 @@ export function JobsPageClient() {
             variant: "destructive",
             withSeparator: true,
             onSelect: (row) => {
-              console.log("[Jobs] delete clicked", {
-                kind: row.kind,
-                resource: JOB_RESOURCE_BY_KIND[row.kind],
-                job: { name: row.name, namespace: row.namespace },
-              })
+              requestDelete(row)
             },
           },
         ],
       }),
-    [handleViewYaml]
+    [handleViewYaml, requestDelete]
   )
 
   React.useEffect(() => {
@@ -205,6 +232,20 @@ export function JobsPageClient() {
         language="yaml"
         loading={yamlLoading}
         error={yamlError}
+      />
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeleteRow)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDeleteRow(null)
+        }}
+        title="删除任务"
+        description={
+          pendingDeleteRow
+            ? `确定删除任务 ${pendingDeleteRow.name} 吗？`
+            : ""
+        }
+        deleting={deleting}
+        onConfirm={handleConfirmDelete}
       />
       <DataTable
         data={filteredRows}

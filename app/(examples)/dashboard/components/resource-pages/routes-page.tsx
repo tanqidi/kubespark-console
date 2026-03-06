@@ -6,10 +6,12 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {
   fetchRouteRows,
   type RouteResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
+import { deleteIngress } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
@@ -24,7 +26,7 @@ const routeColumns: ColumnConfig<RouteRow>[] = [
   { key: "host", label: "\u57df\u540d" },
   { key: "path", label: "\u8def\u5f84" },
   { key: "service", label: "\u670d\u52a1" },
-  { key: "age", label: "杩愯鏃堕棿" },
+  { key: "age", label: "\u8fd0\u884c\u65f6\u95f4" },
   { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
 ]
 
@@ -38,6 +40,8 @@ export function RoutesPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [pendingDeleteRow, setPendingDeleteRow] = React.useState<RouteRow | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
 
   const handleViewYaml = React.useCallback((row: RouteRow) => {
     setYamlOpen(true)
@@ -66,6 +70,37 @@ export function RoutesPageClient() {
       })
   }, [])
 
+  const requestDelete = React.useCallback((row: RouteRow) => {
+    setPendingDeleteRow(row)
+  }, [])
+
+  const handleConfirmDelete = React.useCallback(() => {
+    if (!pendingDeleteRow || deleting) return
+    setDeleting(true)
+
+    void deleteIngress(pendingDeleteRow.namespace, pendingDeleteRow.name)
+      .then(() => {
+        setRows((prev) =>
+          prev.filter(
+            (item) =>
+              !(item.namespace === pendingDeleteRow.namespace && item.name === pendingDeleteRow.name)
+          )
+        )
+        setPendingDeleteRow(null)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "删除失败"
+        setError(message)
+        console.error("[Routes] delete request failed", {
+          ingress: { name: pendingDeleteRow.name, namespace: pendingDeleteRow.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setDeleting(false)
+      })
+  }, [deleting, pendingDeleteRow])
+
   const columns = React.useMemo(
     () =>
       createColumns<RouteRow>({
@@ -92,15 +127,12 @@ export function RoutesPageClient() {
             variant: "destructive",
             withSeparator: true,
             onSelect: (row) => {
-              console.log("[Routes] delete clicked", {
-                resource: "ingresses",
-                ingress: { name: row.name, namespace: row.namespace },
-              })
+              requestDelete(row)
             },
           },
         ],
       }),
-    [handleViewYaml]
+    [handleViewYaml, requestDelete]
   )
 
   React.useEffect(() => {
@@ -185,6 +217,20 @@ export function RoutesPageClient() {
         language="yaml"
         loading={yamlLoading}
         error={yamlError}
+      />
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeleteRow)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDeleteRow(null)
+        }}
+        title="删除应用路由"
+        description={
+          pendingDeleteRow
+            ? `确定删除应用路由 ${pendingDeleteRow.name} 吗？`
+            : ""
+        }
+        deleting={deleting}
+        onConfirm={handleConfirmDelete}
       />
       <DataTable data={filteredRows} columns={columns} toolbarEnd={routeFilters} />
     </>

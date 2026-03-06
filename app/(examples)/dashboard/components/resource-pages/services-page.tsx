@@ -6,10 +6,12 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {
   fetchServiceRows,
   type ServiceResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
+import { deleteService } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
@@ -24,7 +26,7 @@ const serviceColumns: ColumnConfig<ServiceRow>[] = [
   { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
   { key: "clusterIp", label: "Cluster IP" },
   { key: "ports", label: "\u7aef\u53e3" },
-  { key: "age", label: "杩愯鏃堕棿" },
+  { key: "age", label: "\u8fd0\u884c\u65f6\u95f4" },
   { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
 ]
 
@@ -38,6 +40,8 @@ export function ServicesPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [pendingDeleteRow, setPendingDeleteRow] = React.useState<ServiceRow | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
 
   const handleViewYaml = React.useCallback((row: ServiceRow) => {
     setYamlOpen(true)
@@ -66,6 +70,32 @@ export function ServicesPageClient() {
       })
   }, [])
 
+  const requestDelete = React.useCallback((row: ServiceRow) => {
+    setPendingDeleteRow(row)
+  }, [])
+
+  const handleConfirmDelete = React.useCallback(() => {
+    if (!pendingDeleteRow || deleting) return
+    setDeleting(true)
+
+    void deleteService(pendingDeleteRow.namespace, pendingDeleteRow.name)
+      .then(() => {
+        setRows((prev) => prev.filter((item) => item.id !== pendingDeleteRow.id))
+        setPendingDeleteRow(null)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "删除失败"
+        setError(message)
+        console.error("[Services] delete request failed", {
+          service: { name: pendingDeleteRow.name, namespace: pendingDeleteRow.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setDeleting(false)
+      })
+  }, [deleting, pendingDeleteRow])
+
   const columns = React.useMemo(
     () =>
       createColumns<ServiceRow>({
@@ -92,15 +122,12 @@ export function ServicesPageClient() {
             variant: "destructive",
             withSeparator: true,
             onSelect: (row) => {
-              console.log("[Services] delete clicked", {
-                resource: "services",
-                service: { name: row.name, namespace: row.namespace },
-              })
+              requestDelete(row)
             },
           },
         ],
       }),
-    [handleViewYaml]
+    [handleViewYaml, requestDelete]
   )
 
   React.useEffect(() => {
@@ -185,6 +212,20 @@ export function ServicesPageClient() {
         language="yaml"
         loading={yamlLoading}
         error={yamlError}
+      />
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeleteRow)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDeleteRow(null)
+        }}
+        title="删除服务"
+        description={
+          pendingDeleteRow
+            ? `确定删除服务 ${pendingDeleteRow.name} 吗？`
+            : ""
+        }
+        deleting={deleting}
+        onConfirm={handleConfirmDelete}
       />
       <DataTable data={filteredRows} columns={columns} toolbarEnd={serviceFilters} />
     </>

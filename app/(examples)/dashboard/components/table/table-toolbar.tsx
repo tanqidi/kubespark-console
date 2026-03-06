@@ -1,12 +1,12 @@
-"use client"
+﻿"use client"
 
+import * as React from "react"
 import { IconChevronDown, IconLayoutColumns, IconPlus, IconTrash } from "@tabler/icons-react"
 import { type Column, type Table } from "@tanstack/react-table"
-import { type ReactNode } from "react"
 
+import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -30,12 +30,17 @@ export function TableToolbar<TData>({
   onDeleteSelected,
 }: {
   table: Table<TData>
-  startContent?: ReactNode
-  endContent?: ReactNode
+  startContent?: React.ReactNode
+  endContent?: React.ReactNode
   onDeleteSelected?: () => void
 }) {
   const selectedCount = table.getFilteredSelectedRowModel().rows.length
   const showDelete = selectedCount > 0
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!showDelete) setDeleteDialogOpen(false)
+  }, [showDelete])
 
   return (
     <div className="relative min-h-9">
@@ -107,19 +112,25 @@ export function TableToolbar<TData>({
         )}
         aria-hidden={!showDelete}
       >
-        <ConfirmDialog
-          trigger={
-            <Button variant="destructive" size="sm" className="transition-none">
-              <IconTrash />
-              <span className="hidden lg:inline">删除</span>
-            </Button>
-          }
-          title="批量删除容器组"
+        <Button
+          variant="destructive"
+          size="sm"
+          className="transition-none"
+          onClick={() => setDeleteDialogOpen(true)}
+        >
+          <IconTrash />
+          <span className="hidden lg:inline">删除</span>
+        </Button>
+
+        <DeleteConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          title="批量删除"
           description={`此操作不可撤销，将删除已选中的 ${selectedCount} 条数据。`}
-          cancelText="取消"
-          confirmText="删除"
-          confirmVariant="destructive"
-          onConfirm={onDeleteSelected}
+          onConfirm={() => {
+            onDeleteSelected?.()
+            setDeleteDialogOpen(false)
+          }}
         />
       </div>
     </div>

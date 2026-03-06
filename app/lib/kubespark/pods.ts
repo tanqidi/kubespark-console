@@ -1,4 +1,4 @@
-import { API_PROXY_BASE, fetchJsonDeduped } from "./common"
+import { API_PROXY_BASE, deleteResource, fetchJsonDeduped } from "./common"
 import { buildResourceDocument } from "./resource-document"
 import { formatAge, resolveUpdatedAt } from "./utils"
 
@@ -100,6 +100,10 @@ export async function fetchNamespacedPodYaml(namespace: string, name: string): P
     payload,
     text: podPayloadToEditorText(payload),
   }
+}
+
+export async function deletePod(namespace: string, name: string): Promise<void> {
+  return deleteResource("core", "v1", "pods", name, namespace)
 }
 
 export async function fetchPods(): Promise<PodRow[]> {
