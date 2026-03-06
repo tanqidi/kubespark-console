@@ -43,3 +43,11 @@ export async function deleteService(namespace: string, name: string): Promise<vo
 export async function deleteIngress(namespace: string, name: string): Promise<void> {
   return deleteResource("networking.k8s.io", "v1", "ingresses", name, namespace)
 }
+
+export async function deleteConfigMap(namespace: string, name: string): Promise<void> {
+  return deleteResource("core", "v1", "configmaps", name, namespace)
+}
+
+export async function deleteSecret(namespace: string, name: string): Promise<void> {
+  return deleteResource("core", "v1", "secrets", name, namespace)
+}

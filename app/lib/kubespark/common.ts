@@ -36,6 +36,15 @@ export type ResourceCollectionResult<T> = {
   items: T[];
 };
 
+export type ResourceItemQuery = {
+  namespace?: string;
+};
+
+export type ResourceItemResult<T> = {
+  requestUrl: string;
+  payload: T;
+};
+
 export function buildResourceCollectionEndpoint(
   group: string,
   version: string,
@@ -64,6 +73,36 @@ export async function fetchResourceCollection<T = unknown>(
     requestUrl,
     payload,
     items: unwrapItems(payload) as T[],
+  };
+}
+
+export function buildResourceItemEndpoint(
+  group: string,
+  version: string,
+  resource: string,
+  name: string,
+  query?: ResourceItemQuery,
+): string {
+  const searchParams = new URLSearchParams();
+  if (query?.namespace) searchParams.set("namespace", query.namespace);
+
+  const base = `${RESOURCE_ENDPOINT_BASE}/${encodeURIComponent(group)}/${encodeURIComponent(version)}/${encodeURIComponent(resource)}/${encodeURIComponent(name)}`;
+  const queryString = searchParams.toString();
+  return queryString ? `${base}?${queryString}` : base;
+}
+
+export async function fetchResourceItem<T = unknown>(
+  group: string,
+  version: string,
+  resource: string,
+  name: string,
+  query?: ResourceItemQuery,
+): Promise<ResourceItemResult<T>> {
+  const requestUrl = buildResourceItemEndpoint(group, version, resource, name, query);
+  const payload = await fetchJsonDeduped<T>(requestUrl);
+  return {
+    requestUrl,
+    payload,
   };
 }
 
@@ -126,7 +165,6 @@ export async function fetchJsonDeduped<T>(url: string, init: RequestInit = {}): 
 }
 
 export async function deleteResource(group: string, version: string, resource: string, name: string, namespace?: string): Promise<void> {
-  const nsQuery = namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
-  const url = `${RESOURCE_ENDPOINT_BASE}/${encodeURIComponent(group)}/${encodeURIComponent(version)}/${encodeURIComponent(resource)}/${encodeURIComponent(name)}${nsQuery}`;
+  const url = buildResourceItemEndpoint(group, version, resource, name, { namespace });
   await fetchJsonDeduped<unknown>(url, { method: "DELETE" });
 }

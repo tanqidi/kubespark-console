@@ -1,30 +1,33 @@
 "use client"
 
 import * as React from "react"
+import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   fetchConfigMapRows,
   type ConfigMapResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
+import { deleteConfigMap } from "@/app/lib/kubespark/resource-delete"
+import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Input } from "@/registry/new-york-v4/ui/input"
 
 type ConfigMapRow = ConfigMapResourceRow
 
-const columns = createColumns<ConfigMapRow>({
-  columns: [
-    { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
-    { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
-    { key: "dataItems", label: "\u6570\u636e\u9879", align: "right" },
-    { key: "size", label: "\u5927\u5c0f", align: "right" },
-    { key: "age", label: "运行时间" },
-    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
-  ],
-})
+const configMapColumns: ColumnConfig<ConfigMapRow>[] = [
+  { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
+  { key: "namespace", label: "命名空间" },
+  { key: "dataItems", label: "数据项", align: "right" },
+  { key: "size", label: "大小", align: "right" },
+  { key: "age", label: "运行时间" },
+  { key: "updatedAt", label: "更新时间" },
+]
 
 export function ConfigMapsPageClient() {
   const [rows, setRows] = React.useState<ConfigMapRow[]>([])
@@ -32,6 +35,109 @@ export function ConfigMapsPageClient() {
   const [error, setError] = React.useState<string | null>(null)
   const [namespaceQuery, setNamespaceQuery] = React.useState("")
   const [nameQuery, setNameQuery] = React.useState("")
+  const [yamlOpen, setYamlOpen] = React.useState(false)
+  const [yamlContent, setYamlContent] = React.useState("")
+  const [yamlLoading, setYamlLoading] = React.useState(false)
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [pendingDeleteRow, setPendingDeleteRow] = React.useState<ConfigMapRow | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
+
+  const handleViewYaml = React.useCallback((row: ConfigMapRow) => {
+    setYamlOpen(true)
+    setYamlError(null)
+    setYamlLoading(true)
+    setYamlContent("")
+
+    void fetchNamespacedResourceYaml("configmaps", row.namespace, row.name)
+      .then(({ payload, text }) => {
+        setYamlContent(text)
+        console.log("[ConfigMaps] view yaml response", {
+          configmap: { name: row.name, namespace: row.namespace },
+          result: payload,
+        })
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        setYamlError(message)
+        console.error("[ConfigMaps] view yaml request failed", {
+          configmap: { name: row.name, namespace: row.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setYamlLoading(false)
+      })
+  }, [])
+
+  const requestDelete = React.useCallback((row: ConfigMapRow) => {
+    setPendingDeleteRow(row)
+  }, [])
+
+  const handleConfirmDelete = React.useCallback(() => {
+    if (!pendingDeleteRow || deleting) return
+    setDeleting(true)
+
+    void deleteConfigMap(pendingDeleteRow.namespace, pendingDeleteRow.name)
+      .then(() => {
+        setPendingDeleteRow(null)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "删除失败"
+        setError(message)
+        console.error("[ConfigMaps] delete request failed", {
+          configmap: { name: pendingDeleteRow.name, namespace: pendingDeleteRow.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setDeleting(false)
+      })
+  }, [deleting, pendingDeleteRow])
+
+  const handleDeleteSelectedRows = React.useCallback((selectedRows: ConfigMapRow[]) => {
+    if (selectedRows.length === 0) return
+    void Promise.all(
+      selectedRows.map((row) => deleteConfigMap(row.namespace, row.name))
+    ).catch((e: unknown) => {
+      const message = e instanceof Error ? e.message : "删除失败"
+      setError(message)
+      console.error("[ConfigMaps] bulk delete request failed", e)
+    })
+  }, [])
+
+  const columns = React.useMemo(
+    () =>
+      createColumns<ConfigMapRow>({
+        columns: configMapColumns,
+        actionItems: [
+          {
+            label: (
+              <>
+                <IconEye className="size-4" />
+                {"查看 YAML"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewYaml(row)
+            },
+          },
+          {
+            label: (
+              <>
+                <IconTrash className="size-4" />
+                {"删除"}
+              </>
+            ),
+            variant: "destructive",
+            withSeparator: true,
+            onSelect: (row) => {
+              requestDelete(row)
+            },
+          },
+        ],
+      }),
+    [handleViewYaml, requestDelete]
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -83,7 +189,7 @@ export function ConfigMapsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
+          <AlertTitle>{"加载失败"}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -104,18 +210,50 @@ export function ConfigMapsPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"\u540d\u79f0\u7a7a\u95f4"}
-        emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
+        placeholder={"命名空间"}
+        emptyText={"未找到命名空间"}
         className="w-40"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"\u540d\u79f0"}
+        placeholder={"名称"}
         className="h-9 w-40"
       />
     </>
   )
 
-  return <DataTable data={filteredRows} columns={columns} toolbarEnd={configMapFilters} />
+  return (
+    <>
+      <MonacoViewerDialog
+        title="查看YAML"
+        open={yamlOpen}
+        onOpenChange={setYamlOpen}
+        value={yamlContent}
+        language="yaml"
+        loading={yamlLoading}
+        error={yamlError}
+      />
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeleteRow)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDeleteRow(null)
+        }}
+        title="删除配置字典"
+        description={
+          pendingDeleteRow
+            ? `确定删除配置字典 ${pendingDeleteRow.name} 吗？`
+            : ""
+        }
+        deleting={deleting}
+        onConfirm={handleConfirmDelete}
+      />
+      <DataTable
+        data={filteredRows}
+        columns={columns}
+        toolbarEnd={configMapFilters}
+        onDeleteSelectedRows={handleDeleteSelectedRows}
+      />
+    </>
+  )
 }

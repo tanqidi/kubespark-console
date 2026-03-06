@@ -1,9 +1,7 @@
 import { stringify } from "yaml"
 
-import { API_PROXY_BASE, fetchJsonDeduped } from "./common"
+import { buildResourceItemEndpoint, fetchResourceItem } from "./common"
 import { buildResourceDocument, type ResourceDocumentType } from "./resource-document"
-
-const RESOURCE_BASE = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1`
 
 export type NamespacedResourceYamlResult = {
   requestUrl: string
@@ -11,24 +9,75 @@ export type NamespacedResourceYamlResult = {
   text: string
 }
 
+type NamespacedResourceYamlOptions = {
+  documentType?: ResourceDocumentType
+  group?: string
+  version?: string
+}
+
+type ResourceGvr = {
+  group: string
+  version: string
+}
+
+function resolveResourceGvr(
+  resource: string,
+  options?: Pick<NamespacedResourceYamlOptions, "group" | "version">
+): ResourceGvr {
+  const group = options?.group?.trim()
+  const version = options?.version?.trim()
+  if (group && version) return { group, version }
+  if (group || version) {
+    throw new Error(`Invalid GVR options for ${resource}: group and version are both required`)
+  }
+
+  switch (resource) {
+    case "services":
+    case "pods":
+    case "configmaps":
+    case "secrets":
+    case "persistentvolumeclaims":
+      return { group: "core", version: "v1" }
+    case "ingresses":
+      return { group: "networking.k8s.io", version: "v1" }
+    case "jobs":
+    case "cronjobs":
+      return { group: "batch", version: "v1" }
+    case "deployments":
+    case "statefulsets":
+    case "daemonsets":
+      return { group: "apps", version: "v1" }
+    default:
+      throw new Error(
+        `Unknown resource GVR for ${resource}. Please provide group and version in options.`
+      )
+  }
+}
+
 export function buildNamespacedResourceEndpoint(
   resource: string,
   namespace: string,
-  name: string
+  name: string,
+  options?: Pick<NamespacedResourceYamlOptions, "group" | "version">
 ): string {
-  return `${RESOURCE_BASE}/namespaces/${encodeURIComponent(namespace)}/${encodeURIComponent(resource)}/${encodeURIComponent(name)}`
+  const { group, version } = resolveResourceGvr(resource, options)
+  return buildResourceItemEndpoint(group, version, resource, name, { namespace })
 }
 
 export async function fetchNamespacedResourceYaml(
   resource: string,
   namespace: string,
   name: string,
-  options?: {
-    documentType?: ResourceDocumentType
-  }
+  options?: NamespacedResourceYamlOptions
 ): Promise<NamespacedResourceYamlResult> {
-  const requestUrl = buildNamespacedResourceEndpoint(resource, namespace, name)
-  const payload = await fetchJsonDeduped<unknown>(requestUrl)
+  const { group, version } = resolveResourceGvr(resource, options)
+  const { requestUrl, payload } = await fetchResourceItem<unknown>(
+    group,
+    version,
+    resource,
+    name,
+    { namespace }
+  )
   const text = options?.documentType
     ? buildResourceDocument({
         type: options.documentType,

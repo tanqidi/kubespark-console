@@ -1,4 +1,9 @@
-import { API_PROXY_BASE, deleteResource, fetchJsonDeduped, fetchResourceCollection } from "./common"
+import {
+  buildResourceItemEndpoint,
+  deleteResource,
+  fetchResourceCollection,
+  fetchResourceItem,
+} from "./common"
 import { buildResourceDocument } from "./resource-document"
 import { formatAge, resolveUpdatedAt } from "./utils"
 
@@ -47,8 +52,6 @@ export type PodYamlResult = {
   text: string
 }
 
-const RESOURCE_BASE = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1`
-
 function phaseToStatusKey(phase?: string): PodStatusKey {
   switch (phase) {
     case "Running":
@@ -78,12 +81,17 @@ export function podPayloadToEditorText(payload: unknown): string {
 }
 
 export function buildNamespacedPodEndpoint(namespace: string, name: string): string {
-  return `${RESOURCE_BASE}/namespaces/${encodeURIComponent(namespace)}/pods/${encodeURIComponent(name)}`
+  return buildResourceItemEndpoint("core", "v1", "pods", name, { namespace })
 }
 
 export async function fetchNamespacedPodYaml(namespace: string, name: string): Promise<PodYamlResult> {
-  const requestUrl = buildNamespacedPodEndpoint(namespace, name)
-  const payload = await fetchJsonDeduped<unknown>(requestUrl)
+  const { requestUrl, payload } = await fetchResourceItem<unknown>(
+    "core",
+    "v1",
+    "pods",
+    name,
+    { namespace }
+  )
   return {
     requestUrl,
     payload,
