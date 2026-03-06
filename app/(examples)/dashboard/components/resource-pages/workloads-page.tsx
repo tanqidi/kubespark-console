@@ -13,6 +13,7 @@ import {
 } from "@/app/lib/kubespark/resource-rows"
 import { deleteWorkload } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
+import type { ResourceDocumentType } from "@/app/lib/kubespark/resource-document"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
@@ -39,6 +40,12 @@ const WORKLOAD_RESOURCE_BY_KIND: Record<WorkloadRow["kind"], string> = {
   DaemonSet: "daemonsets",
 }
 
+const WORKLOAD_DOCUMENT_BY_KIND: Record<WorkloadRow["kind"], ResourceDocumentType> = {
+  Deployment: "deployment",
+  StatefulSet: "statefulset",
+  DaemonSet: "daemonset",
+}
+
 export function WorkloadsPageClient() {
   const [rows, setRows] = React.useState<WorkloadRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -60,7 +67,9 @@ export function WorkloadsPageClient() {
     setYamlLoading(true)
     setYamlContent("")
 
-    void fetchNamespacedResourceYaml(resource, row.namespace, row.name)
+    void fetchNamespacedResourceYaml(resource, row.namespace, row.name, {
+      documentType: WORKLOAD_DOCUMENT_BY_KIND[row.kind],
+    })
       .then(({ payload, text }) => {
         setYamlContent(text)
         console.log("[Workloads] view yaml response", {

@@ -368,23 +368,22 @@ export async function fetchWorkloadRows(limit = 300): Promise<WorkloadResourceRo
     fetchJsonDeduped<unknown>(`${BASE}/statefulsets`),
   ])
 
-  const items = [
-    ...unwrapItems(deploymentsPayload),
-    ...unwrapItems(daemonSetsPayload),
-    ...unwrapItems(statefulSetsPayload),
+  const itemsWithKind = [
+    ...unwrapItems(deploymentsPayload).map((item) => ({ item, sourceKind: "Deployment" as const })),
+    ...unwrapItems(daemonSetsPayload).map((item) => ({ item, sourceKind: "DaemonSet" as const })),
+    ...unwrapItems(statefulSetsPayload).map((item) => ({ item, sourceKind: "StatefulSet" as const })),
   ]
 
-  return items.slice(0, limit).map((item, index) => {
+  return itemsWithKind.slice(0, limit).map(({ item, sourceKind }, index) => {
     const resource = asObject(item)
     const metadata = asObject(resource.metadata)
     const spec = asObject(resource.spec)
     const status = asObject(resource.status)
     const name = asString(metadata.name)
-    const kind = resource.kind
     const resolvedKind: WorkloadKind =
-      kind === "DaemonSet" || kind === "StatefulSet" || kind === "Deployment"
-        ? kind
-        : "Deployment"
+      resource.kind === "DaemonSet" || resource.kind === "StatefulSet" || resource.kind === "Deployment"
+        ? resource.kind
+        : sourceKind
     const desired =
       typeof spec.replicas === "number"
         ? spec.replicas

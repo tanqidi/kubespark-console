@@ -49,7 +49,9 @@ export function ServicesPageClient() {
     setYamlLoading(true)
     setYamlContent("")
 
-    void fetchNamespacedResourceYaml("services", row.namespace, row.name)
+    void fetchNamespacedResourceYaml("services", row.namespace, row.name, {
+      documentType: "service",
+    })
       .then(({ payload, text }) => {
         setYamlContent(text)
         console.log("[Services] view yaml response", {

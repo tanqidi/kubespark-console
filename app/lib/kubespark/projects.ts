@@ -1,4 +1,5 @@
-import { API_PROXY_BASE, fetchJsonDeduped } from "./common"
+import { API_PROXY_BASE, deleteResource, fetchJsonDeduped } from "./common"
+import { buildResourceDocument } from "./resource-document"
 import { formatAge, resolveUpdatedAt } from "./utils"
 
 export type NamespaceRow = {
@@ -27,6 +28,13 @@ type RawNamespace = {
 }
 
 const NAMESPACES_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/namespaces`
+const NAMESPACES_RESOURCE_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/resources/core/v1/namespaces`
+
+export type NamespaceYamlResult = {
+  requestUrl: string
+  payload: unknown
+  text: string
+}
 
 function unwrapItems(payload: unknown): RawNamespace[] {
   const root = (payload as { data?: unknown; items?: unknown[] } | null) ?? null
@@ -49,4 +57,41 @@ export async function fetchNamespaces(): Promise<NamespaceRow[]> {
       updatedAt: resolveUpdatedAt(item),
     }
   })
+}
+
+function buildNamespaceFieldSelectorEndpoint(name: string): string {
+  const query = new URLSearchParams({
+    fieldSelector: `metadata.name=${name}`,
+  })
+  return `${NAMESPACES_RESOURCE_ENDPOINT}?${query.toString()}`
+}
+
+export async function fetchNamespaceYaml(name: string): Promise<NamespaceYamlResult> {
+  const targetName = name.trim()
+  if (!targetName) {
+    throw new Error("Namespace name is required")
+  }
+
+  const requestUrl = buildNamespaceFieldSelectorEndpoint(targetName)
+  const payload = await fetchJsonDeduped<unknown>(requestUrl)
+  const items = unwrapItems(payload)
+  const matched = items.find((item) => item.metadata?.name === targetName) ?? items[0]
+
+  if (!matched) {
+    throw new Error(`Namespace not found: ${targetName}`)
+  }
+
+  return {
+    requestUrl,
+    payload: matched,
+    text: buildResourceDocument({
+      type: "namespace",
+      payload: matched,
+      output: "yaml",
+    }).text,
+  }
+}
+
+export async function deleteNamespace(name: string): Promise<void> {
+  return deleteResource("core", "v1", "namespaces", name)
 }

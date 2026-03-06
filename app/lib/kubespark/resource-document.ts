@@ -1,6 +1,12 @@
 import { stringify } from "yaml"
 
-export type ResourceDocumentType = "pod"
+export type ResourceDocumentType =
+  | "pod"
+  | "service"
+  | "deployment"
+  | "statefulset"
+  | "daemonset"
+  | "namespace"
 export type ResourceDocumentOutput = "yaml" | "json"
 export type ResourceDocumentLanguage = "yaml" | "json"
 
@@ -20,6 +26,20 @@ function asObject(value: unknown): JsonObject {
 
 function asNonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null
+}
+
+function normalizeManifestMetadata(value: unknown): JsonObject {
+  const metadata = { ...asObject(value) }
+  delete metadata.uid
+  delete metadata.resourceVersion
+  delete metadata.generation
+  delete metadata.creationTimestamp
+  delete metadata.deletionTimestamp
+  delete metadata.deletionGracePeriodSeconds
+  delete metadata.managedFields
+  delete metadata.ownerReferences
+  delete metadata.selfLink
+  return metadata
 }
 
 function normalizePodDocument(payload: unknown): JsonObject {
@@ -46,8 +66,123 @@ function normalizePodDocument(payload: unknown): JsonObject {
   return normalized
 }
 
+function normalizeServiceDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "Service",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "v1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
+  if ("spec" in root) normalized.spec = root.spec
+
+  Object.keys(root).forEach((key) => {
+    if (key === "kind" || key === "apiVersion" || key === "metadata" || key === "spec" || key === "status") {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
+function normalizeDeploymentDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "Deployment",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "apps/v1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
+  if ("spec" in root) normalized.spec = root.spec
+
+  Object.keys(root).forEach((key) => {
+    if (key === "kind" || key === "apiVersion" || key === "metadata" || key === "spec" || key === "status") {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
+function normalizeStatefulSetDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "StatefulSet",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "apps/v1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
+  if ("spec" in root) normalized.spec = root.spec
+
+  Object.keys(root).forEach((key) => {
+    if (key === "kind" || key === "apiVersion" || key === "metadata" || key === "spec" || key === "status") {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
+function normalizeDaemonSetDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "DaemonSet",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "apps/v1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
+  if ("spec" in root) normalized.spec = root.spec
+
+  Object.keys(root).forEach((key) => {
+    if (key === "kind" || key === "apiVersion" || key === "metadata" || key === "spec" || key === "status") {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
+function normalizeNamespaceDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "Namespace",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "v1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
+  if ("spec" in root) normalized.spec = root.spec
+
+  Object.keys(root).forEach((key) => {
+    if (key === "kind" || key === "apiVersion" || key === "metadata" || key === "spec" || key === "status") {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
 function normalizeDocumentByType(type: ResourceDocumentType, payload: unknown): unknown {
   if (type === "pod") return normalizePodDocument(payload)
+  if (type === "service") return normalizeServiceDocument(payload)
+  if (type === "deployment") return normalizeDeploymentDocument(payload)
+  if (type === "statefulset") return normalizeStatefulSetDocument(payload)
+  if (type === "daemonset") return normalizeDaemonSetDocument(payload)
+  if (type === "namespace") return normalizeNamespaceDocument(payload)
   return payload
 }
 
