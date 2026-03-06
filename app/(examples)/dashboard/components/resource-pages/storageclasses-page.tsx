@@ -50,6 +50,7 @@ export function StorageClassesPageClient() {
     void fetchNamespacedResourceYaml("storageclasses", "", row.name, {
       group: "storage.k8s.io",
       version: "v1",
+      documentType: "storageclass",
     })
       .then(({ payload, text }) => {
         setYamlContent(text)

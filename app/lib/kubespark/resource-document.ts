@@ -2,10 +2,13 @@ import { stringify } from "yaml"
 
 export type ResourceDocumentType =
   | "pod"
+  | "job"
+  | "cronjob"
   | "service"
   | "ingress"
   | "configmap"
   | "secret"
+  | "storageclass"
   | "persistentvolume"
   | "persistentvolumeclaim"
   | "deployment"
@@ -97,6 +100,50 @@ function normalizePodDocument(payload: unknown): JsonObject {
   }
 
   if ("metadata" in root) normalized.metadata = metadata
+  if ("spec" in root) normalized.spec = root.spec
+
+  Object.keys(root).forEach((key) => {
+    if (key === "kind" || key === "apiVersion" || key === "metadata" || key === "spec" || key === "status") {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
+function normalizeJobDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "Job",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "batch/v1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
+  if ("spec" in root) normalized.spec = root.spec
+
+  Object.keys(root).forEach((key) => {
+    if (key === "kind" || key === "apiVersion" || key === "metadata" || key === "spec" || key === "status") {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
+function normalizeCronJobDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "CronJob",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "batch/v1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
   if ("spec" in root) normalized.spec = root.spec
 
   Object.keys(root).forEach((key) => {
@@ -228,6 +275,46 @@ function normalizeSecretDocument(payload: unknown): JsonObject {
       key === "data" ||
       key === "stringData" ||
       key === "immutable" ||
+      key === "status"
+    ) {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
+function normalizeStorageClassDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "StorageClass",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "storage.k8s.io/v1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
+  if ("provisioner" in root) normalized.provisioner = root.provisioner
+  if ("parameters" in root) normalized.parameters = root.parameters
+  if ("reclaimPolicy" in root) normalized.reclaimPolicy = root.reclaimPolicy
+  if ("volumeBindingMode" in root) normalized.volumeBindingMode = root.volumeBindingMode
+  if ("allowVolumeExpansion" in root) normalized.allowVolumeExpansion = root.allowVolumeExpansion
+  if ("mountOptions" in root) normalized.mountOptions = root.mountOptions
+  if ("allowedTopologies" in root) normalized.allowedTopologies = root.allowedTopologies
+
+  Object.keys(root).forEach((key) => {
+    if (
+      key === "kind" ||
+      key === "apiVersion" ||
+      key === "metadata" ||
+      key === "provisioner" ||
+      key === "parameters" ||
+      key === "reclaimPolicy" ||
+      key === "volumeBindingMode" ||
+      key === "allowVolumeExpansion" ||
+      key === "mountOptions" ||
+      key === "allowedTopologies" ||
       key === "status"
     ) {
       return
@@ -372,10 +459,13 @@ function normalizeNamespaceDocument(payload: unknown): JsonObject {
 
 function normalizeDocumentByType(type: ResourceDocumentType, payload: unknown): unknown {
   if (type === "pod") return normalizePodDocument(payload)
+  if (type === "job") return normalizeJobDocument(payload)
+  if (type === "cronjob") return normalizeCronJobDocument(payload)
   if (type === "service") return normalizeServiceDocument(payload)
   if (type === "ingress") return normalizeIngressDocument(payload)
   if (type === "configmap") return normalizeConfigMapDocument(payload)
   if (type === "secret") return normalizeSecretDocument(payload)
+  if (type === "storageclass") return normalizeStorageClassDocument(payload)
   if (type === "persistentvolume") return normalizePersistentVolumeDocument(payload)
   if (type === "persistentvolumeclaim") return normalizePersistentVolumeClaimDocument(payload)
   if (type === "deployment") return normalizeDeploymentDocument(payload)

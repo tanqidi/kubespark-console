@@ -49,12 +49,20 @@ export function JobsPageClient() {
 
   const handleViewYaml = React.useCallback((row: JobRow) => {
     const resource = JOB_RESOURCE_BY_KIND[row.kind]
+    const yamlOptions =
+      row.kind === "Job"
+        ? ({
+            documentType: "job" as const,
+          })
+        : ({
+            documentType: "cronjob" as const,
+          })
     setYamlOpen(true)
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
 
-    void fetchNamespacedResourceYaml(resource, row.namespace, row.name)
+    void fetchNamespacedResourceYaml(resource, row.namespace, row.name, yamlOptions)
       .then(({ payload, text }) => {
         setYamlContent(text)
         console.log("[Jobs] view yaml response", {
