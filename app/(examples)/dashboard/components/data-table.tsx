@@ -67,6 +67,7 @@ type DataTableProps<TData> = {
   getRowId?: (row: TData, index: number) => string
   toolbarStart?: React.ReactNode
   toolbarEnd?: React.ReactNode
+  onDeleteSelectedRows?: (rows: TData[]) => void | Promise<void>
 }
 
 function DraggableRow<TData>({ row }: { row: Row<TData> }) {
@@ -100,6 +101,7 @@ export function DataTable<TData extends Record<string, unknown>>({
   getRowId,
   toolbarStart,
   toolbarEnd,
+  onDeleteSelectedRows,
 }: DataTableProps<TData>) {
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
@@ -133,6 +135,12 @@ export function DataTable<TData extends Record<string, unknown>>({
 
   React.useEffect(() => {
     setData(initialData)
+    setPagination((prev) => {
+      const pageCount = Math.max(1, Math.ceil(initialData.length / prev.pageSize))
+      const maxPageIndex = pageCount - 1
+      if (prev.pageIndex <= maxPageIndex) return prev
+      return { ...prev, pageIndex: maxPageIndex }
+    })
   }, [initialData])
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
@@ -157,6 +165,7 @@ export function DataTable<TData extends Record<string, unknown>>({
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
+    autoResetPageIndex: false,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -166,16 +175,23 @@ export function DataTable<TData extends Record<string, unknown>>({
   })
 
   const handleDeleteSelected = React.useCallback(() => {
-    const selectedIds = new Set(
-      table.getFilteredSelectedRowModel().rows.map((row) => row.id)
-    )
-    if (selectedIds.size === 0) return
+    const selectedRows = table
+      .getFilteredSelectedRowModel()
+      .rows.map((row) => row.original)
+    if (selectedRows.length === 0) return
+    if (!onDeleteSelectedRows) {
+      setRowSelection({})
+      return
+    }
 
-    setData((current) =>
-      current.filter((row, index) => !selectedIds.has(resolveRowId(row, index)))
-    )
-    setRowSelection({})
-  }, [resolveRowId, table])
+    void Promise.resolve(onDeleteSelectedRows(selectedRows))
+      .catch((error) => {
+        console.error("[DataTable] bulk delete failed", error)
+      })
+      .finally(() => {
+        setRowSelection({})
+      })
+  }, [onDeleteSelectedRows, table])
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -192,7 +208,7 @@ export function DataTable<TData extends Record<string, unknown>>({
         table={table}
         startContent={toolbarStart}
         endContent={toolbarEnd}
-        onDeleteSelected={handleDeleteSelected}
+        onDeleteSelected={onDeleteSelectedRows ? handleDeleteSelected : undefined}
       />
       <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">

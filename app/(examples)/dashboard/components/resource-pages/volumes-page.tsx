@@ -66,28 +66,41 @@ export function VolumesPageClient() {
 
   React.useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
-    fetchVolumeRows()
-      .then(({ persistentVolumeClaims: pvcRows, persistentVolumes: pvRows }) => {
+    const loadRows = async (silent: boolean) => {
+      if (!silent) {
+        setLoading(true)
+        setError(null)
+      }
+      try {
+        const { persistentVolumeClaims: pvcRows, persistentVolumes: pvRows } =
+          await fetchVolumeRows()
         if (cancelled) return
         setPersistentVolumeClaims(pvcRows)
         setPersistentVolumes(pvRows)
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
+        setError(null)
+      } catch (error: unknown) {
+        if (cancelled) return
+        if (!silent) {
           setPersistentVolumeClaims([])
           setPersistentVolumes([])
           setError(resolveErrorMessage(error))
+        } else {
+          console.error("[Volumes] polling refresh failed", error)
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+      } finally {
+        if (!silent && !cancelled) setLoading(false)
+      }
+    }
+
+    void loadRows(false)
+    const timer = window.setInterval(() => {
+      void loadRows(true)
+    }, 3000)
 
     return () => {
       cancelled = true
+      window.clearInterval(timer)
     }
   }, [])
   // if (loading) {

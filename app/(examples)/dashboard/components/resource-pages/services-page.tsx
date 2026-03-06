@@ -80,7 +80,6 @@ export function ServicesPageClient() {
 
     void deleteService(pendingDeleteRow.namespace, pendingDeleteRow.name)
       .then(() => {
-        setRows((prev) => prev.filter((item) => item.id !== pendingDeleteRow.id))
         setPendingDeleteRow(null)
       })
       .catch((e: unknown) => {
@@ -95,6 +94,17 @@ export function ServicesPageClient() {
         setDeleting(false)
       })
   }, [deleting, pendingDeleteRow])
+
+  const handleDeleteSelectedRows = React.useCallback((selectedRows: ServiceRow[]) => {
+    if (selectedRows.length === 0) return
+    void Promise.all(
+      selectedRows.map((row) => deleteService(row.namespace, row.name))
+    ).catch((e: unknown) => {
+      const message = e instanceof Error ? e.message : "删除失败"
+      setError(message)
+      console.error("[Services] bulk delete request failed", e)
+    })
+  }, [])
 
   const columns = React.useMemo(
     () =>
@@ -132,26 +142,38 @@ export function ServicesPageClient() {
 
   React.useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
-    fetchServiceRows()
-      .then((mapped) => {
+    const loadRows = async (silent: boolean) => {
+      if (!silent) {
+        setLoading(true)
+        setError(null)
+      }
+      try {
+        const mapped = await fetchServiceRows()
         if (cancelled) return
         setRows(mapped)
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) {
+        setError(null)
+      } catch (e: unknown) {
+        if (cancelled) return
+        if (!silent) {
           setRows([])
           setError(e instanceof Error ? e.message : "API request failed")
+        } else {
+          console.error("[Services] polling refresh failed", e)
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+      } finally {
+        if (!silent && !cancelled) setLoading(false)
+      }
+    }
+
+    void loadRows(false)
+    const timer = window.setInterval(() => {
+      void loadRows(true)
+    }, 3000)
 
     return () => {
       cancelled = true
+      window.clearInterval(timer)
     }
   }, [])
 
@@ -227,7 +249,12 @@ export function ServicesPageClient() {
         deleting={deleting}
         onConfirm={handleConfirmDelete}
       />
-      <DataTable data={filteredRows} columns={columns} toolbarEnd={serviceFilters} />
+      <DataTable
+        data={filteredRows}
+        columns={columns}
+        toolbarEnd={serviceFilters}
+        onDeleteSelectedRows={handleDeleteSelectedRows}
+      />
     </>
   )
 }

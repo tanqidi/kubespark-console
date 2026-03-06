@@ -35,7 +35,7 @@ export function TableToolbar<TData>({
   onDeleteSelected?: () => void
 }) {
   const selectedCount = table.getFilteredSelectedRowModel().rows.length
-  const showDelete = selectedCount > 0
+  const showDelete = selectedCount > 0 && Boolean(onDeleteSelected)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
 
   React.useEffect(() => {

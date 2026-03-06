@@ -41,27 +41,39 @@ export function ResourcePage<TData extends DynamicRow>({
 
   React.useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
-    Promise.all(endpoints.map((u) => fetchJsonDeduped<any>(u)))
-      .then((results) => {
+    const loadRows = async (silent: boolean) => {
+      if (!silent) {
+        setLoading(true)
+        setError(null)
+      }
+      try {
+        const results = await Promise.all(endpoints.map((u) => fetchJsonDeduped<any>(u)))
         if (cancelled) return
         const merged = results.flatMap((json) => unwrapItems(json))
         setRows(map(merged))
-      })
-      .catch((e: any) => {
-        if (!cancelled) {
+        setError(null)
+      } catch (e: any) {
+        if (cancelled) return
+        if (!silent) {
           setRows([])
           setError(e?.message || "API request failed")
+        } else {
+          console.error("[ResourcePage] polling refresh failed", e)
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+      } finally {
+        if (!silent && !cancelled) setLoading(false)
+      }
+    }
+
+    void loadRows(false)
+    const timer = window.setInterval(() => {
+      void loadRows(true)
+    }, 3000)
 
     return () => {
       cancelled = true
+      window.clearInterval(timer)
     }
   }, [endpoints, map])
 

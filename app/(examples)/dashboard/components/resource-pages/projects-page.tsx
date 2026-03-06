@@ -28,25 +28,38 @@ export function ProjectsPageClient() {
 
   React.useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
-    fetchNamespaces()
-      .then((items) => {
-        if (!cancelled) setRows(items)
-      })
-      .catch((e: any) => {
-        if (!cancelled) {
+    const loadRows = async (silent: boolean) => {
+      if (!silent) {
+        setLoading(true)
+        setError(null)
+      }
+      try {
+        const items = await fetchNamespaces()
+        if (cancelled) return
+        setRows(items)
+        setError(null)
+      } catch (e: any) {
+        if (cancelled) return
+        if (!silent) {
           setRows([])
           setError(e?.message || "API request failed")
+        } else {
+          console.error("[Projects] polling refresh failed", e)
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+      } finally {
+        if (!silent && !cancelled) setLoading(false)
+      }
+    }
+
+    void loadRows(false)
+    const timer = window.setInterval(() => {
+      void loadRows(true)
+    }, 3000)
 
     return () => {
       cancelled = true
+      window.clearInterval(timer)
     }
   }, [])
   // if (loading) return <ResourceLoadingState /> // kept for potential future use

@@ -36,26 +36,38 @@ export function SecretsPageClient() {
 
   React.useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
-    fetchSecretRows()
-      .then((mapped) => {
+    const loadRows = async (silent: boolean) => {
+      if (!silent) {
+        setLoading(true)
+        setError(null)
+      }
+      try {
+        const mapped = await fetchSecretRows()
         if (cancelled) return
         setRows(mapped)
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) {
+        setError(null)
+      } catch (e: unknown) {
+        if (cancelled) return
+        if (!silent) {
           setRows([])
           setError(e instanceof Error ? e.message : "API request failed")
+        } else {
+          console.error("[Secrets] polling refresh failed", e)
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+      } finally {
+        if (!silent && !cancelled) setLoading(false)
+      }
+    }
+
+    void loadRows(false)
+    const timer = window.setInterval(() => {
+      void loadRows(true)
+    }, 3000)
 
     return () => {
       cancelled = true
+      window.clearInterval(timer)
     }
   }, [])
 

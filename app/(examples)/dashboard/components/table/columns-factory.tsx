@@ -99,15 +99,30 @@ function renderCell<TData>(
       lowered === "success" ||
       lowered === "normal" ||
       lowered === "ready"
+    const isPending =
+      lowered === "pending" ||
+      lowered === "updating" ||
+      lowered === "terminating"
+    const isFailed =
+      lowered === "failed" ||
+      lowered === "abnormal" ||
+      lowered === "error"
+
+    const statusClassName = isPending
+      ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
+      : isFailed
+        ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-300"
+        : "text-muted-foreground"
+
     return (
       <Badge
         variant="outline"
-        className={cn("text-muted-foreground px-1.5", col.cellClassName)}
+        className={cn("px-1.5", statusClassName, col.cellClassName)}
       >
         {isDone ? (
           <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
         ) : (
-          <IconLoader />
+          <IconLoader className={cn(isPending ? "text-amber-500 dark:text-amber-300" : undefined)} />
         )}
         {text}
       </Badge>
