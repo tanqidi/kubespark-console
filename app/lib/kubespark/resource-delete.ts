@@ -51,3 +51,15 @@ export async function deleteConfigMap(namespace: string, name: string): Promise<
 export async function deleteSecret(namespace: string, name: string): Promise<void> {
   return deleteResource("core", "v1", "secrets", name, namespace)
 }
+
+export async function deletePersistentVolumeClaim(namespace: string, name: string): Promise<void> {
+  return deleteResource("core", "v1", "persistentvolumeclaims", name, namespace)
+}
+
+export async function deleteStorageClass(name: string): Promise<void> {
+  return deleteResource("storage.k8s.io", "v1", "storageclasses", name)
+}
+
+export async function deletePersistentVolume(name: string): Promise<void> {
+  return deleteResource("core", "v1", "persistentvolumes", name)
+}
