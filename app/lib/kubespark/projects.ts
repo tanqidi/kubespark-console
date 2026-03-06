@@ -1,4 +1,4 @@
-import { API_PROXY_BASE, deleteResource, fetchJsonDeduped } from "./common"
+import { deleteResource, fetchResourceCollection } from "./common"
 import { buildResourceDocument } from "./resource-document"
 import { formatAge, resolveUpdatedAt } from "./utils"
 
@@ -27,24 +27,18 @@ type RawNamespace = {
   }
 }
 
-const NAMESPACES_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/namespaces`
-const NAMESPACES_RESOURCE_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/resources/core/v1/namespaces`
-
 export type NamespaceYamlResult = {
   requestUrl: string
   payload: unknown
   text: string
 }
 
-function unwrapItems(payload: unknown): RawNamespace[] {
-  const root = (payload as { data?: unknown; items?: unknown[] } | null) ?? null
-  const container = Array.isArray(root?.items) ? root : ((root?.data ?? payload) as { items?: unknown[] })
-  return Array.isArray(container?.items) ? (container.items as RawNamespace[]) : []
-}
-
 export async function fetchNamespaces(): Promise<NamespaceRow[]> {
-  const payload = await fetchJsonDeduped<unknown>(NAMESPACES_ENDPOINT)
-  const items = unwrapItems(payload)
+  const { items } = await fetchResourceCollection<RawNamespace>(
+    "core",
+    "v1",
+    "namespaces"
+  )
   return items.map((item) => {
     const md = item.metadata || {}
     return {
@@ -59,22 +53,20 @@ export async function fetchNamespaces(): Promise<NamespaceRow[]> {
   })
 }
 
-function buildNamespaceFieldSelectorEndpoint(name: string): string {
-  const query = new URLSearchParams({
-    fieldSelector: `metadata.name=${name}`,
-  })
-  return `${NAMESPACES_RESOURCE_ENDPOINT}?${query.toString()}`
-}
-
 export async function fetchNamespaceYaml(name: string): Promise<NamespaceYamlResult> {
   const targetName = name.trim()
   if (!targetName) {
     throw new Error("Namespace name is required")
   }
 
-  const requestUrl = buildNamespaceFieldSelectorEndpoint(targetName)
-  const payload = await fetchJsonDeduped<unknown>(requestUrl)
-  const items = unwrapItems(payload)
+  const { requestUrl, items } = await fetchResourceCollection<RawNamespace>(
+    "core",
+    "v1",
+    "namespaces",
+    {
+      fieldSelector: `metadata.name=${targetName}`,
+    }
+  )
   const matched = items.find((item) => item.metadata?.name === targetName) ?? items[0]
 
   if (!matched) {

@@ -1,7 +1,5 @@
-import { API_PROXY_BASE, fetchJsonDeduped } from "./common"
+import { fetchResourceCollection } from "./common"
 import { formatAge, resolveUpdatedAt } from "./utils"
-
-const BASE = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1`
 
 type JsonObject = Record<string, unknown>
 
@@ -19,13 +17,6 @@ function asStringList(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : []
-}
-
-function unwrapItems(payload: unknown): unknown[] {
-  const root = asObject(payload)
-  const container = root.data ?? payload
-  const items = asObject(container).items
-  return Array.isArray(items) ? items : []
 }
 
 function byteLengthOf(obj: unknown): number {
@@ -53,8 +44,7 @@ export type ConfigMapResourceRow = {
 }
 
 export async function fetchConfigMapRows(limit = 300): Promise<ConfigMapResourceRow[]> {
-  const payload = await fetchJsonDeduped<unknown>(`${BASE}/configmaps`)
-  const items = unwrapItems(payload)
+  const { items } = await fetchResourceCollection("core", "v1", "configmaps")
   return items.slice(0, limit).map((item, index) => {
     const resource = asObject(item)
     const metadata = asObject(resource.metadata)
@@ -87,8 +77,7 @@ export type ServiceResourceRow = {
 }
 
 export async function fetchServiceRows(limit = 300): Promise<ServiceResourceRow[]> {
-  const payload = await fetchJsonDeduped<unknown>(`${BASE}/services`)
-  const items = unwrapItems(payload)
+  const { items } = await fetchResourceCollection("core", "v1", "services")
   return items.slice(0, limit).map((item, index) => {
     const resource = asObject(item)
     const metadata = asObject(resource.metadata)
@@ -129,8 +118,7 @@ export type SecretResourceRow = {
 }
 
 export async function fetchSecretRows(limit = 300): Promise<SecretResourceRow[]> {
-  const payload = await fetchJsonDeduped<unknown>(`${BASE}/secrets`)
-  const items = unwrapItems(payload)
+  const { items } = await fetchResourceCollection("core", "v1", "secrets")
   return items.slice(0, limit).map((item, index) => {
     const resource = asObject(item)
     const metadata = asObject(resource.metadata)
@@ -161,8 +149,7 @@ export type RouteResourceRow = {
 }
 
 export async function fetchRouteRows(limit = 300): Promise<RouteResourceRow[]> {
-  const payload = await fetchJsonDeduped<unknown>(`${BASE}/ingresses`)
-  const items = unwrapItems(payload)
+  const { items } = await fetchResourceCollection("networking.k8s.io", "v1", "ingresses")
   const mapped: RouteResourceRow[] = []
 
   items.slice(0, limit).forEach((item, index) => {
@@ -248,8 +235,7 @@ function formatAllowExpansion(value: unknown): string {
 }
 
 export async function fetchStorageClassRows(limit = 300): Promise<StorageClassResourceRow[]> {
-  const payload = await fetchJsonDeduped<unknown>(`${BASE}/storageclasses`)
-  const items = unwrapItems(payload)
+  const { items } = await fetchResourceCollection("storage.k8s.io", "v1", "storageclasses")
   return items.slice(0, limit).map((item, index) => {
     const resource = asObject(item)
     const metadata = asObject(resource.metadata)
@@ -313,11 +299,11 @@ function resolveJobDuration(resource: JsonObject): string {
 }
 
 export async function fetchJobRows(limit = 300): Promise<JobResourceRow[]> {
-  const [jobsPayload, cronJobsPayload] = await Promise.all([
-    fetchJsonDeduped<unknown>(`${BASE}/jobs`),
-    fetchJsonDeduped<unknown>(`${BASE}/cronjobs`),
+  const [jobsResult, cronJobsResult] = await Promise.all([
+    fetchResourceCollection("batch", "v1", "jobs"),
+    fetchResourceCollection("batch", "v1", "cronjobs"),
   ])
-  const items = [...unwrapItems(jobsPayload), ...unwrapItems(cronJobsPayload)]
+  const items = [...jobsResult.items, ...cronJobsResult.items]
   return items.slice(0, limit).map((item, index) => {
     const resource = asObject(item)
     const metadata = asObject(resource.metadata)
@@ -362,16 +348,16 @@ function resolveWorkloadStatus(desired: number, updated: number, available: numb
 }
 
 export async function fetchWorkloadRows(limit = 300): Promise<WorkloadResourceRow[]> {
-  const [deploymentsPayload, daemonSetsPayload, statefulSetsPayload] = await Promise.all([
-    fetchJsonDeduped<unknown>(`${BASE}/deployments`),
-    fetchJsonDeduped<unknown>(`${BASE}/daemonsets`),
-    fetchJsonDeduped<unknown>(`${BASE}/statefulsets`),
+  const [deploymentsResult, daemonSetsResult, statefulSetsResult] = await Promise.all([
+    fetchResourceCollection("apps", "v1", "deployments"),
+    fetchResourceCollection("apps", "v1", "daemonsets"),
+    fetchResourceCollection("apps", "v1", "statefulsets"),
   ])
 
   const itemsWithKind = [
-    ...unwrapItems(deploymentsPayload).map((item) => ({ item, sourceKind: "Deployment" as const })),
-    ...unwrapItems(daemonSetsPayload).map((item) => ({ item, sourceKind: "DaemonSet" as const })),
-    ...unwrapItems(statefulSetsPayload).map((item) => ({ item, sourceKind: "StatefulSet" as const })),
+    ...deploymentsResult.items.map((item) => ({ item, sourceKind: "Deployment" as const })),
+    ...daemonSetsResult.items.map((item) => ({ item, sourceKind: "DaemonSet" as const })),
+    ...statefulSetsResult.items.map((item) => ({ item, sourceKind: "StatefulSet" as const })),
   ]
 
   return itemsWithKind.slice(0, limit).map(({ item, sourceKind }, index) => {
@@ -526,13 +512,13 @@ function mapPersistentVolumeClaims(
 }
 
 export async function fetchVolumeRows(limit = 300): Promise<VolumeRowsResult> {
-  const [pvcPayload, pvPayload] = await Promise.all([
-    fetchJsonDeduped<unknown>(`${BASE}/persistentvolumeclaims`),
-    fetchJsonDeduped<unknown>(`${BASE}/persistentvolumes`),
+  const [pvcResult, pvResult] = await Promise.all([
+    fetchResourceCollection("core", "v1", "persistentvolumeclaims"),
+    fetchResourceCollection("core", "v1", "persistentvolumes"),
   ])
 
-  const persistentVolumeClaims = mapPersistentVolumeClaims(unwrapItems(pvcPayload), limit)
-  const persistentVolumes = mapPersistentVolumes(unwrapItems(pvPayload), limit)
+  const persistentVolumeClaims = mapPersistentVolumeClaims(pvcResult.items, limit)
+  const persistentVolumes = mapPersistentVolumes(pvResult.items, limit)
 
   return { persistentVolumes, persistentVolumeClaims }
 }

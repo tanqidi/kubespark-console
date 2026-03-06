@@ -1,4 +1,4 @@
-import { API_PROXY_BASE, deleteResource, fetchJsonDeduped } from "./common"
+import { API_PROXY_BASE, deleteResource, fetchJsonDeduped, fetchResourceCollection } from "./common"
 import { buildResourceDocument } from "./resource-document"
 import { formatAge, resolveUpdatedAt } from "./utils"
 
@@ -48,7 +48,6 @@ export type PodYamlResult = {
 }
 
 const RESOURCE_BASE = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1`
-const PODS_ENDPOINT = `${RESOURCE_BASE}/pods`
 
 function phaseToStatusKey(phase?: string): PodStatusKey {
   switch (phase) {
@@ -63,16 +62,6 @@ function phaseToStatusKey(phase?: string): PodStatusKey {
     default:
       return "unknown"
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
-}
-
-function unwrapItems(payload: unknown): RawPod[] {
-  const root = asRecord(payload)
-  const container = Array.isArray(root.items) ? root : asRecord(root.data ?? payload)
-  return Array.isArray(container.items) ? (container.items as RawPod[]) : []
 }
 
 function phaseToStatusLabel(phase?: string): string {
@@ -107,8 +96,7 @@ export async function deletePod(namespace: string, name: string): Promise<void> 
 }
 
 export async function fetchPods(): Promise<PodRow[]> {
-  const payload = await fetchJsonDeduped<unknown>(PODS_ENDPOINT)
-  const items = unwrapItems(payload)
+  const { items } = await fetchResourceCollection<RawPod>("core", "v1", "pods")
 
   return items.map((item, index) => {
     const metadata = item.metadata || {}
@@ -128,8 +116,7 @@ export async function fetchPods(): Promise<PodRow[]> {
 }
 
 export async function fetchPodResourceRows(limit = 300): Promise<PodResourceRow[]> {
-  const payload = await fetchJsonDeduped<unknown>(PODS_ENDPOINT)
-  const items = unwrapItems(payload)
+  const { items } = await fetchResourceCollection<RawPod>("core", "v1", "pods")
 
   return items.slice(0, limit).map((item, index) => {
     const metadata = item.metadata || {}

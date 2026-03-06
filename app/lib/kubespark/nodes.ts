@@ -1,4 +1,4 @@
-import { API_PROXY_BASE, fetchJsonDeduped } from "./common"
+import { fetchResourceCollection } from "./common"
 import { parseQuantityCpu, parseQuantityMemGi, resolveUpdatedAt } from "./utils"
 
 export type NodeStatusKey = "ready" | "unschedulable" | "offline"
@@ -45,9 +45,6 @@ type RawNode = {
   }
 }
 
-const NODES_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/nodes`
-const PODS_ENDPOINT = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/pods`
-
 function roleFromLabels(labels?: Record<string, string>): NodeRoleKey {
   if (!labels) return "unknown"
   if ("node-role.kubernetes.io/control-plane" in labels || "node-role.kubernetes.io/master" in labels) {
@@ -60,20 +57,6 @@ function statusFromNode(node: RawNode): NodeStatusKey {
   const ready = node.status?.conditions?.find((c) => c.type === "Ready")?.status === "True"
   if (!ready) return "offline"
   return node.spec?.unschedulable ? "unschedulable" : "ready"
-}
-
-function unwrapItems(payload: unknown): RawNode[] {
-  const root = (payload as { data?: unknown; items?: unknown[] } | null) ?? null
-  const container = Array.isArray(root?.items) ? root : ((root?.data ?? payload) as { items?: unknown[] })
-  return Array.isArray(container?.items) ? (container.items as RawNode[]) : []
-}
-
-function unwrapPodItems(payload: unknown): Array<{ spec?: { nodeName?: string }; status?: { hostIP?: string } }> {
-  const root = (payload as { data?: unknown; items?: unknown[] } | null) ?? null
-  const container = Array.isArray(root?.items) ? root : ((root?.data ?? payload) as { items?: unknown[] })
-  return Array.isArray(container?.items)
-    ? (container.items as Array<{ spec?: { nodeName?: string }; status?: { hostIP?: string } }>)
-    : []
 }
 
 function statusLabel(status: NodeRowApi["status"]): string {
@@ -101,8 +84,7 @@ function formatMemUsage(used: number, total: number): string {
 }
 
 export async function fetchNodes(): Promise<NodeRowApi[]> {
-  const payload = await fetchJsonDeduped<unknown>(NODES_ENDPOINT)
-  const items = unwrapItems(payload)
+  const { items } = await fetchResourceCollection<RawNode>("core", "v1", "nodes")
 
   return items.map((item) => {
     const metadata = item.metadata || {}
@@ -124,13 +106,17 @@ export async function fetchNodes(): Promise<NodeRowApi[]> {
 }
 
 export async function fetchNodeResourceRows(): Promise<NodeResourceRow[]> {
-  const [nodes, podsPayload] = await Promise.all([
+  const [nodes, podsResult] = await Promise.all([
     fetchNodes(),
-    fetchJsonDeduped<unknown>(PODS_ENDPOINT),
+    fetchResourceCollection<{ spec?: { nodeName?: string }; status?: { hostIP?: string } }>(
+      "core",
+      "v1",
+      "pods"
+    ),
   ])
 
   const usedMap = new Map<string, number>()
-  const podItems = unwrapPodItems(podsPayload)
+  const podItems = podsResult.items
 
   podItems.forEach((item) => {
     const nodeKey = item.spec?.nodeName || item.status?.hostIP

@@ -1,4 +1,5 @@
 export const API_PROXY_BASE = process.env.NEXT_PUBLIC_API_PROXY_BASE || "/api/kubespark";
+const RESOURCE_ENDPOINT_BASE = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/resources`;
 
 const inFlightGet = new Map<string, Promise<unknown>>();
 
@@ -7,6 +8,64 @@ type ApiEnvelope<T> = {
   message?: string;
   data?: T;
 };
+
+type JsonObject = Record<string, unknown>;
+
+function asObject(value: unknown): JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {};
+}
+
+function unwrapItems(payload: unknown): unknown[] {
+  const root = asObject(payload);
+  const container = root.data ?? payload;
+  const items = asObject(container).items;
+  return Array.isArray(items) ? items : [];
+}
+
+export type ResourceListQuery = {
+  namespace?: string;
+  fieldSelector?: string;
+  labelSelector?: string;
+};
+
+export type ResourceCollectionResult<T> = {
+  requestUrl: string;
+  payload: unknown;
+  items: T[];
+};
+
+export function buildResourceCollectionEndpoint(
+  group: string,
+  version: string,
+  resource: string,
+  query?: ResourceListQuery,
+): string {
+  const searchParams = new URLSearchParams();
+  if (query?.namespace) searchParams.set("namespace", query.namespace);
+  if (query?.fieldSelector) searchParams.set("fieldSelector", query.fieldSelector);
+  if (query?.labelSelector) searchParams.set("labelSelector", query.labelSelector);
+
+  const base = `${RESOURCE_ENDPOINT_BASE}/${encodeURIComponent(group)}/${encodeURIComponent(version)}/${encodeURIComponent(resource)}`;
+  const queryString = searchParams.toString();
+  return queryString ? `${base}?${queryString}` : base;
+}
+
+export async function fetchResourceCollection<T = unknown>(
+  group: string,
+  version: string,
+  resource: string,
+  query?: ResourceListQuery,
+): Promise<ResourceCollectionResult<T>> {
+  const requestUrl = buildResourceCollectionEndpoint(group, version, resource, query);
+  const payload = await fetchJsonDeduped<unknown>(requestUrl);
+  return {
+    requestUrl,
+    payload,
+    items: unwrapItems(payload) as T[],
+  };
+}
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -68,6 +127,6 @@ export async function fetchJsonDeduped<T>(url: string, init: RequestInit = {}): 
 
 export async function deleteResource(group: string, version: string, resource: string, name: string, namespace?: string): Promise<void> {
   const nsQuery = namespace ? `?namespace=${encodeURIComponent(namespace)}` : "";
-  const url = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/resources/${encodeURIComponent(group)}/${encodeURIComponent(version)}/${encodeURIComponent(resource)}/${encodeURIComponent(name)}${nsQuery}`;
+  const url = `${RESOURCE_ENDPOINT_BASE}/${encodeURIComponent(group)}/${encodeURIComponent(version)}/${encodeURIComponent(resource)}/${encodeURIComponent(name)}${nsQuery}`;
   await fetchJsonDeduped<unknown>(url, { method: "DELETE" });
 }
