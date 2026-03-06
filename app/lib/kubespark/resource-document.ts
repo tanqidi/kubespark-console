@@ -3,6 +3,7 @@ import { stringify } from "yaml"
 export type ResourceDocumentType =
   | "pod"
   | "service"
+  | "ingress"
   | "configmap"
   | "secret"
   | "deployment"
@@ -113,6 +114,28 @@ function normalizeServiceDocument(payload: unknown): JsonObject {
   const normalized: JsonObject = {
     kind: asNonEmptyString(root.kind) ?? "Service",
     apiVersion: asNonEmptyString(root.apiVersion) ?? "v1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
+  if ("spec" in root) normalized.spec = root.spec
+
+  Object.keys(root).forEach((key) => {
+    if (key === "kind" || key === "apiVersion" || key === "metadata" || key === "spec" || key === "status") {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
+function normalizeIngressDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "Ingress",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "networking.k8s.io/v1",
   }
 
   if (Object.keys(metadata).length > 0) normalized.metadata = metadata
@@ -304,6 +327,7 @@ function normalizeNamespaceDocument(payload: unknown): JsonObject {
 function normalizeDocumentByType(type: ResourceDocumentType, payload: unknown): unknown {
   if (type === "pod") return normalizePodDocument(payload)
   if (type === "service") return normalizeServiceDocument(payload)
+  if (type === "ingress") return normalizeIngressDocument(payload)
   if (type === "configmap") return normalizeConfigMapDocument(payload)
   if (type === "secret") return normalizeSecretDocument(payload)
   if (type === "deployment") return normalizeDeploymentDocument(payload)

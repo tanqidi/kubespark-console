@@ -8,7 +8,7 @@ import {
   IconLoader,
 } from "@tabler/icons-react"
 import { useSortable } from "@dnd-kit/sortable"
-import { type ColumnDef, type HeaderContext } from "@tanstack/react-table"
+import { type ColumnDef } from "@tanstack/react-table"
 
 import { cn } from "@/lib/utils"
 import { Badge } from "@/registry/new-york-v4/ui/badge"
@@ -54,6 +54,32 @@ export type ActionMenuItem<TData> = {
   onSelect?: (row: TData) => void
 }
 
+const HEALTHY_STATUS_SET = new Set<string>([
+  "done",
+  "running",
+  "succeeded",
+  "success",
+  "successful",
+  "normal",
+  "ready",
+  "bound",
+  "active",
+  "available",
+  "healthy",
+  "completed",
+  "online",
+  "true",
+  "就绪",
+  "正常",
+  "运行中",
+  "成功",
+  "已完成",
+  "已绑定",
+  "活跃",
+  "可用",
+  "在线",
+])
+
 function DragHandle({ id }: { id: string }) {
   const { attributes, listeners } = useSortable({ id })
   return (
@@ -91,38 +117,22 @@ function renderCell<TData>(
 
   if (col.render === "status") {
     const text = String(value ?? "-")
-    const lowered = text.toLowerCase()
-    const isDone =
-      lowered === "done" ||
-      lowered === "running" ||
-      lowered === "succeeded" ||
-      lowered === "success" ||
-      lowered === "normal" ||
-      lowered === "ready"
-    const isPending =
-      lowered === "pending" ||
-      lowered === "updating" ||
-      lowered === "terminating"
-    const isFailed =
-      lowered === "failed" ||
-      lowered === "abnormal" ||
-      lowered === "error"
+    const normalized = text.trim().toLowerCase()
+    const isHealthy = HEALTHY_STATUS_SET.has(normalized)
 
-    const statusClassName = isPending
-      ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
-      : isFailed
-        ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-300"
-        : "text-muted-foreground"
+    const statusClassName = isHealthy
+      ? "text-muted-foreground"
+      : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
 
     return (
       <Badge
         variant="outline"
         className={cn("px-1.5", statusClassName, col.cellClassName)}
       >
-        {isDone ? (
+        {isHealthy ? (
           <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
         ) : (
-          <IconLoader className={cn(isPending ? "text-amber-500 dark:text-amber-300" : undefined)} />
+          <IconLoader className="text-amber-500 dark:text-amber-300" />
         )}
         {text}
       </Badge>
@@ -220,7 +230,7 @@ export function createColumns<TData extends Record<string, unknown>>(
       const headerTemplate: ColumnDef<TData>["header"] =
         typeof normalizedHeader === "string"
           ? normalizedHeader
-          : (_ctx: HeaderContext<TData, unknown>) =>
+          : () =>
               col.headerClassName ? (
                 <div className={cn("w-full", col.headerClassName)}>
                   {normalizedHeader}

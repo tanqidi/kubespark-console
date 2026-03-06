@@ -49,7 +49,9 @@ export function RoutesPageClient() {
     setYamlLoading(true)
     setYamlContent("")
 
-    void fetchNamespacedResourceYaml("ingresses", row.namespace, row.name)
+    void fetchNamespacedResourceYaml("ingresses", row.namespace, row.name, {
+      documentType: "ingress",
+    })
       .then(({ payload, text }) => {
         setYamlContent(text)
         console.log("[Routes] view yaml response", {
