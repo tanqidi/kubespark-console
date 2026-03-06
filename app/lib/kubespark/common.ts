@@ -36,11 +36,13 @@ export type ResourceCollectionResult<T> = {
   items: T[];
 };
 
-export type ResourceItemQuery = {
+export type ResourceByNameQuery = {
   namespace?: string;
+  labelSelector?: string;
+  fieldSelector?: string;
 };
 
-export type ResourceItemResult<T> = {
+export type ResourceByNameResult<T> = {
   requestUrl: string;
   payload: T;
 };
@@ -76,33 +78,49 @@ export async function fetchResourceCollection<T = unknown>(
   };
 }
 
-export function buildResourceItemEndpoint(
+function buildResourceItemEndpoint(
   group: string,
   version: string,
   resource: string,
   name: string,
-  query?: ResourceItemQuery,
+  namespace?: string,
 ): string {
   const searchParams = new URLSearchParams();
-  if (query?.namespace) searchParams.set("namespace", query.namespace);
+  if (namespace) searchParams.set("namespace", namespace);
 
   const base = `${RESOURCE_ENDPOINT_BASE}/${encodeURIComponent(group)}/${encodeURIComponent(version)}/${encodeURIComponent(resource)}/${encodeURIComponent(name)}`;
   const queryString = searchParams.toString();
   return queryString ? `${base}?${queryString}` : base;
 }
 
-export async function fetchResourceItem<T = unknown>(
+function readMetadataName(value: unknown): string | undefined {
+  const metadata = asObject(asObject(value).metadata);
+  const name = metadata.name;
+  return typeof name === "string" && name.length > 0 ? name : undefined;
+}
+
+export async function fetchResourceByName<T = unknown>(
   group: string,
   version: string,
   resource: string,
   name: string,
-  query?: ResourceItemQuery,
-): Promise<ResourceItemResult<T>> {
-  const requestUrl = buildResourceItemEndpoint(group, version, resource, name, query);
-  const payload = await fetchJsonDeduped<T>(requestUrl);
+  query?: ResourceByNameQuery,
+): Promise<ResourceByNameResult<T>> {
+  const fieldSelector = query?.fieldSelector ?? `metadata.name=${name}`;
+  const { requestUrl, items } = await fetchResourceCollection<T>(group, version, resource, {
+    namespace: query?.namespace,
+    labelSelector: query?.labelSelector,
+    fieldSelector,
+  });
+
+  const matched = items.find((item) => readMetadataName(item) === name) ?? items[0];
+  if (!matched) {
+    throw new Error(`Resource not found: ${resource}/${name}`);
+  }
+
   return {
     requestUrl,
-    payload,
+    payload: matched,
   };
 }
 
@@ -165,6 +183,6 @@ export async function fetchJsonDeduped<T>(url: string, init: RequestInit = {}): 
 }
 
 export async function deleteResource(group: string, version: string, resource: string, name: string, namespace?: string): Promise<void> {
-  const url = buildResourceItemEndpoint(group, version, resource, name, { namespace });
+  const url = buildResourceItemEndpoint(group, version, resource, name, namespace);
   await fetchJsonDeduped<unknown>(url, { method: "DELETE" });
 }

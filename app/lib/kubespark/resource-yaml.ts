@@ -1,6 +1,9 @@
 import { stringify } from "yaml"
 
-import { buildResourceItemEndpoint, fetchResourceItem } from "./common"
+import {
+  buildResourceCollectionEndpoint,
+  fetchResourceByName,
+} from "./common"
 import { buildResourceDocument, type ResourceDocumentType } from "./resource-document"
 
 export type NamespacedResourceYamlResult = {
@@ -61,7 +64,10 @@ export function buildNamespacedResourceEndpoint(
   options?: Pick<NamespacedResourceYamlOptions, "group" | "version">
 ): string {
   const { group, version } = resolveResourceGvr(resource, options)
-  return buildResourceItemEndpoint(group, version, resource, name, { namespace })
+  return buildResourceCollectionEndpoint(group, version, resource, {
+    namespace,
+    fieldSelector: `metadata.name=${name}`,
+  })
 }
 
 export async function fetchNamespacedResourceYaml(
@@ -71,7 +77,7 @@ export async function fetchNamespacedResourceYaml(
   options?: NamespacedResourceYamlOptions
 ): Promise<NamespacedResourceYamlResult> {
   const { group, version } = resolveResourceGvr(resource, options)
-  const { requestUrl, payload } = await fetchResourceItem<unknown>(
+  const { requestUrl, payload } = await fetchResourceByName<unknown>(
     group,
     version,
     resource,

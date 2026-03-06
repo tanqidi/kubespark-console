@@ -1,8 +1,8 @@
 import {
-  buildResourceItemEndpoint,
+  buildResourceCollectionEndpoint,
   deleteResource,
+  fetchResourceByName,
   fetchResourceCollection,
-  fetchResourceItem,
 } from "./common"
 import { buildResourceDocument } from "./resource-document"
 import { formatAge, resolveUpdatedAt } from "./utils"
@@ -81,11 +81,14 @@ export function podPayloadToEditorText(payload: unknown): string {
 }
 
 export function buildNamespacedPodEndpoint(namespace: string, name: string): string {
-  return buildResourceItemEndpoint("core", "v1", "pods", name, { namespace })
+  return buildResourceCollectionEndpoint("core", "v1", "pods", {
+    namespace,
+    fieldSelector: `metadata.name=${name}`,
+  })
 }
 
 export async function fetchNamespacedPodYaml(namespace: string, name: string): Promise<PodYamlResult> {
-  const { requestUrl, payload } = await fetchResourceItem<unknown>(
+  const { requestUrl, payload } = await fetchResourceByName<unknown>(
     "core",
     "v1",
     "pods",
