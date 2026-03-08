@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import * as React from "react"
+import { usePathname, useRouter } from "next/navigation"
 import {
   closestCenter,
   DndContext,
@@ -65,25 +66,59 @@ type DataTableProps<TData> = {
   data: TData[]
   columns: ColumnDef<TData>[]
   getRowId?: (row: TData, index: number) => string
+  getRowHref?: (row: TData) => string | null | undefined
   toolbarStart?: React.ReactNode
   toolbarEnd?: React.ReactNode
   onDeleteSelectedRows?: (rows: TData[]) => void | Promise<void>
 }
 
-function DraggableRow<TData>({ row }: { row: Row<TData> }) {
+function shouldIgnoreRowClick(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false
+  return Boolean(
+    target.closest(
+      [
+        "a",
+        "button",
+        "input",
+        "textarea",
+        "select",
+        "[role='button']",
+        "[role='menuitem']",
+        "[role='checkbox']",
+        "[data-row-click-ignore='true']",
+      ].join(",")
+    )
+  )
+}
+
+function DraggableRow<TData>({
+  row,
+  href,
+  onNavigate,
+}: {
+  row: Row<TData>
+  href: string | null
+  onNavigate: (href: string) => void
+}) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.id,
   })
+  const isClickable = Boolean(href)
 
   return (
     <TableRow
       data-state={row.getIsSelected() && "selected"}
       data-dragging={isDragging}
       ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
+      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80 data-[row-clickable=true]:cursor-pointer data-[row-clickable=true]:hover:bg-muted/40"
+      data-row-clickable={isClickable}
       style={{
         transform: CSS.Transform.toString(transform),
         transition: transition,
+      }}
+      onClick={(event) => {
+        if (!href || shouldIgnoreRowClick(event.target)) return
+        onNavigate(href)
       }}
     >
       {row.getVisibleCells().map((cell) => (
@@ -99,10 +134,13 @@ export function DataTable<TData extends Record<string, unknown>>({
   data: initialData,
   columns,
   getRowId,
+  getRowHref,
   toolbarStart,
   toolbarEnd,
   onDeleteSelectedRows,
 }: DataTableProps<TData>) {
+  const router = useRouter()
+  const pathname = usePathname()
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -131,6 +169,41 @@ export function DataTable<TData extends Record<string, unknown>>({
         : String(index)
     },
     [getRowId]
+  )
+
+  const resolveRowHref = React.useCallback(
+    (row: TData) => {
+      if (getRowHref) return getRowHref(row) ?? null
+
+      const name = (row as { name?: unknown }).name
+      if (typeof name !== "string" || !name.trim()) return null
+
+      const namespace = (row as { namespace?: unknown }).namespace
+      const segments = [pathname, encodeURIComponent(name.trim())]
+
+      const namespaceText =
+        typeof namespace === "string" ? namespace.trim() : ""
+      const normalizedNamespace = namespaceText.toLowerCase()
+      const hasValidNamespace =
+        namespaceText.length > 0 &&
+        normalizedNamespace !== "-" &&
+        normalizedNamespace !== "n/a" &&
+        normalizedNamespace !== "<none>"
+
+      if (hasValidNamespace) {
+        segments.splice(1, 0, encodeURIComponent(namespaceText))
+      }
+
+      return segments.join("/")
+    },
+    [getRowHref, pathname]
+  )
+
+  const handleNavigate = React.useCallback(
+    (href: string) => {
+      router.push(href)
+    },
+    [router]
   )
 
   React.useEffect(() => {
@@ -245,7 +318,12 @@ export function DataTable<TData extends Record<string, unknown>>({
                     strategy={verticalListSortingStrategy}
                   >
                     {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} />
+                      <DraggableRow
+                        key={row.id}
+                        row={row}
+                        href={resolveRowHref(row.original)}
+                        onNavigate={handleNavigate}
+                      />
                     ))}
                   </SortableContext>
                 ) : (

@@ -1,11 +1,6 @@
 import { cookies } from "next/headers"
 
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/registry/new-york-v4/ui/sidebar"
-import { AppSidebar } from "@/app/(examples)/dashboard/components/app-sidebar"
-import { SiteHeader } from "@/app/(examples)/dashboard/components/site-header"
+import { DashboardShell } from "@/app/(examples)/dashboard/components/dashboard-shell"
 
 import "@/app/(examples)/dashboard/theme.css"
 
@@ -18,19 +13,11 @@ export default async function DashboardLayout({
   const defaultOpen = cookieStore.get("sidebar_state")?.value === "true"
 
   return (
-    <SidebarProvider
+    <DashboardShell
       defaultOpen={defaultOpen}
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-        } as React.CSSProperties
-      }
+      enableDetailSidebarAnimation={true}
     >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
-        <div className="flex flex-1 flex-col">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+      {children}
+    </DashboardShell>
   )
 }
