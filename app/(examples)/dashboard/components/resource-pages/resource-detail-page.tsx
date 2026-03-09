@@ -19,11 +19,11 @@ export function ResourceDetailPage({
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-4 md:py-6">
       <div className="grid gap-4 px-4 lg:grid-cols-[minmax(240px,24%)_minmax(0,1fr)] lg:px-6">
-        <aside className="space-y-4">
+        <aside className="flex flex-col gap-4">
           <section className="rounded-lg border bg-card p-4">
             <Button variant="outline" asChild className="mb-4 w-full justify-start">
               <Link href={backHref}>
-                <IconArrowLeft className="size-4" />
+                <IconArrowLeft data-icon="inline-start" />
                 {"\u8fd4\u56de\u5217\u8868"}
               </Link>
             </Button>

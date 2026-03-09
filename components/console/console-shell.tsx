@@ -86,16 +86,16 @@ export function ConsoleShell() {
             <div className="text-base font-semibold">Acme Inc.</div>
           </div>
           <div className="flex flex-col gap-4 px-4 py-4 lg:px-6">
-            <Button className="w-full justify-start"><Plus className="mr-2 h-4 w-4" />Quick Create</Button>
+            <Button className="w-full justify-start"><Plus data-icon="inline-start" />Quick Create</Button>
 
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const active = activePath === item.path;
                 const href = item.path === "/overview" ? "/clusters" : `/clusters${item.path}`;
                 return (
                   <Link key={item.path} href={href} className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm", active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground")}>
-                    <Icon className="h-4 w-4" />{item.title}
+                    <Icon className="size-4" />{item.title}
                   </Link>
                 );
               })}
@@ -103,29 +103,29 @@ export function ConsoleShell() {
 
             <Separator />
 
-            <div className="space-y-1">
-              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><Folder className="h-4 w-4" />Data Library</Link>
-              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><Database className="h-4 w-4" />Reports</Link>
-              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><FileText className="h-4 w-4" />Documents</Link>
+            <div className="flex flex-col gap-1">
+              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><Folder className="size-4" />Data Library</Link>
+              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><Database className="size-4" />Reports</Link>
+              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><FileText className="size-4" />Documents</Link>
             </div>
 
-            <div className="mt-auto space-y-1 pt-6">
-              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><Settings className="h-4 w-4" />Settings</Link>
-              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><CircleHelp className="h-4 w-4" />Get Help</Link>
+            <div className="mt-auto flex flex-col gap-1 pt-6">
+              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><Settings className="size-4" />Settings</Link>
+              <Link href="#" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"><CircleHelp className="size-4" />Get Help</Link>
             </div>
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-col">
           <header className="flex h-14 items-center border-b px-4 lg:px-6">
-            <PanelLeft className="h-4 w-4 text-muted-foreground" />
+            <PanelLeft className="size-4 text-muted-foreground" />
             <div className="ml-3 text-base font-medium">{currentTitle}</div>
             <div className="ml-auto flex items-center gap-2">
               <div className="relative hidden md:block">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
                 <Input className="h-9 w-64 pl-8" placeholder="Search" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
-              <Button variant="outline" size="sm"><Bell className="mr-1 h-4 w-4" />Alerts</Button>
+              <Button variant="outline" size="sm"><Bell data-icon="inline-start" />Alerts</Button>
             </div>
           </header>
 
@@ -182,7 +182,7 @@ export function ConsoleShell() {
                   <CardTitle>Actions</CardTitle>
                   <CardDescription>Module shortcuts</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="flex flex-col gap-2">
                   {moduleConfig.actions.map((action, idx) => (
                     <Button key={action} className="w-full justify-start" variant={idx === 0 ? "default" : idx === 1 ? "secondary" : "outline"}>{action}</Button>
                   ))}

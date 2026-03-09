@@ -48,13 +48,13 @@ export function LoginClient() {
           <CardDescription>{i18n.footer}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="relative">
-              <User className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <User className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
               <Input className="pl-8" placeholder={i18n.username.placeholder} value={username} onChange={(e) => setUsername(e.target.value)} required />
             </div>
             <div className="relative">
-              <Lock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Lock className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
               <Input
                 className="pl-8 pr-8"
                 type={showPassword ? "text" : "password"}
@@ -64,7 +64,7 @@ export function LoginClient() {
                 required
               />
               <button type="button" className="absolute right-2 top-2.5" onClick={() => setShowPassword((s) => !s)}>
-                {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                {showPassword ? <EyeOff className="size-4 text-muted-foreground" /> : <Eye className="size-4 text-muted-foreground" />}
               </button>
             </div>
             <label className="flex items-center gap-2 text-sm text-muted-foreground">

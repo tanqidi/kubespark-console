@@ -50,6 +50,8 @@ export function MonacoViewerDialog({
   className,
   editorOptions,
 }: MonacoViewerDialogProps) {
+  const resolvedTitle = title?.trim() || "Resource details"
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -59,7 +61,9 @@ export function MonacoViewerDialog({
         )}
       >
         <DialogHeader>
-          {title ? <DialogTitle>{title}</DialogTitle> : null}
+          <DialogTitle className={title ? undefined : "sr-only"}>
+            {resolvedTitle}
+          </DialogTitle>
         </DialogHeader>
         <DialogDescription asChild>
           <MonacoEditor

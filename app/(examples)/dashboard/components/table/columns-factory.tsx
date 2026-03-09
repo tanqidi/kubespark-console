@@ -17,6 +17,7 @@ import { Checkbox } from "@/registry/new-york-v4/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -281,17 +282,19 @@ export function createColumns<TData extends Record<string, unknown>>(
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-32">
-              {visibleActionItems.map((item, index) => (
-                <React.Fragment key={`action-${index}`}>
-                  {item.withSeparator ? <DropdownMenuSeparator /> : null}
-                  <DropdownMenuItem
-                    variant={item.variant}
-                    onSelect={() => item.onSelect?.(row.original)}
-                  >
-                    {item.label}
-                  </DropdownMenuItem>
-                </React.Fragment>
-              ))}
+              <DropdownMenuGroup>
+                {visibleActionItems.map((item, index) => (
+                  <React.Fragment key={`action-${index}`}>
+                    {item.withSeparator ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuItem
+                      variant={item.variant}
+                      onSelect={() => item.onSelect?.(row.original)}
+                    >
+                      {item.label}
+                    </DropdownMenuItem>
+                  </React.Fragment>
+                ))}
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         ),
