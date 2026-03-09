@@ -14,6 +14,11 @@ import {
   WorkloadsPageClient,
 } from "@/app/(examples)/dashboard/components/resource-pages"
 import { ResourceDetailPage } from "@/app/(examples)/dashboard/components/resource-pages/resource-detail-page"
+import {
+  WorkloadDetailLeftTemplate,
+  WorkloadDetailRightTemplate,
+  type WorkloadDetailKind,
+} from "@/app/(examples)/dashboard/components/resource-pages/workload-detail-templates"
 
 const sectionRenderers = {
   nodes: NodesPageClient,
@@ -45,10 +50,13 @@ const sectionLabels: Record<keyof typeof sectionRenderers, string> = {
 
 export default async function DashboardSectionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string[] }>
+  searchParams: Promise<{ kind?: string | string[] }>
 }) {
   const { slug } = await params
+  const resolvedSearchParams = await searchParams
   const key = slug?.[0]
 
   if (!key || !(key in sectionRenderers)) notFound()
@@ -57,6 +65,34 @@ export default async function DashboardSectionPage({
     const resourceName = decodeURIComponent(slug[slug.length - 1] ?? "")
     const namespace =
       slug.length > 2 ? decodeURIComponent(slug[slug.length - 2] ?? "") : undefined
+
+    const kindValue = Array.isArray(resolvedSearchParams.kind)
+      ? resolvedSearchParams.kind[0]
+      : resolvedSearchParams.kind
+    const workloadKind: WorkloadDetailKind =
+      kindValue === "StatefulSet" || kindValue === "DaemonSet" ? kindValue : "Deployment"
+
+    if (key === "workloads") {
+      return (
+        <ResourceDetailPage
+          sectionTitle={sectionLabels.workloads}
+          name={resourceName}
+          namespace={namespace}
+          backHref="/dashboard/workloads"
+          leftSlot={
+            <WorkloadDetailLeftTemplate
+              kind={workloadKind}
+              name={resourceName}
+              namespace={namespace}
+              backHref="/dashboard/workloads"
+            />
+          }
+          rightSlot={
+            <WorkloadDetailRightTemplate kind={workloadKind} name={resourceName} />
+          }
+        />
+      )
+    }
 
     return (
       <ResourceDetailPage

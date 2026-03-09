@@ -288,6 +288,9 @@ export function WorkloadsPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
+        getRowHref={(row) =>
+          `/dashboard/workloads/${encodeURIComponent(row.namespace)}/${encodeURIComponent(row.name)}?kind=${encodeURIComponent(row.kind)}`
+        }
         toolbarStart={workloadTabs}
         toolbarEnd={workloadFilters}
         onDeleteSelectedRows={handleDeleteSelectedRows}

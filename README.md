@@ -1,5 +1,12 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Shell Requirement
+
+All commands in this repository must be run with Git Bash.
+
+- Required shell: `C:\Program Files\Git\bin\bash.exe`
+- All command examples in this project assume Git Bash.
+
 ## Getting Started
 
 First, run the development server:
