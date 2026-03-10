@@ -562,7 +562,7 @@ export function CreateKeyValueResourceDialog({
                 </FieldGroup>
               </div>
             ) : (
-              <div className="px-1 py-1">
+              <div className="">
                 {dataViewMode === "list" ? (
                   <>
                     <div className="flex items-start justify-between gap-4">
