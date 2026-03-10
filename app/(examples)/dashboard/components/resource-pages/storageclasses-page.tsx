@@ -6,7 +6,11 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  createColumns,
+  renderNameDescriptionCell,
+  type ColumnConfig,
+} from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   fetchStorageClassRows,
   type StorageClassResourceRow,
@@ -20,7 +24,12 @@ import { Input } from "@/components/ui/input"
 type StorageClassRow = StorageClassResourceRow
 
 const storageClassColumns: ColumnConfig<StorageClassRow>[] = [
-  { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
+  {
+    key: "name",
+    label: "名称",
+    enableHiding: false,
+    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+  },
   { key: "provisioner", label: "Provisioner" },
   { key: "reclaimPolicy", label: "回收策略" },
   { key: "volumeBindingMode", label: "绑定模式" },

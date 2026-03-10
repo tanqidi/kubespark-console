@@ -6,7 +6,11 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  createColumns,
+  renderNameDescriptionCell,
+  type ColumnConfig,
+} from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   fetchVolumeRows,
   type PersistentVolumeClaimResourceRow,
@@ -31,7 +35,12 @@ type DeleteTarget =
   | null
 
 const persistentVolumeColumns: ColumnConfig<PersistentVolumeRow>[] = [
-  { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
+  {
+    key: "name",
+    label: "名称",
+    enableHiding: false,
+    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+  },
   { key: "capacity", label: "容量", align: "right" },
   { key: "storageClass", label: "存储类" },
   { key: "accessMode", label: "访问模式" },
@@ -42,7 +51,12 @@ const persistentVolumeColumns: ColumnConfig<PersistentVolumeRow>[] = [
 ]
 
 const persistentVolumeClaimColumns: ColumnConfig<PersistentVolumeClaimRow>[] = [
-  { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
+  {
+    key: "name",
+    label: "名称",
+    enableHiding: false,
+    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+  },
   { key: "namespace", label: "命名空间" },
   { key: "capacity", label: "容量", align: "right" },
   { key: "storageClass", label: "存储类" },

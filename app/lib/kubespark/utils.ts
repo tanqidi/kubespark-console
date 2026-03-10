@@ -23,6 +23,14 @@ export function formatDateTime(ts?: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+export function resolveDescriptionFromAnnotations(
+  annotations?: Record<string, unknown> | null
+): string {
+  if (!annotations) return ""
+  const value = annotations.description
+  return typeof value === "string" ? value.trim() : ""
+}
+
 export function resolveUpdatedAt(resource: any): string {
   const metadata = resource?.metadata || {};
   const status = resource?.status || {};

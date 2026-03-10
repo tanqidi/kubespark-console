@@ -5,7 +5,10 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  createColumns,
+  renderNameDescriptionCell,
+} from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   deletePod,
   fetchNamespacedPodYaml,
@@ -103,8 +106,8 @@ export function PodsPageClient() {
           {
             key: "name",
             label: "\u540d\u79f0",
-            cellClassName: "font-medium",
             enableHiding: false,
+            cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
           },
           { key: "status", label: "\u72b6\u6001", render: "status" },
           { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },

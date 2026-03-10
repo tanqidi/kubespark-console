@@ -6,7 +6,11 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  createColumns,
+  renderNameDescriptionCell,
+  type ColumnConfig,
+} from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   createNamespace,
   deleteNamespace,
@@ -40,16 +44,8 @@ const projectColumns: ColumnConfig<NamespaceRow>[] = [
   {
     key: "name",
     label: "名称",
+    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
     enableHiding: false,
-    cell: (_value, row) => {
-      const description = row.description || "-"
-      return (
-        <div className="min-w-0">
-          <div className="truncate font-medium">{row.name}</div>
-          <div className="text-muted-foreground truncate text-sm">{description}</div>
-        </div>
-      )
-    },
   },
   { key: "status", label: "状态", render: "status" },
   { key: "labels", label: "标签", align: "right" },

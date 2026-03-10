@@ -4,7 +4,10 @@ import * as React from "react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  createColumns,
+  renderNameDescriptionCell,
+} from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchNodeResourceRows, type NodeResourceRow } from "@/app/lib/kubespark/nodes"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
@@ -15,15 +18,9 @@ const columns = createColumns<NodeRow>({
   columns: [
     {
       key: "name",
-      label: "\u540d\u79f0/IP",
-      cellClassName: "font-medium",
+      label: "\u540d\u79f0",
       enableHiding: false,
-      cell: (_, row) => (
-        <div className="flex flex-col">
-          <span className="font-medium">{row.name}</span>
-          <span className="text-muted-foreground text-xs">{row.ip}</span>
-        </div>
-      ),
+      cell: (_, row) => renderNameDescriptionCell(row.name, row.description),
     },
     { key: "status", label: "\u72b6\u6001", render: "status" },
     { key: "role", label: "\u89d2\u8272" },

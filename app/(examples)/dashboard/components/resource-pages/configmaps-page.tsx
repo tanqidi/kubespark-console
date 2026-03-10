@@ -6,7 +6,11 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  createColumns,
+  renderNameDescriptionCell,
+  type ColumnConfig,
+} from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   fetchConfigMapRows,
   type ConfigMapResourceRow,
@@ -21,7 +25,12 @@ import { Input } from "@/components/ui/input"
 type ConfigMapRow = ConfigMapResourceRow
 
 const configMapColumns: ColumnConfig<ConfigMapRow>[] = [
-  { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
+  {
+    key: "name",
+    label: "名称",
+    enableHiding: false,
+    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+  },
   { key: "namespace", label: "命名空间" },
   { key: "dataItems", label: "数据项", align: "right" },
   { key: "size", label: "大小", align: "right" },

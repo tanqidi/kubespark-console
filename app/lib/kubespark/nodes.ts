@@ -1,5 +1,10 @@
 import { fetchResourceCollection } from "./common"
-import { parseQuantityCpu, parseQuantityMemGi, resolveUpdatedAt } from "./utils"
+import {
+  parseQuantityCpu,
+  parseQuantityMemGi,
+  resolveDescriptionFromAnnotations,
+  resolveUpdatedAt,
+} from "./utils"
 
 export type NodeStatusKey = "ready" | "unschedulable" | "offline"
 export type NodeRoleKey = "controlPlane" | "worker" | "unknown"
@@ -7,6 +12,7 @@ export type NodeRoleKey = "controlPlane" | "worker" | "unknown"
 export type NodeRowApi = {
   id: string
   name: string
+  description: string
   ip: string
   status: NodeStatusKey
   role: NodeRoleKey
@@ -19,6 +25,7 @@ export type NodeRowApi = {
 export type NodeResourceRow = {
   id: string
   name: string
+  description: string
   ip: string
   status: string
   role: string
@@ -33,6 +40,7 @@ type RawNode = {
     uid?: string
     name?: string
     labels?: Record<string, string>
+    annotations?: Record<string, string>
     creationTimestamp?: string
     managedFields?: Array<{ time?: string }>
   }
@@ -94,6 +102,7 @@ export async function fetchNodes(): Promise<NodeRowApi[]> {
     return {
       id: metadata.uid || metadata.name || Math.random().toString(36).slice(2),
       name: metadata.name || "-",
+      description: resolveDescriptionFromAnnotations(metadata.annotations),
       ip,
       status: statusFromNode(item),
       role: roleFromLabels(metadata.labels),
@@ -129,6 +138,7 @@ export async function fetchNodeResourceRows(): Promise<NodeResourceRow[]> {
     return {
       id: node.id,
       name: node.name,
+      description: node.description,
       ip: node.ip,
       status: statusLabel(node.status),
       role: roleLabel(node.role),

@@ -5,7 +5,11 @@ import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import {
+  createColumns,
+  renderNameDescriptionCell,
+  type ColumnConfig,
+} from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { fetchJobRows, type JobResourceRow } from "@/app/lib/kubespark/resource-rows"
 import { deleteJob } from "@/app/lib/kubespark/resource-delete"
@@ -19,7 +23,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 type JobRow = JobResourceRow
 
 const jobColumns: ColumnConfig<JobRow>[] = [
-  { key: "name", label: "\u540d\u79f0", cellClassName: "font-medium", enableHiding: false },
+  {
+    key: "name",
+    label: "\u540d\u79f0",
+    enableHiding: false,
+    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+  },
   { key: "status", label: "\u72b6\u6001", render: "status" as const },
   { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
   { key: "duration", label: "\u65f6\u957f", align: "right" as const },

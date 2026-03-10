@@ -27,6 +27,22 @@ import { Label } from "@/components/ui/label"
 
 type ColumnRender = "text" | "badge" | "status" | "input"
 
+export function renderNameDescriptionCell(name: unknown, description?: unknown) {
+  const primaryText =
+    typeof name === "string" && name.trim().length > 0 ? name : "-"
+  const secondaryText =
+    typeof description === "string" && description.trim().length > 0
+      ? description
+      : "-"
+
+  return (
+    <div className="min-w-0">
+      <div className="truncate font-medium">{primaryText}</div>
+      <div className="truncate text-sm text-muted-foreground">{secondaryText}</div>
+    </div>
+  )
+}
+
 export type ColumnConfig<TData> = {
   key: keyof TData & string
   label: React.ReactNode

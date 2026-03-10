@@ -1,5 +1,9 @@
 import { fetchResourceCollection } from "./common"
-import { formatAge, resolveUpdatedAt } from "./utils"
+import {
+  formatAge,
+  resolveDescriptionFromAnnotations,
+  resolveUpdatedAt,
+} from "./utils"
 
 type JsonObject = Record<string, unknown>
 
@@ -19,6 +23,12 @@ function asStringList(value: unknown): string[] {
     : []
 }
 
+function readDescription(resource: JsonObject): string {
+  const metadata = asObject(resource.metadata)
+  const annotations = asObject(metadata.annotations)
+  return resolveDescriptionFromAnnotations(annotations)
+}
+
 function byteLengthOf(obj: unknown): number {
   try {
     const encoded = new TextEncoder().encode(JSON.stringify(obj ?? {}))
@@ -36,6 +46,7 @@ function formatSize(bytes: number): string {
 export type ConfigMapResourceRow = {
   id: string
   name: string
+  description: string
   namespace: string
   dataItems: number
   size: string
@@ -56,6 +67,7 @@ export async function fetchConfigMapRows(limit = 300): Promise<ConfigMapResource
     return {
       id: asString(metadata.uid, `${name}-${index}`),
       name: asString(metadata.name),
+      description: readDescription(resource),
       namespace: asString(metadata.namespace, "default"),
       dataItems,
       size: formatSize(sizeBytes),
@@ -68,6 +80,7 @@ export async function fetchConfigMapRows(limit = 300): Promise<ConfigMapResource
 export type ServiceResourceRow = {
   id: string
   name: string
+  description: string
   type: string
   namespace: string
   clusterIp: string
@@ -96,6 +109,7 @@ export async function fetchServiceRows(limit = 300): Promise<ServiceResourceRow[
     return {
       id: asString(metadata.uid, `${name}-${index}`),
       name: asString(metadata.name),
+      description: readDescription(resource),
       type: asString(spec.type),
       namespace: asString(metadata.namespace, "default"),
       clusterIp: asString(spec.clusterIP),
@@ -109,6 +123,7 @@ export async function fetchServiceRows(limit = 300): Promise<ServiceResourceRow[
 export type SecretResourceRow = {
   id: string
   name: string
+  description: string
   namespace: string
   type: string
   dataItems: number
@@ -127,6 +142,7 @@ export async function fetchSecretRows(limit = 300): Promise<SecretResourceRow[]>
     return {
       id: asString(metadata.uid, `${name}-${index}`),
       name: asString(metadata.name),
+      description: readDescription(resource),
       namespace: asString(metadata.namespace, "default"),
       type: asString(resource.type),
       dataItems: Object.keys(dataObj).length,
@@ -140,6 +156,7 @@ export async function fetchSecretRows(limit = 300): Promise<SecretResourceRow[]>
 export type RouteResourceRow = {
   id: string
   name: string
+  description: string
   namespace: string
   host: string
   path: string
@@ -167,6 +184,7 @@ export async function fetchRouteRows(limit = 300): Promise<RouteResourceRow[]> {
       mapped.push({
         id: `${baseId}-0`,
         name,
+        description: readDescription(resource),
         namespace,
         host: "-",
         path: "/",
@@ -187,6 +205,7 @@ export async function fetchRouteRows(limit = 300): Promise<RouteResourceRow[]> {
         mapped.push({
           id: `${baseId}-${ruleIndex}`,
           name,
+          description: readDescription(resource),
           namespace,
           host,
           path: "/",
@@ -204,6 +223,7 @@ export async function fetchRouteRows(limit = 300): Promise<RouteResourceRow[]> {
         mapped.push({
           id: `${baseId}-${ruleIndex}-${pathIndex}`,
           name,
+          description: readDescription(resource),
           namespace,
           host,
           path: asString(pathObj.path, "/"),
@@ -221,6 +241,7 @@ export async function fetchRouteRows(limit = 300): Promise<RouteResourceRow[]> {
 export type StorageClassResourceRow = {
   id: string
   name: string
+  description: string
   provisioner: string
   reclaimPolicy: string
   volumeBindingMode: string
@@ -243,6 +264,7 @@ export async function fetchStorageClassRows(limit = 300): Promise<StorageClassRe
     return {
       id: asString(metadata.uid, `${name}-${index}`),
       name: asString(metadata.name),
+      description: readDescription(resource),
       provisioner: asString(resource.provisioner),
       reclaimPolicy: asString(resource.reclaimPolicy),
       volumeBindingMode: asString(resource.volumeBindingMode),
@@ -258,6 +280,7 @@ export type JobKind = "Job" | "CronJob"
 export type JobResourceRow = {
   id: string
   name: string
+  description: string
   status: string
   namespace: string
   duration: string
@@ -314,6 +337,7 @@ export async function fetchJobRows(limit = 300): Promise<JobResourceRow[]> {
     return {
       id: asString(metadata.uid, `${kind}-${name}-${index}`),
       name,
+      description: readDescription(resource),
       status: kind === "CronJob" ? resolveCronJobStatus(resource) : resolveJobStatus(resource),
       namespace: asString(metadata.namespace, "default"),
       duration: kind === "CronJob" ? "-" : resolveJobDuration(resource),
@@ -330,6 +354,7 @@ export type WorkloadKind = "Deployment" | "StatefulSet" | "DaemonSet"
 export type WorkloadResourceRow = {
   id: string
   name: string
+  description: string
   status: string
   namespace: string
   desired: number
@@ -398,6 +423,7 @@ export async function fetchWorkloadRows(limit = 300): Promise<WorkloadResourceRo
     return {
       id: asString(metadata.uid, `${name}-${index}`),
       name,
+      description: readDescription(resource),
       status: resolveWorkloadStatus(desired, updated, available, ready),
       namespace: asString(metadata.namespace, "default"),
       desired,
@@ -414,6 +440,7 @@ export async function fetchWorkloadRows(limit = 300): Promise<WorkloadResourceRo
 export type PersistentVolumeResourceRow = {
   id: string
   name: string
+  description: string
   capacity: string
   storageClass: string
   accessMode: string
@@ -426,6 +453,7 @@ export type PersistentVolumeResourceRow = {
 export type PersistentVolumeClaimResourceRow = {
   id: string
   name: string
+  description: string
   namespace: string
   capacity: string
   storageClass: string
@@ -467,6 +495,7 @@ function mapPersistentVolumes(items: unknown[], limit: number): PersistentVolume
     return {
       id: asString(metadata.uid, `${name}-${index}`),
       name: asString(metadata.name),
+      description: readDescription(resource),
       capacity: asString(capacity.storage),
       storageClass: asString(spec.storageClassName),
       accessMode,
@@ -500,6 +529,7 @@ function mapPersistentVolumeClaims(
     return {
       id: asString(metadata.uid, `${namespace}-${name}-${index}`),
       name: asString(metadata.name),
+      description: readDescription(resource),
       namespace,
       capacity,
       storageClass: asString(spec.storageClassName),

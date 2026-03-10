@@ -5,7 +5,11 @@ import {
   fetchResourceCollection,
 } from "./common"
 import { buildResourceDocument } from "./resource-document"
-import { formatAge, resolveUpdatedAt } from "./utils"
+import {
+  formatAge,
+  resolveDescriptionFromAnnotations,
+  resolveUpdatedAt,
+} from "./utils"
 
 export type PodStatusKey = "running" | "pending" | "failed" | "succeeded" | "unknown"
 
@@ -21,6 +25,7 @@ export type PodRow = {
 export type PodResourceRow = {
   id: string
   name: string
+  description: string
   status: string
   namespace: string
   node: string
@@ -34,6 +39,7 @@ type RawPod = {
     uid?: string
     name?: string
     namespace?: string
+    annotations?: Record<string, string>
     creationTimestamp?: string
   }
   status?: {
@@ -138,6 +144,7 @@ export async function fetchPodResourceRows(limit = 300): Promise<PodResourceRow[
     return {
       id: metadata.uid || `${name}-${index}`,
       name,
+      description: resolveDescriptionFromAnnotations(metadata.annotations),
       status: phaseToStatusLabel(status.phase),
       namespace: metadata.namespace || "default",
       node: spec.nodeName || status.hostIP || "-",
