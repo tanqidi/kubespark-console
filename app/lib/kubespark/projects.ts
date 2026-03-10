@@ -10,6 +10,7 @@ import { formatAge, resolveUpdatedAt } from "./utils"
 export type NamespaceRow = {
   id: string
   name: string
+  description: string
   status: string
   labels: number
   annotations: number
@@ -60,12 +61,16 @@ export async function fetchNamespaces(): Promise<NamespaceRow[]> {
   )
   return items.map((item) => {
     const md = item.metadata || {}
+    const annotations = md.annotations || {}
+    const description = (annotations["description"] || "").trim()
+
     return {
       id: md.uid || md.name || Math.random().toString(36).slice(2),
       name: md.name || "-",
+      description,
       status: item.status?.phase || "Unknown",
       labels: Object.keys(md.labels || {}).length,
-      annotations: Object.keys(md.annotations || {}).length,
+      annotations: Object.keys(annotations).length,
       age: formatAge(md.creationTimestamp),
       updatedAt: resolveUpdatedAt(item),
     }

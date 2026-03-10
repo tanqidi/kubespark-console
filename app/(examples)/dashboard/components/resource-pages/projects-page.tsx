@@ -33,11 +33,24 @@ import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
 import { Button } from "@/registry/new-york-v4/ui/button"
-import { Input } from "@/registry/new-york-v4/ui/input"
 import { toast } from "sonner"
+import {Input} from "@/components/ui/input"
 
 const projectColumns: ColumnConfig<NamespaceRow>[] = [
-  { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
+  {
+    key: "name",
+    label: "名称",
+    enableHiding: false,
+    cell: (_value, row) => {
+      const description = row.description || "-"
+      return (
+        <div className="min-w-0">
+          <div className="truncate font-medium">{row.name}</div>
+          <div className="text-muted-foreground truncate text-sm">{description}</div>
+        </div>
+      )
+    },
+  },
   { key: "status", label: "状态", render: "status" },
   { key: "labels", label: "标签", align: "right" },
   { key: "annotations", label: "注解", align: "right" },
@@ -61,6 +74,18 @@ function resolveCreateProjectErrorMessage(error: unknown): string {
   return "创建项目失败，请稍后重试"
 }
 
+function isNameRelatedCreateError(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : ""
+  const text = raw.toLowerCase()
+  return (
+    text.includes("already exists") ||
+    text.includes("状态码 409") ||
+    text.includes("status 409") ||
+    text.includes("metadata.name") ||
+    text.includes("名称")
+  )
+}
+
 export function ProjectsPageClient() {
   const [rows, setRows] = React.useState<NamespaceRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -75,6 +100,7 @@ export function ProjectsPageClient() {
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [createName, setCreateName] = React.useState("")
   const [createDescription, setCreateDescription] = React.useState("")
+  const [createNameInvalid, setCreateNameInvalid] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
 
   const handleViewYaml = React.useCallback((row: NamespaceRow) => {
@@ -146,10 +172,12 @@ export function ProjectsPageClient() {
       const nextName = createName.trim()
       const nextDescription = createDescription.trim()
       if (!nextName) {
+        setCreateNameInvalid(true)
         toast.error("请输入项目名称")
         return
       }
 
+      setCreateNameInvalid(false)
       setCreating(true)
 
       void createNamespace({ name: nextName, description: nextDescription })
@@ -163,6 +191,7 @@ export function ProjectsPageClient() {
         })
         .catch((e: unknown) => {
           const message = resolveCreateProjectErrorMessage(e)
+          setCreateNameInvalid(isNameRelatedCreateError(e))
           toast.error(message)
           console.error("[Projects] create request failed", {
             name: nextName,
@@ -281,6 +310,7 @@ export function ProjectsPageClient() {
         onOpenChange={(open) => {
           if (!open && creating) return
           setCreateDialogOpen(open)
+          if (!open) setCreateNameInvalid(false)
         }}
       >
         <DialogContent
@@ -297,15 +327,19 @@ export function ProjectsPageClient() {
             </DialogHeader>
 
             <FieldGroup className="mt-4">
-              <Field>
+              <Field data-invalid={createNameInvalid}>
                 <FieldLabel htmlFor="project-create-name">名称</FieldLabel>
                 <Input
                   id="project-create-name"
                   name="name"
                   value={createName}
-                  onChange={(event) => setCreateName(event.target.value)}
+                  onChange={(event) => {
+                    setCreateName(event.target.value)
+                    if (createNameInvalid) setCreateNameInvalid(false)
+                  }}
                   placeholder="请输入项目名称"
                   autoComplete="off"
+                  aria-invalid={createNameInvalid}
                   disabled={creating}
                 />
                 <FieldDescription>
