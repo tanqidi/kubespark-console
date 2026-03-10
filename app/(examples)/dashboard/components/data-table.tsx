@@ -70,6 +70,7 @@ type DataTableProps<TData> = {
   getRowHref?: (row: TData) => string | null | undefined
   toolbarStart?: React.ReactNode
   toolbarEnd?: React.ReactNode
+  onCreate?: () => void
   onDeleteSelectedRows?: (rows: TData[]) => void | Promise<void>
 }
 
@@ -138,6 +139,7 @@ export function DataTable<TData extends Record<string, unknown>>({
   getRowHref,
   toolbarStart,
   toolbarEnd,
+  onCreate,
   onDeleteSelectedRows,
 }: DataTableProps<TData>) {
   const router = useRouter()
@@ -282,6 +284,7 @@ export function DataTable<TData extends Record<string, unknown>>({
         table={table}
         startContent={toolbarStart}
         endContent={toolbarEnd}
+        onCreate={onCreate}
         onDeleteSelected={onDeleteSelectedRows ? handleDeleteSelected : undefined}
       />
       <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">

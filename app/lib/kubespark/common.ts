@@ -154,12 +154,29 @@ export async function fetchJsonDeduped<T>(url: string, init: RequestInit = {}): 
         throw new Error("未授权，请先登录");
       }
 
-      let detail = "";
+      let detailMessage = "";
       try {
         const text = await res.text();
-        detail = text ? `: ${text.slice(0, 300)}` : "";
+        if (text) {
+          try {
+            const parsed = JSON.parse(text) as Record<string, unknown>;
+            const message = parsed?.message;
+            if (typeof message === "string" && message.trim()) {
+              detailMessage = message.trim();
+            } else {
+              detailMessage = text.slice(0, 300);
+            }
+          } catch {
+            detailMessage = text.slice(0, 300);
+          }
+        }
       } catch {}
-      throw new Error(`请求失败，状态码 ${res.status}${detail}`);
+
+      throw new Error(
+        detailMessage
+          ? `请求失败，状态码 ${res.status}：${detailMessage}`
+          : `请求失败，状态码 ${res.status}`
+      );
     }
 
     const json = (await res.json()) as unknown;
@@ -168,7 +185,9 @@ export async function fetchJsonDeduped<T>(url: string, init: RequestInit = {}): 
       if ("code" in obj || "data" in obj) {
         const env = json as ApiEnvelope<T>;
         const code = env.code ?? 200;
-        if (code !== 200) throw new Error(env.message || `后端返回错误 code=${code}`);
+        if (code !== 200 && code !== 0) {
+          throw new Error(env.message || `后端返回错误 code=${code}`);
+        }
         return (env.data as T) ?? ({} as T);
       }
     }

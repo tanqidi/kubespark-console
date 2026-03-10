@@ -8,14 +8,33 @@ import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resou
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns, type ColumnConfig } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
+  createNamespace,
   deleteNamespace,
   fetchNamespaceYaml,
   fetchNamespaces,
   type NamespaceRow,
 } from "@/app/lib/kubespark/projects"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
+import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
+import { Button } from "@/registry/new-york-v4/ui/button"
 import { Input } from "@/registry/new-york-v4/ui/input"
+import { toast } from "sonner"
 
 const projectColumns: ColumnConfig<NamespaceRow>[] = [
   { key: "name", label: "名称", cellClassName: "font-medium", enableHiding: false },
@@ -25,6 +44,22 @@ const projectColumns: ColumnConfig<NamespaceRow>[] = [
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]
+
+function resolveCreateProjectErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : ""
+  const text = raw.toLowerCase()
+
+  if (text.includes("already exists")) {
+    return "项目名称已存在，请更换后重试"
+  }
+
+  if (text.includes("状态码 409") || text.includes("status 409")) {
+    return "项目名称已存在，请更换后重试"
+  }
+
+  if (raw) return raw
+  return "创建项目失败，请稍后重试"
+}
 
 export function ProjectsPageClient() {
   const [rows, setRows] = React.useState<NamespaceRow[]>([])
@@ -37,6 +72,10 @@ export function ProjectsPageClient() {
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<NamespaceRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const [createName, setCreateName] = React.useState("")
+  const [createDescription, setCreateDescription] = React.useState("")
+  const [creating, setCreating] = React.useState(false)
 
   const handleViewYaml = React.useCallback((row: NamespaceRow) => {
     setYamlOpen(true)
@@ -99,6 +138,44 @@ export function ProjectsPageClient() {
     })
   }, [])
 
+  const handleCreateSubmit = React.useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      if (creating) return
+
+      const nextName = createName.trim()
+      const nextDescription = createDescription.trim()
+      if (!nextName) {
+        toast.error("请输入项目名称")
+        return
+      }
+
+      setCreating(true)
+
+      void createNamespace({ name: nextName, description: nextDescription })
+        .then(async () => {
+          setCreateDialogOpen(false)
+          setCreateName("")
+          setCreateDescription("")
+          const items = await fetchNamespaces()
+          setRows(items)
+          setError(null)
+        })
+        .catch((e: unknown) => {
+          const message = resolveCreateProjectErrorMessage(e)
+          toast.error(message)
+          console.error("[Projects] create request failed", {
+            name: nextName,
+            error: e,
+          })
+        })
+        .finally(() => {
+          setCreating(false)
+        })
+    },
+    [createDescription, createName, creating]
+  )
+
   const columns = React.useMemo(
     () =>
       createColumns<NamespaceRow>({
@@ -146,11 +223,11 @@ export function ProjectsPageClient() {
         if (cancelled) return
         setRows(items)
         setError(null)
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (cancelled) return
         if (!silent) {
           setRows([])
-          setError(e?.message || "API request failed")
+          setError(e instanceof Error ? e.message : "API request failed")
         } else {
           console.error("[Projects] polling refresh failed", e)
         }
@@ -199,6 +276,77 @@ export function ProjectsPageClient() {
 
   return (
     <>
+      <Dialog
+        open={createDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && creating) return
+          setCreateDialogOpen(open)
+        }}
+      >
+        <DialogContent
+          className="sm:max-w-xl"
+          onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+        >
+          <form onSubmit={handleCreateSubmit}>
+            <DialogHeader>
+              <DialogTitle>创建项目</DialogTitle>
+              <DialogDescription>
+                创建项目以对资源进行分组并控制不同用户的权限。
+              </DialogDescription>
+            </DialogHeader>
+
+            <FieldGroup className="mt-4">
+              <Field>
+                <FieldLabel htmlFor="project-create-name">名称</FieldLabel>
+                <Input
+                  id="project-create-name"
+                  name="name"
+                  value={createName}
+                  onChange={(event) => setCreateName(event.target.value)}
+                  placeholder="请输入项目名称"
+                  autoComplete="off"
+                  disabled={creating}
+                />
+                <FieldDescription>
+                  名称只能包含小写字母、数字和连字符（-），必须以小写字母开头并以小写字母或数字结尾，最长 63 个字符。
+                </FieldDescription>
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="project-create-description">
+                  说明
+                </FieldLabel>
+                <Textarea
+                  id="project-create-description"
+                  name="description"
+                  value={createDescription}
+                  onChange={(event) => setCreateDescription(event.target.value)}
+                  placeholder="请输入项目描述（选填）"
+                  maxLength={256}
+                  className="min-h-20"
+                  disabled={creating}
+                />
+                <FieldDescription>
+                  描述可包含任意字符，最长 256 个字符。
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+
+            <DialogFooter className="mt-4">
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={creating}>
+                  取消
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={creating}>
+                {creating ? "创建中..." : "创建"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <MonacoViewerDialog
         title="查看YAML"
         open={yamlOpen}
@@ -225,6 +373,7 @@ export function ProjectsPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
+        onCreate={() => setCreateDialogOpen(true)}
         toolbarEnd={projectFilters}
         onDeleteSelectedRows={handleDeleteSelectedRows}
       />

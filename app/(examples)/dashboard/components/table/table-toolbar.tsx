@@ -28,11 +28,13 @@ export function TableToolbar<TData>({
   table,
   startContent,
   endContent,
+  onCreate,
   onDeleteSelected,
 }: {
   table: Table<TData>
   startContent?: React.ReactNode
   endContent?: React.ReactNode
+  onCreate?: () => void
   onDeleteSelected?: () => void
 }) {
   const selectedCount = table.getFilteredSelectedRowModel().rows.length
@@ -101,7 +103,13 @@ export function TableToolbar<TData>({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" size="sm" className="transition-none">
+          <Button
+            variant="outline"
+            size="sm"
+            className="transition-none"
+            onClick={onCreate}
+            type="button"
+          >
             <IconPlus />
             <span className="hidden lg:inline">创建</span>
           </Button>
