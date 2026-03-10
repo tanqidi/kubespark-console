@@ -26,6 +26,7 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -33,7 +34,6 @@ import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
 import {Input} from "@/components/ui/input"
 
 const projectColumns: ColumnConfig<NamespaceRow>[] = [
@@ -86,6 +86,18 @@ function isNameRelatedCreateError(error: unknown): boolean {
   )
 }
 
+const PROJECT_NAME_RULE_MESSAGE =
+  "名称只能包含小写字母、数字和连字符（-），必须以小写字母开头并以小写字母或数字结尾，最长 63 个字符。"
+
+function validateProjectName(name: string): string | null {
+  if (!name) return "请输入项目名称"
+  if (name.length > 63) return PROJECT_NAME_RULE_MESSAGE
+  if (!/^[a-z](?:[-a-z0-9]*[a-z0-9])?$/.test(name)) {
+    return PROJECT_NAME_RULE_MESSAGE
+  }
+  return null
+}
+
 export function ProjectsPageClient() {
   const [rows, setRows] = React.useState<NamespaceRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -101,6 +113,7 @@ export function ProjectsPageClient() {
   const [createName, setCreateName] = React.useState("")
   const [createDescription, setCreateDescription] = React.useState("")
   const [createNameInvalid, setCreateNameInvalid] = React.useState(false)
+  const [createNameError, setCreateNameError] = React.useState<string | null>(null)
   const [creating, setCreating] = React.useState(false)
 
   const handleViewYaml = React.useCallback((row: NamespaceRow) => {
@@ -171,13 +184,15 @@ export function ProjectsPageClient() {
 
       const nextName = createName.trim()
       const nextDescription = createDescription.trim()
-      if (!nextName) {
+      const validationMessage = validateProjectName(nextName)
+      if (validationMessage) {
         setCreateNameInvalid(true)
-        toast.error("请输入项目名称")
+        setCreateNameError(validationMessage)
         return
       }
 
       setCreateNameInvalid(false)
+      setCreateNameError(null)
       setCreating(true)
 
       void createNamespace({ name: nextName, description: nextDescription })
@@ -191,12 +206,9 @@ export function ProjectsPageClient() {
         })
         .catch((e: unknown) => {
           const message = resolveCreateProjectErrorMessage(e)
-          setCreateNameInvalid(isNameRelatedCreateError(e))
-          toast.error(message)
-          console.error("[Projects] create request failed", {
-            name: nextName,
-            error: e,
-          })
+          const isNameError = isNameRelatedCreateError(e)
+          setCreateNameInvalid(isNameError)
+          setCreateNameError(isNameError ? message : null)
         })
         .finally(() => {
           setCreating(false)
@@ -310,7 +322,10 @@ export function ProjectsPageClient() {
         onOpenChange={(open) => {
           if (!open && creating) return
           setCreateDialogOpen(open)
-          if (!open) setCreateNameInvalid(false)
+          if (!open) {
+            setCreateNameInvalid(false)
+            setCreateNameError(null)
+          }
         }}
       >
         <DialogContent
@@ -336,15 +351,18 @@ export function ProjectsPageClient() {
                   onChange={(event) => {
                     setCreateName(event.target.value)
                     if (createNameInvalid) setCreateNameInvalid(false)
+                    if (createNameError) setCreateNameError(null)
                   }}
                   placeholder="请输入项目名称"
                   autoComplete="off"
                   aria-invalid={createNameInvalid}
                   disabled={creating}
                 />
-                <FieldDescription>
-                  名称只能包含小写字母、数字和连字符（-），必须以小写字母开头并以小写字母或数字结尾，最长 63 个字符。
-                </FieldDescription>
+                {createNameError ? (
+                  <FieldError>{createNameError}</FieldError>
+                ) : (
+                  <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
+                )}
               </Field>
 
               <Field>
