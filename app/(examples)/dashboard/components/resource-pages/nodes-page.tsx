@@ -6,7 +6,6 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
-  renderNameDescriptionCell,
 } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchNodeResourceRows, type NodeResourceRow } from "@/app/lib/kubespark/nodes"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -20,7 +19,12 @@ const columns = createColumns<NodeRow>({
       key: "name",
       label: "\u540d\u79f0",
       enableHiding: false,
-      cell: (_, row) => renderNameDescriptionCell(row.name, row.description),
+      cell: (_, row) => (
+        <div className="min-w-0">
+          <div className="truncate font-medium">{row.name}</div>
+          <div className="truncate text-sm text-muted-foreground">{row.ip || "-"}</div>
+        </div>
+      ),
     },
     { key: "status", label: "\u72b6\u6001", render: "status" },
     { key: "role", label: "\u89d2\u8272" },
