@@ -4,6 +4,7 @@ import * as React from "react"
 import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { CreateKeyValueResourceDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-key-value-resource-dialog"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
@@ -15,7 +16,9 @@ import {
   fetchSecretRows,
   type SecretResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
+import { createSecret } from "@/app/lib/kubespark/resource-create"
 import { deleteSecret } from "@/app/lib/kubespark/resource-delete"
+import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
@@ -41,6 +44,9 @@ const secretColumns: ColumnConfig<SecretRow>[] = [
 
 export function SecretsPageClient() {
   const [rows, setRows] = React.useState<SecretRow[]>([])
+  const [namespaceOptions, setNamespaceOptions] = React.useState<
+    Array<{ id: string; name: string }>
+  >([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [namespaceQuery, setNamespaceQuery] = React.useState("")
@@ -51,6 +57,8 @@ export function SecretsPageClient() {
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<SecretRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const isMountedRef = React.useRef(true)
 
   const handleViewYaml = React.useCallback((row: SecretRow) => {
     setYamlOpen(true)
@@ -151,30 +159,71 @@ export function SecretsPageClient() {
     [handleViewYaml, requestDelete]
   )
 
+  const refreshRows = React.useCallback(async (silent: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
+
+    try {
+      const [mapped, namespaces] = await Promise.all([
+        fetchSecretRows(),
+        fetchNamespaces(),
+      ])
+      if (!isMountedRef.current) return
+      setRows(mapped)
+      setNamespaceOptions(
+        namespaces
+          .map((item) => ({ id: item.name, name: item.name }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
+      setError(null)
+    } catch (e: unknown) {
+      if (!isMountedRef.current) return
+      if (!silent) {
+        setRows([])
+        setError(e instanceof Error ? e.message : "API request failed")
+      } else {
+        console.error("[Secrets] polling refresh failed", e)
+      }
+    } finally {
+      if (!silent && isMountedRef.current) setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  const handleCreateSubmit = React.useCallback(
+    async (payload: {
+      name: string
+      namespace: string
+      description: string
+      type?: string
+      items: Array<{ key: string; value: string }>
+    }) => {
+      await createSecret({
+        name: payload.name,
+        namespace: payload.namespace,
+        description: payload.description,
+        type: payload.type,
+        stringData: Object.fromEntries(payload.items.map((item) => [item.key, item.value])),
+      })
+      await refreshRows(false)
+    },
+    [refreshRows]
+  )
+
   React.useEffect(() => {
     let cancelled = false
 
     const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const mapped = await fetchSecretRows()
-        if (cancelled) return
-        setRows(mapped)
-        setError(null)
-      } catch (e: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setRows([])
-          setError(e instanceof Error ? e.message : "API request failed")
-        } else {
-          console.error("[Secrets] polling refresh failed", e)
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
+      await refreshRows(silent)
+      if (cancelled) return
     }
 
     void loadRows(false)
@@ -186,15 +235,7 @@ export function SecretsPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [])
-
-  const namespaceOptions = React.useMemo(
-    () =>
-      Array.from(new Set(rows.map((row) => row.namespace)))
-        .sort((a, b) => a.localeCompare(b))
-        .map((namespace) => ({ id: namespace, name: namespace })),
-    [rows]
-  )
+  }, [refreshRows])
 
   // if (loading) return <ResourceLoadingState /> // kept for potential future use
   if (error) {
@@ -237,6 +278,13 @@ export function SecretsPageClient() {
 
   return (
     <>
+      <CreateKeyValueResourceDialog
+        kind="secret"
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        namespaceOptions={namespaceOptions}
+        onSubmit={handleCreateSubmit}
+      />
       <MonacoViewerDialog
         title="查看YAML"
         open={yamlOpen}
@@ -263,6 +311,7 @@ export function SecretsPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
+        onCreate={() => setCreateDialogOpen(true)}
         toolbarEnd={secretFilters}
         onDeleteSelectedRows={handleDeleteSelectedRows}
       />
