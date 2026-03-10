@@ -1,5 +1,6 @@
 import {
   buildResourceCollectionEndpoint,
+  fetchResourceCollection,
   fetchJsonDeduped,
 } from "./common"
 
@@ -38,6 +39,11 @@ export type CreateSecretInput = BaseCreateInput & {
   stringData?: Record<string, string>
 }
 
+type ExistenceCheckInput = {
+  name: string
+  namespace: string
+}
+
 function buildMetadata(input: BaseCreateInput): ResourceMetadata {
   const name = normalizeKubernetesResourceName(input.name)
   const namespace = input.namespace.trim()
@@ -59,6 +65,40 @@ function buildMetadata(input: BaseCreateInput): ResourceMetadata {
         }
       : {}),
   }
+}
+
+async function checkNamespacedResourceExists(
+  resource: "configmaps" | "secrets",
+  input: ExistenceCheckInput
+): Promise<boolean> {
+  const metadata = buildMetadata({
+    name: input.name,
+    namespace: input.namespace,
+  })
+
+  const { items } = await fetchResourceCollection(
+    "core",
+    "v1",
+    resource,
+    {
+      namespace: metadata.namespace,
+      fieldSelector: `metadata.name=${metadata.name}`,
+    }
+  )
+
+  return items.length > 0
+}
+
+export async function checkConfigMapExists(
+  input: ExistenceCheckInput
+): Promise<boolean> {
+  return checkNamespacedResourceExists("configmaps", input)
+}
+
+export async function checkSecretExists(
+  input: ExistenceCheckInput
+): Promise<boolean> {
+  return checkNamespacedResourceExists("secrets", input)
 }
 
 export async function createConfigMap(

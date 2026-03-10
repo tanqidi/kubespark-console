@@ -1,16 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { IconPencil, IconTrash } from "@tabler/icons-react"
+import { IconDeviceFloppy, IconPencil, IconTrash } from "@tabler/icons-react"
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
 import {
   Dialog,
   DialogClose,
@@ -31,8 +23,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { checkConfigMapExists, checkSecretExists } from "@/app/lib/kubespark/resource-create"
 
 type ResourceKind = "configmap" | "secret"
 
@@ -123,6 +115,7 @@ export function CreateKeyValueResourceDialog({
   const [secretType, setSecretType] = React.useState("Opaque")
   const [items, setItems] = React.useState<KeyValueItem[]>(() => [createEmptyItem()])
   const [creating, setCreating] = React.useState(false)
+  const [checkingNext, setCheckingNext] = React.useState(false)
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [itemsError, setItemsError] = React.useState<string | null>(null)
@@ -150,6 +143,7 @@ export function CreateKeyValueResourceDialog({
       setSecretType("Opaque")
       setItems([createEmptyItem()])
       setCreating(false)
+      setCheckingNext(false)
       setNameError(null)
       setNamespaceError(null)
       setItemsError(null)
@@ -224,10 +218,10 @@ export function CreateKeyValueResourceDialog({
     setSubmitError(null)
   }, [])
 
-  const handleNextStep = React.useCallback((event?: React.MouseEvent<HTMLButtonElement>) => {
+  const handleNextStep = React.useCallback(async (event?: React.MouseEvent<HTMLButtonElement>) => {
     event?.preventDefault()
     event?.stopPropagation()
-    if (creating) return
+    if (creating || checkingNext) return
 
     const nextName = name.trim().toLowerCase()
     const nextNamespace = namespace.trim()
@@ -243,9 +237,28 @@ export function CreateKeyValueResourceDialog({
     }
 
     setSubmitError(null)
-    setActiveTab("data")
-    setDataViewMode("list")
-  }, [creating, name, namespace])
+    setCheckingNext(true)
+
+    try {
+      const exists = isSecret
+        ? await checkSecretExists({ name: nextName, namespace: nextNamespace })
+        : await checkConfigMapExists({ name: nextName, namespace: nextNamespace })
+
+      if (exists) {
+        setNameError(isSecret ? "保密字典名称已存在，请更换后重试" : "配置字典名称已存在，请更换后重试")
+        setActiveTab("basic")
+        return
+      }
+
+      setActiveTab("data")
+      setDataViewMode("list")
+    } catch (error) {
+      setNameError(error instanceof Error ? error.message : "名称校验失败，请稍后重试")
+      setActiveTab("basic")
+    } finally {
+      setCheckingNext(false)
+    }
+  }, [checkingNext, creating, isSecret, name, namespace])
 
   const handleSubmit = React.useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -347,7 +360,7 @@ export function CreateKeyValueResourceDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && creating) return
+        if (!nextOpen && (creating || checkingNext)) return
         onOpenChange(nextOpen)
       }}
     >
@@ -362,36 +375,9 @@ export function CreateKeyValueResourceDialog({
             <DialogDescription>{descriptionText}</DialogDescription>
           </DialogHeader>
 
-          <Tabs
-            value={activeTab}
-            className="px-6 pb-0 pt-4"
-          >
-            <Breadcrumb>
-              <BreadcrumbList className="gap-2 text-xs">
-                <BreadcrumbItem>
-                  {activeTab === "basic" ? (
-                    <BreadcrumbPage className="font-medium">基本信息</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink asChild>
-                      <button type="button" className="font-medium" onClick={goToBasicStep}>
-                        基本信息
-                      </button>
-                    </BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  {activeTab === "data" ? (
-                    <BreadcrumbPage className="font-medium">数据设置</BreadcrumbPage>
-                  ) : (
-                    <span className="font-medium text-muted-foreground/80">数据设置</span>
-                  )}
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-
-            <TabsContent value="basic" className="mt-4">
-              <div className="max-h-[68vh] overflow-y-auto px-1 py-1">
+          <div className="px-6 pb-0 pt-4">
+            {activeTab === "basic" ? (
+              <div className="">
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">基本信息</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -500,10 +486,8 @@ export function CreateKeyValueResourceDialog({
                   </Field>
                 </FieldGroup>
               </div>
-            </TabsContent>
-
-            <TabsContent value="data" className="mt-4">
-              <div className="max-h-[68vh] overflow-y-auto px-1 py-1">
+            ) : (
+              <div className="">
                 {dataViewMode === "list" ? (
                   <>
                     <div className="flex items-start justify-between gap-4">
@@ -602,6 +586,7 @@ export function CreateKeyValueResourceDialog({
                         onClick={returnToList}
                         disabled={creating}
                       >
+                        <IconDeviceFloppy data-icon="inline-start" />
                         确定保存
                       </Button>
                     </div>
@@ -651,19 +636,24 @@ export function CreateKeyValueResourceDialog({
                   </>
                 )}
               </div>
-            </TabsContent>
-          </Tabs>
+            )}
+          </div>
 
           <DialogFooter className="mt-5 border-t bg-muted/10 px-6 py-4">
             <div className="flex w-full items-center justify-between gap-3">
               {activeTab === "basic" ? (
                 <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={creating}>
+                  <Button type="button" variant="outline" disabled={creating || checkingNext}>
                     取消
                   </Button>
                 </DialogClose>
               ) : (
-                <Button type="button" variant="outline" onClick={goToBasicStep} disabled={creating}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={goToBasicStep}
+                  disabled={creating || checkingNext || dataViewMode === "edit"}
+                >
                   上一步
                 </Button>
               )}
@@ -672,12 +662,12 @@ export function CreateKeyValueResourceDialog({
                 <Button
                   type="button"
                   onClick={(event) => handleNextStep(event)}
-                  disabled={creating}
+                  disabled={creating || checkingNext}
                 >
-                  下一步
+                  {checkingNext ? "校验中..." : "下一步"}
                 </Button>
               ) : (
-                <Button type="submit" disabled={creating}>
+                <Button type="submit" disabled={creating || checkingNext || dataViewMode === "edit"}>
                   {creating ? "创建中..." : "创建"}
                 </Button>
               )}
