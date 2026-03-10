@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconArrowLeft, IconPencil, IconTrash } from "@tabler/icons-react"
+import { IconPencil, IconTrash } from "@tabler/icons-react"
 
 import {
   Breadcrumb,
@@ -28,7 +28,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
@@ -225,7 +224,9 @@ export function CreateKeyValueResourceDialog({
     setSubmitError(null)
   }, [])
 
-  const handleNextStep = React.useCallback(() => {
+  const handleNextStep = React.useCallback((event?: React.MouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault()
+    event?.stopPropagation()
     if (creating) return
 
     const nextName = name.trim().toLowerCase()
@@ -267,6 +268,10 @@ export function CreateKeyValueResourceDialog({
 
       let resolvedItemsError: string | null = null
       const seen = new Set<string>()
+
+      if (cleanedItems.length === 0) {
+        resolvedItemsError = "请至少添加一个数据项"
+      }
 
       cleanedItems.forEach((item, index) => {
         if (resolvedItemsError) return
@@ -352,23 +357,23 @@ export function CreateKeyValueResourceDialog({
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
         <form onSubmit={handleSubmit}>
-          <DialogHeader className="border-b bg-muted/20 px-6 py-5">
+          <DialogHeader className="border-b bg-muted/15 px-6 py-5">
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{descriptionText}</DialogDescription>
           </DialogHeader>
 
           <Tabs
             value={activeTab}
-            className="px-6 pb-0 pt-5"
+            className="px-6 pb-0 pt-4"
           >
             <Breadcrumb>
-              <BreadcrumbList>
+              <BreadcrumbList className="gap-2 text-xs">
                 <BreadcrumbItem>
                   {activeTab === "basic" ? (
-                    <BreadcrumbPage>基本信息</BreadcrumbPage>
+                    <BreadcrumbPage className="font-medium">基本信息</BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild>
-                      <button type="button" onClick={goToBasicStep}>
+                      <button type="button" className="font-medium" onClick={goToBasicStep}>
                         基本信息
                       </button>
                     </BreadcrumbLink>
@@ -377,18 +382,18 @@ export function CreateKeyValueResourceDialog({
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
                   {activeTab === "data" ? (
-                    <BreadcrumbPage>数据设置</BreadcrumbPage>
+                    <BreadcrumbPage className="font-medium">数据设置</BreadcrumbPage>
                   ) : (
-                    <span className="text-muted-foreground">数据设置</span>
+                    <span className="font-medium text-muted-foreground/80">数据设置</span>
                   )}
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
 
-            <TabsContent value="basic" className="mt-5">
+            <TabsContent value="basic" className="mt-4">
               <div className="max-h-[68vh] overflow-y-auto px-1 py-1">
-                <div className="mb-5">
-                  <h3 className="text-base font-semibold">基本信息</h3>
+                <div className="mb-4">
+                  <h3 className="text-[15px] font-semibold">基本信息</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     填写资源名称、所属项目以及描述信息。
                   </p>
@@ -497,29 +502,26 @@ export function CreateKeyValueResourceDialog({
               </div>
             </TabsContent>
 
-            <TabsContent value="data" className="mt-5">
+            <TabsContent value="data" className="mt-4">
               <div className="max-h-[68vh] overflow-y-auto px-1 py-1">
                 {dataViewMode === "list" ? (
                   <>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex flex-col gap-1">
-                        <h3 className="text-base font-semibold">数据</h3>
+                        <h3 className="text-[15px] font-semibold">数据</h3>
                         <p className="text-sm text-muted-foreground">
                           管理资源中的键值对数据，空白项不会被提交。
                         </p>
                       </div>
-                      <Badge variant="secondary" className="shrink-0">
-                        {filledItems.length} 项
-                      </Badge>
                     </div>
 
-                    <div className="mt-5 flex flex-col gap-0">
+                    <div className="mt-4 flex flex-col gap-0">
                       {filledItems.length > 0 ? (
                         <div className="overflow-hidden rounded-lg border">
                           {filledItems.map((item, index) => (
                             <div
                               key={item.id}
-                              className="group flex items-center gap-4 border-b px-4 py-4 last:border-b-0"
+                              className="group flex items-center gap-4 border-b px-4 py-3.5 last:border-b-0"
                             >
                               <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground">
                                 {String(index + 1).padStart(2, "0")}
@@ -570,7 +572,7 @@ export function CreateKeyValueResourceDialog({
 
                       <button
                         type="button"
-                        className="mt-4 flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
+                        className="mt-3 flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
                         onClick={addItem}
                         disabled={creating}
                       >
@@ -586,36 +588,26 @@ export function CreateKeyValueResourceDialog({
                   </>
                 ) : (
                   <>
-                    <div>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col gap-1">
+                        <h3 className="text-[15px] font-semibold">编辑数据</h3>
+                        <p className="text-sm text-muted-foreground">
+                          设置当前数据项的键和值。
+                        </p>
+                      </div>
                       <Button
                         type="button"
-                        variant="ghost"
-                        className="-ml-2 w-fit"
+                        variant="outline"
+                        size="sm"
                         onClick={returnToList}
                         disabled={creating}
                       >
-                        <IconArrowLeft data-icon="inline-start" />
-                        返回数据列表
+                        确定保存
                       </Button>
-
-                      <div className="mt-3 flex items-start justify-between gap-4">
-                        <div className="flex flex-col gap-1">
-                          <h3 className="text-base font-semibold">编辑数据</h3>
-                          <p className="text-sm text-muted-foreground">
-                            设置当前数据项的键和值。
-                          </p>
-                        </div>
-
-                        {editingItem?.key.trim() ? (
-                          <Badge variant="secondary" className="shrink-0">
-                            {editingItem.key.trim()}
-                          </Badge>
-                        ) : null}
-                      </div>
                     </div>
 
                     {editingItem ? (
-                      <div className="mt-5 flex flex-col gap-5">
+                      <div className="mt-4 flex flex-col gap-5">
                         <FieldGroup className="flex flex-col gap-5">
                           <Field>
                             <FieldLabel htmlFor={`${editingItem.id}-key`}>键</FieldLabel>
@@ -662,26 +654,34 @@ export function CreateKeyValueResourceDialog({
             </TabsContent>
           </Tabs>
 
-          <DialogFooter className="mt-6 border-t bg-muted/10 px-6 py-4">
-            <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={creating}>
-                取消
-              </Button>
-            </DialogClose>
-            {activeTab === "basic" ? (
-              <Button type="button" onClick={handleNextStep} disabled={creating}>
-                下一步
-              </Button>
-            ) : (
-              <>
+          <DialogFooter className="mt-5 border-t bg-muted/10 px-6 py-4">
+            <div className="flex w-full items-center justify-between gap-3">
+              {activeTab === "basic" ? (
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={creating}>
+                    取消
+                  </Button>
+                </DialogClose>
+              ) : (
                 <Button type="button" variant="outline" onClick={goToBasicStep} disabled={creating}>
                   上一步
                 </Button>
+              )}
+
+              {activeTab === "basic" ? (
+                <Button
+                  type="button"
+                  onClick={(event) => handleNextStep(event)}
+                  disabled={creating}
+                >
+                  下一步
+                </Button>
+              ) : (
                 <Button type="submit" disabled={creating}>
                   {creating ? "创建中..." : "创建"}
                 </Button>
-              </>
-            )}
+              )}
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
