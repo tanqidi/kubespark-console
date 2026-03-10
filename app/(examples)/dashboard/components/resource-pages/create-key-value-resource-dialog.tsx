@@ -96,6 +96,15 @@ function validateName(value: string): string | null {
   return null
 }
 
+function validateDataItemKey(value: string): string | null {
+  const nextKey = value.trim()
+  if (!nextKey) return "请输入数据项键名"
+  if (!/^[A-Za-z0-9._-]+$/.test(nextKey)) {
+    return "数据项键名格式无效，仅支持字母、数字、点、短横线和下划线"
+  }
+  return null
+}
+
 function resolveSubmitErrorMessage(error: unknown, kind: ResourceKind): string {
   const raw = error instanceof Error ? error.message : ""
   const text = raw.toLowerCase()
@@ -127,6 +136,7 @@ export function CreateKeyValueResourceDialog({
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [itemsError, setItemsError] = React.useState<string | null>(null)
+  const [editingKeyError, setEditingKeyError] = React.useState<string | null>(null)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
   const [activeTab, setActiveTab] = React.useState<DialogTab>("basic")
   const [dataViewMode, setDataViewMode] = React.useState<DataViewMode>("list")
@@ -155,6 +165,7 @@ export function CreateKeyValueResourceDialog({
       setNameError(null)
       setNamespaceError(null)
       setItemsError(null)
+      setEditingKeyError(null)
       setSubmitError(null)
       setActiveTab("basic")
       setDataViewMode("list")
@@ -180,9 +191,10 @@ export function CreateKeyValueResourceDialog({
         )
       )
       if (itemsError) setItemsError(null)
+      if (editingKeyError) setEditingKeyError(null)
       if (submitError) setSubmitError(null)
     },
-    [itemsError, submitError]
+    [editingKeyError, itemsError, submitError]
   )
 
   const addItem = React.useCallback(() => {
@@ -191,7 +203,8 @@ export function CreateKeyValueResourceDialog({
     setEditingItemId(nextItem.id)
     setDataViewMode("edit")
     if (itemsError) setItemsError(null)
-  }, [itemsError])
+    if (editingKeyError) setEditingKeyError(null)
+  }, [editingKeyError, itemsError])
 
   const removeItem = React.useCallback(
     (id: string) => {
@@ -204,22 +217,58 @@ export function CreateKeyValueResourceDialog({
       setEditingItemId((current) => (current === id ? null : current))
       setDataViewMode("list")
       if (itemsError) setItemsError(null)
+      if (editingKeyError) setEditingKeyError(null)
       if (submitError) setSubmitError(null)
     },
-    [itemsError, submitError]
+    [editingKeyError, itemsError, submitError]
   )
 
   const beginEditItem = React.useCallback((id: string) => {
     setEditingItemId(id)
     setDataViewMode("edit")
     if (itemsError) setItemsError(null)
+    if (editingKeyError) setEditingKeyError(null)
     if (submitError) setSubmitError(null)
-  }, [itemsError, submitError])
+  }, [editingKeyError, itemsError, submitError])
 
   const returnToList = React.useCallback(() => {
+    if (!editingItem) {
+      setDataViewMode("list")
+      setEditingItemId(null)
+      return
+    }
+
+    const nextKey = editingItem.key.trim()
+    const nextValue = editingItem.value.trim()
+
+    if (!nextKey && !nextValue) {
+      setEditingKeyError(null)
+      setItemsError(null)
+      setDataViewMode("list")
+      setEditingItemId(null)
+      return
+    }
+
+    const keyError = validateDataItemKey(editingItem.key)
+    if (keyError) {
+      setEditingKeyError(keyError)
+      return
+    }
+
+    const duplicateExists = items.some(
+      (item) => item.id !== editingItem.id && item.key.trim() === nextKey
+    )
+
+    if (duplicateExists) {
+      setEditingKeyError(`数据项键名 ${nextKey} 已存在，请更换后重试`)
+      return
+    }
+
+    setEditingKeyError(null)
+    setItemsError(null)
     setDataViewMode("list")
     setEditingItemId(null)
-  }, [])
+  }, [editingItem, items])
 
   const goToBasicStep = React.useCallback(() => {
     setActiveTab("basic")
@@ -383,9 +432,9 @@ export function CreateKeyValueResourceDialog({
             <DialogDescription>{descriptionText}</DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 px-6 pb-0 pt-4">
+          <div className="min-h-0 flex-1 px-6 py-6">
             {activeTab === "basic" ? (
-              <div className="overflow-y-auto px-1 py-1">
+              <div className="">
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">基本信息</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -602,10 +651,10 @@ export function CreateKeyValueResourceDialog({
                     </div>
 
                     {editingItem ? (
-                      <div className="mt-4 overflow-y-auto px-1 py-1">
+                      <div className="mt-4 ">
                         <div className="flex flex-col gap-5 pb-4">
                           <FieldGroup className="flex flex-col gap-5">
-                            <Field>
+                            <Field data-invalid={Boolean(editingKeyError)}>
                               <FieldLabel htmlFor={`${editingItem.id}-key`}>键</FieldLabel>
                               <Input
                                 id={`${editingItem.id}-key`}
@@ -614,11 +663,16 @@ export function CreateKeyValueResourceDialog({
                                   updateItem(editingItem.id, "key", event.target.value)
                                 }
                                 placeholder="例如：application.yaml"
+                                aria-invalid={Boolean(editingKeyError)}
                                 disabled={creating}
                               />
-                              <FieldDescription>
-                                支持字母、数字、点、短横线和下划线。
-                              </FieldDescription>
+                              {editingKeyError ? (
+                                <FieldError>{editingKeyError}</FieldError>
+                              ) : (
+                                <FieldDescription>
+                                  支持字母、数字、点、短横线和下划线。
+                                </FieldDescription>
+                              )}
                             </Field>
 
                             <Separator />
@@ -639,8 +693,6 @@ export function CreateKeyValueResourceDialog({
                               />
                             </Field>
                           </FieldGroup>
-
-                          {itemsError ? <FieldError>{itemsError}</FieldError> : null}
                           {submitError ? <FieldError>{submitError}</FieldError> : null}
                         </div>
                       </div>
