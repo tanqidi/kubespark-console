@@ -74,60 +74,60 @@ type DataTableProps<TData> = {
   onDeleteSelectedRows?: (rows: TData[]) => void | Promise<void>
 }
 
-function shouldIgnoreRowClick(target: EventTarget | null) {
-  if (!(target instanceof Element)) return false
-  return Boolean(
-    target.closest(
-      [
-        "a",
-        "button",
-        "input",
-        "textarea",
-        "select",
-        "[role='button']",
-        "[role='menuitem']",
-        "[role='checkbox']",
-        "[data-row-click-ignore='true']",
-      ].join(",")
-    )
-  )
-}
-
 function DraggableRow<TData>({
   row,
   href,
+  primaryColumnId,
   onNavigate,
 }: {
   row: Row<TData>
   href: string | null
+  primaryColumnId: string | null
   onNavigate: (href: string) => void
 }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.id,
   })
-  const isClickable = Boolean(href)
 
   return (
     <TableRow
       data-state={row.getIsSelected() && "selected"}
       data-dragging={isDragging}
       ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80 data-[row-clickable=true]:cursor-pointer data-[row-clickable=true]:hover:bg-muted/40"
-      data-row-clickable={isClickable}
+      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
       style={{
         transform: CSS.Transform.toString(transform),
         transition: transition,
       }}
-      onClick={(event) => {
-        if (!href || shouldIgnoreRowClick(event.target)) return
-        onNavigate(href)
-      }}
     >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
+      {row.getVisibleCells().map((cell) => {
+        const content = flexRender(cell.column.columnDef.cell, cell.getContext())
+        const isPrimaryClickableCell =
+          primaryColumnId !== null && cell.column.id === primaryColumnId
+
+        return (
+          <TableCell key={cell.id}>
+            {href && isPrimaryClickableCell ? (
+              <span
+                role="link"
+                tabIndex={0}
+                onClick={() => onNavigate(href)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    onNavigate(href)
+                  }
+                }}
+                className="inline-flex max-w-full cursor-pointer text-left hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              >
+                {content}
+              </span>
+            ) : (
+              content
+            )}
+          </TableCell>
+        )
+      })}
     </TableRow>
   )
 }
@@ -223,6 +223,15 @@ export function DataTable<TData extends Record<string, unknown>>({
     () => data.map((row, index) => resolveRowId(row, index)),
     [data, resolveRowId]
   )
+
+  const primaryColumnId = React.useMemo(() => {
+    const firstAccessorColumn = columns.find((column) => {
+      const accessorKey = (column as { accessorKey?: unknown }).accessorKey
+      return typeof accessorKey === "string" && accessorKey.length > 0
+    }) as { accessorKey?: string } | undefined
+
+    return firstAccessorColumn?.accessorKey ?? null
+  }, [columns])
 
   const table = useReactTable({
     data,
@@ -326,6 +335,7 @@ export function DataTable<TData extends Record<string, unknown>>({
                         key={row.id}
                         row={row}
                         href={resolveRowHref(row.original)}
+                        primaryColumnId={primaryColumnId}
                         onNavigate={handleNavigate}
                       />
                     ))}
