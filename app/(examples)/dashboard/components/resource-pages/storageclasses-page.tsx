@@ -14,8 +14,8 @@ import {
 import { deleteStorageClass } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
-import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
-import { Input } from "@/registry/new-york-v4/ui/input"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
 
 type StorageClassRow = StorageClassResourceRow
 

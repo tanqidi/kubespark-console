@@ -15,8 +15,8 @@ import { deleteSecret } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
-import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
-import { Input } from "@/registry/new-york-v4/ui/input"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
 
 type SecretRow = SecretResourceRow
 

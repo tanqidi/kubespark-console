@@ -13,7 +13,7 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuTrigger,
-} from "@/registry/new-york-v4/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu"
 
 type ColumnMeta = {
   label?: string

@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { ActiveThemeProvider } from "@/components/active-theme"
 import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/registry/new-york-v4/ui/sonner"
+import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
   title: "KubeSpark Dashboard Scaffold",

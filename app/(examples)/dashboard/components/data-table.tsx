@@ -44,8 +44,8 @@ import {
 } from "@tanstack/react-table"
 
 import { TableToolbar } from "@/app/(examples)/dashboard/components/table/table-toolbar"
-import { Button } from "@/registry/new-york-v4/ui/button"
-import { Label } from "@/registry/new-york-v4/ui/label"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -53,7 +53,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/registry/new-york-v4/ui/select"
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -61,7 +61,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/registry/new-york-v4/ui/table"
+} from "@/components/ui/table"
 
 type DataTableProps<TData> = {
   data: TData[]

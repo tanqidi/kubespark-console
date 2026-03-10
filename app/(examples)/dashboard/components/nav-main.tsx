@@ -14,7 +14,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from "@/registry/new-york-v4/ui/sidebar"
+} from "@/components/ui/sidebar"
 
 function toDashboardPath(path?: string) {
   if (!path) return "/dashboard"

@@ -14,12 +14,12 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/registry/new-york-v4/ui/command"
+} from "@/components/ui/command"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/registry/new-york-v4/ui/popover"
+} from "@/components/ui/popover"
 
 export interface PresetOption {
   id: string

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import {
   SidebarInset,
   SidebarProvider,
-} from "@/registry/new-york-v4/ui/sidebar"
+} from "@/components/ui/sidebar"
 import { AppSidebar } from "@/app/(examples)/dashboard/components/app-sidebar"
 import { SiteHeader } from "@/app/(examples)/dashboard/components/site-header"
 

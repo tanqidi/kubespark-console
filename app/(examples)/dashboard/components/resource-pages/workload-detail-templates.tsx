@@ -1,15 +1,15 @@
 import { IconArrowLeft, IconChevronDown } from "@tabler/icons-react"
 import Link from "next/link"
 
-import { Button } from "@/registry/new-york-v4/ui/button"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/registry/new-york-v4/ui/card"
-import { Separator } from "@/registry/new-york-v4/ui/separator"
+} from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 
 export type WorkloadDetailKind = "Deployment" | "StatefulSet" | "DaemonSet"
 

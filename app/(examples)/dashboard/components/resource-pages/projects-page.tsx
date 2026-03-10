@@ -31,8 +31,8 @@ import {
 } from "@/components/ui/field"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
-import { Button } from "@/registry/new-york-v4/ui/button"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import {Input} from "@/components/ui/input"
 

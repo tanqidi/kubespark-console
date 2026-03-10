@@ -10,9 +10,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/registry/new-york-v4/ui/sidebar"
-import { Skeleton } from "@/registry/new-york-v4/ui/skeleton"
-import { Switch } from "@/registry/new-york-v4/ui/switch"
+} from "@/components/ui/sidebar"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
 
 export function NavSecondary({
   items,

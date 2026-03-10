@@ -2,7 +2,7 @@ import { AppSidebar } from "@/registry/new-york-v4/blocks/dashboard-01/component
 import { DataTable } from "@/registry/new-york-v4/blocks/dashboard-01/components/data-table";
 import { SectionCards } from "@/registry/new-york-v4/blocks/dashboard-01/components/section-cards";
 import { SiteHeader } from "@/registry/new-york-v4/blocks/dashboard-01/components/site-header";
-import { SidebarInset, SidebarProvider } from "@/registry/new-york-v4/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import data from "@/registry/new-york-v4/blocks/dashboard-01/data.json";
 
 import "@/app/dashboard-theme.css";

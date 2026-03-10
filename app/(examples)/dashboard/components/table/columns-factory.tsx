@@ -11,9 +11,9 @@ import { useSortable } from "@dnd-kit/sortable"
 import { type ColumnDef } from "@tanstack/react-table"
 
 import { cn } from "@/lib/utils"
-import { Badge } from "@/registry/new-york-v4/ui/badge"
-import { Button } from "@/registry/new-york-v4/ui/button"
-import { Checkbox } from "@/registry/new-york-v4/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,9 +21,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/registry/new-york-v4/ui/dropdown-menu"
-import { Input } from "@/registry/new-york-v4/ui/input"
-import { Label } from "@/registry/new-york-v4/ui/label"
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 type ColumnRender = "text" | "badge" | "status" | "input"
 

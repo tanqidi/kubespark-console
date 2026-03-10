@@ -2,7 +2,7 @@ import Link from "next/link"
 import { IconArrowLeft } from "@tabler/icons-react"
 import * as React from "react"
 
-import { Button } from "@/registry/new-york-v4/ui/button"
+import { Button } from "@/components/ui/button"
 
 type ResourceDetailPageProps = {
   sectionTitle: string

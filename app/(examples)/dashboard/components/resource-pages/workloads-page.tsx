@@ -16,9 +16,9 @@ import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import type { ResourceDocumentType } from "@/app/lib/kubespark/resource-document"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
-import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
-import { Input } from "@/registry/new-york-v4/ui/input"
-import { Tabs, TabsList, TabsTrigger } from "@/registry/new-york-v4/ui/tabs"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type WorkloadRow = WorkloadResourceRow
 

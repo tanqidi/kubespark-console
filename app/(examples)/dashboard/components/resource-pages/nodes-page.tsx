@@ -6,8 +6,8 @@ import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import { fetchNodeResourceRows, type NodeResourceRow } from "@/app/lib/kubespark/nodes"
-import { Alert, AlertDescription, AlertTitle } from "@/registry/new-york-v4/ui/alert"
-import { Input } from "@/registry/new-york-v4/ui/input"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
 
 type NodeRow = NodeResourceRow
 
