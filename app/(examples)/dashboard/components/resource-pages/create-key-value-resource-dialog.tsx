@@ -365,19 +365,19 @@ export function CreateKeyValueResourceDialog({
       }}
     >
       <DialogContent
-        className="overflow-hidden p-0 sm:max-w-4xl"
+        className="flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-4xl"
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="border-b bg-muted/15 px-6 py-5">
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{descriptionText}</DialogDescription>
           </DialogHeader>
 
-          <div className="px-6 pb-0 pt-4">
+          <div className="min-h-0 flex-1 px-6 pb-0 pt-4">
             {activeTab === "basic" ? (
-              <div className="">
+              <div className="overflow-y-auto px-1 py-1">
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">基本信息</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -487,7 +487,7 @@ export function CreateKeyValueResourceDialog({
                 </FieldGroup>
               </div>
             ) : (
-              <div className="">
+              <div className="px-1 py-1">
                 {dataViewMode === "list" ? (
                   <>
                     <div className="flex items-start justify-between gap-4">
@@ -499,75 +499,77 @@ export function CreateKeyValueResourceDialog({
                       </div>
                     </div>
 
-                    <div className="mt-4 flex flex-col gap-0">
-                      {filledItems.length > 0 ? (
-                        <div className="overflow-hidden rounded-lg border">
-                          {filledItems.map((item, index) => (
-                            <div
-                              key={item.id}
-                              className="group flex items-center gap-4 border-b px-4 py-3.5 last:border-b-0"
-                            >
-                              <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground">
-                                {String(index + 1).padStart(2, "0")}
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-semibold text-foreground">
-                                  {item.key.trim() || "未命名数据项"}
+                    <div className="mt-4 max-h-[44vh] overflow-y-auto pr-2">
+                      <div className="flex flex-col gap-0 pb-4">
+                        {filledItems.length > 0 ? (
+                          <div className="overflow-hidden rounded-lg border">
+                            {filledItems.map((item) => (
+                              <div
+                                key={item.id}
+                                className="group flex items-center gap-4 border-b px-4 py-3.5 transition-colors hover:bg-muted/20 last:border-b-0"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-6 text-sm">
+                                    <div className="min-w-0 flex-1 truncate font-semibold text-foreground">
+                                      {item.key.trim() || "未命名数据项"}
+                                    </div>
+                                    <div className="min-w-0 flex-1 truncate text-muted-foreground">
+                                      {item.value.trim() || "-"}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="mt-1 line-clamp-2 whitespace-pre-wrap break-all text-sm text-muted-foreground">
-                                  {item.value.trim() || "-"}
+
+                                <div className="flex items-center gap-1 opacity-100 transition md:pointer-events-none md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground hover:text-foreground"
+                                    onClick={() => removeItem(item.id)}
+                                    disabled={creating}
+                                  >
+                                    <IconTrash data-icon="inline-start" />
+                                    删除
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground hover:text-foreground"
+                                    onClick={() => beginEditItem(item.id)}
+                                    disabled={creating}
+                                  >
+                                    <IconPencil data-icon="inline-start" />
+                                    编辑
+                                  </Button>
                                 </div>
                               </div>
-
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeItem(item.id)}
-                                  disabled={creating}
-                                >
-                                  <IconTrash data-icon="inline-start" />
-                                  删除
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => beginEditItem(item.id)}
-                                  disabled={creating}
-                                >
-                                  <IconPencil data-icon="inline-start" />
-                                  编辑
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                          <div className="text-sm font-semibold">暂无数据项</div>
-                          <div className="mt-1 text-sm text-muted-foreground">
-                            先添加一组键值对，再继续创建资源。
+                            ))}
                           </div>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                            <div className="text-sm font-semibold">暂无数据项</div>
+                            <div className="mt-1 text-sm text-muted-foreground">
+                              先添加一组键值对，再继续创建资源。
+                            </div>
+                          </div>
+                        )}
 
-                      <button
-                        type="button"
-                        className="mt-3 flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
-                        onClick={addItem}
-                        disabled={creating}
-                      >
-                        <span className="text-sm font-semibold">添加数据</span>
-                        <span className="mt-1 text-sm text-muted-foreground">
-                          添加新的键值对数据项。
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          className="mt-3 flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
+                          onClick={addItem}
+                          disabled={creating}
+                        >
+                          <span className="text-sm font-semibold">添加数据</span>
+                          <span className="mt-1 text-sm text-muted-foreground">
+                            添加新的键值对数据项。
+                          </span>
+                        </button>
 
-                      {itemsError ? <FieldError className="mt-4">{itemsError}</FieldError> : null}
-                      {submitError ? <FieldError className="mt-4">{submitError}</FieldError> : null}
+                        {itemsError ? <FieldError className="mt-4">{itemsError}</FieldError> : null}
+                        {submitError ? <FieldError className="mt-4">{submitError}</FieldError> : null}
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -592,45 +594,47 @@ export function CreateKeyValueResourceDialog({
                     </div>
 
                     {editingItem ? (
-                      <div className="mt-4 flex flex-col gap-5">
-                        <FieldGroup className="flex flex-col gap-5">
-                          <Field>
-                            <FieldLabel htmlFor={`${editingItem.id}-key`}>键</FieldLabel>
-                            <Input
-                              id={`${editingItem.id}-key`}
-                              value={editingItem.key}
-                              onChange={(event) =>
-                                updateItem(editingItem.id, "key", event.target.value)
-                              }
-                              placeholder="例如：application.yaml"
-                              disabled={creating}
-                            />
-                            <FieldDescription>
-                              支持字母、数字、点、短横线和下划线。
-                            </FieldDescription>
-                          </Field>
+                      <div className="mt-4 overflow-y-auto px-1 py-1">
+                        <div className="flex flex-col gap-5 pb-4">
+                          <FieldGroup className="flex flex-col gap-5">
+                            <Field>
+                              <FieldLabel htmlFor={`${editingItem.id}-key`}>键</FieldLabel>
+                              <Input
+                                id={`${editingItem.id}-key`}
+                                value={editingItem.key}
+                                onChange={(event) =>
+                                  updateItem(editingItem.id, "key", event.target.value)
+                                }
+                                placeholder="例如：application.yaml"
+                                disabled={creating}
+                              />
+                              <FieldDescription>
+                                支持字母、数字、点、短横线和下划线。
+                              </FieldDescription>
+                            </Field>
 
-                          <Separator />
+                            <Separator />
 
-                          <Field>
-                            <FieldLabel htmlFor={`${editingItem.id}-value`}>
-                              {valueLabel}
-                            </FieldLabel>
-                            <Textarea
-                              id={`${editingItem.id}-value`}
-                              value={editingItem.value}
-                              onChange={(event) =>
-                                updateItem(editingItem.id, "value", event.target.value)
-                              }
-                              placeholder={isSecret ? "请输入密文内容" : "请输入配置内容"}
-                              className="min-h-56"
-                              disabled={creating}
-                            />
-                          </Field>
-                        </FieldGroup>
+                            <Field>
+                              <FieldLabel htmlFor={`${editingItem.id}-value`}>
+                                {valueLabel}
+                              </FieldLabel>
+                              <Textarea
+                                id={`${editingItem.id}-value`}
+                                value={editingItem.value}
+                                onChange={(event) =>
+                                  updateItem(editingItem.id, "value", event.target.value)
+                                }
+                                placeholder={isSecret ? "请输入密文内容" : "请输入配置内容"}
+                                className="min-h-56"
+                                disabled={creating}
+                              />
+                            </Field>
+                          </FieldGroup>
 
-                        {itemsError ? <FieldError>{itemsError}</FieldError> : null}
-                        {submitError ? <FieldError>{submitError}</FieldError> : null}
+                          {itemsError ? <FieldError>{itemsError}</FieldError> : null}
+                          {submitError ? <FieldError>{submitError}</FieldError> : null}
+                        </div>
                       </div>
                     ) : null}
                   </>
@@ -639,7 +643,7 @@ export function CreateKeyValueResourceDialog({
             )}
           </div>
 
-          <DialogFooter className="mt-5 border-t bg-muted/10 px-6 py-4">
+          <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <div className="flex w-full items-center justify-between gap-3">
               {activeTab === "basic" ? (
                 <DialogClose asChild>
