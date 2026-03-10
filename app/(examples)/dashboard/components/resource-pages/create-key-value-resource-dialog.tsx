@@ -3,6 +3,7 @@
 import * as React from "react"
 import { IconDeviceFloppy, IconPencil, IconTrash } from "@tabler/icons-react"
 
+import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {
   Dialog,
   DialogClose,
@@ -141,6 +142,7 @@ export function CreateKeyValueResourceDialog({
   const [activeTab, setActiveTab] = React.useState<DialogTab>("basic")
   const [dataViewMode, setDataViewMode] = React.useState<DataViewMode>("list")
   const [editingItemId, setEditingItemId] = React.useState<string | null>(null)
+  const [pendingDeleteItemId, setPendingDeleteItemId] = React.useState<string | null>(null)
 
   const isSecret = kind === "secret"
   const title = isSecret ? "创建保密字典" : "创建配置字典"
@@ -170,6 +172,7 @@ export function CreateKeyValueResourceDialog({
       setActiveTab("basic")
       setDataViewMode("list")
       setEditingItemId(null)
+      setPendingDeleteItemId(null)
     }
   }, [open])
 
@@ -230,6 +233,21 @@ export function CreateKeyValueResourceDialog({
     if (editingKeyError) setEditingKeyError(null)
     if (submitError) setSubmitError(null)
   }, [editingKeyError, itemsError, submitError])
+
+  const pendingDeleteItem = React.useMemo(
+    () => items.find((item) => item.id === pendingDeleteItemId) ?? null,
+    [items, pendingDeleteItemId]
+  )
+
+  const requestDeleteItem = React.useCallback((id: string) => {
+    setPendingDeleteItemId(id)
+  }, [])
+
+  const handleConfirmDeleteItem = React.useCallback(() => {
+    if (!pendingDeleteItemId) return
+    removeItem(pendingDeleteItemId)
+    setPendingDeleteItemId(null)
+  }, [pendingDeleteItemId, removeItem])
 
   const returnToList = React.useCallback(() => {
     if (!editingItem) {
@@ -582,7 +600,7 @@ export function CreateKeyValueResourceDialog({
                                     variant="ghost"
                                     size="sm"
                                     className="text-muted-foreground hover:text-foreground"
-                                    onClick={() => removeItem(item.id)}
+                                    onClick={() => requestDeleteItem(item.id)}
                                     disabled={creating}
                                   >
                                     <IconTrash data-icon="inline-start" />
@@ -738,6 +756,21 @@ export function CreateKeyValueResourceDialog({
             </div>
           </DialogFooter>
         </form>
+
+        <DeleteConfirmDialog
+          open={Boolean(pendingDeleteItem)}
+          title="删除数据项"
+          description={
+            pendingDeleteItem?.key.trim()
+              ? `确定要删除数据项 ${pendingDeleteItem.key.trim()} 吗？`
+              : "确定要删除该数据项吗？"
+          }
+          deleting={false}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setPendingDeleteItemId(null)
+          }}
+          onConfirm={handleConfirmDeleteItem}
+        />
       </DialogContent>
     </Dialog>
   )
