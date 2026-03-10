@@ -21,6 +21,14 @@ import {
 } from "@/components/ui/field"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "@/components/ui/item"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
@@ -502,24 +510,24 @@ export function CreateKeyValueResourceDialog({
                     <div className="mt-4 max-h-[44vh] overflow-y-auto pr-2">
                       <div className="flex flex-col gap-0 pb-4">
                         {filledItems.length > 0 ? (
-                          <div className="overflow-hidden rounded-lg border">
+                          <ItemGroup className="gap-3">
                             {filledItems.map((item) => (
-                              <div
+                              <Item
                                 key={item.id}
-                                className="group flex items-center gap-4 border-b px-4 py-3.5 transition-colors hover:bg-muted/20 last:border-b-0"
+                                variant="outline"
+                                size="sm"
+                                className="group rounded-lg transition-colors hover:bg-muted/20"
                               >
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-6 text-sm">
-                                    <div className="min-w-0 flex-1 truncate font-semibold text-foreground">
-                                      {item.key.trim() || "未命名数据项"}
-                                    </div>
-                                    <div className="min-w-0 flex-1 truncate text-muted-foreground">
-                                      {item.value.trim() || "-"}
-                                    </div>
-                                  </div>
-                                </div>
+                                <ItemContent className="min-w-0 md:flex-row md:items-center md:gap-6">
+                                  <ItemTitle className="min-w-0 flex-1 truncate text-sm">
+                                    {item.key.trim() || "未命名数据项"}
+                                  </ItemTitle>
+                                  <ItemDescription className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                                    {item.value.trim() || "-"}
+                                  </ItemDescription>
+                                </ItemContent>
 
-                                <div className="flex items-center gap-1 opacity-100 transition md:pointer-events-none md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100">
+                                <ItemActions className="gap-1 opacity-100 transition md:pointer-events-none md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100">
                                   <Button
                                     type="button"
                                     variant="ghost"
@@ -542,10 +550,10 @@ export function CreateKeyValueResourceDialog({
                                     <IconPencil data-icon="inline-start" />
                                     编辑
                                   </Button>
-                                </div>
-                              </div>
+                                </ItemActions>
+                              </Item>
                             ))}
-                          </div>
+                          </ItemGroup>
                         ) : (
                           <div className="rounded-lg border border-dashed px-4 py-10 text-center">
                             <div className="text-sm font-semibold">暂无数据项</div>
