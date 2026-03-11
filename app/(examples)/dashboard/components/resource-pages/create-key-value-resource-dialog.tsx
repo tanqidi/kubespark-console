@@ -3,7 +3,13 @@
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
 import dynamic from "next/dynamic"
-import { IconDeviceFloppy, IconPencil, IconTrash } from "@tabler/icons-react"
+import {
+  IconAdjustmentsHorizontal,
+  IconDeviceFloppy,
+  IconPencil,
+  IconSettings2,
+  IconTrash,
+} from "@tabler/icons-react"
 import { parse, stringify } from "yaml"
 
 import { checkConfigMapExists, checkSecretExists } from "@/app/lib/kubespark/resource-create"
@@ -812,6 +818,7 @@ export function CreateKeyValueResourceDialog({
                   title: "基本信息",
                   status: activeTab === "basic" ? "当前" : "已设置",
                   active: activeTab === "basic",
+                  icon: <IconSettings2 className="size-4" />,
                   disabled: !canNavigateStep,
                   onClick: goToBasicStep,
                 },
@@ -820,6 +827,7 @@ export function CreateKeyValueResourceDialog({
                   title: "数据设置",
                   status: activeTab === "data" ? "当前" : "未设置",
                   active: activeTab === "data",
+                  icon: <IconAdjustmentsHorizontal className="size-4" />,
                   disabled: !canNavigateStep,
                   onClick: () => {
                     if (activeTab === "data") {
