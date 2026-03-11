@@ -1022,7 +1022,7 @@ export function CreateKeyValueResourceDialog({
                       <div className="flex flex-col gap-1">
                         <h3 className="text-[15px] font-semibold">数据</h3>
                         <p className="text-sm text-muted-foreground">
-                          管理资源中的键值对数据，空白项不会被提交。
+                          管理资源中的键值对数据，可随时新增、编辑或取消本次修改。
                         </p>
                       </div>
                     </div>
@@ -1095,17 +1095,8 @@ export function CreateKeyValueResourceDialog({
                   </>
                 ) : (
                   <>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex flex-col gap-1">
-                        <h3 className="text-[15px] font-semibold">编辑数据</h3>
-                        <p className="text-sm text-muted-foreground">
-                          设置当前数据项的键和值。
-                        </p>
-                      </div>
-                    </div>
-
                     {editingItem ? (
-                      <div className="mt-4 ">
+                      <div>
                         <div className="flex flex-col gap-5 pb-4">
                           <FieldGroup className="flex flex-col gap-5">
                             <Field data-invalid={Boolean(editingKeyError)}>
@@ -1142,7 +1133,7 @@ export function CreateKeyValueResourceDialog({
                                   updateItem(editingItem.id, "value", event.target.value)
                                 }
                                 placeholder={isSecret ? "请输入密文内容" : "请输入配置内容"}
-                                className="h-50"
+                                className="h-54"
                                 disabled={creating}
                               />
                             </Field>

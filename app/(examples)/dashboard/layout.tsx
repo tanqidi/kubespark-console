@@ -15,7 +15,7 @@ export default async function DashboardLayout({
   return (
     <DashboardShell
       defaultOpen={defaultOpen}
-      enableDetailSidebarAnimation={true}
+      enableDetailSidebarAnimation={false}
     >
       {children}
     </DashboardShell>
