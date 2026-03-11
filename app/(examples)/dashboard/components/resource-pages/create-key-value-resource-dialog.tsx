@@ -1042,12 +1042,11 @@ export function CreateKeyValueResourceDialog({
                                   </ItemDescription>
                                 </ItemContent>
 
-                                <ItemActions className="gap-1">
+                                <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
                                   <Button
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    className="text-muted-foreground hover:text-foreground"
                                     onClick={() => requestDeleteItem(item.id)}
                                     disabled={creating}
                                   >
@@ -1058,7 +1057,6 @@ export function CreateKeyValueResourceDialog({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="text-muted-foreground hover:text-foreground"
                                     onClick={() => beginEditItem(item.id)}
                                     disabled={creating}
                                   >
