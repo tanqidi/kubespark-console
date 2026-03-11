@@ -4,10 +4,8 @@ import * as React from "react"
 import {
   IconCircleCheckFilled,
   IconDotsVertical,
-  IconGripVertical,
   IconLoader,
 } from "@tabler/icons-react"
-import { useSortable } from "@dnd-kit/sortable"
 import { type ColumnDef } from "@tanstack/react-table"
 
 import { cn } from "@/lib/utils"
@@ -58,7 +56,6 @@ export type ColumnConfig<TData> = {
 
 type CreateColumnsOptions<TData> = {
   columns: ColumnConfig<TData>[]
-  includeDrag?: boolean
   includeSelect?: boolean
   includeActions?: boolean
   actionItems?: ActionMenuItem<TData>[]
@@ -96,22 +93,6 @@ const HEALTHY_STATUS_SET = new Set<string>([
   "可用",
   "在线",
 ])
-
-function DragHandle({ id }: { id: string }) {
-  const { attributes, listeners } = useSortable({ id })
-  return (
-    <Button
-      {...attributes}
-      {...listeners}
-      variant="ghost"
-      size="icon"
-      className="text-muted-foreground size-7 hover:bg-transparent"
-    >
-      <IconGripVertical className="text-muted-foreground size-3" />
-      <span className="sr-only">Drag to reorder</span>
-    </Button>
-  )
-}
 
 function renderCell<TData>(
   col: ColumnConfig<TData>,
@@ -187,7 +168,6 @@ export function createColumns<TData extends Record<string, unknown>>(
 ): ColumnDef<TData>[] {
   const {
     columns,
-    includeDrag = true,
     includeSelect = true,
     includeActions = true,
     actionItems,
@@ -195,16 +175,6 @@ export function createColumns<TData extends Record<string, unknown>>(
   const visibleActionItems = actionItems?.filter((item) => Boolean(item.label)) ?? []
 
   const defs: ColumnDef<TData>[] = []
-
-  if (includeDrag) {
-    defs.push({
-      id: "drag",
-      header: () => null,
-      cell: ({ row }) => <DragHandle id={row.id} />,
-      enableSorting: false,
-      enableHiding: false,
-    })
-  }
 
   if (includeSelect) {
     defs.push({

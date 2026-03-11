@@ -3,25 +3,6 @@
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type UniqueIdentifier,
-} from "@dnd-kit/core"
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import {
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
@@ -85,21 +66,8 @@ function DraggableRow<TData>({
   primaryColumnId: string | null
   onNavigate: (href: string) => void
 }) {
-  const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.id,
-  })
-
   return (
-    <TableRow
-      data-state={row.getIsSelected() && "selected"}
-      data-dragging={isDragging}
-      ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
-    >
+    <TableRow data-state={row.getIsSelected() && "selected"}>
       {row.getVisibleCells().map((cell) => {
         const content = flexRender(cell.column.columnDef.cell, cell.getContext())
         const isPrimaryClickableCell =
@@ -156,12 +124,6 @@ export function DataTable<TData extends Record<string, unknown>>({
     pageIndex: 0,
     pageSize: 10,
   })
-  const sortableId = React.useId()
-  const sensors = useSensors(
-    useSensor(MouseSensor, {}),
-    useSensor(TouchSensor, {}),
-    useSensor(KeyboardSensor, {})
-  )
 
   const resolveRowId = React.useCallback(
     (row: TData, index: number) => {
@@ -219,11 +181,6 @@ export function DataTable<TData extends Record<string, unknown>>({
     })
   }, [initialData])
 
-  const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data.map((row, index) => resolveRowId(row, index)),
-    [data, resolveRowId]
-  )
-
   const primaryColumnId = React.useMemo(() => {
     const firstAccessorColumn = columns.find((column) => {
       const accessorKey = (column as { accessorKey?: unknown }).accessorKey
@@ -278,15 +235,6 @@ export function DataTable<TData extends Record<string, unknown>>({
       })
   }, [onDeleteSelectedRows, table])
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!active || !over || active.id === over.id) return
-    const oldIndex = dataIds.indexOf(active.id)
-    const newIndex = dataIds.indexOf(over.id)
-    if (oldIndex < 0 || newIndex < 0) return
-    setData((current) => arrayMove(current, oldIndex, newIndex))
-  }
-
   return (
     <div className="flex w-full flex-col justify-start gap-6">
       <TableToolbar
@@ -298,58 +246,45 @@ export function DataTable<TData extends Record<string, unknown>>({
       />
       <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
-          <DndContext
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-            sensors={sensors}
-            id={sortableId}
-          >
-            <Table>
-              <TableHeader className="bg-muted sticky top-0 z-10">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      )
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                {table.getRowModel().rows?.length ? (
-                  <SortableContext
-                    items={dataIds}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {table.getRowModel().rows.map((row) => (
-                      <DraggableRow
-                        key={row.id}
-                        row={row}
-                        href={resolveRowHref(row.original)}
-                        primaryColumnId={primaryColumnId}
-                        onNavigate={handleNavigate}
-                      />
-                    ))}
-                  </SortableContext>
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center">
-                      暂无数据
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </DndContext>
+          <Table>
+            <TableHeader className="bg-muted sticky top-0 z-10">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id} colSpan={header.colSpan}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    )
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody className="**:data-[slot=table-cell]:first:w-8">
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <DraggableRow
+                    key={row.id}
+                    row={row}
+                    href={resolveRowHref(row.original)}
+                    primaryColumnId={primaryColumnId}
+                    onNavigate={handleNavigate}
+                  />
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-24 text-center">
+                    暂无数据
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
         <div className="flex items-center justify-between px-4">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
