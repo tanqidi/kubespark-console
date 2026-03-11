@@ -784,7 +784,7 @@ export function CreateKeyValueResourceDialog({
       }}
     >
       <DialogContent
-        className="flex max-h-[96vh] w-[min(92vw,110vh)] flex-col overflow-hidden p-0 sm:max-w-[1080px]"
+        className="flex max-h-[96vh] w-[min(92vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
