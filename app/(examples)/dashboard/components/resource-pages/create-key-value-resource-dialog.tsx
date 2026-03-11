@@ -8,6 +8,7 @@ import { parse, stringify } from "yaml"
 
 import { checkConfigMapExists, checkSecretExists } from "@/app/lib/kubespark/resource-create"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -766,6 +767,7 @@ export function CreateKeyValueResourceDialog({
   )
 
   const isBusy = creating || checkingNext
+  const canNavigateStep = !isBusy && dataViewMode !== "edit"
 
   return (
     <Dialog
@@ -776,7 +778,7 @@ export function CreateKeyValueResourceDialog({
       }}
     >
       <DialogContent
-        className="flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-4xl"
+        className="flex max-h-[96vh] w-[min(92vw,110vh)] flex-col overflow-hidden p-0 sm:max-w-[1080px]"
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
@@ -801,6 +803,35 @@ export function CreateKeyValueResourceDialog({
               </label>
             </div>
           </DialogHeader>
+
+          {!yamlMode ? (
+            <StepHeaderNav
+              items={[
+                {
+                  id: "basic",
+                  title: "基本信息",
+                  status: activeTab === "basic" ? "当前" : "已设置",
+                  active: activeTab === "basic",
+                  disabled: !canNavigateStep,
+                  onClick: goToBasicStep,
+                },
+                {
+                  id: "data",
+                  title: "数据设置",
+                  status: activeTab === "data" ? "当前" : "未设置",
+                  active: activeTab === "data",
+                  disabled: !canNavigateStep,
+                  onClick: () => {
+                    if (activeTab === "data") {
+                      setSubmitError(null)
+                      return
+                    }
+                    void handleNextStep()
+                  },
+                },
+              ]}
+            />
+          ) : null}
 
           <div className="min-h-0 flex-1 px-6 py-6">
             {yamlMode ? (
@@ -957,7 +988,7 @@ export function CreateKeyValueResourceDialog({
                       </div>
                     </div>
 
-                    <div className="mt-4 max-h-[44vh] overflow-y-auto pr-2">
+                    <div className="mt-4 max-h-[56vh] overflow-y-auto pr-2">
                       <div className="flex flex-col gap-0 pb-4">
                         {filledItems.length > 0 ? (
                           <ItemGroup className="gap-3">
