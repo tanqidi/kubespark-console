@@ -903,7 +903,7 @@ export function CreateKeyValueResourceDialog({
                           setSecretType(value)
                           if (yamlError) setYamlError(null)
                         }}
-                        disabled={creating}
+                        disabled={creating || isEditMode}
                       >
                         <SelectTrigger id="secret-create-type">
                           <SelectValue placeholder="请选择 Secret 类型" />
