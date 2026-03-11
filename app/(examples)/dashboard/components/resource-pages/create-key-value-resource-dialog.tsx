@@ -1,9 +1,14 @@
 "use client"
 
 import * as React from "react"
+import type { EditorProps } from "@monaco-editor/react"
+import dynamic from "next/dynamic"
 import { IconDeviceFloppy, IconPencil, IconTrash } from "@tabler/icons-react"
+import { parse, stringify } from "yaml"
 
+import { checkConfigMapExists, checkSecretExists } from "@/app/lib/kubespark/resource-create"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogClose,
@@ -20,7 +25,6 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Item,
@@ -32,8 +36,8 @@ import {
 } from "@/components/ui/item"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { checkConfigMapExists, checkSecretExists } from "@/app/lib/kubespark/resource-create"
 
 type ResourceKind = "configmap" | "secret"
 
@@ -49,6 +53,14 @@ type KeyValueItem = {
   id: string
   key: string
   value: string
+}
+
+type DialogSnapshot = {
+  name: string
+  namespace: string
+  description: string
+  secretType: string
+  items: KeyValueItem[]
 }
 
 type SubmitPayload = {
@@ -67,6 +79,22 @@ type CreateKeyValueResourceDialogProps = {
   onSubmit: (payload: SubmitPayload) => Promise<void>
 }
 
+type JsonObject = Record<string, unknown>
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+})
+
+const MONACO_OPTIONS: EditorProps["options"] = {
+  automaticLayout: true,
+  fontSize: 13,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  stickyScroll: { enabled: false },
+  tabSize: 2,
+  wordWrap: "on",
+}
+
 let nextItemId = 0
 
 function createEmptyItem(): KeyValueItem {
@@ -75,6 +103,14 @@ function createEmptyItem(): KeyValueItem {
     id: `kv-item-${nextItemId}`,
     key: "",
     value: "",
+  }
+}
+
+function createItem(key = "", value = ""): KeyValueItem {
+  return {
+    id: createEmptyItem().id,
+    key,
+    value,
   }
 }
 
@@ -120,6 +156,107 @@ function resolveSubmitErrorMessage(error: unknown, kind: ResourceKind): string {
   return kind === "configmap" ? "创建配置字典失败" : "创建保密字典失败"
 }
 
+function asObject(value: unknown): JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {}
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+function buildResourceManifest(kind: ResourceKind, snapshot: DialogSnapshot) {
+  const metadata: JsonObject = {}
+  const annotations: JsonObject = {}
+
+  if (snapshot.name.trim()) metadata.name = snapshot.name.trim()
+  if (snapshot.namespace.trim()) metadata.namespace = snapshot.namespace.trim()
+  if (snapshot.description.trim()) annotations.description = snapshot.description.trim()
+  if (Object.keys(annotations).length > 0) metadata.annotations = annotations
+
+  const manifest: JsonObject = {
+    apiVersion: "v1",
+    kind: kind === "secret" ? "Secret" : "ConfigMap",
+    metadata,
+  }
+
+  const itemMap = Object.fromEntries(
+    snapshot.items
+      .map((item) => ({
+        key: item.key.trim(),
+        value: item.value,
+      }))
+      .filter((item) => item.key.length > 0)
+      .map((item) => [item.key, item.value])
+  )
+
+  if (kind === "secret") {
+    manifest.type = snapshot.secretType.trim() || "Opaque"
+    manifest.stringData = itemMap
+  } else {
+    manifest.data = itemMap
+  }
+
+  return manifest
+}
+
+function buildYamlText(kind: ResourceKind, snapshot: DialogSnapshot) {
+  return stringify(buildResourceManifest(kind, snapshot), {
+    indent: 2,
+    lineWidth: 0,
+    sortMapEntries: false,
+  })
+}
+
+function parseYamlText(kind: ResourceKind, yamlText: string): DialogSnapshot {
+  const normalizedText = yamlText.trim()
+  if (!normalizedText) {
+    throw new Error("请输入 YAML 内容")
+  }
+
+  const parsed = parse(normalizedText)
+  const root = asObject(parsed)
+  if (Object.keys(root).length === 0) {
+    throw new Error("YAML 内容格式无效")
+  }
+
+  const expectedKind = kind === "secret" ? "Secret" : "ConfigMap"
+  const actualKind = asString(root.kind)
+  if (actualKind && actualKind !== expectedKind) {
+    throw new Error(`YAML 资源类型必须是 ${expectedKind}`)
+  }
+
+  const metadata = asObject(root.metadata)
+  const annotations = asObject(metadata.annotations)
+  const itemSource =
+    kind === "secret"
+      ? (() => {
+          const stringData = asObject(root.stringData)
+          if (Object.keys(stringData).length > 0) return stringData
+          return asObject(root.data)
+        })()
+      : asObject(root.data)
+
+  const items = Object.entries(itemSource).map(([key, value]) =>
+    createItem(key, typeof value === "string" ? value : value == null ? "" : String(value))
+  )
+
+  return {
+    name: asString(metadata.name),
+    namespace: asString(metadata.namespace),
+    description: asString(annotations.description),
+    secretType: kind === "secret" ? asString(root.type) || "Opaque" : "Opaque",
+    items: items.length > 0 ? items : [createEmptyItem()],
+  }
+}
+
+async function checkResourceExists(kind: ResourceKind, name: string, namespace: string) {
+  return kind === "secret"
+    ? checkSecretExists({ name, namespace })
+    : checkConfigMapExists({ name, namespace })
+}
+
 export function CreateKeyValueResourceDialog({
   kind,
   open,
@@ -134,6 +271,9 @@ export function CreateKeyValueResourceDialog({
   const [items, setItems] = React.useState<KeyValueItem[]>(() => [createEmptyItem()])
   const [creating, setCreating] = React.useState(false)
   const [checkingNext, setCheckingNext] = React.useState(false)
+  const [yamlMode, setYamlMode] = React.useState(false)
+  const [yamlText, setYamlText] = React.useState("")
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [itemsError, setItemsError] = React.useState<string | null>(null)
@@ -155,6 +295,36 @@ export function CreateKeyValueResourceDialog({
     [items]
   )
 
+  const clearInlineErrors = React.useCallback(() => {
+    setNameError(null)
+    setNamespaceError(null)
+    setItemsError(null)
+    setEditingKeyError(null)
+    setSubmitError(null)
+    setYamlError(null)
+  }, [])
+
+  const getSnapshot = React.useCallback(
+    (): DialogSnapshot => ({
+      name,
+      namespace,
+      description,
+      secretType,
+      items,
+    }),
+    [description, items, name, namespace, secretType]
+  )
+
+  const applySnapshot = React.useCallback((snapshot: DialogSnapshot) => {
+    setName(snapshot.name)
+    setNamespace(snapshot.namespace)
+    setDescription(snapshot.description)
+    setSecretType(snapshot.secretType || "Opaque")
+    setItems(snapshot.items.length > 0 ? snapshot.items : [createEmptyItem()])
+    setDataViewMode("list")
+    setEditingItemId(null)
+  }, [])
+
   React.useEffect(() => {
     if (!open) {
       setName("")
@@ -164,6 +334,9 @@ export function CreateKeyValueResourceDialog({
       setItems([createEmptyItem()])
       setCreating(false)
       setCheckingNext(false)
+      setYamlMode(false)
+      setYamlText("")
+      setYamlError(null)
       setNameError(null)
       setNamespaceError(null)
       setItemsError(null)
@@ -196,8 +369,9 @@ export function CreateKeyValueResourceDialog({
       if (itemsError) setItemsError(null)
       if (editingKeyError) setEditingKeyError(null)
       if (submitError) setSubmitError(null)
+      if (yamlError) setYamlError(null)
     },
-    [editingKeyError, itemsError, submitError]
+    [editingKeyError, itemsError, submitError, yamlError]
   )
 
   const addItem = React.useCallback(() => {
@@ -207,7 +381,9 @@ export function CreateKeyValueResourceDialog({
     setDataViewMode("edit")
     if (itemsError) setItemsError(null)
     if (editingKeyError) setEditingKeyError(null)
-  }, [editingKeyError, itemsError])
+    if (submitError) setSubmitError(null)
+    if (yamlError) setYamlError(null)
+  }, [editingKeyError, itemsError, submitError, yamlError])
 
   const removeItem = React.useCallback(
     (id: string) => {
@@ -222,8 +398,9 @@ export function CreateKeyValueResourceDialog({
       if (itemsError) setItemsError(null)
       if (editingKeyError) setEditingKeyError(null)
       if (submitError) setSubmitError(null)
+      if (yamlError) setYamlError(null)
     },
-    [editingKeyError, itemsError, submitError]
+    [editingKeyError, itemsError, submitError, yamlError]
   )
 
   const beginEditItem = React.useCallback((id: string) => {
@@ -232,7 +409,8 @@ export function CreateKeyValueResourceDialog({
     if (itemsError) setItemsError(null)
     if (editingKeyError) setEditingKeyError(null)
     if (submitError) setSubmitError(null)
-  }, [editingKeyError, itemsError, submitError])
+    if (yamlError) setYamlError(null)
+  }, [editingKeyError, itemsError, submitError, yamlError])
 
   const pendingDeleteItem = React.useMemo(
     () => items.find((item) => item.id === pendingDeleteItemId) ?? null,
@@ -293,6 +471,29 @@ export function CreateKeyValueResourceDialog({
     setSubmitError(null)
   }, [])
 
+  const handleYamlModeChange = React.useCallback(
+    (checked: boolean) => {
+      if (creating || checkingNext) return
+
+      if (checked) {
+        setYamlText(buildYamlText(kind, getSnapshot()))
+        setYamlError(null)
+        setYamlMode(true)
+        return
+      }
+
+      try {
+        const snapshot = parseYamlText(kind, yamlText)
+        applySnapshot(snapshot)
+        clearInlineErrors()
+        setYamlMode(false)
+      } catch (error) {
+        setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      }
+    },
+    [applySnapshot, checkingNext, clearInlineErrors, creating, getSnapshot, kind, yamlText]
+  )
+
   const handleNextStep = React.useCallback(async (event?: React.MouseEvent<HTMLButtonElement>) => {
     event?.preventDefault()
     event?.stopPropagation()
@@ -315,9 +516,7 @@ export function CreateKeyValueResourceDialog({
     setCheckingNext(true)
 
     try {
-      const exists = isSecret
-        ? await checkSecretExists({ name: nextName, namespace: nextNamespace })
-        : await checkConfigMapExists({ name: nextName, namespace: nextNamespace })
+      const exists = await checkResourceExists(kind, nextName, nextNamespace)
 
       if (exists) {
         setNameError(isSecret ? "保密字典名称已存在，请更换后重试" : "配置字典名称已存在，请更换后重试")
@@ -333,21 +532,34 @@ export function CreateKeyValueResourceDialog({
     } finally {
       setCheckingNext(false)
     }
-  }, [checkingNext, creating, isSecret, name, namespace])
+  }, [checkingNext, creating, isSecret, kind, name, namespace])
 
   const handleSubmit = React.useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault()
-      if (creating) return
+      if (creating || checkingNext) return
 
-      const nextName = name.trim().toLowerCase()
-      const nextNamespace = namespace.trim()
-      const nextDescription = description.trim()
+      let draft = getSnapshot()
+
+      if (yamlMode) {
+        try {
+          draft = parseYamlText(kind, yamlText)
+          applySnapshot(draft)
+          setYamlError(null)
+        } catch (error) {
+          setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+          return
+        }
+      }
+
+      const nextName = draft.name.trim().toLowerCase()
+      const nextNamespace = draft.namespace.trim()
+      const nextDescription = draft.description.trim()
 
       const resolvedNameError = validateName(nextName)
       const resolvedNamespaceError = nextNamespace ? null : "请选择项目"
 
-      const cleanedItems = items
+      const cleanedItems = draft.items
         .map((item) => ({
           key: item.key.trim(),
           value: item.value,
@@ -383,15 +595,40 @@ export function CreateKeyValueResourceDialog({
       setItemsError(resolvedItemsError)
       setSubmitError(null)
 
-      if (resolvedNameError || resolvedNamespaceError) {
-        setActiveTab("basic")
-        return
+      if (yamlMode) {
+        if (resolvedNameError || resolvedNamespaceError || resolvedItemsError) {
+          setYamlError(resolvedNameError ?? resolvedNamespaceError ?? resolvedItemsError)
+          return
+        }
+      } else {
+        if (resolvedNameError || resolvedNamespaceError) {
+          setActiveTab("basic")
+          return
+        }
+
+        if (resolvedItemsError) {
+          setActiveTab("data")
+          setDataViewMode("list")
+          return
+        }
       }
 
-      if (resolvedItemsError) {
-        setActiveTab("data")
-        setDataViewMode("list")
-        return
+      if (yamlMode) {
+        setCheckingNext(true)
+        try {
+          const exists = await checkResourceExists(kind, nextName, nextNamespace)
+          if (exists) {
+            const message = isSecret ? "保密字典名称已存在，请更换后重试" : "配置字典名称已存在，请更换后重试"
+            setNameError(message)
+            setYamlError(message)
+            return
+          }
+        } catch (error) {
+          setYamlError(error instanceof Error ? error.message : "名称校验失败，请稍后重试")
+          return
+        } finally {
+          setCheckingNext(false)
+        }
       }
 
       setCreating(true)
@@ -401,7 +638,7 @@ export function CreateKeyValueResourceDialog({
           name: nextName,
           namespace: nextNamespace,
           description: nextDescription,
-          ...(isSecret ? { type: secretType } : {}),
+          ...(isSecret ? { type: draft.secretType.trim() || "Opaque" } : {}),
           items: cleanedItems,
         })
         onOpenChange(false)
@@ -409,7 +646,9 @@ export function CreateKeyValueResourceDialog({
         const message = resolveSubmitErrorMessage(error, kind)
         const normalized = message.toLowerCase()
 
-        if (
+        if (yamlMode) {
+          setYamlError(message)
+        } else if (
           normalized.includes("已存在") ||
           normalized.includes("already exists") ||
           normalized.includes("metadata.name")
@@ -428,14 +667,27 @@ export function CreateKeyValueResourceDialog({
         setCreating(false)
       }
     },
-    [creating, description, isSecret, items, kind, name, namespace, onOpenChange, onSubmit, secretType]
+    [
+      applySnapshot,
+      checkingNext,
+      creating,
+      getSnapshot,
+      isSecret,
+      kind,
+      onOpenChange,
+      onSubmit,
+      yamlMode,
+      yamlText,
+    ]
   )
+
+  const isBusy = creating || checkingNext
 
   return (
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && (creating || checkingNext)) return
+        if (!nextOpen && isBusy) return
         onOpenChange(nextOpen)
       }}
     >
@@ -445,14 +697,53 @@ export function CreateKeyValueResourceDialog({
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogHeader className="border-b bg-muted/15 px-6 py-5">
-            <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>{descriptionText}</DialogDescription>
+          <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 flex-col gap-1">
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription>{descriptionText}</DialogDescription>
+              </div>
+              <label
+                htmlFor={`${kind}-yaml-mode`}
+                className="flex shrink-0 items-center gap-3 rounded-full border bg-background px-3 py-1.5 text-sm"
+              >
+                <span className="font-medium">编辑 YAML</span>
+                <Switch
+                  id={`${kind}-yaml-mode`}
+                  checked={yamlMode}
+                  onCheckedChange={handleYamlModeChange}
+                  disabled={isBusy}
+                />
+              </label>
+            </div>
           </DialogHeader>
 
           <div className="min-h-0 flex-1 px-6 py-6">
-            {activeTab === "basic" ? (
-              <div className="">
+            {yamlMode ? (
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="h-[58vh] min-h-[420px] overflow-hidden rounded-lg border">
+                  <MonacoEditor
+                    language="yaml"
+                    theme="vs-dark"
+                    value={yamlText}
+                    onChange={(value) => {
+                      setYamlText(value ?? "")
+                      if (yamlError) setYamlError(null)
+                    }}
+                    options={MONACO_OPTIONS}
+                    height="100%"
+                    loading={
+                      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                        YAML 编辑器加载中...
+                      </div>
+                    }
+                  />
+                </div>
+
+                {yamlError ? <FieldError className="mt-3">{yamlError}</FieldError> : null}
+              </div>
+            ) : activeTab === "basic" ? (
+              <div>
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">基本信息</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -470,6 +761,7 @@ export function CreateKeyValueResourceDialog({
                         setName(event.target.value)
                         if (nameError) setNameError(null)
                         if (submitError) setSubmitError(null)
+                        if (yamlError) setYamlError(null)
                       }}
                       placeholder={isSecret ? "请输入保密字典名称" : "请输入配置字典名称"}
                       autoComplete="off"
@@ -491,6 +783,7 @@ export function CreateKeyValueResourceDialog({
                         setNamespace(value)
                         if (namespaceError) setNamespaceError(null)
                         if (submitError) setSubmitError(null)
+                        if (yamlError) setYamlError(null)
                       }}
                       disabled={creating}
                     >
@@ -522,7 +815,10 @@ export function CreateKeyValueResourceDialog({
                       <FieldLabel htmlFor="secret-create-type">类型</FieldLabel>
                       <Select
                         value={secretType}
-                        onValueChange={setSecretType}
+                        onValueChange={(value) => {
+                          setSecretType(value)
+                          if (yamlError) setYamlError(null)
+                        }}
                         disabled={creating}
                       >
                         <SelectTrigger id="secret-create-type">
@@ -549,7 +845,10 @@ export function CreateKeyValueResourceDialog({
                     <Textarea
                       id={`${kind}-create-description`}
                       value={description}
-                      onChange={(event) => setDescription(event.target.value)}
+                      onChange={(event) => {
+                        setDescription(event.target.value)
+                        if (yamlError) setYamlError(null)
+                      }}
                       placeholder="请输入描述（选填）"
                       maxLength={256}
                       className="min-h-24"
@@ -723,9 +1022,15 @@ export function CreateKeyValueResourceDialog({
 
           <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
             <div className="flex w-full items-center justify-between gap-3">
-              {activeTab === "basic" ? (
+              {yamlMode ? (
                 <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={creating || checkingNext}>
+                  <Button type="button" variant="outline" disabled={isBusy}>
+                    取消
+                  </Button>
+                </DialogClose>
+              ) : activeTab === "basic" ? (
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={isBusy}>
                     取消
                   </Button>
                 </DialogClose>
@@ -734,22 +1039,26 @@ export function CreateKeyValueResourceDialog({
                   type="button"
                   variant="outline"
                   onClick={goToBasicStep}
-                  disabled={creating || checkingNext || dataViewMode === "edit"}
+                  disabled={isBusy || dataViewMode === "edit"}
                 >
                   上一步
                 </Button>
               )}
 
-              {activeTab === "basic" ? (
+              {yamlMode ? (
+                <Button type="submit" disabled={isBusy}>
+                  {creating ? "创建中..." : checkingNext ? "校验中..." : "创建"}
+                </Button>
+              ) : activeTab === "basic" ? (
                 <Button
                   type="button"
                   onClick={(event) => handleNextStep(event)}
-                  disabled={creating || checkingNext}
+                  disabled={isBusy}
                 >
                   {checkingNext ? "校验中..." : "下一步"}
                 </Button>
               ) : (
-                <Button type="submit" disabled={creating || checkingNext || dataViewMode === "edit"}>
+                <Button type="submit" disabled={isBusy || dataViewMode === "edit"}>
                   {creating ? "创建中..." : "创建"}
                 </Button>
               )}
