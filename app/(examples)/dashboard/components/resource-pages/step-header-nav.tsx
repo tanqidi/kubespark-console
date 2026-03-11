@@ -20,25 +20,34 @@ type StepHeaderNavProps = {
 
 export function StepHeaderNav({ items }: StepHeaderNavProps) {
   return (
-    <div className="border-b bg-muted/35">
-      <div className="flex w-full items-center gap-2 overflow-x-auto px-4 py-2">
+    <div className="border-b bg-muted/30">
+      <div className="flex w-full items-center overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item, index) => {
           const isDone = !item.active && item.status.includes("已")
+          const isProgressed = item.active || isDone
           const statusTone = item.active
-            ? "bg-primary"
+            ? "bg-emerald-500"
             : isDone
-              ? "bg-primary/35"
-              : "bg-border"
+              ? "bg-primary"
+              : "bg-muted-foreground/35"
+          const statusTextTone = isProgressed ? "text-primary" : "text-muted-foreground"
+          const shapeClass =
+            index === 0
+              ? "rounded-l-lg rounded-r-none"
+              : index === items.length - 1
+                ? "rounded-r-lg rounded-l-none border-l-0"
+                : "rounded-none border-l-0"
 
           return (
             <button
               key={item.id}
               type="button"
               className={cn(
-                "inline-flex min-w-fit items-center gap-2 rounded-md border px-3 py-2 text-left transition",
-                item.active
-                  ? "border-primary/30 bg-primary/10"
-                  : "border-transparent bg-background/75 hover:border-border hover:bg-background",
+                "inline-flex min-w-fit shrink-0 items-center gap-1.5 border px-3.5 py-2.5 text-left transition",
+                isProgressed
+                  ? "border-primary/35 bg-primary/10"
+                  : "border-border/70 bg-background/85 hover:border-primary/25 hover:bg-primary/5",
+                shapeClass,
                 item.disabled && "cursor-not-allowed opacity-70"
               )}
               onClick={item.onClick}
@@ -47,16 +56,16 @@ export function StepHeaderNav({ items }: StepHeaderNavProps) {
             >
               <span
                 className={cn(
-                  "inline-flex size-7 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground",
-                  item.active && "border-primary/40 text-primary"
+                  "inline-flex size-5 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground me-1.5",
+                  isProgressed && "border-primary/40 text-primary"
                 )}
               >
-                {item.icon ?? <span className="text-xs font-semibold">{index + 1}</span>}
+                {item.icon ?? <span className="text-[12px] font-semibold">{index + 1}</span>}
               </span>
 
               <span className="flex min-w-0 flex-col">
-                <span className="text-sm font-semibold leading-none">{item.title}</span>
-                <span className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="text-[12px] font-semibold leading-none">{item.title}</span>
+                <span className={cn("mt-0.5 inline-flex items-center gap-1 text-[11px] leading-4", statusTextTone)}>
                   <span className={cn("size-1.5 rounded-full", statusTone)} />
                   {item.status}
                 </span>
