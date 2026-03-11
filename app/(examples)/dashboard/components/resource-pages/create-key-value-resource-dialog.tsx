@@ -1032,26 +1032,21 @@ export function CreateKeyValueResourceDialog({
                         {filledItems.length > 0 ? (
                           <ItemGroup className="gap-3">
                             {filledItems.map((item) => (
-                              <Item
-                                key={item.id}
-                                variant="outline"
-                                size="sm"
-                                className="group rounded-lg transition-colors hover:bg-muted/20"
-                              >
-                                <ItemContent className="min-w-0 md:flex-row md:items-center md:gap-6">
-                                  <ItemTitle className="min-w-0 flex-1 truncate text-sm">
+                              <Item key={item.id} variant="outline" size="sm" className="hover:bg-muted">
+                                <ItemContent className="min-w-0">
+                                  <ItemTitle className="min-w-0 truncate">
                                     {item.key.trim() || "未命名数据项"}
                                   </ItemTitle>
-                                  <ItemDescription className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                                  <ItemDescription className="min-w-0 truncate">
                                     {item.value.trim() || "-"}
                                   </ItemDescription>
                                 </ItemContent>
 
-                                <ItemActions className="gap-1 opacity-100 transition md:pointer-events-none md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100">
+                                <ItemActions className="gap-1">
                                   <Button
                                     type="button"
-                                    variant="ghost"
                                     size="sm"
+                                    variant="outline"
                                     className="text-muted-foreground hover:text-foreground"
                                     onClick={() => requestDeleteItem(item.id)}
                                     disabled={creating}
@@ -1061,7 +1056,7 @@ export function CreateKeyValueResourceDialog({
                                   </Button>
                                   <Button
                                     type="button"
-                                    variant="ghost"
+                                    variant="outline"
                                     size="sm"
                                     className="text-muted-foreground hover:text-foreground"
                                     onClick={() => beginEditItem(item.id)}
