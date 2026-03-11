@@ -5,7 +5,6 @@ import type { EditorProps } from "@monaco-editor/react"
 import dynamic from "next/dynamic"
 import {
   IconAdjustmentsHorizontal,
-  IconDeviceFloppy,
   IconPencil,
   IconSettings2,
   IconTrash,
@@ -302,6 +301,8 @@ export function CreateKeyValueResourceDialog({
   const [dataViewMode, setDataViewMode] = React.useState<DataViewMode>("list")
   const [editingItemId, setEditingItemId] = React.useState<string | null>(null)
   const [pendingDeleteItemId, setPendingDeleteItemId] = React.useState<string | null>(null)
+  const suppressSubmitRef = React.useRef(false)
+  const suppressSubmitTimerRef = React.useRef<number | null>(null)
   const isEditMode = mode === "edit"
 
   const isSecret = kind === "secret"
@@ -378,6 +379,20 @@ export function CreateKeyValueResourceDialog({
     [lockedIdentity]
   )
 
+  const armSubmitSuppression = React.useCallback(() => {
+    suppressSubmitRef.current = true
+
+    if (typeof window !== "undefined") {
+      if (suppressSubmitTimerRef.current !== null) {
+        window.clearTimeout(suppressSubmitTimerRef.current)
+      }
+      suppressSubmitTimerRef.current = window.setTimeout(() => {
+        suppressSubmitRef.current = false
+        suppressSubmitTimerRef.current = null
+      }, 240)
+    }
+  }, [])
+
   React.useEffect(() => {
     if (!open) {
       setName("")
@@ -399,8 +414,21 @@ export function CreateKeyValueResourceDialog({
       setDataViewMode("list")
       setEditingItemId(null)
       setPendingDeleteItemId(null)
+      suppressSubmitRef.current = false
+      if (typeof window !== "undefined" && suppressSubmitTimerRef.current !== null) {
+        window.clearTimeout(suppressSubmitTimerRef.current)
+        suppressSubmitTimerRef.current = null
+      }
     }
   }, [open])
+
+  React.useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && suppressSubmitTimerRef.current !== null) {
+        window.clearTimeout(suppressSubmitTimerRef.current)
+      }
+    }
+  }, [])
 
   React.useEffect(() => {
     if (!open || !isEditMode || !initialValues) return
@@ -503,22 +531,13 @@ export function CreateKeyValueResourceDialog({
 
   const returnToList = React.useCallback(() => {
     if (!editingItem) {
+      armSubmitSuppression()
       setDataViewMode("list")
       setEditingItemId(null)
       return
     }
 
     const nextKey = editingItem.key.trim()
-    const nextValue = editingItem.value.trim()
-
-    if (!nextKey && !nextValue) {
-      setEditingKeyError(null)
-      setItemsError(null)
-      setDataViewMode("list")
-      setEditingItemId(null)
-      return
-    }
-
     const keyError = validateDataItemKey(editingItem.key)
     if (keyError) {
       setEditingKeyError(keyError)
@@ -536,9 +555,19 @@ export function CreateKeyValueResourceDialog({
 
     setEditingKeyError(null)
     setItemsError(null)
+    armSubmitSuppression()
     setDataViewMode("list")
     setEditingItemId(null)
-  }, [editingItem, items])
+  }, [armSubmitSuppression, editingItem, items])
+
+  const cancelEditItem = React.useCallback(() => {
+    setEditingKeyError(null)
+    setItemsError(null)
+    setSubmitError(null)
+    armSubmitSuppression()
+    setDataViewMode("list")
+    setEditingItemId(null)
+  }, [armSubmitSuppression])
 
   const goToBasicStep = React.useCallback(() => {
     setActiveTab("basic")
@@ -626,6 +655,7 @@ export function CreateKeyValueResourceDialog({
   const handleSubmit = React.useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault()
+      if (suppressSubmitRef.current) return
       if (creating || checkingNext) return
 
       let draft = getSnapshot()
@@ -774,6 +804,7 @@ export function CreateKeyValueResourceDialog({
 
   const isBusy = creating || checkingNext
   const canNavigateStep = !isBusy && dataViewMode !== "edit"
+  const isEditingDataView = !yamlMode && activeTab === "data" && dataViewMode === "edit"
 
   return (
     <Dialog
@@ -784,7 +815,7 @@ export function CreateKeyValueResourceDialog({
       }}
     >
       <DialogContent
-        className="flex max-h-[96vh] w-[min(92vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+        className="flex max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
@@ -996,7 +1027,7 @@ export function CreateKeyValueResourceDialog({
                       </div>
                     </div>
 
-                    <div className="mt-4 max-h-[56vh] overflow-y-auto pr-2">
+                    <div className="mt-4 max-h-[50vh] overflow-y-auto pr-2">
                       <div className="flex flex-col gap-0 pb-4">
                         {filledItems.length > 0 ? (
                           <ItemGroup className="gap-3">
@@ -1078,16 +1109,6 @@ export function CreateKeyValueResourceDialog({
                           设置当前数据项的键和值。
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={returnToList}
-                        disabled={creating}
-                      >
-                        <IconDeviceFloppy data-icon="inline-start" />
-                        确定保存
-                      </Button>
                     </div>
 
                     {editingItem ? (
@@ -1128,7 +1149,7 @@ export function CreateKeyValueResourceDialog({
                                   updateItem(editingItem.id, "value", event.target.value)
                                 }
                                 placeholder={isSecret ? "请输入密文内容" : "请输入配置内容"}
-                                className="min-h-56"
+                                className="h-50"
                                 disabled={creating}
                               />
                             </Field>
@@ -1143,36 +1164,46 @@ export function CreateKeyValueResourceDialog({
             )}
           </div>
 
-          <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
-            <div className="flex w-full items-center justify-between gap-3">
-              {yamlMode ? (
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={isBusy}>
-                    取消
-                  </Button>
-                </DialogClose>
-              ) : activeTab === "basic" ? (
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={isBusy}>
-                    取消
-                  </Button>
-                </DialogClose>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={goToBasicStep}
-                  disabled={isBusy || dataViewMode === "edit"}
-                >
-                  上一步
+          {isEditingDataView ? (
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+              <div className="flex w-full items-center justify-between gap-3">
+                <Button type="button" variant="outline" onClick={cancelEditItem} disabled={isBusy}>
+                  取消
                 </Button>
-              )}
-
-              {yamlMode ? (
+                <Button type="button" onClick={returnToList} disabled={isBusy}>
+                  确认保存
+                </Button>
+              </div>
+            </DialogFooter>
+          ) : yamlMode ? (
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+              <div className="flex w-full items-center justify-between gap-3">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={isBusy}>
+                    取消
+                  </Button>
+                </DialogClose>
                 <Button type="submit" disabled={isBusy}>
-                  {creating ? (isEditMode ? "保存中..." : "创建中...") : checkingNext ? "校验中..." : isEditMode ? "保存" : "创建"}
+                  {creating
+                    ? isEditMode
+                      ? "保存中..."
+                      : "创建中..."
+                    : checkingNext
+                      ? "校验中..."
+                      : isEditMode
+                        ? "保存"
+                        : "创建"}
                 </Button>
-              ) : activeTab === "basic" ? (
+              </div>
+            </DialogFooter>
+          ) : activeTab === "basic" ? (
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+              <div className="flex w-full items-center justify-between gap-3">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={isBusy}>
+                    取消
+                  </Button>
+                </DialogClose>
                 <Button
                   type="button"
                   onClick={(event) => handleNextStep(event)}
@@ -1180,13 +1211,25 @@ export function CreateKeyValueResourceDialog({
                 >
                   {checkingNext ? "校验中..." : "下一步"}
                 </Button>
-              ) : (
-                <Button type="submit" disabled={isBusy || dataViewMode === "edit"}>
+              </div>
+            </DialogFooter>
+          ) : (
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+              <div className="flex w-full items-center justify-between gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={goToBasicStep}
+                  disabled={isBusy}
+                >
+                  上一步
+                </Button>
+                <Button type="submit" disabled={isBusy}>
                   {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                 </Button>
-              )}
-            </div>
-          </DialogFooter>
+              </div>
+            </DialogFooter>
+          )}
         </form>
 
         <DeleteConfirmDialog
