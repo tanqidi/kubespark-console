@@ -63,6 +63,14 @@ type DialogSnapshot = {
   items: KeyValueItem[]
 }
 
+export type KeyValueDialogInitialValues = {
+  name: string
+  namespace: string
+  description?: string
+  type?: string
+  items: Array<{ key: string; value: string }>
+}
+
 type SubmitPayload = {
   name: string
   namespace: string
@@ -76,6 +84,8 @@ type CreateKeyValueResourceDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   namespaceOptions: NamespaceOption[]
+  mode?: "create" | "edit"
+  initialValues?: KeyValueDialogInitialValues | null
   onSubmit: (payload: SubmitPayload) => Promise<void>
 }
 
@@ -262,6 +272,8 @@ export function CreateKeyValueResourceDialog({
   open,
   onOpenChange,
   namespaceOptions,
+  mode = "create",
+  initialValues = null,
   onSubmit,
 }: CreateKeyValueResourceDialogProps) {
   const [name, setName] = React.useState("")
@@ -283,12 +295,23 @@ export function CreateKeyValueResourceDialog({
   const [dataViewMode, setDataViewMode] = React.useState<DataViewMode>("list")
   const [editingItemId, setEditingItemId] = React.useState<string | null>(null)
   const [pendingDeleteItemId, setPendingDeleteItemId] = React.useState<string | null>(null)
+  const isEditMode = mode === "edit"
 
   const isSecret = kind === "secret"
-  const title = isSecret ? "创建保密字典" : "创建配置字典"
-  const descriptionText = isSecret
-    ? "使用 Kubernetes Secret 创建保密数据，数据项将通过 stringData 写入。"
-    : "使用 Kubernetes ConfigMap 创建配置数据，数据项将以键值对形式写入。"
+  const title = isEditMode
+    ? isSecret
+      ? "编辑保密字典"
+      : "编辑配置字典"
+    : isSecret
+      ? "创建保密字典"
+      : "创建配置字典"
+  const descriptionText = isEditMode
+    ? isSecret
+      ? "编辑 Kubernetes Secret 的描述与数据项内容。"
+      : "编辑 Kubernetes ConfigMap 的描述与数据项内容。"
+    : isSecret
+      ? "使用 Kubernetes Secret 创建保密数据，数据项将通过 stringData 写入。"
+      : "使用 Kubernetes ConfigMap 创建配置数据，数据项将以键值对形式写入。"
   const valueLabel = isSecret ? "密文内容" : "值"
   const filledItems = React.useMemo(
     () => items.filter((item) => item.key.trim() || item.value.trim()),
@@ -325,6 +348,29 @@ export function CreateKeyValueResourceDialog({
     setEditingItemId(null)
   }, [])
 
+  const lockedIdentity = React.useMemo(
+    () =>
+      isEditMode && initialValues
+        ? {
+            name: initialValues.name.trim().toLowerCase(),
+            namespace: initialValues.namespace.trim(),
+          }
+        : null,
+    [initialValues, isEditMode]
+  )
+
+  const withLockedIdentity = React.useCallback(
+    (snapshot: DialogSnapshot): DialogSnapshot => {
+      if (!lockedIdentity) return snapshot
+      return {
+        ...snapshot,
+        name: lockedIdentity.name,
+        namespace: lockedIdentity.namespace,
+      }
+    },
+    [lockedIdentity]
+  )
+
   React.useEffect(() => {
     if (!open) {
       setName("")
@@ -348,6 +394,27 @@ export function CreateKeyValueResourceDialog({
       setPendingDeleteItemId(null)
     }
   }, [open])
+
+  React.useEffect(() => {
+    if (!open || !isEditMode || !initialValues) return
+
+    setName(initialValues.name)
+    setNamespace(initialValues.namespace)
+    setDescription(initialValues.description ?? "")
+    setSecretType(initialValues.type?.trim() || "Opaque")
+    setItems(
+      initialValues.items.length > 0
+        ? initialValues.items.map((item) => createItem(item.key, item.value))
+        : [createEmptyItem()]
+    )
+    setActiveTab("basic")
+    setDataViewMode("list")
+    setEditingItemId(null)
+    setPendingDeleteItemId(null)
+    setYamlMode(false)
+    setYamlText("")
+    clearInlineErrors()
+  }, [clearInlineErrors, initialValues, isEditMode, open])
 
   const editingItem = React.useMemo(
     () => items.find((item) => item.id === editingItemId) ?? null,
@@ -483,7 +550,7 @@ export function CreateKeyValueResourceDialog({
       }
 
       try {
-        const snapshot = parseYamlText(kind, yamlText)
+        const snapshot = withLockedIdentity(parseYamlText(kind, yamlText))
         applySnapshot(snapshot)
         clearInlineErrors()
         setYamlMode(false)
@@ -491,7 +558,16 @@ export function CreateKeyValueResourceDialog({
         setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
       }
     },
-    [applySnapshot, checkingNext, clearInlineErrors, creating, getSnapshot, kind, yamlText]
+    [
+      applySnapshot,
+      checkingNext,
+      clearInlineErrors,
+      creating,
+      getSnapshot,
+      kind,
+      withLockedIdentity,
+      yamlText,
+    ]
   )
 
   const handleNextStep = React.useCallback(async (event?: React.MouseEvent<HTMLButtonElement>) => {
@@ -509,6 +585,12 @@ export function CreateKeyValueResourceDialog({
 
     if (resolvedNameError || resolvedNamespaceError) {
       setActiveTab("basic")
+      return
+    }
+
+    if (isEditMode) {
+      setActiveTab("data")
+      setDataViewMode("list")
       return
     }
 
@@ -532,7 +614,7 @@ export function CreateKeyValueResourceDialog({
     } finally {
       setCheckingNext(false)
     }
-  }, [checkingNext, creating, isSecret, kind, name, namespace])
+  }, [checkingNext, creating, isEditMode, isSecret, kind, name, namespace])
 
   const handleSubmit = React.useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -543,7 +625,7 @@ export function CreateKeyValueResourceDialog({
 
       if (yamlMode) {
         try {
-          draft = parseYamlText(kind, yamlText)
+          draft = withLockedIdentity(parseYamlText(kind, yamlText))
           applySnapshot(draft)
           setYamlError(null)
         } catch (error) {
@@ -613,7 +695,7 @@ export function CreateKeyValueResourceDialog({
         }
       }
 
-      if (yamlMode) {
+      if (yamlMode && !isEditMode) {
         setCheckingNext(true)
         try {
           const exists = await checkResourceExists(kind, nextName, nextNamespace)
@@ -672,10 +754,12 @@ export function CreateKeyValueResourceDialog({
       checkingNext,
       creating,
       getSnapshot,
+      isEditMode,
       isSecret,
       kind,
       onOpenChange,
       onSubmit,
+      withLockedIdentity,
       yamlMode,
       yamlText,
     ]
@@ -766,7 +850,7 @@ export function CreateKeyValueResourceDialog({
                       placeholder={isSecret ? "请输入保密字典名称" : "请输入配置字典名称"}
                       autoComplete="off"
                       aria-invalid={Boolean(nameError)}
-                      disabled={creating}
+                      disabled={creating || isEditMode}
                     />
                     {nameError ? (
                       <FieldError>{nameError}</FieldError>
@@ -785,7 +869,7 @@ export function CreateKeyValueResourceDialog({
                         if (submitError) setSubmitError(null)
                         if (yamlError) setYamlError(null)
                       }}
-                      disabled={creating}
+                      disabled={creating || isEditMode}
                     >
                       <SelectTrigger
                         id={`${kind}-create-namespace`}
@@ -1047,7 +1131,7 @@ export function CreateKeyValueResourceDialog({
 
               {yamlMode ? (
                 <Button type="submit" disabled={isBusy}>
-                  {creating ? "创建中..." : checkingNext ? "校验中..." : "创建"}
+                  {creating ? (isEditMode ? "保存中..." : "创建中...") : checkingNext ? "校验中..." : isEditMode ? "保存" : "创建"}
                 </Button>
               ) : activeTab === "basic" ? (
                 <Button
@@ -1059,7 +1143,7 @@ export function CreateKeyValueResourceDialog({
                 </Button>
               ) : (
                 <Button type="submit" disabled={isBusy || dataViewMode === "edit"}>
-                  {creating ? "创建中..." : "创建"}
+                  {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                 </Button>
               )}
             </div>

@@ -1,10 +1,13 @@
 "use client"
 
 import * as React from "react"
-import { IconEye, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
-import { CreateKeyValueResourceDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-key-value-resource-dialog"
+import {
+  CreateKeyValueResourceDialog,
+  type KeyValueDialogInitialValues,
+} from "@/app/(examples)/dashboard/components/resource-pages/create-key-value-resource-dialog"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
@@ -16,7 +19,8 @@ import {
   fetchSecretRows,
   type SecretResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
-import { createSecret } from "@/app/lib/kubespark/resource-create"
+import { fetchResourceByName } from "@/app/lib/kubespark/common"
+import { createSecret, updateSecret } from "@/app/lib/kubespark/resource-create"
 import { deleteSecret } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
@@ -26,6 +30,35 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 
 type SecretRow = SecretResourceRow
+type JsonObject = Record<string, unknown>
+
+function asObject(value: unknown): JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {}
+}
+
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback
+}
+
+function decodeBase64ToUtf8(value: string): string {
+  try {
+    if (typeof window !== "undefined" && typeof window.atob === "function") {
+      const binary = window.atob(value)
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+      return new TextDecoder("utf-8", { fatal: false }).decode(bytes)
+    }
+
+    if (typeof Buffer !== "undefined") {
+      return Buffer.from(value, "base64").toString("utf8")
+    }
+  } catch {
+    return value
+  }
+
+  return value
+}
 
 const secretColumns: ColumnConfig<SecretRow>[] = [
   {
@@ -58,6 +91,8 @@ export function SecretsPageClient() {
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<SecretRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false)
+  const [editInitialValues, setEditInitialValues] = React.useState<KeyValueDialogInitialValues | null>(null)
   const isMountedRef = React.useRef(true)
 
   const handleViewYaml = React.useCallback((row: SecretRow) => {
@@ -91,6 +126,35 @@ export function SecretsPageClient() {
 
   const requestDelete = React.useCallback((row: SecretRow) => {
     setPendingDeleteRow(row)
+  }, [])
+
+  const handleEdit = React.useCallback((row: SecretRow) => {
+    void fetchResourceByName<unknown>("core", "v1", "secrets", row.name, {
+      namespace: row.namespace,
+    })
+      .then(({ payload }) => {
+        const resource = asObject(payload)
+        const metadata = asObject(resource.metadata)
+        const annotations = asObject(metadata.annotations)
+        const data = asObject(resource.data)
+        const items = Object.entries(data).map(([key, value]) => ({
+          key,
+          value: decodeBase64ToUtf8(asString(value)),
+        }))
+
+        setEditInitialValues({
+          name: asString(metadata.name, row.name),
+          namespace: asString(metadata.namespace, row.namespace),
+          description: asString(annotations.description),
+          type: asString(resource.type, "Opaque"),
+          items: items.length > 0 ? items : [],
+        })
+        setEditDialogOpen(true)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载保密字典详情失败"
+        setError(message)
+      })
   }, [])
 
   const handleConfirmDelete = React.useCallback(() => {
@@ -144,6 +208,17 @@ export function SecretsPageClient() {
           {
             label: (
               <>
+                <IconPencil className="size-4" />
+                {"编辑"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleEdit(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconTrash className="size-4" />
                 {"删除"}
               </>
@@ -156,7 +231,7 @@ export function SecretsPageClient() {
           },
         ],
       }),
-    [handleViewYaml, requestDelete]
+    [handleEdit, handleViewYaml, requestDelete]
   )
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
@@ -216,6 +291,30 @@ export function SecretsPageClient() {
       await refreshRows(false)
     },
     [refreshRows]
+  )
+
+  const handleEditSubmit = React.useCallback(
+    async (payload: {
+      name: string
+      namespace: string
+      description: string
+      type?: string
+      items: Array<{ key: string; value: string }>
+    }) => {
+      if (!editInitialValues) {
+        throw new Error("编辑上下文丢失，请重新打开编辑弹窗")
+      }
+
+      await updateSecret({
+        name: editInitialValues.name,
+        namespace: editInitialValues.namespace,
+        description: payload.description,
+        type: payload.type,
+        stringData: Object.fromEntries(payload.items.map((item) => [item.key, item.value])),
+      })
+      await refreshRows(false)
+    },
+    [editInitialValues, refreshRows]
   )
 
   React.useEffect(() => {
@@ -284,6 +383,20 @@ export function SecretsPageClient() {
         onOpenChange={setCreateDialogOpen}
         namespaceOptions={namespaceOptions}
         onSubmit={handleCreateSubmit}
+      />
+      <CreateKeyValueResourceDialog
+        kind="secret"
+        mode="edit"
+        open={editDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setEditDialogOpen(nextOpen)
+          if (!nextOpen) {
+            setEditInitialValues(null)
+          }
+        }}
+        initialValues={editInitialValues}
+        namespaceOptions={namespaceOptions}
+        onSubmit={handleEditSubmit}
       />
       <MonacoViewerDialog
         title="查看YAML"

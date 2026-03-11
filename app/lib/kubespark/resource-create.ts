@@ -1,6 +1,8 @@
 import {
   buildResourceCollectionEndpoint,
+  buildResourceItemEndpoint,
   fetchResourceCollection,
+  fetchResourceByName,
   fetchJsonDeduped,
 } from "./common"
 
@@ -35,6 +37,15 @@ export type CreateConfigMapInput = BaseCreateInput & {
 }
 
 export type CreateSecretInput = BaseCreateInput & {
+  type?: string
+  stringData?: Record<string, string>
+}
+
+export type UpdateConfigMapInput = BaseCreateInput & {
+  data?: Record<string, string>
+}
+
+export type UpdateSecretInput = BaseCreateInput & {
   type?: string
   stringData?: Record<string, string>
 }
@@ -146,6 +157,138 @@ export async function createSecret(input: CreateSecretInput): Promise<void> {
 
   await fetchJsonDeduped<unknown>(url, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  })
+}
+
+function buildDescriptionPatch(description?: string): { annotations: { description: string | null } } {
+  const value = description?.trim() ?? ""
+  return {
+    annotations: {
+      description: value || null,
+    },
+  }
+}
+
+type JsonObject = Record<string, unknown>
+
+function asObject(value: unknown): JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {}
+}
+
+function encodeBase64Utf8(value: string): string {
+  if (typeof window !== "undefined" && typeof window.btoa === "function") {
+    const bytes = new TextEncoder().encode(value)
+    let binary = ""
+    bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte)
+    })
+    return window.btoa(binary)
+  }
+
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(value, "utf8").toString("base64")
+  }
+
+  throw new Error("当前环境不支持 Base64 编码")
+}
+
+export async function updateConfigMap(input: UpdateConfigMapInput): Promise<void> {
+  const metadata = buildMetadata(input)
+  const { payload } = await fetchResourceByName<unknown>("core", "v1", "configmaps", metadata.name, {
+    namespace: metadata.namespace,
+  })
+  const existing = asObject(payload)
+  const existingMetadata = asObject(existing.metadata)
+  const existingAnnotations = asObject(existingMetadata.annotations)
+  const mergedAnnotations = {
+    ...existingAnnotations,
+    ...buildDescriptionPatch(input.description).annotations,
+  }
+  if (mergedAnnotations.description === null) {
+    delete mergedAnnotations.description
+  }
+
+  const requestBody = {
+    apiVersion: "v1",
+    kind: "ConfigMap",
+    metadata: {
+      name: metadata.name,
+      namespace: metadata.namespace,
+      resourceVersion:
+        typeof existingMetadata.resourceVersion === "string"
+          ? existingMetadata.resourceVersion
+          : undefined,
+      ...(Object.keys(mergedAnnotations).length > 0 ? { annotations: mergedAnnotations } : {}),
+      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
+        ? { labels: existingMetadata.labels }
+        : {}),
+    },
+    ...(typeof existing.immutable === "boolean" ? { immutable: existing.immutable } : {}),
+    data: input.data ?? {},
+  }
+
+  const url = buildResourceItemEndpoint("core", "v1", "configmaps", metadata.name, metadata.namespace)
+
+  await fetchJsonDeduped<unknown>(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  })
+}
+
+export async function updateSecret(input: UpdateSecretInput): Promise<void> {
+  const metadata = buildMetadata(input)
+  const secretType = input.type?.trim() || "Opaque"
+  const stringData = input.stringData ?? {}
+  const encodedData = Object.fromEntries(
+    Object.entries(stringData).map(([key, value]) => [key, encodeBase64Utf8(value)])
+  ) as Record<string, string>
+  const { payload } = await fetchResourceByName<unknown>("core", "v1", "secrets", metadata.name, {
+    namespace: metadata.namespace,
+  })
+  const existing = asObject(payload)
+  const existingMetadata = asObject(existing.metadata)
+  const existingAnnotations = asObject(existingMetadata.annotations)
+  const mergedAnnotations = {
+    ...existingAnnotations,
+    ...buildDescriptionPatch(input.description).annotations,
+  }
+  if (mergedAnnotations.description === null) {
+    delete mergedAnnotations.description
+  }
+
+  const requestBody = {
+    apiVersion: "v1",
+    kind: "Secret",
+    metadata: {
+      name: metadata.name,
+      namespace: metadata.namespace,
+      resourceVersion:
+        typeof existingMetadata.resourceVersion === "string"
+          ? existingMetadata.resourceVersion
+          : undefined,
+      ...(Object.keys(mergedAnnotations).length > 0 ? { annotations: mergedAnnotations } : {}),
+      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
+        ? { labels: existingMetadata.labels }
+        : {}),
+    },
+    type: secretType,
+    ...(typeof existing.immutable === "boolean" ? { immutable: existing.immutable } : {}),
+    data: encodedData,
+  }
+
+  const url = buildResourceItemEndpoint("core", "v1", "secrets", metadata.name, metadata.namespace)
+
+  await fetchJsonDeduped<unknown>(url, {
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },

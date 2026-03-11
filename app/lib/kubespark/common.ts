@@ -78,7 +78,7 @@ export async function fetchResourceCollection<T = unknown>(
   };
 }
 
-function buildResourceItemEndpoint(
+export function buildResourceItemEndpoint(
   group: string,
   version: string,
   resource: string,

@@ -68,6 +68,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
   return proxyUpstream(req, "POST", context);
 }
 
+export async function PUT(req: NextRequest, context: RouteContext) {
+  return proxyUpstream(req, "PUT", context);
+}
+
 export async function DELETE(req: NextRequest, context: RouteContext) {
   return proxyUpstream(req, "DELETE", context);
 }
