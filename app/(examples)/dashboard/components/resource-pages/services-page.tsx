@@ -31,11 +31,19 @@ const serviceColumns: ColumnConfig<ServiceRow>[] = [
     enableHiding: false,
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
-  { key: "type", label: "\u7c7b\u578b", render: "badge" as const },
   { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
-  { key: "clusterIp", label: "Cluster IP" },
-  { key: "ports", label: "\u7aef\u53e3" },
-  { key: "age", label: "\u8fd0\u884c\u65f6\u95f4" },
+  {
+    key: "internalAccess",
+    label: "内部访问",
+    cell: (_value, row) =>
+      renderNameDescriptionCell(row.internalAccess, row.internalAccessType),
+  },
+  {
+    key: "externalAccess",
+    label: "外部访问",
+    cell: (_value, row) =>
+      renderNameDescriptionCell(row.externalAccess, row.externalAccessType),
+  },
   { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
 ]
 

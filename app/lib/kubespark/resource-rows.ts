@@ -83,8 +83,10 @@ export type ServiceResourceRow = {
   description: string
   type: string
   namespace: string
-  clusterIp: string
-  ports: string
+  internalAccess: string
+  internalAccessType: string
+  externalAccess: string
+  externalAccessType: string
   age: string
   updatedAt: string
 }
@@ -96,15 +98,35 @@ export async function fetchServiceRows(limit = 300): Promise<ServiceResourceRow[
     const metadata = asObject(resource.metadata)
     const spec = asObject(resource.spec)
     const name = asString(metadata.name, "service")
-    const ports = Array.isArray(spec.ports)
+    const clusterIpRaw = asString(spec.clusterIP)
+    const externalName = asString(spec.externalName, "")
+
+    let internalAccess = clusterIpRaw
+    let internalAccessType = "VirtualIP"
+    if (clusterIpRaw === "None") {
+      internalAccess = "None"
+      internalAccessType = "Headless"
+    } else if (clusterIpRaw === "-" && externalName) {
+      internalAccess = externalName
+      internalAccessType = "ExternalName"
+    } else if (clusterIpRaw === "-") {
+      internalAccessType = "-"
+    }
+
+    const nodePorts = Array.isArray(spec.ports)
       ? spec.ports
           .map((p) => {
-            const port = asObject(p).port
-            const protocol = asObject(p).protocol
-            return `${String(port ?? "-")}/${asString(protocol, "TCP")}`
+            const portObj = asObject(p)
+            const nodePort = portObj.nodePort
+            if (typeof nodePort !== "number" || nodePort <= 0) return null
+            const protocol = asString(portObj.protocol, "TCP")
+            return `${nodePort}/${protocol}`
           })
-          .join(",")
-      : "-"
+          .filter((value): value is string => Boolean(value))
+      : []
+
+    const externalAccess = nodePorts.length > 0 ? nodePorts.join(", ") : "-"
+    const externalAccessType = nodePorts.length > 0 ? "端口" : "-"
 
     return {
       id: asString(metadata.uid, `${name}-${index}`),
@@ -112,8 +134,10 @@ export async function fetchServiceRows(limit = 300): Promise<ServiceResourceRow[
       description: readDescription(resource),
       type: asString(spec.type),
       namespace: asString(metadata.namespace, "default"),
-      clusterIp: asString(spec.clusterIP),
-      ports: ports || "-",
+      internalAccess,
+      internalAccessType,
+      externalAccess,
+      externalAccessType,
       age: formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined),
       updatedAt: resolveUpdatedAt(resource),
     }
