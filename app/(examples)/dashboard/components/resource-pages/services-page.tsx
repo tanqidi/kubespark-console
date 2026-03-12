@@ -50,6 +50,7 @@ const serviceColumns: ColumnConfig<ServiceRow>[] = [
     cell: (_value, row) =>
       renderNameDescriptionCell(row.externalAccess, row.externalAccessType),
   },
+  { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
 ]
 
