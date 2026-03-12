@@ -79,7 +79,7 @@ function buildMetadata(input: BaseCreateInput): ResourceMetadata {
 }
 
 async function checkNamespacedResourceExists(
-  resource: "configmaps" | "secrets",
+  resource: "configmaps" | "secrets" | "services",
   input: ExistenceCheckInput
 ): Promise<boolean> {
   const metadata = buildMetadata({
@@ -110,6 +110,12 @@ export async function checkSecretExists(
   input: ExistenceCheckInput
 ): Promise<boolean> {
   return checkNamespacedResourceExists("secrets", input)
+}
+
+export async function checkServiceExists(
+  input: ExistenceCheckInput
+): Promise<boolean> {
+  return checkNamespacedResourceExists("services", input)
 }
 
 export async function createConfigMap(

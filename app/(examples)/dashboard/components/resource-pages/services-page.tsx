@@ -4,6 +4,7 @@ import * as React from "react"
 import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { CreateServiceDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-service-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -16,6 +17,7 @@ import {
   type ServiceResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
 import { deleteService } from "@/app/lib/kubespark/resource-delete"
+import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
@@ -49,6 +51,10 @@ const serviceColumns: ColumnConfig<ServiceRow>[] = [
 
 export function ServicesPageClient() {
   const [rows, setRows] = React.useState<ServiceRow[]>([])
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const [createNamespaceOptions, setCreateNamespaceOptions] = React.useState<
+    Array<{ id: string; name: string }>
+  >([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [namespaceQuery, setNamespaceQuery] = React.useState("")
@@ -168,9 +174,17 @@ export function ServicesPageClient() {
         setError(null)
       }
       try {
-        const mapped = await fetchServiceRows()
+        const [mapped, namespaces] = await Promise.all([
+          fetchServiceRows(),
+          fetchNamespaces(),
+        ])
         if (cancelled) return
         setRows(mapped)
+        setCreateNamespaceOptions(
+          namespaces
+            .map((item) => ({ id: item.name, name: item.name }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        )
         setError(null)
       } catch (e: unknown) {
         if (cancelled) return
@@ -245,6 +259,11 @@ export function ServicesPageClient() {
 
   return (
     <>
+      <CreateServiceDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        namespaceOptions={createNamespaceOptions}
+      />
       <MonacoViewerDialog
         title="查看YAML"
         open={yamlOpen}
@@ -271,6 +290,7 @@ export function ServicesPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
+        onCreate={() => setCreateDialogOpen(true)}
         toolbarEnd={serviceFilters}
         onDeleteSelectedRows={handleDeleteSelectedRows}
       />
