@@ -15,6 +15,7 @@ import {
   WorkloadPickerDialog,
 } from "@/app/(examples)/dashboard/components/resource-pages/workload-picker-dialog"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogClose,
@@ -32,6 +33,12 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from "@/components/ui/item"
 import {
   Select,
   SelectContent,
@@ -180,6 +187,8 @@ export function CreateServiceDialog({
   const [checkingNext, setCheckingNext] = React.useState(false)
   const [basicCompleted, setBasicCompleted] = React.useState(false)
   const [serviceCompleted, setServiceCompleted] = React.useState(false)
+  const [enableNodePort, setEnableNodePort] = React.useState(false)
+  const [enableSessionAffinity, setEnableSessionAffinity] = React.useState(false)
 
   React.useEffect(() => {
     if (!open) {
@@ -199,8 +208,16 @@ export function CreateServiceDialog({
       setCheckingNext(false)
       setBasicCompleted(false)
       setServiceCompleted(false)
+      setEnableNodePort(false)
+      setEnableSessionAffinity(false)
     }
   }, [open])
+
+  React.useEffect(() => {
+    if (internalAccessMode === "headless" && enableNodePort) {
+      setEnableNodePort(false)
+    }
+  }, [enableNodePort, internalAccessMode])
 
   const handleBasicNext = React.useCallback(async () => {
     if (checkingNext) return
@@ -454,7 +471,12 @@ export function CreateServiceDialog({
                 {
                   id: "advanced",
                   title: "高级设置",
-                  status: activeStep === "advanced" ? "当前" : "未设置",
+                  status:
+                    activeStep === "advanced"
+                      ? "当前"
+                      : enableNodePort || enableSessionAffinity
+                        ? "已设置"
+                        : "未设置",
                   active: activeStep === "advanced",
                   icon: <IconAdjustments className="size-4" />,
                   disabled: isBusy || !canNavigateAdvanced,
@@ -729,16 +751,68 @@ export function CreateServiceDialog({
               <div className="mb-4">
                 <h3 className="text-[15px] font-semibold">高级设置</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  这里将用于设置服务的更多高级参数。
+                  配置外部访问与会话保持策略。
                 </p>
               </div>
-              <div className="rounded-lg border border-dashed px-5 py-8">
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    第三步先展示流程占位内容。下一版会在这里补充会话亲和性、流量策略和更多高级参数。
-                  </p>
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    当前版本暂不开放创建提交。
-                  </p>
+              <div className="flex flex-col gap-4">
+                <Item
+                  variant="outline"
+                  size="sm"
+                  className="w-full cursor-pointer"
+                  onClick={() => {
+                    if (internalAccessMode === "headless" || isBusy) return
+                    setEnableNodePort((current) => !current)
+                  }}
+                >
+                  <Checkbox
+                    checked={enableNodePort}
+                    onClick={(event) => event.stopPropagation()}
+                    onCheckedChange={(checked) => {
+                      if (internalAccessMode === "headless" || isBusy) return
+                      setEnableNodePort(checked === true)
+                    }}
+                    aria-label="外部访问"
+                    disabled={isBusy || internalAccessMode === "headless"}
+                  />
+                  <ItemContent>
+                    <ItemTitle>外部访问</ItemTitle>
+                    <ItemDescription>
+                      启用后服务类型将设置为 NodePort，用于从集群外访问服务。
+                      {internalAccessMode === "headless" ? (
+                        <span className="font-semibold text-foreground">
+                          {" "}当前为无头服务模式，不能开启外部访问。
+                        </span>
+                      ) : null}
+                    </ItemDescription>
+                  </ItemContent>
+                </Item>
+
+                <Item
+                  variant="outline"
+                  size="sm"
+                  className="w-full cursor-pointer"
+                  onClick={() => {
+                    if (isBusy) return
+                    setEnableSessionAffinity((current) => !current)
+                  }}
+                >
+                  <Checkbox
+                    checked={enableSessionAffinity}
+                    onClick={(event) => event.stopPropagation()}
+                    onCheckedChange={(checked) => {
+                      if (isBusy) return
+                      setEnableSessionAffinity(checked === true)
+                    }}
+                    aria-label="会话保持"
+                    disabled={isBusy}
+                  />
+                  <ItemContent>
+                    <ItemTitle>会话保持</ItemTitle>
+                    <ItemDescription>
+                      开启后将同一客户端请求保持到同一后端 Pod（ClientIP）。
+                    </ItemDescription>
+                  </ItemContent>
+                </Item>
               </div>
             </div>
           )}
