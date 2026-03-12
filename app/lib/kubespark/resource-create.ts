@@ -50,6 +50,29 @@ export type UpdateSecretInput = BaseCreateInput & {
   stringData?: Record<string, string>
 }
 
+export type CreateServiceInput = BaseCreateInput & {
+  internalAccessMode?: "virtual-ip" | "headless"
+  enableNodePort?: boolean
+  enableSessionAffinity?: boolean
+  selectors?: Record<string, string>
+  ports?: Array<{
+    protocol:
+      | "GRPC"
+      | "HTTP"
+      | "HTTP2"
+      | "HTTPS"
+      | "MONGO"
+      | "REDIS"
+      | "TCP"
+      | "TLS"
+      | "UDP"
+      | "SCTP"
+    name?: string
+    targetPort: number
+    servicePort: number
+  }>
+}
+
 type ExistenceCheckInput = {
   name: string
   namespace: string
@@ -158,6 +181,49 @@ export async function createSecret(input: CreateSecretInput): Promise<void> {
   }
 
   const url = buildResourceCollectionEndpoint("core", "v1", "secrets", {
+    namespace: metadata.namespace,
+  })
+
+  await fetchJsonDeduped<unknown>(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  })
+}
+
+export async function createService(input: CreateServiceInput): Promise<void> {
+  const metadata = buildMetadata(input)
+  const internalAccessMode = input.internalAccessMode ?? "virtual-ip"
+  const enableNodePort = Boolean(input.enableNodePort) && internalAccessMode !== "headless"
+  const enableSessionAffinity = Boolean(input.enableSessionAffinity)
+  const selector = input.selectors ?? {}
+  const ports = input.ports ?? []
+
+  const requestBody = {
+    apiVersion: "v1",
+    kind: "Service",
+    metadata,
+    spec: {
+      type: internalAccessMode === "headless" ? "ClusterIP" : enableNodePort ? "NodePort" : "ClusterIP",
+      ...(internalAccessMode === "headless" ? { clusterIP: "None" } : {}),
+      ...(enableSessionAffinity ? { sessionAffinity: "ClientIP" } : { sessionAffinity: "None" }),
+      ...(Object.keys(selector).length > 0 ? { selector } : {}),
+      ...(ports.length > 0
+        ? {
+            ports: ports.map((port) => ({
+              protocol: port.protocol,
+              ...(port.name ? { name: port.name } : {}),
+              port: port.servicePort,
+              targetPort: port.targetPort,
+            })),
+          }
+        : {}),
+    },
+  }
+
+  const url = buildResourceCollectionEndpoint("core", "v1", "services", {
     namespace: metadata.namespace,
   })
 

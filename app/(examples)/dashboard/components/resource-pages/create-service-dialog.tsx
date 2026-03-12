@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import type { EditorProps } from "@monaco-editor/react"
+import dynamic from "next/dynamic"
 import {
   IconAdjustments,
   IconAdjustmentsHorizontal,
@@ -8,8 +10,10 @@ import {
   IconSettings2,
   IconTrash,
 } from "@tabler/icons-react"
+import { parse, stringify } from "yaml"
 
 import { checkServiceExists } from "@/app/lib/kubespark/resource-create"
+import { createService } from "@/app/lib/kubespark/resource-create"
 import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 import {
   WorkloadPickerDialog,
@@ -47,6 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 
 type NamespaceOption = {
@@ -88,6 +93,33 @@ type CreateServiceDialogProps = {
   namespaceOptions: NamespaceOption[]
 }
 
+type JsonObject = Record<string, unknown>
+
+type ServiceDialogSnapshot = {
+  name: string
+  namespace: string
+  description: string
+  internalAccessMode: InternalAccessMode
+  selectorItems: SelectorItem[]
+  portItems: PortItem[]
+  enableNodePort: boolean
+  enableSessionAffinity: boolean
+}
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+})
+
+const MONACO_OPTIONS: EditorProps["options"] = {
+  automaticLayout: true,
+  fontSize: 13,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  stickyScroll: { enabled: false },
+  tabSize: 2,
+  wordWrap: "on",
+}
+
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 
@@ -102,6 +134,21 @@ function validateName(value: string): string | null {
 
 let nextSelectorId = 0
 let nextPortId = 0
+
+const PORT_PROTOCOL_OPTIONS = [
+  "GRPC",
+  "HTTP",
+  "HTTP2",
+  "HTTPS",
+  "MONGO",
+  "REDIS",
+  "TCP",
+  "TLS",
+  "UDP",
+  "SCTP",
+] as const
+
+const PORT_PROTOCOL_SET = new Set<string>(PORT_PROTOCOL_OPTIONS)
 
 function createSelectorItem(): SelectorItem {
   nextSelectorId += 1
@@ -123,6 +170,21 @@ function createPortItem(
     targetPort: defaults?.targetPort ?? "",
     servicePort: defaults?.servicePort ?? "",
   }
+}
+
+function asObject(value: unknown): JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {}
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+function resolveProtocolFromYaml(value: unknown): PortItem["protocol"] {
+  const next = asString(value).trim().toUpperCase()
+  return PORT_PROTOCOL_SET.has(next) ? (next as PortItem["protocol"]) : "TCP"
 }
 
 const AUTO_PROTOCOL_PREFIX_SET = new Set([
@@ -166,6 +228,160 @@ function replaceProtocolPrefixInName(
   return `${resolveProtocolNamePrefix(nextProtocol)}-${tail}`
 }
 
+function buildServiceManifest(snapshot: ServiceDialogSnapshot): JsonObject {
+  const metadata: JsonObject = {}
+  const annotations: JsonObject = {}
+
+  if (snapshot.name.trim()) metadata.name = snapshot.name.trim().toLowerCase()
+  if (snapshot.namespace.trim()) metadata.namespace = snapshot.namespace.trim()
+  if (snapshot.description.trim()) annotations.description = snapshot.description.trim()
+  if (Object.keys(annotations).length > 0) metadata.annotations = annotations
+
+  const selector = Object.fromEntries(
+    snapshot.selectorItems
+      .map((item) => ({ key: item.key.trim(), value: item.value.trim() }))
+      .filter((item) => item.key && item.value)
+      .map((item) => [item.key, item.value])
+  )
+
+  const ports = snapshot.portItems
+    .map((item) => {
+      const name = item.name.trim()
+      const targetPort = item.targetPort.trim()
+      const servicePort = item.servicePort.trim()
+
+      if (!name && !targetPort && !servicePort) return null
+
+      const parsedServicePort = Number(servicePort)
+      const parsedTargetPort = Number(targetPort)
+
+      return {
+        protocol: item.protocol,
+        ...(name ? { name } : {}),
+        ...(Number.isFinite(parsedServicePort) && servicePort ? { port: parsedServicePort } : {}),
+        ...(Number.isFinite(parsedTargetPort) && targetPort ? { targetPort: parsedTargetPort } : {}),
+      }
+    })
+    .filter((item): item is Record<string, unknown> => item !== null)
+
+  const spec: JsonObject = {
+    type:
+      snapshot.internalAccessMode === "headless"
+        ? "ClusterIP"
+        : snapshot.enableNodePort
+          ? "NodePort"
+          : "ClusterIP",
+    sessionAffinity: snapshot.enableSessionAffinity ? "ClientIP" : "None",
+  }
+
+  if (snapshot.internalAccessMode === "headless") {
+    spec.clusterIP = "None"
+  }
+
+  if (Object.keys(selector).length > 0) {
+    spec.selector = selector
+  }
+
+  if (ports.length > 0) {
+    spec.ports = ports
+  }
+
+  return {
+    apiVersion: "v1",
+    kind: "Service",
+    metadata,
+    spec,
+  }
+}
+
+function buildServiceYamlText(snapshot: ServiceDialogSnapshot): string {
+  return stringify(buildServiceManifest(snapshot), {
+    indent: 2,
+    lineWidth: 0,
+    sortMapEntries: false,
+  })
+}
+
+function parseServiceYamlText(yamlText: string): ServiceDialogSnapshot {
+  const normalizedText = yamlText.trim()
+  if (!normalizedText) throw new Error("请输入 YAML 内容")
+
+  const root = asObject(parse(normalizedText))
+  if (Object.keys(root).length === 0) throw new Error("YAML 内容格式无效")
+
+  const actualKind = asString(root.kind)
+  if (actualKind && actualKind !== "Service") {
+    throw new Error("YAML 资源类型必须是 Service")
+  }
+
+  const metadata = asObject(root.metadata)
+  const annotations = asObject(metadata.annotations)
+  const spec = asObject(root.spec)
+
+  const internalAccessMode: InternalAccessMode =
+    asString(spec.clusterIP).trim() === "None" ? "headless" : "virtual-ip"
+
+  const rawSelectors = asObject(spec.selector)
+  const selectorEntries = Object.entries(rawSelectors).map(([key, value]) => ({
+    key,
+    value: asString(value),
+  }))
+  const selectorItems =
+    selectorEntries.length > 0
+      ? selectorEntries.map((item) =>
+          createSelectorItemWithDefaults(item.key, item.value)
+        )
+      : [createSelectorItem()]
+
+  const rawPorts = Array.isArray(spec.ports) ? spec.ports : []
+  const portItems = rawPorts.map((rawPort) => {
+    const portObj = asObject(rawPort)
+    const protocol = resolveProtocolFromYaml(portObj.protocol)
+    const name = asString(portObj.name).trim()
+    const targetPortRaw = portObj.targetPort
+    const portRaw = portObj.port
+
+    const targetPort =
+      typeof targetPortRaw === "number"
+        ? String(targetPortRaw)
+        : asString(targetPortRaw)
+    const servicePort =
+      typeof portRaw === "number" ? String(portRaw) : asString(portRaw)
+
+    const autoName = buildAutoPortName(protocol, servicePort || targetPort) ?? ""
+
+    return createPortItem({
+      protocol,
+      name: name || autoName,
+      targetPort,
+      servicePort,
+    })
+  })
+
+  const type = asString(spec.type).trim().toUpperCase()
+  const enableNodePort = internalAccessMode !== "headless" && type === "NODEPORT"
+  const enableSessionAffinity = asString(spec.sessionAffinity).trim().toUpperCase() === "CLIENTIP"
+
+  return {
+    name: asString(metadata.name),
+    namespace: asString(metadata.namespace),
+    description: asString(annotations.description),
+    internalAccessMode,
+    selectorItems,
+    portItems,
+    enableNodePort,
+    enableSessionAffinity,
+  }
+}
+
+function createSelectorItemWithDefaults(key: string, value: string): SelectorItem {
+  return {
+    ...createSelectorItem(),
+    key,
+    value,
+  }
+}
+
 export function CreateServiceDialog({
   open,
   onOpenChange,
@@ -185,10 +401,15 @@ export function CreateServiceDialog({
   const [portError, setPortError] = React.useState<string | null>(null)
   const [stepError, setStepError] = React.useState<string | null>(null)
   const [checkingNext, setCheckingNext] = React.useState(false)
+  const [creating, setCreating] = React.useState(false)
   const [basicCompleted, setBasicCompleted] = React.useState(false)
   const [serviceCompleted, setServiceCompleted] = React.useState(false)
   const [enableNodePort, setEnableNodePort] = React.useState(false)
   const [enableSessionAffinity, setEnableSessionAffinity] = React.useState(false)
+  const [yamlMode, setYamlMode] = React.useState(false)
+  const [yamlText, setYamlText] = React.useState("")
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const isBusy = checkingNext || creating
 
   React.useEffect(() => {
     if (!open) {
@@ -206,10 +427,14 @@ export function CreateServiceDialog({
       setPortError(null)
       setStepError(null)
       setCheckingNext(false)
+      setCreating(false)
       setBasicCompleted(false)
       setServiceCompleted(false)
       setEnableNodePort(false)
       setEnableSessionAffinity(false)
+      setYamlMode(false)
+      setYamlText("")
+      setYamlError(null)
     }
   }, [open])
 
@@ -218,6 +443,68 @@ export function CreateServiceDialog({
       setEnableNodePort(false)
     }
   }, [enableNodePort, internalAccessMode])
+
+  const getSnapshot = React.useCallback(
+    (): ServiceDialogSnapshot => ({
+      name,
+      namespace,
+      description,
+      internalAccessMode,
+      selectorItems,
+      portItems,
+      enableNodePort,
+      enableSessionAffinity,
+    }),
+    [
+      description,
+      enableNodePort,
+      enableSessionAffinity,
+      internalAccessMode,
+      name,
+      namespace,
+      portItems,
+      selectorItems,
+    ]
+  )
+
+  const applySnapshot = React.useCallback((snapshot: ServiceDialogSnapshot) => {
+    setName(snapshot.name)
+    setNamespace(snapshot.namespace)
+    setDescription(snapshot.description)
+    setInternalAccessMode(snapshot.internalAccessMode)
+    setSelectorItems(snapshot.selectorItems.length > 0 ? snapshot.selectorItems : [createSelectorItem()])
+    setPortItems(snapshot.portItems)
+    setEnableNodePort(snapshot.enableNodePort)
+    setEnableSessionAffinity(snapshot.enableSessionAffinity)
+    setNameError(null)
+    setNamespaceError(null)
+    setSelectorError(null)
+    setPortError(null)
+    setStepError(null)
+  }, [])
+
+  const handleYamlModeChange = React.useCallback(
+    (checked: boolean) => {
+      if (isBusy) return
+
+      if (checked) {
+        setYamlText(buildServiceYamlText(getSnapshot()))
+        setYamlError(null)
+        setYamlMode(true)
+        return
+      }
+
+      try {
+        const parsed = parseServiceYamlText(yamlText)
+        applySnapshot(parsed)
+        setYamlError(null)
+        setYamlMode(false)
+      } catch (error) {
+        setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      }
+    },
+    [applySnapshot, getSnapshot, isBusy, yamlText]
+  )
 
   const handleBasicNext = React.useCallback(async () => {
     if (checkingNext) return
@@ -332,9 +619,157 @@ export function CreateServiceDialog({
     setActiveStep("advanced")
   }, [portItems, selectorItems])
 
+  const validateServiceFields = React.useCallback(() => {
+    const normalizedSelectors = selectorItems.map((item) => ({
+      key: item.key.trim(),
+      value: item.value.trim(),
+    }))
+    const filledSelectors = normalizedSelectors.filter((item) => item.key || item.value)
+
+    let nextSelectorError: string | null = null
+    if (filledSelectors.length === 0) {
+      nextSelectorError = "请至少添加一个工作负载选择器"
+    }
+
+    if (!nextSelectorError) {
+      for (let index = 0; index < filledSelectors.length; index += 1) {
+        const item = filledSelectors[index]
+        if (!item.key || !item.value) {
+          nextSelectorError = `第 ${index + 1} 个工作负载选择器需同时填写键和值`
+          break
+        }
+      }
+    }
+
+    if (!nextSelectorError) {
+      const seen = new Set<string>()
+      for (const item of filledSelectors) {
+        if (seen.has(item.key)) {
+          nextSelectorError = `工作负载选择器键 ${item.key} 重复，请更换后重试`
+          break
+        }
+        seen.add(item.key)
+      }
+    }
+
+    const normalizedPorts = portItems.map((item) => ({
+      protocol: item.protocol,
+      name: item.name.trim(),
+      targetPort: item.targetPort.trim(),
+      servicePort: item.servicePort.trim(),
+    }))
+
+    let nextPortError: string | null = null
+    if (normalizedPorts.length > 0) {
+      for (let index = 0; index < normalizedPorts.length; index += 1) {
+        const item = normalizedPorts[index]
+        if (!item.name || !item.targetPort || !item.servicePort) {
+          nextPortError = `第 ${index + 1} 个端口需完整填写名称、容器端口和服务端口`
+          break
+        }
+        if (!/^\d+$/.test(item.targetPort)) {
+          nextPortError = `第 ${index + 1} 个端口的容器端口格式无效`
+          break
+        }
+        const targetPortNumber = Number(item.targetPort)
+        if (targetPortNumber < 1 || targetPortNumber > 65535) {
+          nextPortError = `第 ${index + 1} 个端口的容器端口超出范围（1-65535）`
+          break
+        }
+        if (!/^\d+$/.test(item.servicePort)) {
+          nextPortError = `第 ${index + 1} 个端口的服务端口格式无效`
+          break
+        }
+        const servicePortNumber = Number(item.servicePort)
+        if (servicePortNumber < 1 || servicePortNumber > 65535) {
+          nextPortError = `第 ${index + 1} 个端口的服务端口超出范围（1-65535）`
+          break
+        }
+      }
+    }
+
+    return {
+      nextSelectorError,
+      nextPortError,
+      filledSelectors,
+      normalizedPorts,
+    }
+  }, [portItems, selectorItems])
+
+  const handleCreateSubmit = React.useCallback(async () => {
+    if (isBusy) return
+
+    const normalizedName = name.trim().toLowerCase()
+    const normalizedNamespace = namespace.trim()
+    const nextNameError = validateName(normalizedName)
+    const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
+
+    const { nextSelectorError, nextPortError, filledSelectors, normalizedPorts } = validateServiceFields()
+
+    setNameError(nextNameError)
+    setNamespaceError(nextNamespaceError)
+    setSelectorError(nextSelectorError)
+    setPortError(nextPortError)
+    setStepError(null)
+
+    if (nextNameError || nextNamespaceError) {
+      setActiveStep("basic")
+      return
+    }
+
+    if (nextSelectorError || nextPortError) {
+      setActiveStep("service")
+      return
+    }
+
+    setCreating(true)
+    try {
+      await createService({
+        name: normalizedName,
+        namespace: normalizedNamespace,
+        description: description.trim(),
+        internalAccessMode,
+        enableNodePort,
+        enableSessionAffinity,
+        selectors: Object.fromEntries(filledSelectors.map((item) => [item.key, item.value])),
+        ports: normalizedPorts.map((item) => ({
+          protocol: item.protocol,
+          name: item.name,
+          targetPort: Number(item.targetPort),
+          servicePort: Number(item.servicePort),
+        })),
+      })
+      onOpenChange(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "创建服务失败，请稍后重试"
+      const lower = message.toLowerCase()
+      if (
+        lower.includes("already exists") ||
+        lower.includes("状态码 409") ||
+        message.includes("已存在")
+      ) {
+        setNameError("服务名称已存在，请更换后重试")
+        setActiveStep("basic")
+      } else {
+        setStepError(message)
+      }
+    } finally {
+      setCreating(false)
+    }
+  }, [
+    description,
+    enableNodePort,
+    enableSessionAffinity,
+    internalAccessMode,
+    isBusy,
+    name,
+    namespace,
+    onOpenChange,
+    validateServiceFields,
+  ])
+
   const canNavigateService = basicCompleted
   const canNavigateAdvanced = basicCompleted && serviceCompleted
-  const isBusy = checkingNext
 
   const updateSelectorItem = React.useCallback(
     (id: string, field: "key" | "value", value: string) => {
@@ -439,11 +874,25 @@ export function CreateServiceDialog({
 
         <div className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
-            <DialogTitle>创建服务</DialogTitle>
-            <DialogDescription>使用 Kubernetes Service 创建网络访问入口。</DialogDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <DialogTitle>创建服务</DialogTitle>
+                <DialogDescription>使用 Kubernetes Service 创建网络访问入口。</DialogDescription>
+              </div>
+              <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                <span className="text-sm font-medium">编辑 YAML</span>
+                <Switch
+                  checked={yamlMode}
+                  onCheckedChange={handleYamlModeChange}
+                  disabled={isBusy}
+                  aria-label="编辑 YAML"
+                />
+              </div>
+            </div>
           </DialogHeader>
 
-          <StepHeaderNav
+          {!yamlMode ? (
+            <StepHeaderNav
               items={[
                 {
                   id: "basic",
@@ -483,10 +932,28 @@ export function CreateServiceDialog({
                   onClick: () => setActiveStep("advanced"),
                 },
               ]}
-          />
+            />
+          ) : null}
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-          {activeStep === "basic" ? (
+          {yamlMode ? (
+            <div className="flex h-full min-h-[56vh] flex-col">
+              <div className="overflow-hidden rounded-lg border">
+                <MonacoEditor
+                  language="yaml"
+                  theme="vs-dark"
+                  value={yamlText}
+                  onChange={(value) => {
+                    setYamlText(value ?? "")
+                    if (yamlError) setYamlError(null)
+                  }}
+                  options={MONACO_OPTIONS}
+                  height="56vh"
+                />
+              </div>
+              {yamlError ? <FieldError className="mt-3">{yamlError}</FieldError> : null}
+            </div>
+          ) : activeStep === "basic" ? (
             <div>
               <div className="mb-4">
                 <h3 className="text-[15px] font-semibold">基本信息</h3>
@@ -820,7 +1287,20 @@ export function CreateServiceDialog({
             {stepError ? <FieldError className="mt-4">{stepError}</FieldError> : null}
           </div>
 
-          {activeStep === "basic" ? (
+          {yamlMode ? (
+              <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+                <div className="flex w-full items-center justify-between gap-3">
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline" disabled={isBusy}>
+                      取消
+                    </Button>
+                  </DialogClose>
+                  <Button type="button" onClick={() => handleYamlModeChange(false)} disabled={isBusy}>
+                    返回表单
+                  </Button>
+                </div>
+              </DialogFooter>
+          ) : activeStep === "basic" ? (
               <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
                 <div className="flex w-full items-center justify-between gap-3">
                   <DialogClose asChild>
@@ -860,8 +1340,8 @@ export function CreateServiceDialog({
                   >
                     上一步
                   </Button>
-                  <Button type="button" disabled>
-                    创建
+                  <Button type="button" onClick={() => void handleCreateSubmit()} disabled={isBusy}>
+                    {creating ? "创建中..." : "创建"}
                   </Button>
                 </div>
               </DialogFooter>
