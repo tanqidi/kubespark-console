@@ -12,8 +12,7 @@ import {
 } from "@tabler/icons-react"
 import { parse, stringify } from "yaml"
 
-import { checkServiceExists } from "@/app/lib/kubespark/resource-create"
-import { createService } from "@/app/lib/kubespark/resource-create"
+import { checkServiceExists, createService, updateService } from "@/app/lib/kubespark/resource-create"
 import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 import {
   WorkloadPickerDialog,
@@ -91,6 +90,25 @@ type CreateServiceDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   namespaceOptions: NamespaceOption[]
+  mode?: "create" | "edit"
+  initialValues?: ServiceDialogInitialValues | null
+  onSubmitted?: () => void | Promise<void>
+}
+
+export type ServiceDialogInitialValues = {
+  name: string
+  namespace: string
+  description?: string
+  internalAccessMode: InternalAccessMode
+  selectors: Array<{ key: string; value: string }>
+  ports: Array<{
+    protocol: PortItem["protocol"]
+    name: string
+    targetPort: string
+    servicePort: string
+  }>
+  enableNodePort: boolean
+  enableSessionAffinity: boolean
 }
 
 type JsonObject = Record<string, unknown>
@@ -386,7 +404,11 @@ export function CreateServiceDialog({
   open,
   onOpenChange,
   namespaceOptions,
+  mode = "create",
+  initialValues = null,
+  onSubmitted,
 }: CreateServiceDialogProps) {
+  const isEditMode = mode === "edit"
   const [activeStep, setActiveStep] = React.useState<ServiceCreateStep>("basic")
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
@@ -410,6 +432,11 @@ export function CreateServiceDialog({
   const [yamlText, setYamlText] = React.useState("")
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const isBusy = checkingNext || creating
+
+  const title = isEditMode ? "编辑服务" : "创建服务"
+  const descriptionText = isEditMode
+    ? "编辑 Kubernetes Service 的配置内容。"
+    : "使用 Kubernetes Service 创建网络访问入口。"
 
   React.useEffect(() => {
     if (!open) {
@@ -437,6 +464,43 @@ export function CreateServiceDialog({
       setYamlError(null)
     }
   }, [open])
+
+  React.useEffect(() => {
+    if (!open || !isEditMode || !initialValues) return
+
+    setActiveStep("basic")
+    setName(initialValues.name)
+    setNamespace(initialValues.namespace)
+    setDescription(initialValues.description ?? "")
+    setInternalAccessMode(initialValues.internalAccessMode)
+    setSelectorItems(
+      initialValues.selectors.length > 0
+        ? initialValues.selectors.map((item) => createSelectorItemWithDefaults(item.key, item.value))
+        : [createSelectorItem()]
+    )
+    setPortItems(
+      initialValues.ports.map((item) =>
+        createPortItem({
+          protocol: item.protocol,
+          name: item.name,
+          targetPort: item.targetPort,
+          servicePort: item.servicePort,
+        })
+      )
+    )
+    setEnableNodePort(initialValues.enableNodePort)
+    setEnableSessionAffinity(initialValues.enableSessionAffinity)
+    setNameError(null)
+    setNamespaceError(null)
+    setSelectorError(null)
+    setPortError(null)
+    setStepError(null)
+    setYamlMode(false)
+    setYamlText("")
+    setYamlError(null)
+    setBasicCompleted(true)
+    setServiceCompleted(true)
+  }, [initialValues, isEditMode, open])
 
   React.useEffect(() => {
     if (internalAccessMode === "headless" && enableNodePort) {
@@ -496,21 +560,29 @@ export function CreateServiceDialog({
 
       try {
         const parsed = parseServiceYamlText(yamlText)
-        applySnapshot(parsed)
+        const nextSnapshot =
+          isEditMode && initialValues
+            ? {
+                ...parsed,
+                name: initialValues.name,
+                namespace: initialValues.namespace,
+              }
+            : parsed
+        applySnapshot(nextSnapshot)
         setYamlError(null)
         setYamlMode(false)
       } catch (error) {
         setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
       }
     },
-    [applySnapshot, getSnapshot, isBusy, yamlText]
+    [applySnapshot, getSnapshot, initialValues, isBusy, isEditMode, yamlText]
   )
 
   const handleBasicNext = React.useCallback(async () => {
     if (checkingNext) return
 
-    const normalizedName = name.trim().toLowerCase()
-    const normalizedNamespace = namespace.trim()
+    const normalizedName = (isEditMode && initialValues ? initialValues.name : name).trim().toLowerCase()
+    const normalizedNamespace = (isEditMode && initialValues ? initialValues.namespace : namespace).trim()
     const nextNameError = validateName(normalizedName)
     const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
 
@@ -519,6 +591,12 @@ export function CreateServiceDialog({
     setStepError(null)
 
     if (nextNameError || nextNamespaceError) return
+
+    if (isEditMode) {
+      setBasicCompleted(true)
+      setActiveStep("service")
+      return
+    }
 
     setCheckingNext(true)
     try {
@@ -538,7 +616,7 @@ export function CreateServiceDialog({
     } finally {
       setCheckingNext(false)
     }
-  }, [checkingNext, name, namespace])
+  }, [checkingNext, initialValues, isEditMode, name, namespace])
 
   const handleServiceNext = React.useCallback(() => {
     const normalizedSelectors = selectorItems.map((item) => ({
@@ -619,8 +697,12 @@ export function CreateServiceDialog({
     setActiveStep("advanced")
   }, [portItems, selectorItems])
 
-  const validateServiceFields = React.useCallback(() => {
-    const normalizedSelectors = selectorItems.map((item) => ({
+  const validateServiceFields = React.useCallback(
+    (sourceSelectorItems?: SelectorItem[], sourcePortItems?: PortItem[]) => {
+    const targetSelectors = sourceSelectorItems ?? selectorItems
+    const targetPorts = sourcePortItems ?? portItems
+
+    const normalizedSelectors = targetSelectors.map((item) => ({
       key: item.key.trim(),
       value: item.value.trim(),
     }))
@@ -652,7 +734,7 @@ export function CreateServiceDialog({
       }
     }
 
-    const normalizedPorts = portItems.map((item) => ({
+    const normalizedPorts = targetPorts.map((item) => ({
       protocol: item.protocol,
       name: item.name.trim(),
       targetPort: item.targetPort.trim(),
@@ -696,15 +778,90 @@ export function CreateServiceDialog({
     }
   }, [portItems, selectorItems])
 
+  const submitService = React.useCallback(
+    async (
+      normalizedName: string,
+      normalizedNamespace: string,
+      filledSelectors: Array<{ key: string; value: string }>,
+      normalizedPorts: Array<{
+        protocol: PortItem["protocol"]
+        name: string
+        targetPort: string
+        servicePort: string
+      }>,
+      useDraft?: ServiceDialogSnapshot
+    ) => {
+      const source =
+        useDraft
+        ? {
+            description: useDraft.description,
+            internalAccessMode: useDraft.internalAccessMode,
+            enableNodePort: useDraft.enableNodePort,
+            enableSessionAffinity: useDraft.enableSessionAffinity,
+          }
+        : {
+            description,
+            internalAccessMode,
+            enableNodePort,
+            enableSessionAffinity,
+          }
+
+      const payload = {
+        name: normalizedName,
+        namespace: normalizedNamespace,
+        description: source.description.trim(),
+        internalAccessMode: source.internalAccessMode,
+        enableNodePort: source.enableNodePort,
+        enableSessionAffinity: source.enableSessionAffinity,
+        selectors: Object.fromEntries(filledSelectors.map((item) => [item.key, item.value])),
+        ports: normalizedPorts.map((item) => ({
+          protocol: item.protocol,
+          name: item.name,
+          targetPort: Number(item.targetPort),
+          servicePort: Number(item.servicePort),
+        })),
+      }
+
+      if (isEditMode) {
+        await updateService(payload)
+      } else {
+        await createService(payload)
+      }
+    },
+    [description, enableNodePort, enableSessionAffinity, internalAccessMode, isEditMode]
+  )
+
   const handleCreateSubmit = React.useCallback(async () => {
     if (isBusy) return
 
-    const normalizedName = name.trim().toLowerCase()
-    const normalizedNamespace = namespace.trim()
+    let draft: ServiceDialogSnapshot | undefined
+    if (yamlMode) {
+      try {
+        draft = parseServiceYamlText(yamlText)
+        if (isEditMode && initialValues) {
+          draft = {
+            ...draft,
+            name: initialValues.name,
+            namespace: initialValues.namespace,
+          }
+        }
+        applySnapshot(draft)
+        setYamlError(null)
+      } catch (error) {
+        setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+        return
+      }
+    }
+
+    const source = draft ?? getSnapshot()
+    const normalizedName = (isEditMode && initialValues ? initialValues.name : source.name).trim().toLowerCase()
+    const normalizedNamespace = (isEditMode && initialValues ? initialValues.namespace : source.namespace).trim()
     const nextNameError = validateName(normalizedName)
     const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
-
-    const { nextSelectorError, nextPortError, filledSelectors, normalizedPorts } = validateServiceFields()
+    const { nextSelectorError, nextPortError, filledSelectors, normalizedPorts } = validateServiceFields(
+      source.selectorItems,
+      source.portItems
+    )
 
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
@@ -713,32 +870,20 @@ export function CreateServiceDialog({
     setStepError(null)
 
     if (nextNameError || nextNamespaceError) {
+      if (yamlMode) setYamlError(nextNameError ?? nextNamespaceError)
       setActiveStep("basic")
       return
     }
-
     if (nextSelectorError || nextPortError) {
+      if (yamlMode) setYamlError(nextSelectorError ?? nextPortError)
       setActiveStep("service")
       return
     }
 
     setCreating(true)
     try {
-      await createService({
-        name: normalizedName,
-        namespace: normalizedNamespace,
-        description: description.trim(),
-        internalAccessMode,
-        enableNodePort,
-        enableSessionAffinity,
-        selectors: Object.fromEntries(filledSelectors.map((item) => [item.key, item.value])),
-        ports: normalizedPorts.map((item) => ({
-          protocol: item.protocol,
-          name: item.name,
-          targetPort: Number(item.targetPort),
-          servicePort: Number(item.servicePort),
-        })),
-      })
+      await submitService(normalizedName, normalizedNamespace, filledSelectors, normalizedPorts, source)
+      await onSubmitted?.()
       onOpenChange(false)
     } catch (error) {
       const message = error instanceof Error ? error.message : "创建服务失败，请稍后重试"
@@ -748,24 +893,28 @@ export function CreateServiceDialog({
         lower.includes("状态码 409") ||
         message.includes("已存在")
       ) {
-        setNameError("服务名称已存在，请更换后重试")
+        setNameError(isEditMode ? "服务名称冲突，请稍后重试" : "服务名称已存在，请更换后重试")
+        if (yamlMode) setYamlError(isEditMode ? "服务名称冲突，请稍后重试" : "服务名称已存在，请更换后重试")
         setActiveStep("basic")
       } else {
+        if (yamlMode) setYamlError(message)
         setStepError(message)
       }
     } finally {
       setCreating(false)
     }
   }, [
-    description,
-    enableNodePort,
-    enableSessionAffinity,
-    internalAccessMode,
+    applySnapshot,
+    getSnapshot,
+    initialValues,
     isBusy,
-    name,
-    namespace,
+    isEditMode,
     onOpenChange,
+    onSubmitted,
+    submitService,
     validateServiceFields,
+    yamlMode,
+    yamlText,
   ])
 
   const canNavigateService = basicCompleted
@@ -876,8 +1025,8 @@ export function CreateServiceDialog({
           <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <DialogTitle>创建服务</DialogTitle>
-                <DialogDescription>使用 Kubernetes Service 创建网络访问入口。</DialogDescription>
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription>{descriptionText}</DialogDescription>
               </div>
               <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
                 <span className="text-sm font-medium">编辑 YAML</span>
@@ -975,7 +1124,7 @@ export function CreateServiceDialog({
                     placeholder="请输入服务名称"
                     autoComplete="off"
                     aria-invalid={Boolean(nameError)}
-                    disabled={isBusy}
+                    disabled={isBusy || isEditMode}
                   />
                   {nameError ? (
                     <FieldError>{nameError}</FieldError>
@@ -989,11 +1138,12 @@ export function CreateServiceDialog({
                   <Select
                     value={namespace}
                     onValueChange={(value) => {
+                      if (isEditMode) return
                       setNamespace(value)
                       if (namespaceError) setNamespaceError(null)
                       if (stepError) setStepError(null)
                     }}
-                    disabled={isBusy}
+                    disabled={isBusy || isEditMode}
                   >
                     <SelectTrigger
                       id="service-create-namespace"
@@ -1295,8 +1445,8 @@ export function CreateServiceDialog({
                       取消
                     </Button>
                   </DialogClose>
-                  <Button type="button" onClick={() => handleYamlModeChange(false)} disabled={isBusy}>
-                    返回表单
+                  <Button type="button" onClick={() => void handleCreateSubmit()} disabled={isBusy}>
+                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                   </Button>
                 </div>
               </DialogFooter>
@@ -1341,7 +1491,7 @@ export function CreateServiceDialog({
                     上一步
                   </Button>
                   <Button type="button" onClick={() => void handleCreateSubmit()} disabled={isBusy}>
-                    {creating ? "创建中..." : "创建"}
+                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                   </Button>
                 </div>
               </DialogFooter>
