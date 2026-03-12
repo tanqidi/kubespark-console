@@ -18,6 +18,16 @@ import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resou
 import {
   WorkloadPickerDialog,
 } from "@/app/(examples)/dashboard/components/resource-pages/workload-picker-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -211,6 +221,17 @@ function resolveProtocolFromYaml(value: unknown): PortItem["protocol"] {
   return PORT_PROTOCOL_SET.has(next) ? (next as PortItem["protocol"]) : "TCP"
 }
 
+function normalizePortInput(value: string): string {
+  const digits = value.replace(/\D+/g, "")
+  if (!digits) return ""
+
+  const parsed = Number(digits)
+  if (!Number.isFinite(parsed)) return ""
+  if (parsed > 65535) return "65535"
+  if (parsed < 0) return "0"
+  return String(parsed)
+}
+
 const AUTO_PROTOCOL_PREFIX_SET = new Set([
   "grpc",
   "http",
@@ -355,7 +376,7 @@ function parseServiceYamlText(yamlText: string): ServiceDialogSnapshot {
       ? selectorEntries.map((item) =>
           createSelectorItemWithDefaults(item.key, item.value)
         )
-      : [createSelectorItem()]
+      : []
 
   const rawPorts = Array.isArray(spec.ports) ? spec.ports : []
   const portItems = rawPorts.map((rawPort) => {
@@ -420,7 +441,7 @@ export function CreateServiceDialog({
   const [namespace, setNamespace] = React.useState("")
   const [description, setDescription] = React.useState("")
   const [internalAccessMode, setInternalAccessMode] = React.useState<InternalAccessMode>("virtual-ip")
-  const [selectorItems, setSelectorItems] = React.useState<SelectorItem[]>(() => [createSelectorItem()])
+  const [selectorItems, setSelectorItems] = React.useState<SelectorItem[]>([])
   const [portItems, setPortItems] = React.useState<PortItem[]>([])
   const [workloadPickerOpen, setWorkloadPickerOpen] = React.useState(false)
   const [nameError, setNameError] = React.useState<string | null>(null)
@@ -438,6 +459,8 @@ export function CreateServiceDialog({
   const [yamlText, setYamlText] = React.useState("")
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [pendingDeleteTarget, setPendingDeleteTarget] = React.useState<PendingDeleteTarget>(null)
+  const [selectorAddPromptOpen, setSelectorAddPromptOpen] = React.useState(false)
+  const [selectorAddPromptShown, setSelectorAddPromptShown] = React.useState(false)
   const isBusy = checkingNext || creating
 
   const title = isEditMode ? "编辑服务" : "创建服务"
@@ -452,7 +475,7 @@ export function CreateServiceDialog({
       setNamespace("")
       setDescription("")
       setInternalAccessMode("virtual-ip")
-      setSelectorItems([createSelectorItem()])
+      setSelectorItems([])
       setPortItems([])
       setWorkloadPickerOpen(false)
       setNameError(null)
@@ -470,6 +493,8 @@ export function CreateServiceDialog({
       setYamlText("")
       setYamlError(null)
       setPendingDeleteTarget(null)
+      setSelectorAddPromptOpen(false)
+      setSelectorAddPromptShown(false)
     }
   }, [open])
 
@@ -484,7 +509,7 @@ export function CreateServiceDialog({
     setSelectorItems(
       initialValues.selectors.length > 0
         ? initialValues.selectors.map((item) => createSelectorItemWithDefaults(item.key, item.value))
-        : [createSelectorItem()]
+        : []
     )
     setPortItems(
       initialValues.ports.map((item) =>
@@ -508,6 +533,7 @@ export function CreateServiceDialog({
     setYamlError(null)
     setBasicCompleted(true)
     setServiceCompleted(true)
+    setSelectorAddPromptShown(initialValues.selectors.length > 0)
   }, [initialValues, isEditMode, open])
 
   React.useEffect(() => {
@@ -515,6 +541,12 @@ export function CreateServiceDialog({
       setEnableNodePort(false)
     }
   }, [enableNodePort, internalAccessMode])
+
+  React.useEffect(() => {
+    if (selectorItems.length > 0 && !selectorAddPromptShown) {
+      setSelectorAddPromptShown(true)
+    }
+  }, [selectorAddPromptShown, selectorItems.length])
 
   const getSnapshot = React.useCallback(
     (): ServiceDialogSnapshot => ({
@@ -544,7 +576,7 @@ export function CreateServiceDialog({
     setNamespace(snapshot.namespace)
     setDescription(snapshot.description)
     setInternalAccessMode(snapshot.internalAccessMode)
-    setSelectorItems(snapshot.selectorItems.length > 0 ? snapshot.selectorItems : [createSelectorItem()])
+    setSelectorItems(snapshot.selectorItems)
     setPortItems(snapshot.portItems)
     setEnableNodePort(snapshot.enableNodePort)
     setEnableSessionAffinity(snapshot.enableSessionAffinity)
@@ -679,8 +711,8 @@ export function CreateServiceDialog({
           break
         }
         const targetPortNumber = Number(item.targetPort)
-        if (targetPortNumber < 1 || targetPortNumber > 65535) {
-          nextPortError = `第 ${index + 1} 个端口的容器端口超出范围（1-65535）`
+        if (targetPortNumber < 0 || targetPortNumber > 65535) {
+          nextPortError = `第 ${index + 1} 个端口的容器端口超出范围（0-65535）`
           break
         }
         if (!/^\d+$/.test(item.servicePort)) {
@@ -688,8 +720,8 @@ export function CreateServiceDialog({
           break
         }
         const servicePortNumber = Number(item.servicePort)
-        if (servicePortNumber < 1 || servicePortNumber > 65535) {
-          nextPortError = `第 ${index + 1} 个端口的服务端口超出范围（1-65535）`
+        if (servicePortNumber < 0 || servicePortNumber > 65535) {
+          nextPortError = `第 ${index + 1} 个端口的服务端口超出范围（0-65535）`
           break
         }
       }
@@ -762,8 +794,8 @@ export function CreateServiceDialog({
           break
         }
         const targetPortNumber = Number(item.targetPort)
-        if (targetPortNumber < 1 || targetPortNumber > 65535) {
-          nextPortError = `第 ${index + 1} 个端口的容器端口超出范围（1-65535）`
+        if (targetPortNumber < 0 || targetPortNumber > 65535) {
+          nextPortError = `第 ${index + 1} 个端口的容器端口超出范围（0-65535）`
           break
         }
         if (!/^\d+$/.test(item.servicePort)) {
@@ -771,8 +803,8 @@ export function CreateServiceDialog({
           break
         }
         const servicePortNumber = Number(item.servicePort)
-        if (servicePortNumber < 1 || servicePortNumber > 65535) {
-          nextPortError = `第 ${index + 1} 个端口的服务端口超出范围（1-65535）`
+        if (servicePortNumber < 0 || servicePortNumber > 65535) {
+          nextPortError = `第 ${index + 1} 个端口的服务端口超出范围（0-65535）`
           break
         }
       }
@@ -944,7 +976,7 @@ export function CreateServiceDialog({
     (id: string) => {
       setSelectorItems((current) => {
         const next = current.filter((item) => item.id !== id)
-        return next.length > 0 ? next : [createSelectorItem()]
+        return next
       })
       setServiceCompleted(false)
       if (selectorError) setSelectorError(null)
@@ -952,6 +984,29 @@ export function CreateServiceDialog({
     },
     [selectorError, stepError]
   )
+
+  const addSelectorItem = React.useCallback(() => {
+    if (selectorItems.length === 0 && !selectorAddPromptShown) {
+      setSelectorAddPromptOpen(true)
+      return
+    }
+    setSelectorItems((current) => [...current, createSelectorItem()])
+    setServiceCompleted(false)
+    if (selectorError) setSelectorError(null)
+    if (stepError) setStepError(null)
+    setSelectorAddPromptShown(true)
+  }, [selectorAddPromptShown, selectorError, selectorItems.length, stepError])
+
+  const handleConfirmSelectorAdd = React.useCallback(() => {
+    setSelectorAddPromptOpen(false)
+    setSelectorAddPromptShown(true)
+    setSelectorItems((current) =>
+      current.length === 0 ? [createSelectorItem()] : [...current, createSelectorItem()]
+    )
+    setServiceCompleted(false)
+    if (selectorError) setSelectorError(null)
+    if (stepError) setStepError(null)
+  }, [selectorError, stepError])
 
   const updatePortItem = React.useCallback(
     (id: string, field: keyof Omit<PortItem, "id">, value: string) => {
@@ -1283,9 +1338,8 @@ export function CreateServiceDialog({
                         指定工作负载
                       </Button>
                     </div>
-                <div className="mt-3 flex flex-col gap-3">
-                      {selectorItems.length > 0 &&
-                      selectorItems.some((item) => item.key.trim() || item.value.trim()) ? (
+                    <div className="mt-3 flex flex-col gap-3">
+                      {selectorItems.length > 0 ? (
                           selectorItems.map((item) => (
                               <div key={item.id} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
                                 <Input
@@ -1320,6 +1374,12 @@ export function CreateServiceDialog({
                             暂未指定工作负载，点击“指定工作负载”自动回填标签选择器。
                           </div>
                       )}
+                      <div className="flex justify-end">
+                        <Button type="button" variant="outline" onClick={addSelectorItem} disabled={isBusy}>
+                          <IconPlus data-icon="inline-start" />
+                          添加
+                        </Button>
+                      </div>
                     </div>
                     {selectorError ? (
                         <FieldError>{selectorError}</FieldError>
@@ -1368,16 +1428,30 @@ export function CreateServiceDialog({
                               <Input
                                   value={item.targetPort}
                                   onChange={(event) =>
-                                      updatePortItem(item.id, "targetPort", event.target.value)
+                                      updatePortItem(
+                                        item.id,
+                                        "targetPort",
+                                        normalizePortInput(event.target.value)
+                                      )
                                   }
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  maxLength={5}
                                   placeholder="容器端口"
                                   disabled={isBusy}
                               />
                               <Input
                                   value={item.servicePort}
                                   onChange={(event) =>
-                                      updatePortItem(item.id, "servicePort", event.target.value)
+                                      updatePortItem(
+                                        item.id,
+                                        "servicePort",
+                                        normalizePortInput(event.target.value)
+                                      )
                                   }
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  maxLength={5}
                                   placeholder="服务端口"
                                   disabled={isBusy}
                               />
@@ -1587,14 +1661,34 @@ export function CreateServiceDialog({
               })
             )
 
-            setSelectorItems(nextSelectors.length > 0 ? nextSelectors : [createSelectorItem()])
+            setSelectorItems(nextSelectors)
             setPortItems(nextPorts)
             setServiceCompleted(false)
             setSelectorError(null)
             setPortError(null)
             setStepError(null)
+            if (nextSelectors.length > 0) {
+              setSelectorAddPromptShown(true)
+            }
           }}
         />
+
+        <AlertDialog open={selectorAddPromptOpen} onOpenChange={setSelectorAddPromptOpen}>
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>手动添加选择器</AlertDialogTitle>
+              <AlertDialogDescription>
+                建议优先使用“指定工作负载”自动回填标签选择器，是否继续手动添加？
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isBusy}>取消</AlertDialogCancel>
+              <AlertDialogAction disabled={isBusy} onClick={handleConfirmSelectorAdd}>
+                确定
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   )
