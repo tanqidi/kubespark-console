@@ -375,6 +375,16 @@ export async function fetchJobRows(limit = 300): Promise<JobResourceRow[]> {
 
 export type WorkloadKind = "Deployment" | "StatefulSet" | "DaemonSet"
 
+export type WorkloadSelectorPair = {
+  key: string
+  value: string
+}
+
+export type WorkloadPortItem = {
+  protocol: "TCP" | "UDP" | "SCTP"
+  port: number
+}
+
 export type WorkloadResourceRow = {
   id: string
   name: string
@@ -388,12 +398,65 @@ export type WorkloadResourceRow = {
   age: string
   updatedAt: string
   kind: WorkloadKind
+  selectors: WorkloadSelectorPair[]
+  ports: WorkloadPortItem[]
 }
 
 function resolveWorkloadStatus(desired: number, updated: number, available: number, ready: number): string {
   if (ready >= Math.max(1, desired) || available >= desired) return "Normal"
   if (ready > 0 || updated > 0) return "Updating"
   return "Abnormal"
+}
+
+function resolveWorkloadSelectors(spec: JsonObject): WorkloadSelectorPair[] {
+  const selector = asObject(spec.selector)
+  const matchLabels = asObject(selector.matchLabels)
+
+  let source = matchLabels
+  if (Object.keys(source).length === 0) {
+    const template = asObject(spec.template)
+    const metadata = asObject(template.metadata)
+    source = asObject(metadata.labels)
+  }
+
+  return Object.entries(source)
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    .map(([key, value]) => ({ key, value }))
+}
+
+function resolveWorkloadPorts(spec: JsonObject): WorkloadPortItem[] {
+  const template = asObject(spec.template)
+  const podSpec = asObject(template.spec)
+  const containers = Array.isArray(podSpec.containers) ? podSpec.containers : []
+  const seen = new Set<string>()
+  const ports: WorkloadPortItem[] = []
+
+  containers.forEach((container) => {
+    const containerObj = asObject(container)
+    const containerPorts = Array.isArray(containerObj.ports) ? containerObj.ports : []
+
+    containerPorts.forEach((entry) => {
+      const portObj = asObject(entry)
+      const containerPort = portObj.containerPort
+      if (typeof containerPort !== "number" || containerPort < 1 || containerPort > 65535) {
+        return
+      }
+
+      const protocolRaw = portObj.protocol
+      const protocol: WorkloadPortItem["protocol"] =
+        protocolRaw === "UDP" || protocolRaw === "SCTP" ? protocolRaw : "TCP"
+      const dedupeKey = `${protocol}:${containerPort}`
+      if (seen.has(dedupeKey)) return
+
+      seen.add(dedupeKey)
+      ports.push({
+        protocol,
+        port: containerPort,
+      })
+    })
+  })
+
+  return ports
 }
 
 export async function fetchWorkloadRows(limit = 300): Promise<WorkloadResourceRow[]> {
@@ -457,6 +520,8 @@ export async function fetchWorkloadRows(limit = 300): Promise<WorkloadResourceRo
       age: formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined),
       updatedAt: resolveUpdatedAt(resource),
       kind: resolvedKind,
+      selectors: resolveWorkloadSelectors(spec),
+      ports: resolveWorkloadPorts(spec),
     }
   })
 }
