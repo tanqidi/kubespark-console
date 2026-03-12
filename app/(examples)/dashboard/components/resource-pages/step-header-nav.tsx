@@ -16,21 +16,24 @@ export type StepHeaderNavItem = {
 
 type StepHeaderNavProps = {
   items: StepHeaderNavItem[]
+  highlightByActiveOnly?: boolean
 }
 
-export function StepHeaderNav({ items }: StepHeaderNavProps) {
+export function StepHeaderNav({ items, highlightByActiveOnly = false }: StepHeaderNavProps) {
+  const activeIndex = items.findIndex((item) => item.active)
+
   return (
     <div className="border-b bg-muted/30">
       <div className="flex w-full items-center overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item, index) => {
-          const isDone = !item.active && item.status.includes("已")
+          const isDone =
+            !highlightByActiveOnly &&
+            activeIndex >= 0 &&
+            index < activeIndex &&
+            item.status.includes("已")
           const isProgressed = item.active || isDone
-          const statusTone = item.active
-            ? "bg-emerald-500"
-            : isDone
-              ? "bg-primary"
-              : "bg-muted-foreground/35"
-          const statusTextTone = isProgressed ? "text-primary" : "text-muted-foreground"
+          const statusTone = item.active || isDone ? "bg-emerald-500" : "bg-muted-foreground/35"
+          const statusTextTone = item.active || isDone ? "text-foreground" : "text-muted-foreground"
           const shapeClass =
             index === 0
               ? "rounded-l-lg rounded-r-none"
@@ -57,7 +60,7 @@ export function StepHeaderNav({ items }: StepHeaderNavProps) {
               <span
                 className={cn(
                   "inline-flex size-5 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground me-1.5",
-                  isProgressed && "border-primary/40 text-primary"
+                  (item.active || isDone) && "border-emerald-500/40 text-foreground"
                 )}
               >
                 {item.icon ?? <span className="text-[12px] font-semibold">{index + 1}</span>}

@@ -856,7 +856,12 @@ export function CreateKeyValueResourceDialog({
                 {
                   id: "data",
                   title: "数据设置",
-                  status: activeTab === "data" ? "当前" : "未设置",
+                  status:
+                    activeTab === "data"
+                      ? "当前"
+                      : filledItems.length > 0
+                        ? "已设置"
+                        : "未设置",
                   active: activeTab === "data",
                   icon: <IconAdjustmentsHorizontal className="size-4" />,
                   disabled: !canNavigateStep,
