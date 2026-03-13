@@ -1,6 +1,6 @@
 ﻿# KubeSpark React 架构细节
 
-更新时间：2026-03-06
+更新时间：2026-03-13
 
 ## 1. 目录细分
 
@@ -83,12 +83,12 @@ app/
 
 ## 5. API 代理层细节（`app/api/kubespark/[[...path]]/route.ts`）
 
-- 支持方法：`GET`、`POST`、`DELETE`
+- 支持方法：`GET`、`POST`、`PUT`、`DELETE`
 - 上游地址：`KUBESPARK_API_BASE`（默认 `http://172.31.0.88:8080`）
 - 透传 `Authorization` 和 query 参数
 - 代理失败返回 `502`，附带 `upstreamUrl`
 
-当前缺口：尚未实现 `PUT/PATCH` 转发。
+当前缺口：`PATCH` 转发尚未实现。
 
 ## 6. YAML 规范化细节（`resource-document.ts`）
 

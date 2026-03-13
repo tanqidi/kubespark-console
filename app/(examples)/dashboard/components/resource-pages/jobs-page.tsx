@@ -4,15 +4,18 @@ import * as React from "react"
 import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { CreateJobDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
   renderNameDescriptionCell,
   type ColumnConfig,
 } from "@/app/(examples)/dashboard/components/table/columns-factory"
+import { createJob } from "@/app/lib/kubespark/resource-create"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { fetchJobRows, type JobResourceRow } from "@/app/lib/kubespark/resource-rows"
 import { deleteJob } from "@/app/lib/kubespark/resource-delete"
+import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
@@ -44,6 +47,10 @@ const JOB_RESOURCE_BY_KIND: Record<JobRow["kind"], string> = {
 
 export function JobsPageClient() {
   const [rows, setRows] = React.useState<JobRow[]>([])
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const [createNamespaceOptions, setCreateNamespaceOptions] = React.useState<
+    Array<{ id: string; name: string }>
+  >([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [jobType, setJobType] = React.useState<JobRow["kind"]>("Job")
@@ -167,30 +174,55 @@ export function JobsPageClient() {
     [handleViewYaml, requestDelete]
   )
 
+  const refreshRows = React.useCallback(async (silent: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
+    try {
+      const [mapped, namespacesResult] = await Promise.all([
+        fetchJobRows(),
+        fetchNamespaces().catch(() => []),
+      ])
+      const namespaces = namespacesResult
+      setRows(mapped)
+      setCreateNamespaceOptions(
+        namespaces
+          .map((item) => ({ id: item.name, name: item.name }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
+      setError(null)
+    } catch (e: unknown) {
+      if (!silent) {
+        setRows([])
+        setError(e instanceof Error ? e.message : "API request failed")
+      } else {
+        console.error("[Jobs] polling refresh failed", e)
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [])
+
+  const handleCreateSubmit = React.useCallback(
+    async (payload: {
+      kind: "Job" | "CronJob"
+      name: string
+      namespace: string
+      description: string
+    }) => {
+      await createJob(payload)
+      await refreshRows(false)
+    },
+    [refreshRows]
+  )
+
   React.useEffect(() => {
     let cancelled = false
 
     const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const mapped = await fetchJobRows()
-        if (cancelled) return
-        setRows(mapped)
-        setError(null)
-      } catch (e: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setRows([])
-          setError(e instanceof Error ? e.message : "API request failed")
-        } else {
-          console.error("[Jobs] polling refresh failed", e)
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
+      await refreshRows(silent)
+      if (cancelled) return
     }
 
     void loadRows(false)
@@ -202,7 +234,7 @@ export function JobsPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [])
+  }, [refreshRows])
 
   const namespaceOptions = React.useMemo(
     () =>
@@ -263,6 +295,13 @@ export function JobsPageClient() {
 
   return (
     <>
+      <CreateJobDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        kind={jobType}
+        namespaceOptions={createNamespaceOptions}
+        onSubmit={handleCreateSubmit}
+      />
       <MonacoViewerDialog
         title="查看YAML"
         open={yamlOpen}
@@ -289,6 +328,7 @@ export function JobsPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
+        onCreate={() => setCreateDialogOpen(true)}
         toolbarStart={jobTabs}
         toolbarEnd={jobFilters}
         onDeleteSelectedRows={handleDeleteSelectedRows}

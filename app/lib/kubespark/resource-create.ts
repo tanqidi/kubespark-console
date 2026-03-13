@@ -1,9 +1,8 @@
 import {
   buildResourceCollectionEndpoint,
   buildResourceItemEndpoint,
-  fetchResourceCollection,
-  fetchResourceByName,
   fetchJsonDeduped,
+  fetchResourceByName,
 } from "./common"
 
 function normalizeKubernetesResourceName(name: string): string {
@@ -73,6 +72,12 @@ export type CreateServiceInput = BaseCreateInput & {
   }>
 }
 
+export type JobCreateKind = "Job" | "CronJob"
+
+export type CreateJobInput = BaseCreateInput & {
+  kind: JobCreateKind
+}
+
 export type UpdateServiceInput = BaseCreateInput & {
   internalAccessMode?: "virtual-ip" | "headless"
   enableNodePort?: boolean
@@ -125,7 +130,7 @@ function buildMetadata(input: BaseCreateInput): ResourceMetadata {
 }
 
 async function checkNamespacedResourceExists(
-  resource: "configmaps" | "secrets" | "services",
+  resource: "configmaps" | "secrets" | "services" | "jobs" | "cronjobs",
   input: ExistenceCheckInput
 ): Promise<boolean> {
   const metadata = buildMetadata({
@@ -133,17 +138,44 @@ async function checkNamespacedResourceExists(
     namespace: input.namespace,
   })
 
-  const { items } = await fetchResourceCollection(
-    "core",
-    "v1",
-    resource,
-    {
-      namespace: metadata.namespace,
-      fieldSelector: `metadata.name=${metadata.name}`,
-    }
-  )
+  const group = resource === "jobs" || resource === "cronjobs" ? "batch" : "core"
+  const version = "v1"
+  const fieldSelector = `metadata.name=${metadata.name}`
 
-  return items.length > 0
+  const readItems = (payload: unknown): unknown[] => {
+    const root = asObject(payload)
+    return Array.isArray(root.items) ? root.items : []
+  }
+
+  const hasMatchedName = (items: unknown[]): boolean =>
+    items.some((item) => {
+      const metadataObj = asObject(asObject(item).metadata)
+      return typeof metadataObj.name === "string" && metadataObj.name === metadata.name
+    })
+
+  const fieldSelectorUrl = buildResourceCollectionEndpoint(group, version, resource, {
+    namespace: metadata.namespace,
+    fieldSelector,
+  })
+
+  try {
+    const payload = await fetchJsonDeduped<unknown>(fieldSelectorUrl)
+    return hasMatchedName(readItems(payload))
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : ""
+    const canFallback =
+      message.includes("状态码 404") ||
+      message.includes("not found") ||
+      message.includes("fieldselector")
+
+    if (!canFallback) throw error
+
+    const fallbackUrl = buildResourceCollectionEndpoint(group, version, resource, {
+      namespace: metadata.namespace,
+    })
+    const fallbackPayload = await fetchJsonDeduped<unknown>(fallbackUrl)
+    return hasMatchedName(readItems(fallbackPayload))
+  }
 }
 
 export async function checkConfigMapExists(
@@ -162,6 +194,12 @@ export async function checkServiceExists(
   input: ExistenceCheckInput
 ): Promise<boolean> {
   return checkNamespacedResourceExists("services", input)
+}
+
+export async function checkJobExists(
+  input: ExistenceCheckInput & { kind: JobCreateKind }
+): Promise<boolean> {
+  return checkNamespacedResourceExists(input.kind === "CronJob" ? "cronjobs" : "jobs", input)
 }
 
 export async function createConfigMap(
@@ -247,6 +285,70 @@ export async function createService(input: CreateServiceInput): Promise<void> {
   }
 
   const url = buildResourceCollectionEndpoint("core", "v1", "services", {
+    namespace: metadata.namespace,
+  })
+
+  await fetchJsonDeduped<unknown>(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  })
+}
+
+function buildDefaultTaskContainer() {
+  return {
+    name: "task",
+    image: "busybox:1.36",
+    command: ["sh", "-c", "echo task-created"],
+  }
+}
+
+export async function createJob(input: CreateJobInput): Promise<void> {
+  const metadata = buildMetadata(input)
+  const resource = input.kind === "CronJob" ? "cronjobs" : "jobs"
+
+  const requestBody =
+    input.kind === "CronJob"
+      ? {
+          apiVersion: "batch/v1",
+          kind: "CronJob",
+          metadata,
+          spec: {
+            schedule: "*/5 * * * *",
+            concurrencyPolicy: "Forbid",
+            successfulJobsHistoryLimit: 3,
+            failedJobsHistoryLimit: 1,
+            jobTemplate: {
+              spec: {
+                backoffLimit: 1,
+                template: {
+                  spec: {
+                    restartPolicy: "Never",
+                    containers: [buildDefaultTaskContainer()],
+                  },
+                },
+              },
+            },
+          },
+        }
+      : {
+          apiVersion: "batch/v1",
+          kind: "Job",
+          metadata,
+          spec: {
+            backoffLimit: 1,
+            template: {
+              spec: {
+                restartPolicy: "Never",
+                containers: [buildDefaultTaskContainer()],
+              },
+            },
+          },
+        }
+
+  const url = buildResourceCollectionEndpoint("batch", "v1", resource, {
     namespace: metadata.namespace,
   })
 
