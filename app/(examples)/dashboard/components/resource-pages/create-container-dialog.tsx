@@ -1,6 +1,11 @@
 "use client"
 
 import * as React from "react"
+import {
+  resolveFirstContainerEditorErrorFieldId,
+  type ContainerPortFieldErrors,
+  scrollAndFocusFieldById,
+} from "@/app/lib/kubespark/form-validation"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -71,7 +76,7 @@ type CreateContainerDialogProps = {
   onOpenChange: (open: boolean) => void
   container: ContainerDraft | null
   imageError: string | null
-  portFieldErrors: Record<string, { name?: string; containerPort?: string }>
+  portFieldErrors: ContainerPortFieldErrors
   isBusy: boolean
   onChange: (
     field:
@@ -134,27 +139,17 @@ export function CreateContainerDialog({
 }: CreateContainerDialogProps) {
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
-    if (imageError) return `${container.id}-image`
-
-    if (!container) return null
-    for (const item of container.ports) {
-      const fieldError = portFieldErrors[item.id]
-      if (!fieldError) continue
-      if (fieldError.name) return `${container.id}-port-${item.id}-name`
-      if (fieldError.containerPort) return `${container.id}-port-${item.id}-container-port`
-    }
-    return null
+    return resolveFirstContainerEditorErrorFieldId({
+      containerId: container.id,
+      imageError,
+      ports: container.ports,
+      portFieldErrors,
+    })
   }, [container, imageError, portFieldErrors])
 
   React.useEffect(() => {
     if (!firstErrorFieldId) return
-    const target = document.getElementById(firstErrorFieldId) as HTMLInputElement | null
-    if (!target) return
-
-    requestAnimationFrame(() => {
-      target.scrollIntoView({ behavior: "smooth", block: "center" })
-      target.focus({ preventScroll: true })
-    })
+    scrollAndFocusFieldById(firstErrorFieldId)
   }, [firstErrorFieldId])
 
   if (!container) return null
@@ -170,7 +165,10 @@ export function CreateContainerDialog({
         onOpenChange(nextOpen)
       }}
     >
-      <DialogContent className="flex max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270">
+      <DialogContent
+        onInteractOutside={(event) => event.preventDefault()}
+        className="flex max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+      >
         <DialogHeader className="shrink-0 border-b bg-muted/15 px-6 py-5 pr-20">
           <DialogTitle>录入容器</DialogTitle>
           <DialogDescription>填写镜像、容器名称、容器类型和拉取策略。</DialogDescription>

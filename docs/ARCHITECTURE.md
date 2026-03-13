@@ -91,6 +91,24 @@ UI 层 (app/(examples)/dashboard/components)
 
 并按类型保留核心字段（如 `spec`、`data`、`parameters` 等）。
 
+## 4.5 表单校验复用
+
+针对创建/编辑弹窗中常见的“按视觉顺序校验 + 定位首个错误 + 自动滚动聚焦”场景，已抽出通用工具：
+
+- `app/lib/kubespark/form-validation.ts`
+  - `resolveFirstContainerPortErrorFieldId`：按行顺序定位首个端口错误字段。
+  - `resolveFirstInvalidFieldId`：通用首错选择器（支持多段校验链）。
+  - `scrollAndFocusFieldById`：统一滚动到字段并聚焦。
+
+当前已在以下组件复用：
+
+- `create-job-dialog.tsx`：容器录入保存前的有序校验与首错跳转。
+- `create-container-dialog.tsx`：字段级错误出现后自动滚动并聚焦。
+
+说明：业务校验规则与错误文案仍保留在各自页面/弹窗内，工具层不承载资源特定提示文案。
+
+后续若新增 `Deployment/CronJob/Service` 复杂表单，可直接沿用该工具，避免重复实现校验与定位逻辑。
+
 ## 5. 路由与页面组织
 
 - `app/(examples)/dashboard/[...slug]/page.tsx`：按 slug 选择资源页面组件。
