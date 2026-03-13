@@ -216,6 +216,9 @@ export function JobsPageClient() {
         parallelism?: number
         activeDeadlineSeconds?: number
       }
+      pod?: {
+        restartPolicy?: "Never" | "OnFailure"
+      }
     }) => {
       await createJob(payload)
       await refreshRows(false)

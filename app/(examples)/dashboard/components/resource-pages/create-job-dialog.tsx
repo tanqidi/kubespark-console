@@ -1,13 +1,7 @@
 "use client"
 
 import * as React from "react"
-import {
-  IconAdjustments,
-  IconBraces,
-  IconDatabase,
-  IconSettings2,
-  IconStack2,
-} from "@tabler/icons-react"
+import { IconAdjustments, IconBraces, IconDatabase, IconSettings2, IconStack2 } from "@tabler/icons-react"
 
 import { checkJobExists, type JobCreateKind } from "@/app/lib/kubespark/jobs"
 import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
@@ -60,6 +54,9 @@ type CreateJobDialogProps = {
       parallelism?: number
       activeDeadlineSeconds?: number
     }
+    pod?: {
+      restartPolicy?: "Never" | "OnFailure"
+    }
   }) => Promise<void>
 }
 
@@ -91,8 +88,6 @@ function resolveSubmitErrorMessage(error: unknown, kind: JobCreateKind): string 
 
 function resolveStepDescription(step: CreateStep): string {
   switch (step) {
-    case "pod":
-      return "容器组设置功能即将开放。"
     case "storage":
       return "存储设置功能即将开放。"
     case "advanced":
@@ -129,6 +124,7 @@ export function CreateJobDialog({
   const [completions, setCompletions] = React.useState("")
   const [parallelism, setParallelism] = React.useState("")
   const [activeDeadlineSeconds, setActiveDeadlineSeconds] = React.useState("")
+  const [restartPolicy, setRestartPolicy] = React.useState<"Never" | "OnFailure">("Never")
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
@@ -139,6 +135,7 @@ export function CreateJobDialog({
   const currentStepIndex = STEP_ORDER.indexOf(activeStep)
   const isBasicStep = activeStep === "basic"
   const isStrategyStep = activeStep === "strategy"
+  const isPodStep = activeStep === "pod"
   const isFinalStep = activeStep === "advanced"
 
   const dialogTitle = kind === "CronJob" ? "创建定时任务" : "创建任务"
@@ -157,6 +154,7 @@ export function CreateJobDialog({
       setCompletions("")
       setParallelism("")
       setActiveDeadlineSeconds("")
+      setRestartPolicy("Never")
       setNameError(null)
       setNamespaceError(null)
       setSubmitError(null)
@@ -240,12 +238,20 @@ export function CreateJobDialog({
             ? strategyDraft
             : undefined
 
+        const pod =
+          restartPolicy === "OnFailure"
+            ? {
+                restartPolicy,
+              }
+            : undefined
+
         await onSubmit({
           kind,
           name: name.trim().toLowerCase(),
           namespace: namespace.trim(),
           description: description.trim(),
           strategy,
+          pod,
         })
 
         onOpenChange(false)
@@ -268,6 +274,7 @@ export function CreateJobDialog({
       onOpenChange,
       onSubmit,
       parallelism,
+      restartPolicy,
       runBasicValidation,
     ]
   )
@@ -518,6 +525,57 @@ export function CreateJobDialog({
                     <FieldDescription>
                       限制任务最长运行秒数，超时后任务会被系统终止。
                     </FieldDescription>
+                  </Field>
+                </FieldGroup>
+              </div>
+            ) : isPodStep ? (
+              <div>
+                <div className="mb-4">
+                  <h3 className="text-[15px] font-semibold">容器组设置</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    配置容器组重启行为与容器信息，未配置项会使用默认模板。
+                  </p>
+                </div>
+
+                <FieldGroup className="flex flex-col gap-6">
+                  <Field className="max-w-2xl">
+                    <FieldLabel htmlFor="create-job-restart-policy">重启策略</FieldLabel>
+                    <Select
+                      value={restartPolicy}
+                      onValueChange={(value) => {
+                        if (value === "Never" || value === "OnFailure") {
+                          setRestartPolicy(value)
+                        }
+                      }}
+                      disabled={isBusy}
+                    >
+                      <SelectTrigger id="create-job-restart-policy">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="Never">重新创建容器组</SelectItem>
+                          <SelectItem value="OnFailure">重启容器</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>
+                      容器退出后采用的处理方式。默认使用“重新创建容器组”。
+                    </FieldDescription>
+                  </Field>
+
+                  <Field>
+                    <FieldLabel>容器</FieldLabel>
+                    <button
+                      type="button"
+                      className="flex w-full flex-col items-start rounded-md border border-dashed px-6 py-10 text-left transition hover:bg-muted/50"
+                      disabled={isBusy}
+                    >
+                      <span className="text-base font-semibold">添加容器</span>
+                      <span className="mt-1 text-sm text-muted-foreground">
+                        容器详细配置将在下一版开放，当前将使用默认容器模板。
+                      </span>
+                    </button>
                   </Field>
                 </FieldGroup>
               </div>

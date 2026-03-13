@@ -15,9 +15,14 @@ export type JobStrategyInput = {
   activeDeadlineSeconds?: number
 }
 
+export type JobPodInput = {
+  restartPolicy?: "Never" | "OnFailure"
+}
+
 export type CreateJobInput = BaseCreateInput & {
   kind: JobCreateKind
   strategy?: JobStrategyInput
+  pod?: JobPodInput
 }
 
 function buildDefaultTaskContainer() {
@@ -48,6 +53,10 @@ function buildJobStrategySpec(strategy?: JobStrategyInput) {
   }
 }
 
+function resolveRestartPolicy(pod?: JobPodInput): "Never" | "OnFailure" {
+  return pod?.restartPolicy === "OnFailure" ? "OnFailure" : "Never"
+}
+
 export async function checkJobExists(
   input: ExistenceCheckInput & { kind: JobCreateKind }
 ): Promise<boolean> {
@@ -63,6 +72,7 @@ export async function createJob(input: CreateJobInput): Promise<void> {
   const metadata = buildMetadata(input)
   const resource = input.kind === "CronJob" ? "cronjobs" : "jobs"
   const strategySpec = buildJobStrategySpec(input.strategy)
+  const restartPolicy = resolveRestartPolicy(input.pod)
 
   const requestBody =
     input.kind === "CronJob"
@@ -80,7 +90,7 @@ export async function createJob(input: CreateJobInput): Promise<void> {
                 ...strategySpec,
                 template: {
                   spec: {
-                    restartPolicy: "Never",
+                    restartPolicy,
                     containers: [buildDefaultTaskContainer()],
                   },
                 },
@@ -96,7 +106,7 @@ export async function createJob(input: CreateJobInput): Promise<void> {
             ...strategySpec,
             template: {
               spec: {
-                restartPolicy: "Never",
+                restartPolicy,
                 containers: [buildDefaultTaskContainer()],
               },
             },
