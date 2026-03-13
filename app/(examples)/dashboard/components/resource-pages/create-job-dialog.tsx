@@ -14,6 +14,7 @@ import {
 import { checkJobExists, type JobCreateKind } from "@/app/lib/kubespark/jobs"
 import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import {
   Dialog,
   DialogClose,
@@ -125,6 +126,7 @@ const STEP_ORDER: CreateStep[] = ["basic", "strategy", "pod", "storage", "advanc
 
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
+const POD_REQUIRED_MESSAGE = "请至少添加一个容器配置后再进入下一步"
 
 function createContainerDraft(): ContainerDraft {
   return {
@@ -137,7 +139,7 @@ function createContainerDraft(): ContainerDraft {
     cpuLimit: "",
     memoryRequestMi: "",
     memoryLimitMi: "",
-    ports: [],
+    ports: [createContainerPortDraft(0)],
   }
 }
 
@@ -148,6 +150,40 @@ function createContainerPortDraft(index: number): ContainerPortDraft {
     name: `http-${index}`,
     containerPort: "",
   }
+}
+
+type ContainerPortFieldErrors = Record<string, { name?: boolean; containerPort?: boolean }>
+
+function validateContainerPorts(container: ContainerDraft): ContainerPortFieldErrors {
+  if (container.ports.length === 0) return {}
+
+  const errors: ContainerPortFieldErrors = {}
+
+  container.ports.forEach((item) => {
+    const name = item.name.trim()
+    const containerPort = item.containerPort.trim()
+    const rowError: { name?: boolean; containerPort?: boolean } = {}
+
+    if (!name) {
+      rowError.name = true
+    }
+    if (!containerPort) {
+      rowError.containerPort = true
+    } else if (!/^\d+$/.test(containerPort)) {
+      rowError.containerPort = true
+    } else {
+      const parsed = Number(containerPort)
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 65535) {
+        rowError.containerPort = true
+      }
+    }
+
+    if (rowError.name || rowError.containerPort) {
+      errors[item.id] = rowError
+    }
+  })
+
+  return errors
 }
 
 function resolveProtocolNamePrefix(protocol: ContainerPortProtocol): string {
@@ -239,6 +275,7 @@ export function CreateJobDialog({
   const [containerDialogOpen, setContainerDialogOpen] = React.useState(false)
   const [editingContainerId, setEditingContainerId] = React.useState<string | null>(null)
   const [editingImageError, setEditingImageError] = React.useState<string | null>(null)
+  const [editingPortFieldErrors, setEditingPortFieldErrors] = React.useState<ContainerPortFieldErrors>({})
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
@@ -275,6 +312,7 @@ export function CreateJobDialog({
       setContainerDialogOpen(false)
       setEditingContainerId(null)
       setEditingImageError(null)
+      setEditingPortFieldErrors({})
       setNameError(null)
       setNamespaceError(null)
       setSubmitError(null)
@@ -299,6 +337,12 @@ export function CreateJobDialog({
     () => containers.filter((item) => item.image.trim()),
     [containers]
   )
+
+  const runPodValidation = React.useCallback(() => {
+    if (configuredContainers.length > 0) return true
+    setSubmitError(POD_REQUIRED_MESSAGE)
+    return false
+  }, [configuredContainers.length])
 
   const updateContainer = React.useCallback(
     (
@@ -325,6 +369,7 @@ export function CreateJobDialog({
         )
       )
       if (editingImageError) setEditingImageError(null)
+      setEditingPortFieldErrors({})
       if (submitError) setSubmitError(null)
     },
     [editingImageError, submitError]
@@ -342,6 +387,7 @@ export function CreateJobDialog({
             : item
         )
       )
+      setEditingPortFieldErrors({})
       if (submitError) setSubmitError(null)
     },
     [submitError]
@@ -396,6 +442,7 @@ export function CreateJobDialog({
           }
         })
       )
+      setEditingPortFieldErrors({})
       if (submitError) setSubmitError(null)
     },
     [submitError]
@@ -413,6 +460,7 @@ export function CreateJobDialog({
             : item
         )
       )
+      setEditingPortFieldErrors({})
       if (submitError) setSubmitError(null)
     },
     [submitError]
@@ -420,9 +468,20 @@ export function CreateJobDialog({
 
   const beginEditContainer = React.useCallback(
     (id: string) => {
+      setContainers((current) =>
+        current.map((item) =>
+          item.id === id && item.ports.length === 0
+            ? {
+                ...item,
+                ports: [createContainerPortDraft(0)],
+              }
+            : item
+        )
+      )
       setEditingContainerId(id)
       setContainerDialogOpen(true)
       if (editingImageError) setEditingImageError(null)
+      setEditingPortFieldErrors({})
       if (submitError) setSubmitError(null)
     },
     [editingImageError, submitError]
@@ -434,6 +493,7 @@ export function CreateJobDialog({
     setEditingContainerId(next.id)
     setContainerDialogOpen(true)
     if (editingImageError) setEditingImageError(null)
+    setEditingPortFieldErrors({})
     if (submitError) setSubmitError(null)
   }, [editingImageError, submitError])
 
@@ -442,6 +502,7 @@ export function CreateJobDialog({
       setContainers((current) => current.filter((item) => item.id !== id))
       setEditingContainerId((current) => (current === id ? null : current))
       if (editingImageError) setEditingImageError(null)
+      setEditingPortFieldErrors({})
       if (submitError) setSubmitError(null)
     },
     [editingImageError, submitError]
@@ -457,7 +518,13 @@ export function CreateJobDialog({
       setEditingImageError("请输入镜像地址")
       return
     }
+    const nextPortFieldErrors = validateContainerPorts(editingContainer)
+    if (Object.keys(nextPortFieldErrors).length > 0) {
+      setEditingPortFieldErrors(nextPortFieldErrors)
+      return
+    }
     setEditingImageError(null)
+    setEditingPortFieldErrors({})
     setContainerDialogOpen(false)
     setEditingContainerId(null)
   }, [editingContainer])
@@ -474,13 +541,12 @@ export function CreateJobDialog({
             item.cpuLimit.trim().length > 0 ||
             item.memoryRequestMi.trim().length > 0 ||
             item.memoryLimitMi.trim().length > 0 ||
-            item.ports.some(
-              (port) => port.name.trim().length > 0 || port.containerPort.trim().length > 0
-            )
+            item.ports.some((port) => port.containerPort.trim().length > 0)
         )
       )
     }
     setEditingImageError(null)
+    setEditingPortFieldErrors({})
     setContainerDialogOpen(false)
     setEditingContainerId(null)
   }, [editingContainerId])
@@ -524,13 +590,26 @@ export function CreateJobDialog({
       }
     }
 
+    if (isPodStep) {
+      const passed = runPodValidation()
+      if (!passed) return
+    }
+
     const nextStep = STEP_ORDER[Math.min(STEP_ORDER.length - 1, currentStepIndex + 1)]
     setActiveStep(nextStep)
-  }, [currentStepIndex, isBasicStep, isBusy, isEditingPodView, isFinalStep, runBasicValidation])
+  }, [
+    currentStepIndex,
+    isBasicStep,
+    isBusy,
+    isEditingPodView,
+    isFinalStep,
+    isPodStep,
+    runBasicValidation,
+    runPodValidation,
+  ])
 
-  const handleSubmit = React.useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
+  const handleCreate = React.useCallback(
+    async () => {
       if (isBusy || !isFinalStep) return
 
       setSubmitError(null)
@@ -637,7 +716,7 @@ export function CreateJobDialog({
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
             <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>{dialogDescription}</DialogDescription>
@@ -697,6 +776,10 @@ export function CreateJobDialog({
                 disabled: !canNavigateStep,
                 onClick: () => {
                   if (!canNavigateStep || currentStepIndex < 2) return
+                  if (activeStep === "pod") {
+                    const passed = runPodValidation()
+                    if (!passed) return
+                  }
                   setActiveStep("storage")
                   setSubmitError(null)
                 },
@@ -956,9 +1039,18 @@ export function CreateJobDialog({
                           </ItemGroup>
                         ) : (
                           <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                            <div className="text-sm font-semibold">暂无容器配置</div>
-                            <div className="mt-1 text-sm text-muted-foreground">
-                              点击下方“添加容器”录入镜像信息。
+                            <div className={cn("text-sm font-semibold", submitError === POD_REQUIRED_MESSAGE && "text-destructive")}>
+                              暂无容器配置
+                            </div>
+                            <div
+                              className={cn(
+                                "mt-1 text-sm text-muted-foreground",
+                                submitError === POD_REQUIRED_MESSAGE && "text-destructive"
+                              )}
+                            >
+                              {submitError === POD_REQUIRED_MESSAGE
+                                ? POD_REQUIRED_MESSAGE
+                                : "点击下方“添加容器”录入镜像信息。"}
                             </div>
                           </div>
                         )}
@@ -996,7 +1088,9 @@ export function CreateJobDialog({
               </div>
             )}
 
-            {submitError ? <FieldError className="mt-4">{submitError}</FieldError> : null}
+            {submitError && !(isPodStep && submitError === POD_REQUIRED_MESSAGE) ? (
+              <FieldError className="mt-4">{submitError}</FieldError>
+            ) : null}
           </div>
 
           {isBasicStep ? (
@@ -1018,7 +1112,7 @@ export function CreateJobDialog({
                 <Button type="button" variant="outline" onClick={goPrev} disabled={isBusy}>
                   上一步
                 </Button>
-                <Button type="submit" disabled={isBusy}>
+                <Button type="button" onClick={() => void handleCreate()} disabled={isBusy}>
                   {creating ? "创建中..." : "创建"}
                 </Button>
               </div>
@@ -1035,12 +1129,13 @@ export function CreateJobDialog({
               </div>
             </DialogFooter>
           )}
-        </form>
+        </div>
         <CreateContainerDialog
           open={containerDialogOpen}
           onOpenChange={setContainerDialogOpen}
           container={editingContainer}
           imageError={editingImageError}
+          portFieldErrors={editingPortFieldErrors}
           isBusy={isBusy}
           onChange={(field, value) => {
             if (!editingContainer) return

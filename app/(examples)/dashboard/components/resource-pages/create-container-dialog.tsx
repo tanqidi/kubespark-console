@@ -70,6 +70,7 @@ type CreateContainerDialogProps = {
   onOpenChange: (open: boolean) => void
   container: ContainerDraft | null
   imageError: string | null
+  portFieldErrors: Record<string, { name?: boolean; containerPort?: boolean }>
   isBusy: boolean
   onChange: (
     field:
@@ -121,6 +122,7 @@ export function CreateContainerDialog({
   onOpenChange,
   container,
   imageError,
+  portFieldErrors,
   isBusy,
   onChange,
   onAddPort,
@@ -151,8 +153,8 @@ export function CreateContainerDialog({
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
           <FieldGroup className="flex flex-col gap-5">
             <div className="rounded-md border bg-card">
-              <div className="border-b bg-muted/60 px-4 py-3">
-                <div className="text-sm font-medium">基础信息</div>
+              <div className="border-b bg-muted/80 px-4 py-3">
+                <div className="text-sm font-semibold">基础信息</div>
                 <div className="mt-1 text-sm text-muted-foreground">
                   填写容器的基础信息，包括镜像、容器名称、类型和拉取策略。
                 </div>
@@ -243,8 +245,8 @@ export function CreateContainerDialog({
             </div>
 
             <div className="rounded-md border bg-card">
-              <div className="border-b bg-muted/60 px-4 py-3">
-                <div className="text-sm font-medium">资源设置</div>
+              <div className="border-b bg-muted/80 px-4 py-3">
+                <div className="text-sm font-semibold">资源设置</div>
                 <div className="mt-1 text-sm text-muted-foreground">
                   设置容器的资源上限与资源预留，调度时会优先参考这些值。
                 </div>
@@ -333,15 +335,17 @@ export function CreateContainerDialog({
             </div>
 
             <div className="rounded-md border bg-card">
-              <div className="border-b bg-muted/60 px-4 py-3">
-                <div className="text-sm font-medium">端口设置</div>
+              <div className="border-b bg-muted/80 px-4 py-3">
+                <div className="text-sm font-semibold">端口设置</div>
                 <div className="mt-1 text-sm text-muted-foreground">设置用于访问容器的端口。</div>
               </div>
               <div className="p-4">
                 <FieldGroup className="flex flex-col gap-3">
                   {container.ports.length > 0
-                    ? container.ports.map((item) => (
-                      <div key={item.id} className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+                    ? container.ports.map((item) => {
+                      const fieldError = portFieldErrors[item.id]
+                      return (
+                        <div key={item.id} className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
                         <Select
                           value={item.protocol}
                           onValueChange={(value) =>
@@ -371,6 +375,7 @@ export function CreateContainerDialog({
                           value={item.name}
                           onChange={(event) => onUpdatePort(item.id, "name", event.target.value)}
                           placeholder="名称"
+                          aria-invalid={Boolean(fieldError?.name)}
                           disabled={isBusy}
                         />
                         <Input
@@ -386,6 +391,7 @@ export function CreateContainerDialog({
                           pattern="[0-9]*"
                           maxLength={5}
                           placeholder="容器端口"
+                          aria-invalid={Boolean(fieldError?.containerPort)}
                           disabled={isBusy}
                         />
                         <Button
@@ -397,7 +403,8 @@ export function CreateContainerDialog({
                           删除
                         </Button>
                       </div>
-                    ))
+                      )
+                    })
                     : null}
 
                   <div className="flex justify-end">
