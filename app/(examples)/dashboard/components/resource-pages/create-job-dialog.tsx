@@ -568,10 +568,10 @@ export function CreateJobDialog({
                     <FieldLabel>容器</FieldLabel>
                     <button
                       type="button"
-                      className="flex w-full flex-col items-start rounded-md border border-dashed px-6 py-10 text-left transition hover:bg-muted/50"
+                      className="flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
                       disabled={isBusy}
                     >
-                      <span className="text-base font-semibold">添加容器</span>
+                      <span className="text-sm font-semibold">添加容器</span>
                       <span className="mt-1 text-sm text-muted-foreground">
                         容器详细配置将在下一版开放，当前将使用默认容器模板。
                       </span>
