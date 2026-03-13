@@ -25,6 +25,10 @@ import {
 } from "@/components/ui/dialog"
 import {
   CreateContainerDialog,
+  type ContainerDraft,
+  type ContainerPortDraft,
+  type ContainerPortProtocol,
+  type ContainerType,
 } from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog"
 import {
   Field,
@@ -73,20 +77,49 @@ type CreateJobDialogProps = {
         type?: ContainerType
         image: string
         imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+        ports?: Array<{
+          protocol?: ContainerPortProtocol
+          name?: string
+          containerPort: string
+        }>
+        cpuRequest?: string
+        cpuLimit?: string
+        memoryRequestMi?: string
+        memoryLimitMi?: string
       }>
     }
   }) => Promise<void>
 }
 
 type CreateStep = "basic" | "strategy" | "pod" | "storage" | "advanced"
-type ContainerType = "container" | "initContainer"
-type ContainerDraft = {
-  id: string
-  name: string
-  type: ContainerType
-  image: string
-  imagePullPolicy: "Always" | "IfNotPresent" | "Never"
-}
+const CONTAINER_PORT_PROTOCOL_OPTIONS = [
+  "GRPC",
+  "HTTP",
+  "HTTP2",
+  "HTTPS",
+  "MONGO",
+  "REDIS",
+  "TCP",
+  "TLS",
+  "UDP",
+  "SCTP",
+] as const
+
+const CONTAINER_PORT_PROTOCOL_SET = new Set<string>(CONTAINER_PORT_PROTOCOL_OPTIONS)
+
+const AUTO_PROTOCOL_PREFIX_SET = new Set([
+  "grpc",
+  "http",
+  "http2",
+  "https",
+  "mongo",
+  "redis",
+  "tcp",
+  "tpc",
+  "tls",
+  "udp",
+  "sctp",
+])
 
 const STEP_ORDER: CreateStep[] = ["basic", "strategy", "pod", "storage", "advanced"]
 
@@ -100,7 +133,48 @@ function createContainerDraft(): ContainerDraft {
     type: "container",
     image: "",
     imagePullPolicy: "IfNotPresent",
+    cpuRequest: "",
+    cpuLimit: "",
+    memoryRequestMi: "",
+    memoryLimitMi: "",
+    ports: [],
   }
+}
+
+function createContainerPortDraft(index: number): ContainerPortDraft {
+  return {
+    id: crypto.randomUUID(),
+    protocol: "HTTP",
+    name: `http-${index}`,
+    containerPort: "",
+  }
+}
+
+function resolveProtocolNamePrefix(protocol: ContainerPortProtocol): string {
+  return protocol === "TCP" ? "tpc" : protocol.toLowerCase()
+}
+
+function buildAutoPortName(protocol: ContainerPortProtocol, portText: string): string | null {
+  const normalized = portText.trim()
+  if (!/^\d+$/.test(normalized)) return null
+  return `${resolveProtocolNamePrefix(protocol)}-${normalized}`
+}
+
+function replaceProtocolPrefixInName(
+  name: string,
+  nextProtocol: ContainerPortProtocol
+): string | null {
+  const trimmed = name.trim()
+  const parts = trimmed.split("-")
+  if (parts.length < 2) return null
+
+  const firstPart = parts[0]?.toLowerCase() ?? ""
+  if (!AUTO_PROTOCOL_PREFIX_SET.has(firstPart)) return null
+
+  const tail = parts.slice(1).join("-")
+  if (!tail.trim()) return null
+
+  return `${resolveProtocolNamePrefix(nextProtocol)}-${tail}`
 }
 
 function validateName(value: string): string | null {
@@ -227,7 +301,19 @@ export function CreateJobDialog({
   )
 
   const updateContainer = React.useCallback(
-    (id: string, field: "name" | "type" | "image" | "imagePullPolicy", value: string) => {
+    (
+      id: string,
+      field:
+        | "name"
+        | "type"
+        | "image"
+        | "imagePullPolicy"
+        | "cpuRequest"
+        | "cpuLimit"
+        | "memoryRequestMi"
+        | "memoryLimitMi",
+      value: string
+    ) => {
       setContainers((current) =>
         current.map((item) =>
           item.id === id
@@ -242,6 +328,94 @@ export function CreateJobDialog({
       if (submitError) setSubmitError(null)
     },
     [editingImageError, submitError]
+  )
+
+  const addContainerPort = React.useCallback(
+    (id: string) => {
+      setContainers((current) =>
+        current.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                ports: [...item.ports, createContainerPortDraft(item.ports.length)],
+              }
+            : item
+        )
+      )
+      if (submitError) setSubmitError(null)
+    },
+    [submitError]
+  )
+
+  const updateContainerPort = React.useCallback(
+    (
+      containerId: string,
+      portId: string,
+      field: "protocol" | "name" | "containerPort",
+      value: string
+    ) => {
+      setContainers((current) =>
+        current.map((item) => {
+          if (item.id !== containerId) return item
+
+          return {
+            ...item,
+            ports: item.ports.map((port) => {
+              if (port.id !== portId) return port
+
+              if (field === "protocol") {
+                const nextProtocol = value.toUpperCase()
+                if (!CONTAINER_PORT_PROTOCOL_SET.has(nextProtocol)) return port
+                const normalizedProtocol = nextProtocol as ContainerPortProtocol
+
+                const replacedName = replaceProtocolPrefixInName(port.name, normalizedProtocol)
+                return {
+                  ...port,
+                  protocol: normalizedProtocol,
+                  name: replacedName ?? port.name,
+                }
+              }
+
+              if (field === "containerPort") {
+                const autoNameBefore = buildAutoPortName(port.protocol, port.containerPort)
+                const autoNameAfter = buildAutoPortName(port.protocol, value)
+                const shouldAutoRename =
+                  Boolean(autoNameBefore) && port.name.trim() === autoNameBefore
+                return {
+                  ...port,
+                  containerPort: value,
+                  ...(shouldAutoRename && autoNameAfter ? { name: autoNameAfter } : {}),
+                }
+              }
+
+              return {
+                ...port,
+                name: value,
+              }
+            }),
+          }
+        })
+      )
+      if (submitError) setSubmitError(null)
+    },
+    [submitError]
+  )
+
+  const removeContainerPort = React.useCallback(
+    (containerId: string, portId: string) => {
+      setContainers((current) =>
+        current.map((item) =>
+          item.id === containerId
+            ? {
+                ...item,
+                ports: item.ports.filter((port) => port.id !== portId),
+              }
+            : item
+        )
+      )
+      if (submitError) setSubmitError(null)
+    },
+    [submitError]
   )
 
   const beginEditContainer = React.useCallback(
@@ -293,7 +467,16 @@ export function CreateJobDialog({
       setContainers((current) =>
         current.filter(
           (item) =>
-            item.id !== editingContainerId || item.image.trim().length > 0 || item.name.trim().length > 0
+            item.id !== editingContainerId ||
+            item.image.trim().length > 0 ||
+            item.name.trim().length > 0 ||
+            item.cpuRequest.trim().length > 0 ||
+            item.cpuLimit.trim().length > 0 ||
+            item.memoryRequestMi.trim().length > 0 ||
+            item.memoryLimitMi.trim().length > 0 ||
+            item.ports.some(
+              (port) => port.name.trim().length > 0 || port.containerPort.trim().length > 0
+            )
         )
       )
     }
@@ -371,12 +554,27 @@ export function CreateJobDialog({
             : undefined
 
         const normalizedContainers = containers
-          .map((item) => ({
-            name: item.name.trim(),
-            type: item.type,
-            image: item.image.trim(),
-            imagePullPolicy: item.imagePullPolicy,
-          }))
+          .map((item) => {
+            const normalizedPorts = item.ports
+              .map((port) => ({
+                protocol: port.protocol,
+                name: port.name.trim(),
+                containerPort: port.containerPort.trim(),
+              }))
+              .filter((port) => /^\d+$/.test(port.containerPort))
+
+            return {
+              name: item.name.trim(),
+              type: item.type,
+              image: item.image.trim(),
+              imagePullPolicy: item.imagePullPolicy,
+              cpuRequest: item.cpuRequest.trim(),
+              cpuLimit: item.cpuLimit.trim(),
+              memoryRequestMi: item.memoryRequestMi.trim(),
+              memoryLimitMi: item.memoryLimitMi.trim(),
+              ...(normalizedPorts.length > 0 ? { ports: normalizedPorts } : {}),
+            }
+          })
           .filter((item) => item.image.length > 0)
 
         const pod =
@@ -685,7 +883,7 @@ export function CreateJobDialog({
                 </div>
 
                 <FieldGroup className="flex flex-col gap-6">
-                  <Field className="max-w-2xl">
+                  <Field>
                     <FieldLabel htmlFor="create-job-restart-policy">重启策略</FieldLabel>
                     <Select
                       value={restartPolicy}
@@ -847,6 +1045,18 @@ export function CreateJobDialog({
           onChange={(field, value) => {
             if (!editingContainer) return
             updateContainer(editingContainer.id, field, value)
+          }}
+          onAddPort={() => {
+            if (!editingContainer) return
+            addContainerPort(editingContainer.id)
+          }}
+          onUpdatePort={(portId, field, value) => {
+            if (!editingContainer) return
+            updateContainerPort(editingContainer.id, portId, field, value)
+          }}
+          onRemovePort={(portId) => {
+            if (!editingContainer) return
+            removeContainerPort(editingContainer.id, portId)
           }}
           onCancel={cancelEditContainer}
           onConfirm={returnToPodList}

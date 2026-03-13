@@ -223,6 +223,15 @@ export function JobsPageClient() {
           type?: "container" | "initContainer"
           image: string
           imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+          ports?: Array<{
+            protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
+            name?: string
+            containerPort: string
+          }>
+          cpuRequest?: string
+          cpuLimit?: string
+          memoryRequestMi?: string
+          memoryLimitMi?: string
         }>
       }
     }) => {

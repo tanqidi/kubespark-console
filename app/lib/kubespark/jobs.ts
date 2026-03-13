@@ -22,6 +22,15 @@ export type JobPodInput = {
     type?: "container" | "initContainer"
     image: string
     imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+    ports?: Array<{
+      protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
+      name?: string
+      containerPort: string
+    }>
+    cpuRequest?: string
+    cpuLimit?: string
+    memoryRequestMi?: string
+    memoryLimitMi?: string
   }>
 }
 
@@ -56,48 +65,110 @@ function resolveContainerName(name: string | undefined, index: number): string {
   return `task-${index + 1}`
 }
 
+function pickCpuQuantity(value: string | undefined): string | undefined {
+  const text = typeof value === "string" ? value.trim() : ""
+  if (!text) return undefined
+  if (!/^\d+(?:\.\d+)?$/.test(text)) return undefined
+  return text
+}
+
+function pickMemoryMiQuantity(value: string | undefined): string | undefined {
+  const text = typeof value === "string" ? value.trim() : ""
+  if (!text) return undefined
+  if (!/^\d+$/.test(text)) return undefined
+  return `${text}Mi`
+}
+
+function pickContainerPortProtocol(
+  value: unknown
+): "TCP" | "UDP" | "SCTP" | undefined {
+  const normalized = typeof value === "string" ? value.trim().toUpperCase() : ""
+  if (normalized === "TCP" || normalized === "UDP" || normalized === "SCTP") {
+    return normalized
+  }
+  return undefined
+}
+
+function pickContainerPortNumber(value: unknown): number | undefined {
+  const text = typeof value === "string" ? value.trim() : ""
+  if (!/^\d+$/.test(text)) return undefined
+  const parsed = Number(text)
+  if (!Number.isFinite(parsed)) return undefined
+  if (parsed < 0 || parsed > 65535) return undefined
+  return parsed
+}
+
 function buildPodContainerSpec(pod?: JobPodInput) {
   const raw = Array.isArray(pod?.containers) ? pod.containers : []
-  const normalized = raw
-    .map((item, index) => {
-      const image = typeof item.image === "string" ? item.image.trim() : ""
-      if (!image) return null
-      const imagePullPolicy =
-        item.imagePullPolicy === "Always" || item.imagePullPolicy === "Never"
-          ? item.imagePullPolicy
-          : item.imagePullPolicy === "IfNotPresent"
-            ? "IfNotPresent"
-            : undefined
-      return {
-        name: resolveContainerName(item.name, index),
-        type: item.type === "initContainer" ? "initContainer" : "container",
-        image,
-        ...(imagePullPolicy ? { imagePullPolicy } : {}),
-      }
-    })
-    .filter(
-      (item): item is {
-        name: string
-        type: "container" | "initContainer"
-        image: string
-        imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
-      } =>
-      Boolean(item)
-    )
-  const containers = normalized
-    .filter((item) => item.type === "container")
-    .map((item) => ({
-      name: item.name,
-      image: item.image,
-      ...(item.imagePullPolicy ? { imagePullPolicy: item.imagePullPolicy } : {}),
-    }))
-  const initContainers = normalized
-    .filter((item) => item.type === "initContainer")
-    .map((item) => ({
-      name: item.name,
-      image: item.image,
-      ...(item.imagePullPolicy ? { imagePullPolicy: item.imagePullPolicy } : {}),
-    }))
+  const containers: Array<Record<string, unknown>> = []
+  const initContainers: Array<Record<string, unknown>> = []
+
+  raw.forEach((item, index) => {
+    const image = typeof item.image === "string" ? item.image.trim() : ""
+    if (!image) return
+
+    const imagePullPolicy =
+      item.imagePullPolicy === "Always" || item.imagePullPolicy === "Never"
+        ? item.imagePullPolicy
+        : item.imagePullPolicy === "IfNotPresent"
+          ? "IfNotPresent"
+          : undefined
+
+    const cpuRequest = pickCpuQuantity(item.cpuRequest)
+    const cpuLimit = pickCpuQuantity(item.cpuLimit)
+    const memoryRequest = pickMemoryMiQuantity(item.memoryRequestMi)
+    const memoryLimit = pickMemoryMiQuantity(item.memoryLimitMi)
+
+    const requests =
+      cpuRequest || memoryRequest
+        ? {
+            ...(cpuRequest ? { cpu: cpuRequest } : {}),
+            ...(memoryRequest ? { memory: memoryRequest } : {}),
+          }
+        : undefined
+    const limits =
+      cpuLimit || memoryLimit
+        ? {
+            ...(cpuLimit ? { cpu: cpuLimit } : {}),
+            ...(memoryLimit ? { memory: memoryLimit } : {}),
+          }
+        : undefined
+    const resources =
+      requests || limits
+        ? {
+            ...(requests ? { requests } : {}),
+            ...(limits ? { limits } : {}),
+          }
+        : undefined
+
+    const ports = (Array.isArray(item.ports) ? item.ports : [])
+      .map((port) => {
+        const containerPort = pickContainerPortNumber(port.containerPort)
+        if (typeof containerPort !== "number") return null
+        const protocol = pickContainerPortProtocol(port.protocol)
+        const name = typeof port.name === "string" ? port.name.trim() : ""
+        return {
+          containerPort,
+          ...(name ? { name } : {}),
+          ...(protocol ? { protocol } : {}),
+        }
+      })
+      .filter((port): port is { containerPort: number; name?: string; protocol?: "TCP" | "UDP" | "SCTP" } => Boolean(port))
+
+    const containerSpec: Record<string, unknown> = {
+      name: resolveContainerName(item.name, index),
+      image,
+      ...(imagePullPolicy ? { imagePullPolicy } : {}),
+      ...(resources ? { resources } : {}),
+      ...(ports.length > 0 ? { ports } : {}),
+    }
+
+    if (item.type === "initContainer") {
+      initContainers.push(containerSpec)
+      return
+    }
+    containers.push(containerSpec)
+  })
 
   return {
     containers: containers.length > 0 ? containers : [buildDefaultTaskContainer()],
