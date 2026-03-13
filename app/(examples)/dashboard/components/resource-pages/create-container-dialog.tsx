@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -70,7 +71,7 @@ type CreateContainerDialogProps = {
   onOpenChange: (open: boolean) => void
   container: ContainerDraft | null
   imageError: string | null
-  portFieldErrors: Record<string, { name?: boolean; containerPort?: boolean }>
+  portFieldErrors: Record<string, { name?: string; containerPort?: string }>
   isBusy: boolean
   onChange: (
     field:
@@ -131,6 +132,31 @@ export function CreateContainerDialog({
   onCancel,
   onConfirm,
 }: CreateContainerDialogProps) {
+  const firstErrorFieldId = React.useMemo(() => {
+    if (!container) return null
+    if (imageError) return `${container.id}-image`
+
+    if (!container) return null
+    for (const item of container.ports) {
+      const fieldError = portFieldErrors[item.id]
+      if (!fieldError) continue
+      if (fieldError.name) return `${container.id}-port-${item.id}-name`
+      if (fieldError.containerPort) return `${container.id}-port-${item.id}-container-port`
+    }
+    return null
+  }, [container, imageError, portFieldErrors])
+
+  React.useEffect(() => {
+    if (!firstErrorFieldId) return
+    const target = document.getElementById(firstErrorFieldId) as HTMLInputElement | null
+    if (!target) return
+
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "center" })
+      target.focus({ preventScroll: true })
+    })
+  }, [firstErrorFieldId])
+
   if (!container) return null
 
   return (
@@ -345,64 +371,74 @@ export function CreateContainerDialog({
                     ? container.ports.map((item) => {
                       const fieldError = portFieldErrors[item.id]
                       return (
-                        <div key={item.id} className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-                        <Select
-                          value={item.protocol}
-                          onValueChange={(value) =>
-                            onUpdatePort(item.id, "protocol", value)
-                          }
-                          disabled={isBusy}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="协议" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectItem value="GRPC">GRPC</SelectItem>
-                              <SelectItem value="HTTP">HTTP</SelectItem>
-                              <SelectItem value="HTTP2">HTTP2</SelectItem>
-                              <SelectItem value="HTTPS">HTTPS</SelectItem>
-                              <SelectItem value="MONGO">MONGO</SelectItem>
-                              <SelectItem value="REDIS">REDIS</SelectItem>
-                              <SelectItem value="TCP">TCP</SelectItem>
-                              <SelectItem value="TLS">TLS</SelectItem>
-                              <SelectItem value="UDP">UDP</SelectItem>
-                              <SelectItem value="SCTP">SCTP</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          value={item.name}
-                          onChange={(event) => onUpdatePort(item.id, "name", event.target.value)}
-                          placeholder="名称"
-                          aria-invalid={Boolean(fieldError?.name)}
-                          disabled={isBusy}
-                        />
-                        <Input
-                          value={item.containerPort}
-                          onChange={(event) =>
-                            onUpdatePort(
-                              item.id,
-                              "containerPort",
-                              normalizePortInput(event.target.value)
-                            )
-                          }
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={5}
-                          placeholder="容器端口"
-                          aria-invalid={Boolean(fieldError?.containerPort)}
-                          disabled={isBusy}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => onRemovePort(item.id)}
-                          disabled={isBusy}
-                        >
-                          删除
-                        </Button>
-                      </div>
+                        <div key={item.id} className="grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+                          <Select
+                            value={item.protocol}
+                            onValueChange={(value) => onUpdatePort(item.id, "protocol", value)}
+                            disabled={isBusy}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="协议" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectItem value="GRPC">GRPC</SelectItem>
+                                <SelectItem value="HTTP">HTTP</SelectItem>
+                                <SelectItem value="HTTP2">HTTP2</SelectItem>
+                                <SelectItem value="HTTPS">HTTPS</SelectItem>
+                                <SelectItem value="MONGO">MONGO</SelectItem>
+                                <SelectItem value="REDIS">REDIS</SelectItem>
+                                <SelectItem value="TCP">TCP</SelectItem>
+                                <SelectItem value="TLS">TLS</SelectItem>
+                                <SelectItem value="UDP">UDP</SelectItem>
+                                <SelectItem value="SCTP">SCTP</SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              id={`${container.id}-port-${item.id}-name`}
+                              value={item.name}
+                              onChange={(event) => onUpdatePort(item.id, "name", event.target.value)}
+                              placeholder="名称"
+                              aria-invalid={Boolean(fieldError?.name)}
+                              disabled={isBusy}
+                            />
+                            {fieldError?.name ? (
+                              <p className="text-xs text-destructive">{fieldError.name}</p>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              id={`${container.id}-port-${item.id}-container-port`}
+                              value={item.containerPort}
+                              onChange={(event) =>
+                                onUpdatePort(
+                                  item.id,
+                                  "containerPort",
+                                  normalizePortInput(event.target.value)
+                                )
+                              }
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              maxLength={5}
+                              placeholder="容器端口"
+                              aria-invalid={Boolean(fieldError?.containerPort)}
+                              disabled={isBusy}
+                            />
+                            {fieldError?.containerPort ? (
+                              <p className="text-xs text-destructive">{fieldError.containerPort}</p>
+                            ) : null}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => onRemovePort(item.id)}
+                            disabled={isBusy}
+                          >
+                            删除
+                          </Button>
+                        </div>
                       )
                     })
                     : null}

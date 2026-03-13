@@ -152,7 +152,7 @@ function createContainerPortDraft(index: number): ContainerPortDraft {
   }
 }
 
-type ContainerPortFieldErrors = Record<string, { name?: boolean; containerPort?: boolean }>
+type ContainerPortFieldErrors = Record<string, { name?: string; containerPort?: string }>
 
 function validateContainerPorts(container: ContainerDraft): ContainerPortFieldErrors {
   if (container.ports.length === 0) return {}
@@ -162,19 +162,19 @@ function validateContainerPorts(container: ContainerDraft): ContainerPortFieldEr
   container.ports.forEach((item) => {
     const name = item.name.trim()
     const containerPort = item.containerPort.trim()
-    const rowError: { name?: boolean; containerPort?: boolean } = {}
+    const rowError: { name?: string; containerPort?: string } = {}
 
     if (!name) {
-      rowError.name = true
+      rowError.name = "请输入端口名称"
     }
     if (!containerPort) {
-      rowError.containerPort = true
+      rowError.containerPort = "请输入容器端口"
     } else if (!/^\d+$/.test(containerPort)) {
-      rowError.containerPort = true
+      rowError.containerPort = "容器端口需为 0-65535 的数字"
     } else {
       const parsed = Number(containerPort)
       if (!Number.isFinite(parsed) || parsed < 0 || parsed > 65535) {
-        rowError.containerPort = true
+        rowError.containerPort = "容器端口需为 0-65535 的数字"
       }
     }
 
@@ -184,6 +184,19 @@ function validateContainerPorts(container: ContainerDraft): ContainerPortFieldEr
   })
 
   return errors
+}
+
+function resolveFirstPortErrorFieldId(
+  container: ContainerDraft,
+  errors: ContainerPortFieldErrors
+): string | null {
+  for (const item of container.ports) {
+    const rowError = errors[item.id]
+    if (!rowError) continue
+    if (rowError.name) return `${container.id}-port-${item.id}-name`
+    if (rowError.containerPort) return `${container.id}-port-${item.id}-container-port`
+  }
+  return null
 }
 
 function resolveProtocolNamePrefix(protocol: ContainerPortProtocol): string {
@@ -514,15 +527,35 @@ export function CreateJobDialog({
       setEditingContainerId(null)
       return
     }
-    if (!editingContainer.image.trim()) {
-      setEditingImageError("请输入镜像地址")
+
+    // Required checks follow visual order: image -> ports (row by row).
+    const nextImageError = editingContainer.image.trim() ? null : "请输入镜像地址"
+    const nextPortFieldErrors = nextImageError ? {} : validateContainerPorts(editingContainer)
+
+    setEditingImageError(nextImageError)
+    setEditingPortFieldErrors(nextPortFieldErrors)
+
+    if (nextImageError) {
+      requestAnimationFrame(() => {
+        const target = document.getElementById(`${editingContainer.id}-image`) as HTMLInputElement | null
+        if (!target) return
+        target.scrollIntoView({ behavior: "smooth", block: "center" })
+        target.focus({ preventScroll: true })
+      })
       return
     }
-    const nextPortFieldErrors = validateContainerPorts(editingContainer)
-    if (Object.keys(nextPortFieldErrors).length > 0) {
-      setEditingPortFieldErrors(nextPortFieldErrors)
+
+    const firstPortErrorFieldId = resolveFirstPortErrorFieldId(editingContainer, nextPortFieldErrors)
+    if (firstPortErrorFieldId) {
+      requestAnimationFrame(() => {
+        const target = document.getElementById(firstPortErrorFieldId) as HTMLInputElement | null
+        if (!target) return
+        target.scrollIntoView({ behavior: "smooth", block: "center" })
+        target.focus({ preventScroll: true })
+      })
       return
     }
+
     setEditingImageError(null)
     setEditingPortFieldErrors({})
     setContainerDialogOpen(false)
