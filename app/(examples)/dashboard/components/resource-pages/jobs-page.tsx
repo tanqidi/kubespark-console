@@ -218,6 +218,12 @@ export function JobsPageClient() {
       }
       pod?: {
         restartPolicy?: "Never" | "OnFailure"
+        containers?: Array<{
+          name?: string
+          type?: "container" | "initContainer"
+          image: string
+          imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+        }>
       }
     }) => {
       await createJob(payload)
