@@ -24,6 +24,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  CreateContainerDialog,
+} from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog"
+import {
   Field,
   FieldDescription,
   FieldError,
@@ -76,7 +79,6 @@ type CreateJobDialogProps = {
 }
 
 type CreateStep = "basic" | "strategy" | "pod" | "storage" | "advanced"
-type PodViewMode = "list" | "edit"
 type ContainerType = "container" | "initContainer"
 type ContainerDraft = {
   id: string
@@ -160,7 +162,7 @@ export function CreateJobDialog({
   const [activeDeadlineSeconds, setActiveDeadlineSeconds] = React.useState("")
   const [restartPolicy, setRestartPolicy] = React.useState<"Never" | "OnFailure">("Never")
   const [containers, setContainers] = React.useState<ContainerDraft[]>([])
-  const [podViewMode, setPodViewMode] = React.useState<PodViewMode>("list")
+  const [containerDialogOpen, setContainerDialogOpen] = React.useState(false)
   const [editingContainerId, setEditingContainerId] = React.useState<string | null>(null)
   const [editingImageError, setEditingImageError] = React.useState<string | null>(null)
   const [nameError, setNameError] = React.useState<string | null>(null)
@@ -175,7 +177,7 @@ export function CreateJobDialog({
   const isStrategyStep = activeStep === "strategy"
   const isPodStep = activeStep === "pod"
   const isFinalStep = activeStep === "advanced"
-  const isEditingPodView = isPodStep && podViewMode === "edit"
+  const isEditingPodView = containerDialogOpen
   const canNavigateStep = !isBusy && !isEditingPodView
 
   const dialogTitle = kind === "CronJob" ? "创建定时任务" : "创建任务"
@@ -196,7 +198,7 @@ export function CreateJobDialog({
       setActiveDeadlineSeconds("")
       setRestartPolicy("Never")
       setContainers([])
-      setPodViewMode("list")
+      setContainerDialogOpen(false)
       setEditingContainerId(null)
       setEditingImageError(null)
       setNameError(null)
@@ -245,7 +247,7 @@ export function CreateJobDialog({
   const beginEditContainer = React.useCallback(
     (id: string) => {
       setEditingContainerId(id)
-      setPodViewMode("edit")
+      setContainerDialogOpen(true)
       if (editingImageError) setEditingImageError(null)
       if (submitError) setSubmitError(null)
     },
@@ -256,7 +258,7 @@ export function CreateJobDialog({
     const next = createContainerDraft()
     setContainers((current) => [...current, next])
     setEditingContainerId(next.id)
-    setPodViewMode("edit")
+    setContainerDialogOpen(true)
     if (editingImageError) setEditingImageError(null)
     if (submitError) setSubmitError(null)
   }, [editingImageError, submitError])
@@ -265,7 +267,6 @@ export function CreateJobDialog({
     (id: string) => {
       setContainers((current) => current.filter((item) => item.id !== id))
       setEditingContainerId((current) => (current === id ? null : current))
-      setPodViewMode("list")
       if (editingImageError) setEditingImageError(null)
       if (submitError) setSubmitError(null)
     },
@@ -274,7 +275,7 @@ export function CreateJobDialog({
 
   const returnToPodList = React.useCallback(() => {
     if (!editingContainer) {
-      setPodViewMode("list")
+      setContainerDialogOpen(false)
       setEditingContainerId(null)
       return
     }
@@ -283,7 +284,7 @@ export function CreateJobDialog({
       return
     }
     setEditingImageError(null)
-    setPodViewMode("list")
+    setContainerDialogOpen(false)
     setEditingContainerId(null)
   }, [editingContainer])
 
@@ -297,7 +298,7 @@ export function CreateJobDialog({
       )
     }
     setEditingImageError(null)
-    setPodViewMode("list")
+    setContainerDialogOpen(false)
     setEditingContainerId(null)
   }, [editingContainerId])
 
@@ -683,204 +684,102 @@ export function CreateJobDialog({
                   </p>
                 </div>
 
-                {podViewMode === "list" ? (
-                  <FieldGroup className="flex flex-col gap-6">
-                    <Field className="max-w-2xl">
-                      <FieldLabel htmlFor="create-job-restart-policy">重启策略</FieldLabel>
-                      <Select
-                        value={restartPolicy}
-                        onValueChange={(value) => {
-                          if (value === "Never" || value === "OnFailure") {
-                            setRestartPolicy(value)
-                          }
-                        }}
-                        disabled={isBusy}
-                      >
-                        <SelectTrigger id="create-job-restart-policy">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="Never">重新创建容器组</SelectItem>
-                            <SelectItem value="OnFailure">重启容器</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      <FieldDescription>
-                        容器退出后采用的处理方式。默认使用“重新创建容器组”。
-                      </FieldDescription>
-                    </Field>
+                <FieldGroup className="flex flex-col gap-6">
+                  <Field className="max-w-2xl">
+                    <FieldLabel htmlFor="create-job-restart-policy">重启策略</FieldLabel>
+                    <Select
+                      value={restartPolicy}
+                      onValueChange={(value) => {
+                        if (value === "Never" || value === "OnFailure") {
+                          setRestartPolicy(value)
+                        }
+                      }}
+                      disabled={isBusy}
+                    >
+                      <SelectTrigger id="create-job-restart-policy">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="Never">重新创建容器组</SelectItem>
+                          <SelectItem value="OnFailure">重启容器</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>
+                      容器退出后采用的处理方式。默认使用“重新创建容器组”。
+                    </FieldDescription>
+                  </Field>
 
-                    <Field>
-                      <FieldLabel>容器</FieldLabel>
-                      <div className="max-h-[44vh] overflow-y-auto pr-2">
-                        <div className="flex flex-col gap-0 pb-1">
-                          {configuredContainers.length > 0 ? (
-                            <ItemGroup className="gap-3">
-                              {configuredContainers.map((item) => (
-                                <Item key={item.id} variant="outline" size="sm" className="hover:bg-muted">
-                                  <ItemContent className="min-w-0">
-                                    <ItemTitle className="min-w-0 truncate">
-                                      {item.name.trim() || "未命名容器"}
-                                    </ItemTitle>
-                                    <ItemDescription className="min-w-0 truncate">
-                                      {item.image.trim()}
-                                      {" · "}
-                                      {item.type === "initContainer" ? "初始化容器" : "工作容器"}
-                                      {" · "}
-                                      {item.imagePullPolicy}
-                                    </ItemDescription>
-                                  </ItemContent>
-                                  <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => removeContainer(item.id)}
-                                      disabled={isBusy}
-                                    >
-                                      <IconTrash data-icon="inline-start" />
-                                      删除
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => beginEditContainer(item.id)}
-                                      disabled={isBusy}
-                                    >
-                                      <IconPencil data-icon="inline-start" />
-                                      编辑
-                                    </Button>
-                                  </ItemActions>
-                                </Item>
-                              ))}
-                            </ItemGroup>
-                          ) : (
-                            <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                              <div className="text-sm font-semibold">暂无容器配置</div>
-                              <div className="mt-1 text-sm text-muted-foreground">
-                                点击下方“添加容器”录入镜像信息。
-                              </div>
+                  <Field>
+                    <FieldLabel>容器</FieldLabel>
+                    <div className="max-h-[44vh] overflow-y-auto pr-2">
+                      <div className="flex flex-col gap-0 pb-1">
+                        {configuredContainers.length > 0 ? (
+                          <ItemGroup className="gap-3">
+                            {configuredContainers.map((item) => (
+                              <Item key={item.id} variant="outline" size="sm" className="hover:bg-muted">
+                                <ItemContent className="min-w-0">
+                                  <ItemTitle className="min-w-0 truncate">
+                                    {item.name.trim() || "未命名容器"}
+                                  </ItemTitle>
+                                  <ItemDescription className="min-w-0 truncate">
+                                    {item.image.trim()}
+                                    {" · "}
+                                    {item.type === "initContainer" ? "初始化容器" : "工作容器"}
+                                    {" · "}
+                                    {item.imagePullPolicy}
+                                  </ItemDescription>
+                                </ItemContent>
+                                <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => removeContainer(item.id)}
+                                    disabled={isBusy}
+                                  >
+                                    <IconTrash data-icon="inline-start" />
+                                    删除
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => beginEditContainer(item.id)}
+                                    disabled={isBusy}
+                                  >
+                                    <IconPencil data-icon="inline-start" />
+                                    编辑
+                                  </Button>
+                                </ItemActions>
+                              </Item>
+                            ))}
+                          </ItemGroup>
+                        ) : (
+                          <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                            <div className="text-sm font-semibold">暂无容器配置</div>
+                            <div className="mt-1 text-sm text-muted-foreground">
+                              点击下方“添加容器”录入镜像信息。
                             </div>
-                          )}
+                          </div>
+                        )}
 
-                          <button
-                            type="button"
-                            className="mt-3 flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
-                            onClick={addContainer}
-                            disabled={isBusy}
-                          >
-                            <span className="text-sm font-semibold">添加容器</span>
-                            <span className="mt-1 text-sm text-muted-foreground">
-                              新增一条容器镜像配置。
-                            </span>
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          className="mt-3 flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
+                          onClick={addContainer}
+                          disabled={isBusy}
+                        >
+                          <span className="text-sm font-semibold">添加容器</span>
+                          <span className="mt-1 text-sm text-muted-foreground">
+                            新增一条容器镜像配置。
+                          </span>
+                        </button>
                       </div>
-                    </Field>
-                  </FieldGroup>
-                ) : editingContainer ? (
-                  <div className="flex flex-col gap-5 pb-4">
-                    <FieldGroup className="flex flex-col gap-5">
-                      <div className="grid gap-5 md:grid-cols-2">
-                        <Field data-invalid={Boolean(editingImageError)}>
-                          <FieldLabel htmlFor={`${editingContainer.id}-image`}>
-                            镜像
-                          </FieldLabel>
-                          <Input
-                            id={`${editingContainer.id}-image`}
-                            value={editingContainer.image}
-                            onChange={(event) =>
-                              updateContainer(editingContainer.id, "image", event.target.value)
-                            }
-                            placeholder="例如：nginx:1.27"
-                            aria-invalid={Boolean(editingImageError)}
-                            autoComplete="off"
-                            disabled={isBusy}
-                          />
-                          {editingImageError ? (
-                            <FieldError>{editingImageError}</FieldError>
-                          ) : (
-                            <FieldDescription>请输入完整镜像地址，例如 `repo/name:tag`。</FieldDescription>
-                          )}
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor={`${editingContainer.id}-pull-policy`}>
-                            镜像拉取策略
-                          </FieldLabel>
-                          <Select
-                            value={editingContainer.imagePullPolicy}
-                            onValueChange={(value) => {
-                              if (value === "Always" || value === "IfNotPresent" || value === "Never") {
-                                updateContainer(editingContainer.id, "imagePullPolicy", value)
-                              }
-                            }}
-                            disabled={isBusy}
-                          >
-                            <SelectTrigger id={`${editingContainer.id}-pull-policy`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                <SelectItem value="IfNotPresent">IfNotPresent</SelectItem>
-                                <SelectItem value="Always">Always</SelectItem>
-                                <SelectItem value="Never">Never</SelectItem>
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                        </Field>
-                      </div>
-
-                      <div className="grid gap-5 md:grid-cols-2">
-                        <Field>
-                          <FieldLabel htmlFor={`${editingContainer.id}-name`}>
-                            容器名称
-                          </FieldLabel>
-                          <Input
-                            id={`${editingContainer.id}-name`}
-                            value={editingContainer.name}
-                            onChange={(event) =>
-                              updateContainer(editingContainer.id, "name", event.target.value)
-                            }
-                            placeholder="例如：worker"
-                            autoComplete="off"
-                            disabled={isBusy}
-                          />
-                          <FieldDescription>
-                            选填。留空时系统会按规则自动生成容器名称。
-                          </FieldDescription>
-                        </Field>
-
-                        <Field>
-                          <FieldLabel htmlFor={`${editingContainer.id}-type`}>
-                            容器类型
-                          </FieldLabel>
-                          <Select
-                            value={editingContainer.type}
-                            onValueChange={(value) => {
-                              if (value === "container" || value === "initContainer") {
-                                updateContainer(editingContainer.id, "type", value)
-                              }
-                            }}
-                            disabled={isBusy}
-                          >
-                            <SelectTrigger id={`${editingContainer.id}-type`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                <SelectItem value="container">工作容器</SelectItem>
-                                <SelectItem value="initContainer">初始化容器</SelectItem>
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                        </Field>
-                      </div>
-                    </FieldGroup>
-                  </div>
-                ) : null}
+                    </div>
+                  </Field>
+                </FieldGroup>
               </div>
             ) : (
               <div>
@@ -902,18 +801,7 @@ export function CreateJobDialog({
             {submitError ? <FieldError className="mt-4">{submitError}</FieldError> : null}
           </div>
 
-          {isEditingPodView ? (
-            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
-              <div className="flex w-full items-center justify-between gap-3">
-                <Button type="button" variant="outline" onClick={cancelEditContainer} disabled={isBusy}>
-                  取消
-                </Button>
-                <Button type="button" onClick={returnToPodList} disabled={isBusy}>
-                  确认保存
-                </Button>
-              </div>
-            </DialogFooter>
-          ) : isBasicStep ? (
+          {isBasicStep ? (
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <DialogClose asChild>
@@ -950,6 +838,19 @@ export function CreateJobDialog({
             </DialogFooter>
           )}
         </form>
+        <CreateContainerDialog
+          open={containerDialogOpen}
+          onOpenChange={setContainerDialogOpen}
+          container={editingContainer}
+          imageError={editingImageError}
+          isBusy={isBusy}
+          onChange={(field, value) => {
+            if (!editingContainer) return
+            updateContainer(editingContainer.id, field, value)
+          }}
+          onCancel={cancelEditContainer}
+          onConfirm={returnToPodList}
+        />
       </DialogContent>
     </Dialog>
   )
