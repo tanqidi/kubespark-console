@@ -9,7 +9,7 @@ import {
   IconStack2,
 } from "@tabler/icons-react"
 
-import { checkJobExists, type JobCreateKind } from "@/app/lib/kubespark/resource-create"
+import { checkJobExists, type JobCreateKind } from "@/app/lib/kubespark/jobs"
 import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 import { Button } from "@/components/ui/button"
 import {
@@ -54,6 +54,12 @@ type CreateJobDialogProps = {
     name: string
     namespace: string
     description: string
+    strategy?: {
+      backoffLimit?: number
+      completions?: number
+      parallelism?: number
+      activeDeadlineSeconds?: number
+    }
   }) => Promise<void>
 }
 
@@ -85,8 +91,6 @@ function resolveSubmitErrorMessage(error: unknown, kind: JobCreateKind): string 
 
 function resolveStepDescription(step: CreateStep): string {
   switch (step) {
-    case "strategy":
-      return "策略设置功能即将开放。"
     case "pod":
       return "容器组设置功能即将开放。"
     case "storage":
@@ -96,6 +100,18 @@ function resolveStepDescription(step: CreateStep): string {
     default:
       return ""
   }
+}
+
+function normalizeIntegerInput(value: string): string {
+  return value.replace(/\D+/g, "")
+}
+
+function toOptionalNonNegativeInt(value: string): number | undefined {
+  const normalized = value.trim()
+  if (!normalized) return undefined
+  const parsed = Number.parseInt(normalized, 10)
+  if (!Number.isFinite(parsed)) return undefined
+  return Math.max(0, parsed)
 }
 
 export function CreateJobDialog({
@@ -109,6 +125,10 @@ export function CreateJobDialog({
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [backoffLimit, setBackoffLimit] = React.useState("")
+  const [completions, setCompletions] = React.useState("")
+  const [parallelism, setParallelism] = React.useState("")
+  const [activeDeadlineSeconds, setActiveDeadlineSeconds] = React.useState("")
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
@@ -118,6 +138,7 @@ export function CreateJobDialog({
   const isBusy = checkingNext || creating
   const currentStepIndex = STEP_ORDER.indexOf(activeStep)
   const isBasicStep = activeStep === "basic"
+  const isStrategyStep = activeStep === "strategy"
   const isFinalStep = activeStep === "advanced"
 
   const dialogTitle = kind === "CronJob" ? "创建定时任务" : "创建任务"
@@ -132,6 +153,10 @@ export function CreateJobDialog({
       setName("")
       setNamespace("")
       setDescription("")
+      setBackoffLimit("")
+      setCompletions("")
+      setParallelism("")
+      setActiveDeadlineSeconds("")
       setNameError(null)
       setNamespaceError(null)
       setSubmitError(null)
@@ -201,11 +226,26 @@ export function CreateJobDialog({
         const passed = await runBasicValidation()
         if (!passed) return
 
+        const strategyDraft = {
+          backoffLimit: toOptionalNonNegativeInt(backoffLimit),
+          completions: toOptionalNonNegativeInt(completions),
+          parallelism: toOptionalNonNegativeInt(parallelism),
+          activeDeadlineSeconds: toOptionalNonNegativeInt(activeDeadlineSeconds),
+        }
+        const strategy =
+          typeof strategyDraft.backoffLimit === "number" ||
+          typeof strategyDraft.completions === "number" ||
+          typeof strategyDraft.parallelism === "number" ||
+          typeof strategyDraft.activeDeadlineSeconds === "number"
+            ? strategyDraft
+            : undefined
+
         await onSubmit({
           kind,
           name: name.trim().toLowerCase(),
           namespace: namespace.trim(),
           description: description.trim(),
+          strategy,
         })
 
         onOpenChange(false)
@@ -215,7 +255,21 @@ export function CreateJobDialog({
         setCreating(false)
       }
     },
-    [description, isBusy, isFinalStep, kind, name, namespace, onOpenChange, onSubmit, runBasicValidation]
+    [
+      activeDeadlineSeconds,
+      backoffLimit,
+      completions,
+      description,
+      isBusy,
+      isFinalStep,
+      kind,
+      name,
+      namespace,
+      onOpenChange,
+      onSubmit,
+      parallelism,
+      runBasicValidation,
+    ]
   )
 
   return (
@@ -388,6 +442,81 @@ export function CreateJobDialog({
                     />
                     <FieldDescription>
                       描述将写入资源注解 `description`，最长 256 个字符。
+                    </FieldDescription>
+                  </Field>
+                </FieldGroup>
+              </div>
+            ) : isStrategyStep ? (
+              <div>
+                <div className="mb-4">
+                  <h3 className="text-[15px] font-semibold">策略设置</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    配置任务重试、并发与超时策略。全部为选填，留空将使用默认值。
+                  </p>
+                </div>
+
+                <FieldGroup className="grid gap-6 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="create-job-backoff-limit">最大重试次数</FieldLabel>
+                    <Input
+                      id="create-job-backoff-limit"
+                      value={backoffLimit}
+                      onChange={(event) => setBackoffLimit(normalizeIntegerInput(event.target.value))}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="例如：6"
+                      disabled={isBusy}
+                    />
+                    <FieldDescription>
+                      失败前最多可重试的次数。留空时按系统默认策略处理。
+                    </FieldDescription>
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor="create-job-completions">容器组完成数量</FieldLabel>
+                    <Input
+                      id="create-job-completions"
+                      value={completions}
+                      onChange={(event) => setCompletions(normalizeIntegerInput(event.target.value))}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="例如：1"
+                      disabled={isBusy}
+                    />
+                    <FieldDescription>
+                      任务完成所需的成功执行次数。未填写则使用平台默认行为。
+                    </FieldDescription>
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor="create-job-parallelism">并行容器组数量</FieldLabel>
+                    <Input
+                      id="create-job-parallelism"
+                      value={parallelism}
+                      onChange={(event) => setParallelism(normalizeIntegerInput(event.target.value))}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="例如：1"
+                      disabled={isBusy}
+                    />
+                    <FieldDescription>同一时刻允许并发运行的容器组数量。</FieldDescription>
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor="create-job-active-deadline">最大运行时间（s）</FieldLabel>
+                    <Input
+                      id="create-job-active-deadline"
+                      value={activeDeadlineSeconds}
+                      onChange={(event) =>
+                        setActiveDeadlineSeconds(normalizeIntegerInput(event.target.value))
+                      }
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="例如：3600"
+                      disabled={isBusy}
+                    />
+                    <FieldDescription>
+                      限制任务最长运行秒数，超时后任务会被系统终止。
                     </FieldDescription>
                   </Field>
                 </FieldGroup>

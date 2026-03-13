@@ -11,7 +11,7 @@ import {
   renderNameDescriptionCell,
   type ColumnConfig,
 } from "@/app/(examples)/dashboard/components/table/columns-factory"
-import { createJob } from "@/app/lib/kubespark/resource-create"
+import { createJob } from "@/app/lib/kubespark/jobs"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { fetchJobRows, type JobResourceRow } from "@/app/lib/kubespark/resource-rows"
 import { deleteJob } from "@/app/lib/kubespark/resource-delete"
@@ -210,6 +210,12 @@ export function JobsPageClient() {
       name: string
       namespace: string
       description: string
+      strategy?: {
+        backoffLimit?: number
+        completions?: number
+        parallelism?: number
+        activeDeadlineSeconds?: number
+      }
     }) => {
       await createJob(payload)
       await refreshRows(false)

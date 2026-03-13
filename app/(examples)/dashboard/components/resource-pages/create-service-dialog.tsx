@@ -12,7 +12,7 @@ import {
 } from "@tabler/icons-react"
 import { parse, stringify } from "yaml"
 
-import { checkServiceExists, createService, updateService } from "@/app/lib/kubespark/resource-create"
+import { checkServiceExists, createService, updateService } from "@/app/lib/kubespark/services"
 import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {

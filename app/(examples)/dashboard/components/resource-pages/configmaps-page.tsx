@@ -20,7 +20,7 @@ import {
   type ConfigMapResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
 import { fetchResourceByName } from "@/app/lib/kubespark/common"
-import { createConfigMap, updateConfigMap } from "@/app/lib/kubespark/resource-create"
+import { createConfigMap, updateConfigMap } from "@/app/lib/kubespark/configmaps"
 import { deleteConfigMap } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"

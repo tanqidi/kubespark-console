@@ -11,7 +11,8 @@ import {
 } from "@tabler/icons-react"
 import { parse, stringify } from "yaml"
 
-import { checkConfigMapExists, checkSecretExists } from "@/app/lib/kubespark/resource-create"
+import { checkConfigMapExists } from "@/app/lib/kubespark/configmaps"
+import { checkSecretExists } from "@/app/lib/kubespark/secrets"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 import { Button } from "@/components/ui/button"

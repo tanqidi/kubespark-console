@@ -20,7 +20,7 @@ import {
   type SecretResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
 import { fetchResourceByName } from "@/app/lib/kubespark/common"
-import { createSecret, updateSecret } from "@/app/lib/kubespark/resource-create"
+import { createSecret, updateSecret } from "@/app/lib/kubespark/secrets"
 import { deleteSecret } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
