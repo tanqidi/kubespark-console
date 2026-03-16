@@ -84,6 +84,7 @@ type CreateJobDialogProps = {
         type?: ContainerType
         image: string
         imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+        syncHostTimezone?: boolean
         ports?: Array<{
           protocol?: ContainerPortProtocol
           name?: string
@@ -141,6 +142,7 @@ function createContainerDraft(): ContainerDraft {
     type: "container",
     image: "",
     imagePullPolicy: "IfNotPresent",
+    syncHostTimezone: false,
     cpuRequest: "",
     cpuLimit: "",
     memoryRequestMi: "",
@@ -356,18 +358,19 @@ export function CreateJobDialog({
         | "type"
         | "image"
         | "imagePullPolicy"
+        | "syncHostTimezone"
         | "cpuRequest"
         | "cpuLimit"
         | "memoryRequestMi"
         | "memoryLimitMi",
-      value: string
+      value: string | boolean
     ) => {
       setContainers((current) =>
         current.map((item) =>
           item.id === id
             ? {
                 ...item,
-                [field]: value,
+                [field]: field === "syncHostTimezone" ? value === true : value,
               }
             : item
         )
@@ -664,6 +667,7 @@ export function CreateJobDialog({
               type: item.type,
               image: item.image.trim(),
               imagePullPolicy: item.imagePullPolicy,
+              ...(item.syncHostTimezone ? { syncHostTimezone: true } : {}),
               cpuRequest: item.cpuRequest.trim(),
               cpuLimit: item.cpuLimit.trim(),
               memoryRequestMi: item.memoryRequestMi.trim(),

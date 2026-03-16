@@ -7,6 +7,7 @@ import {
   scrollAndFocusFieldById,
 } from "@/app/lib/kubespark/form-validation"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,7 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group"
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
 import {
   Select,
   SelectContent,
@@ -37,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 export type ContainerType = "container" | "initContainer"
 export type ContainerPortProtocol =
@@ -64,6 +67,7 @@ export type ContainerDraft = {
   type: ContainerType
   image: string
   imagePullPolicy: "Always" | "IfNotPresent" | "Never"
+  syncHostTimezone: boolean
   cpuRequest: string
   cpuLimit: string
   memoryRequestMi: string
@@ -84,11 +88,12 @@ type CreateContainerDialogProps = {
       | "type"
       | "image"
       | "imagePullPolicy"
+      | "syncHostTimezone"
       | "cpuRequest"
       | "cpuLimit"
       | "memoryRequestMi"
       | "memoryLimitMi",
-    value: string
+    value: string | boolean
   ) => void
   onAddPort: () => void
   onUpdatePort: (
@@ -99,6 +104,62 @@ type CreateContainerDialogProps = {
   onRemovePort: (portId: string) => void
   onCancel: () => void
   onConfirm: () => void
+}
+
+type ContainerExtensionOptionKey =
+  | "healthCheck"
+  | "lifecycle"
+  | "startupCommand"
+  | "env"
+  | "securityContext"
+  | "syncHostTimezone"
+
+const CONTAINER_EXTENSION_OPTIONS: Array<{
+  key: ContainerExtensionOptionKey
+  title: string
+  description: string
+}> = [
+  {
+    key: "healthCheck",
+    title: "健康检查",
+    description: "添加探针以定时检查容器健康状态。",
+  },
+  {
+    key: "lifecycle",
+    title: "生命周期管理",
+    description: "设置容器启动后或终止前需要执行的动作，以进行环境检查或体面终止。",
+  },
+  {
+    key: "startupCommand",
+    title: "启动命令",
+    description: "自定义容器启动时运行的命令。默认情况下，容器启动将运行镜像默认命令。",
+  },
+  {
+    key: "env",
+    title: "环境变量",
+    description: "为容器添加环境变量。",
+  },
+  {
+    key: "securityContext",
+    title: "容器安全上下文",
+    description: "自定义容器的权限设置。",
+  },
+  {
+    key: "syncHostTimezone",
+    title: "同步主机时区",
+    description: "同步容器与主机的时区。",
+  },
+]
+
+function createDefaultExtensionState(): Record<ContainerExtensionOptionKey, boolean> {
+  return {
+    healthCheck: false,
+    lifecycle: false,
+    startupCommand: false,
+    env: false,
+    securityContext: false,
+    syncHostTimezone: false,
+  }
 }
 
 function normalizeCpuInput(value: string): string {
@@ -123,6 +184,16 @@ function normalizePortInput(value: string): string {
   return String(parsed)
 }
 
+function resolveImagePullPolicyDescription(value: "Always" | "IfNotPresent" | "Never"): string {
+  if (value === "Always") {
+    return "在容器组创建及更新时，每次都尝试拉取新的镜像。"
+  }
+  if (value === "Never") {
+    return "仅使用本地镜像。如果本地不存在所需的镜像，则会导致容器异常。"
+  }
+  return "如果本地存在所需的镜像，则优先使用本地镜像。"
+}
+
 export function CreateContainerDialog({
   open,
   onOpenChange,
@@ -137,6 +208,14 @@ export function CreateContainerDialog({
   onCancel,
   onConfirm,
 }: CreateContainerDialogProps) {
+  const [extensionState, setExtensionState] = React.useState<Record<ContainerExtensionOptionKey, boolean>>(
+    createDefaultExtensionState
+  )
+  const [startupCommand, setStartupCommand] = React.useState("")
+  const [startupArgs, setStartupArgs] = React.useState("")
+  const containerId = container?.id ?? null
+  const syncHostTimezoneEnabled = container?.syncHostTimezone ?? false
+
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
     return resolveFirstContainerEditorErrorFieldId({
@@ -151,6 +230,16 @@ export function CreateContainerDialog({
     if (!firstErrorFieldId) return
     scrollAndFocusFieldById(firstErrorFieldId)
   }, [firstErrorFieldId])
+
+  React.useEffect(() => {
+    if (!containerId) return
+    setExtensionState({
+      ...createDefaultExtensionState(),
+      syncHostTimezone: syncHostTimezoneEnabled,
+    })
+    setStartupCommand("")
+    setStartupArgs("")
+  }, [containerId, syncHostTimezoneEnabled])
 
   if (!container) return null
 
@@ -220,12 +309,15 @@ export function CreateContainerDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="IfNotPresent">IfNotPresent</SelectItem>
-                          <SelectItem value="Always">Always</SelectItem>
-                          <SelectItem value="Never">Never</SelectItem>
+                          <SelectItem value="IfNotPresent">优先使用本地镜像</SelectItem>
+                          <SelectItem value="Always">每次都拉取镜像</SelectItem>
+                          <SelectItem value="Never">仅使用本地镜像</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
+                    <FieldDescription>
+                      {resolveImagePullPolicyDescription(container.imagePullPolicy)}
+                    </FieldDescription>
                   </Field>
                 </div>
 
@@ -448,6 +540,84 @@ export function CreateContainerDialog({
                     </Button>
                   </div>
                 </FieldGroup>
+              </div>
+            </div>
+
+            <div className="rounded-md border bg-card">
+              <div className="border-b bg-muted/80 px-4 py-3">
+                <div className="text-sm font-semibold">扩展配置</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  通过开关启用容器扩展能力，具体参数配置后续逐步开放。
+                </div>
+              </div>
+              <div className="p-4">
+                <ItemGroup className="gap-3">
+                  {CONTAINER_EXTENSION_OPTIONS.map((option) => {
+                    const checked =
+                      option.key === "syncHostTimezone"
+                        ? container.syncHostTimezone
+                        : extensionState[option.key]
+                    const isStartupCommand = option.key === "startupCommand"
+                    return (
+                      <Item key={option.key} variant="outline" className="items-start">
+                        <Checkbox
+                          id={`${container.id}-option-${option.key}`}
+                          checked={checked}
+                          onCheckedChange={(nextChecked) => {
+                            const nextValue = nextChecked === true
+                            setExtensionState((current) => ({
+                              ...current,
+                              [option.key]: nextValue,
+                            }))
+                            if (option.key === "syncHostTimezone") {
+                              onChange("syncHostTimezone", nextValue)
+                            }
+                          }}
+                          disabled={isBusy}
+                          className="mt-1"
+                        />
+                        <ItemContent>
+                          <ItemTitle>{option.title}</ItemTitle>
+                          <ItemDescription>{option.description}</ItemDescription>
+                        </ItemContent>
+
+                        {isStartupCommand && checked ? (
+                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                            <FieldGroup className="flex flex-col gap-4">
+                              <Field>
+                                <FieldLabel htmlFor={`${container.id}-startup-command`}>命令</FieldLabel>
+                                <Textarea
+                                  id={`${container.id}-startup-command`}
+                                  value={startupCommand}
+                                  onChange={(event) => setStartupCommand(event.target.value)}
+                                  placeholder='例如：/bin/sh'
+                                  className="min-h-20"
+                                  disabled={isBusy}
+                                />
+                                <FieldDescription>容器的启动命令。</FieldDescription>
+                              </Field>
+
+                              <Field>
+                                <FieldLabel htmlFor={`${container.id}-startup-args`}>参数</FieldLabel>
+                                <Textarea
+                                  id={`${container.id}-startup-args`}
+                                  value={startupArgs}
+                                  onChange={(event) => setStartupArgs(event.target.value)}
+                                  placeholder='例如：-c,while true; do echo hello; sleep 10;done'
+                                  className="min-h-20"
+                                  disabled={isBusy}
+                                />
+                                <FieldDescription>
+                                  容器启动命令的参数。如有多个参数请使用半角逗号（,）分隔。
+                                </FieldDescription>
+                              </Field>
+                            </FieldGroup>
+                          </div>
+                        ) : null}
+                      </Item>
+                    )
+                  })}
+                </ItemGroup>
               </div>
             </div>
           </FieldGroup>

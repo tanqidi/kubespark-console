@@ -22,6 +22,7 @@ export type JobPodInput = {
     type?: "container" | "initContainer"
     image: string
     imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+    syncHostTimezone?: boolean
     ports?: Array<{
       protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
       name?: string
@@ -102,6 +103,7 @@ function buildPodContainerSpec(pod?: JobPodInput) {
   const raw = Array.isArray(pod?.containers) ? pod.containers : []
   const containers: Array<Record<string, unknown>> = []
   const initContainers: Array<Record<string, unknown>> = []
+  let withHostTimezone = false
 
   raw.forEach((item, index) => {
     const image = typeof item.image === "string" ? item.image.trim() : ""
@@ -160,7 +162,21 @@ function buildPodContainerSpec(pod?: JobPodInput) {
       image,
       ...(imagePullPolicy ? { imagePullPolicy } : {}),
       ...(resources ? { resources } : {}),
+      ...(item.syncHostTimezone
+        ? {
+            volumeMounts: [
+              {
+                name: "host-time",
+                readOnly: true,
+                mountPath: "/etc/localtime",
+              },
+            ],
+          }
+        : {}),
       ...(ports.length > 0 ? { ports } : {}),
+    }
+    if (item.syncHostTimezone) {
+      withHostTimezone = true
     }
 
     if (item.type === "initContainer") {
@@ -173,6 +189,19 @@ function buildPodContainerSpec(pod?: JobPodInput) {
   return {
     containers: containers.length > 0 ? containers : [buildDefaultTaskContainer()],
     ...(initContainers.length > 0 ? { initContainers } : {}),
+    ...(withHostTimezone
+      ? {
+          volumes: [
+            {
+              name: "host-time",
+              hostPath: {
+                path: "/etc/localtime",
+                type: "",
+              },
+            },
+          ],
+        }
+      : {}),
   }
 }
 
