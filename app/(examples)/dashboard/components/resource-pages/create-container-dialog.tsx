@@ -61,6 +61,15 @@ export type ContainerPortDraft = {
   containerPort: string
 }
 
+export type ContainerEnvVarSource = "custom" | "configMap" | "secret"
+
+export type ContainerEnvVarDraft = {
+  id: string
+  source: ContainerEnvVarSource
+  name: string
+  value: string
+}
+
 export type ContainerDraft = {
   id: string
   name: string
@@ -75,6 +84,7 @@ export type ContainerDraft = {
   memoryRequestMi: string
   memoryLimitMi: string
   ports: ContainerPortDraft[]
+  env: ContainerEnvVarDraft[]
 }
 
 type CreateContainerDialogProps = {
@@ -106,6 +116,10 @@ type CreateContainerDialogProps = {
     value: string
   ) => void
   onRemovePort: (portId: string) => void
+  onAddEnv: (defaults?: { source?: ContainerEnvVarSource; name?: string; value?: string }) => void
+  onClearEnv: () => void
+  onUpdateEnv: (envId: string, field: "source" | "name" | "value", value: string) => void
+  onRemoveEnv: (envId: string) => void
   onCancel: () => void
   onConfirm: () => void
 }
@@ -209,6 +223,10 @@ export function CreateContainerDialog({
   onAddPort,
   onUpdatePort,
   onRemovePort,
+  onAddEnv,
+  onClearEnv,
+  onUpdateEnv,
+  onRemoveEnv,
   onCancel,
   onConfirm,
 }: CreateContainerDialogProps) {
@@ -218,6 +236,7 @@ export function CreateContainerDialog({
   const containerId = container?.id ?? null
   const syncHostTimezoneEnabled = container?.syncHostTimezone ?? false
   const startupCommandEnabled = (container?.command.trim().length ?? 0) > 0 || (container?.args.trim().length ?? 0) > 0
+  const envEnabled = (container?.env.length ?? 0) > 0
 
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
@@ -239,9 +258,10 @@ export function CreateContainerDialog({
     setExtensionState({
       ...createDefaultExtensionState(),
       startupCommand: startupCommandEnabled,
+      env: envEnabled,
       syncHostTimezone: syncHostTimezoneEnabled,
     })
-  }, [containerId, startupCommandEnabled, syncHostTimezoneEnabled])
+  }, [containerId, envEnabled, startupCommandEnabled, syncHostTimezoneEnabled])
 
   if (!container) return null
 
@@ -578,6 +598,13 @@ export function CreateContainerDialog({
                             } else if (option.key === "startupCommand" && !nextValue) {
                               onChange("command", "")
                               onChange("args", "")
+                            } else if (option.key === "env" && nextValue && container.env.length === 0) {
+                              onAddEnv({
+                                name: "TZ",
+                                value: "Asia/Shanghai",
+                              })
+                            } else if (option.key === "env" && !nextValue) {
+                              onClearEnv()
                             }
                           }}
                           disabled={isBusy}
@@ -618,6 +645,73 @@ export function CreateContainerDialog({
                                   容器启动命令的参数。如有多个参数请使用半角逗号（,）分隔。
                                 </FieldDescription>
                               </Field>
+                            </FieldGroup>
+                          </div>
+                        ) : null}
+
+                        {option.key === "env" && checked ? (
+                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                            <FieldGroup className="flex flex-col gap-3">
+                              {container.env.length > 0 ? (
+                                container.env.map((item) => (
+                                  <div key={item.id} className="grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+                                    <Select
+                                      value={item.source}
+                                      onValueChange={(value) => {
+                                        if (value === "custom" || value === "configMap" || value === "secret") {
+                                          onUpdateEnv(item.id, "source", value)
+                                        }
+                                      }}
+                                      disabled={isBusy}
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectGroup>
+                                          <SelectItem value="custom">自定义</SelectItem>
+                                          <SelectItem value="configMap">来自配置字典</SelectItem>
+                                          <SelectItem value="secret">来自保密字典</SelectItem>
+                                        </SelectGroup>
+                                      </SelectContent>
+                                    </Select>
+                                    <Input
+                                      value={item.name}
+                                      onChange={(event) => onUpdateEnv(item.id, "name", event.target.value)}
+                                      placeholder="键"
+                                      autoComplete="off"
+                                      disabled={isBusy}
+                                    />
+                                    <Input
+                                      value={item.value}
+                                      onChange={(event) => onUpdateEnv(item.id, "value", event.target.value)}
+                                      placeholder="值"
+                                      autoComplete="off"
+                                      disabled={isBusy}
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      onClick={() => onRemoveEnv(item.id)}
+                                      disabled={isBusy}
+                                    >
+                                      删除
+                                    </Button>
+                                  </div>
+                                ))
+                              ) : (
+                                <FieldDescription>暂无环境变量，点击右下角添加。</FieldDescription>
+                              )}
+                              <div className="flex justify-end">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => onAddEnv()}
+                                  disabled={isBusy}
+                                >
+                                  添加环境变量
+                                </Button>
+                              </div>
                             </FieldGroup>
                           </div>
                         ) : null}

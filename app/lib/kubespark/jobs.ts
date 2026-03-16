@@ -32,6 +32,10 @@ export type JobPodInput = {
     command?: string[]
     args?: string[]
     syncHostTimezone?: boolean
+    env?: Array<{
+      name?: string
+      value?: string
+    }>
     ports?: Array<{
       protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
       name?: string
@@ -175,6 +179,16 @@ function buildPodContainerSpec(pod?: JobPodInput) {
         }
       })
       .filter((port): port is { containerPort: number; name?: string; protocol?: "TCP" | "UDP" | "SCTP" } => Boolean(port))
+    const env = (Array.isArray(item.env) ? item.env : [])
+      .map((entry) => {
+        const name = typeof entry.name === "string" ? entry.name.trim() : ""
+        if (!name) return null
+        return {
+          name,
+          value: typeof entry.value === "string" ? entry.value : "",
+        }
+      })
+      .filter((entry): entry is { name: string; value: string } => Boolean(entry))
 
     const containerSpec: Record<string, unknown> = {
       name: resolveContainerName(item.name, image, index),
@@ -183,6 +197,7 @@ function buildPodContainerSpec(pod?: JobPodInput) {
       ...(Array.isArray(item.command) && item.command.length > 0 ? { command: item.command } : {}),
       ...(Array.isArray(item.args) && item.args.length > 0 ? { args: item.args } : {}),
       ...(resources ? { resources } : {}),
+      ...(env.length > 0 ? { env } : {}),
       ...(item.syncHostTimezone
         ? {
             volumeMounts: [

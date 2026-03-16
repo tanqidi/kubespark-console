@@ -30,6 +30,7 @@ import {
 import {
   CreateContainerDialog,
   type ContainerDraft,
+  type ContainerEnvVarSource,
   type ContainerPortDraft,
   type ContainerPortProtocol,
   type ContainerType,
@@ -102,6 +103,10 @@ export type JobDialogInitialValues = {
       command?: string[]
       args?: string[]
       syncHostTimezone?: boolean
+      env?: Array<{
+        name?: string
+        value?: string
+      }>
       ports?: Array<{
         protocol?: ContainerPortProtocol
         name?: string
@@ -143,6 +148,10 @@ type CreateJobDialogProps = {
         command?: string[]
         args?: string[]
         syncHostTimezone?: boolean
+        env?: Array<{
+          name?: string
+          value?: string
+        }>
         ports?: Array<{
           protocol?: ContainerPortProtocol
           name?: string
@@ -335,6 +344,17 @@ function createContainerDraftFromInitial(
   value: NonNullable<NonNullable<JobDialogInitialValues["pod"]>["containers"]>[number],
   index: number
 ): ContainerDraft {
+  const env = (Array.isArray(value.env) ? value.env : [])
+    .map((item) => {
+      const name = asString(item.name)
+      if (!name.trim()) return null
+      return createContainerEnvDraft({
+        name,
+        value: asString(item.value),
+      })
+    })
+    .filter((item): item is NonNullable<ReturnType<typeof createContainerEnvDraft>> => Boolean(item))
+
   return {
     id: crypto.randomUUID(),
     name: asString(value.name),
@@ -351,6 +371,7 @@ function createContainerDraftFromInitial(
     cpuLimit: asString(value.cpuLimit),
     memoryRequestMi: asString(value.memoryRequestMi),
     memoryLimitMi: asString(value.memoryLimitMi),
+    env,
     ports:
       Array.isArray(value.ports) && value.ports.length > 0
         ? value.ports.map((port) => ({
@@ -405,6 +426,16 @@ function buildPodSpecFromContainers(
             protocol?: ContainerPortProtocol
           } => Boolean(port)
         )
+      const env = item.env
+        .map((entry) => {
+          const name = entry.name.trim()
+          if (!name) return null
+          return {
+            name,
+            value: entry.value,
+          }
+        })
+        .filter((entry): entry is { name: string; value: string } => Boolean(entry))
 
       const spec: JsonObject = {
         name: resolveContainerName(item.name, item.image, index, usedContainerNames),
@@ -424,6 +455,7 @@ function buildPodSpecFromContainers(
               },
             }
           : {}),
+        ...(env.length > 0 ? { env } : {}),
         ...(ports.length > 0 ? { ports } : {}),
       }
 
@@ -582,6 +614,17 @@ function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnaps
             }
           })
           .filter((port): port is ContainerPortDraft => Boolean(port))
+        const env = (Array.isArray(item.env) ? item.env : [])
+          .map((entry) => {
+            const envItem = asObject(entry)
+            const name = asString(envItem.name)
+            if (!name.trim()) return null
+            return createContainerEnvDraft({
+              name,
+              value: asString(envItem.value),
+            })
+          })
+          .filter((entry): entry is NonNullable<ReturnType<typeof createContainerEnvDraft>> => Boolean(entry))
         const mounts = Array.isArray(item.volumeMounts) ? item.volumeMounts : []
         const withTimezone = mounts.some((mount) => {
           const mountObj = asObject(mount)
@@ -612,6 +655,7 @@ function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnaps
           cpuLimit: asString(limits.cpu),
           memoryRequestMi: toMemoryMiText(requests.memory),
           memoryLimitMi: toMemoryMiText(limits.memory),
+          env,
           ports: ports.length > 0 ? ports : index === 0 ? [createContainerPortDraft(0)] : [],
         }
       })
@@ -653,6 +697,7 @@ function createContainerDraft(): ContainerDraft {
     cpuLimit: "",
     memoryRequestMi: "",
     memoryLimitMi: "",
+    env: [],
     ports: [createContainerPortDraft(0)],
   }
 }
@@ -663,6 +708,19 @@ function createContainerPortDraft(index: number): ContainerPortDraft {
     protocol: "HTTP",
     name: `http-${index}`,
     containerPort: "",
+  }
+}
+
+function createContainerEnvDraft(defaults?: {
+  source?: ContainerEnvVarSource
+  name?: string
+  value?: string
+}) {
+  return {
+    id: crypto.randomUUID(),
+    source: defaults?.source ?? "custom",
+    name: defaults?.name ?? "",
+    value: defaults?.value ?? "",
   }
 }
 
@@ -1171,6 +1229,89 @@ export function CreateJobDialog({
     [submitError]
   )
 
+  const addContainerEnv = React.useCallback(
+    (
+      containerId: string,
+      defaults?: { source?: ContainerEnvVarSource; name?: string; value?: string }
+    ) => {
+      setContainers((current) =>
+        current.map((item) =>
+          item.id === containerId
+            ? {
+                ...item,
+                env: [...item.env, createContainerEnvDraft(defaults)],
+              }
+            : item
+        )
+      )
+      if (submitError) setSubmitError(null)
+    },
+    [submitError]
+  )
+
+  const updateContainerEnv = React.useCallback(
+    (
+      containerId: string,
+      envId: string,
+      field: "source" | "name" | "value",
+      value: string
+    ) => {
+      setContainers((current) =>
+        current.map((item) =>
+          item.id === containerId
+            ? {
+                ...item,
+                env: item.env.map((entry) =>
+                  entry.id === envId
+                    ? {
+                        ...entry,
+                        [field]: value,
+                      }
+                    : entry
+                ),
+              }
+            : item
+        )
+      )
+      if (submitError) setSubmitError(null)
+    },
+    [submitError]
+  )
+
+  const removeContainerEnv = React.useCallback(
+    (containerId: string, envId: string) => {
+      setContainers((current) =>
+        current.map((item) =>
+          item.id === containerId
+            ? {
+                ...item,
+                env: item.env.filter((entry) => entry.id !== envId),
+              }
+            : item
+        )
+      )
+      if (submitError) setSubmitError(null)
+    },
+    [submitError]
+  )
+
+  const clearContainerEnv = React.useCallback(
+    (containerId: string) => {
+      setContainers((current) =>
+        current.map((item) =>
+          item.id === containerId
+            ? {
+                ...item,
+                env: [],
+              }
+            : item
+        )
+      )
+      if (submitError) setSubmitError(null)
+    },
+    [submitError]
+  )
+
   const beginEditContainer = React.useCallback(
     (id: string) => {
       setContainers((current) =>
@@ -1399,6 +1540,12 @@ export function CreateJobDialog({
 
         const normalizedContainers = source.pod.containers
           .map((item) => {
+            const normalizedEnv = item.env
+              .map((entry) => ({
+                name: entry.name.trim(),
+                value: entry.value,
+              }))
+              .filter((entry) => entry.name.length > 0)
             const normalizedPorts = item.ports
               .map((port) => ({
                 protocol: port.protocol,
@@ -1417,6 +1564,7 @@ export function CreateJobDialog({
               ...(normalizedCommand.length > 0 ? { command: normalizedCommand } : {}),
               ...(normalizedArgs.length > 0 ? { args: normalizedArgs } : {}),
               ...(item.syncHostTimezone ? { syncHostTimezone: true } : {}),
+              ...(normalizedEnv.length > 0 ? { env: normalizedEnv } : {}),
               cpuRequest: item.cpuRequest.trim(),
               cpuLimit: item.cpuLimit.trim(),
               memoryRequestMi: item.memoryRequestMi.trim(),
@@ -1966,6 +2114,22 @@ export function CreateJobDialog({
           onRemovePort={(portId) => {
             if (!editingContainer) return
             removeContainerPort(editingContainer.id, portId)
+          }}
+          onAddEnv={(defaults) => {
+            if (!editingContainer) return
+            addContainerEnv(editingContainer.id, defaults)
+          }}
+          onClearEnv={() => {
+            if (!editingContainer) return
+            clearContainerEnv(editingContainer.id)
+          }}
+          onUpdateEnv={(envId, field, value) => {
+            if (!editingContainer) return
+            updateContainerEnv(editingContainer.id, envId, field, value)
+          }}
+          onRemoveEnv={(envId) => {
+            if (!editingContainer) return
+            removeContainerEnv(editingContainer.id, envId)
           }}
           onCancel={cancelEditContainer}
           onConfirm={returnToPodList}
