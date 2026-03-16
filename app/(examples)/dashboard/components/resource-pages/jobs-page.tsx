@@ -100,6 +100,13 @@ function toPortProtocol(
     : "TCP"
 }
 
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => item.length > 0)
+}
+
 function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unknown): JobDialogInitialValues {
   const resource = asObject(payload)
   const metadata = asObject(resource.metadata)
@@ -160,6 +167,8 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
         if (!image.trim()) return null
 
         const imagePullPolicy = asString(item.imagePullPolicy)
+        const command = toStringArray(item.command)
+        const args = toStringArray(item.args)
         const normalizedImagePullPolicy: "Always" | "IfNotPresent" | "Never" =
           imagePullPolicy === "Always" || imagePullPolicy === "Never"
             ? imagePullPolicy
@@ -170,6 +179,8 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
           type,
           image,
           imagePullPolicy: normalizedImagePullPolicy,
+          ...(command.length > 0 ? { command } : {}),
+          ...(args.length > 0 ? { args } : {}),
           syncHostTimezone,
           ...(ports.length > 0 ? { ports } : {}),
           cpuRequest: asString(requests.cpu),
@@ -411,6 +422,8 @@ export function JobsPageClient() {
           type?: "container" | "initContainer"
           image: string
           imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+          command?: string[]
+          args?: string[]
           ports?: Array<{
             protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
             name?: string
@@ -448,6 +461,8 @@ export function JobsPageClient() {
           type?: "container" | "initContainer"
           image: string
           imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+          command?: string[]
+          args?: string[]
           syncHostTimezone?: boolean
           ports?: Array<{
             protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"

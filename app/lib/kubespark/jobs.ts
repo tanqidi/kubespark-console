@@ -29,6 +29,8 @@ export type JobPodInput = {
     type?: "container" | "initContainer"
     image: string
     imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+    command?: string[]
+    args?: string[]
     syncHostTimezone?: boolean
     ports?: Array<{
       protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
@@ -52,14 +54,6 @@ export type UpdateJobInput = BaseCreateInput & {
   kind: JobCreateKind
   strategy?: JobStrategyInput
   pod?: JobPodInput
-}
-
-function buildDefaultTaskContainer() {
-  return {
-    name: "task",
-    image: "busybox:1.36",
-    command: ["sh", "-c", "echo task-created"],
-  }
 }
 
 function toDnsLabelFragment(value: string): string {
@@ -174,6 +168,8 @@ function buildPodContainerSpec(pod?: JobPodInput) {
       name: resolveContainerName(item.name, index),
       image,
       ...(imagePullPolicy ? { imagePullPolicy } : {}),
+      ...(Array.isArray(item.command) && item.command.length > 0 ? { command: item.command } : {}),
+      ...(Array.isArray(item.args) && item.args.length > 0 ? { args: item.args } : {}),
       ...(resources ? { resources } : {}),
       ...(item.syncHostTimezone
         ? {
@@ -200,7 +196,7 @@ function buildPodContainerSpec(pod?: JobPodInput) {
   })
 
   return {
-    containers: containers.length > 0 ? containers : [buildDefaultTaskContainer()],
+    ...(containers.length > 0 ? { containers } : {}),
     ...(initContainers.length > 0 ? { initContainers } : {}),
     ...(withHostTimezone
       ? {
@@ -326,12 +322,19 @@ export async function updateJob(input: UpdateJobInput): Promise<void> {
   const existing = asObject(payload)
   const existingMetadata = asObject(existing.metadata)
   const existingAnnotations = asObject(existingMetadata.annotations)
-  const mergedAnnotations = {
+  const nextDescription = buildDescriptionPatch(input.description).annotations.description
+  let mergedAnnotations: Record<string, unknown> = {
     ...existingAnnotations,
-    ...buildDescriptionPatch(input.description).annotations,
   }
-  if (mergedAnnotations.description === null) {
-    delete mergedAnnotations.description
+  if (nextDescription === null) {
+    mergedAnnotations = Object.fromEntries(
+      Object.entries(mergedAnnotations).filter(([key]) => key !== "description")
+    )
+  } else {
+    mergedAnnotations = {
+      ...mergedAnnotations,
+      description: nextDescription,
+    }
   }
 
   const nextSpec =

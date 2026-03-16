@@ -67,6 +67,8 @@ export type ContainerDraft = {
   type: ContainerType
   image: string
   imagePullPolicy: "Always" | "IfNotPresent" | "Never"
+  command: string
+  args: string
   syncHostTimezone: boolean
   cpuRequest: string
   cpuLimit: string
@@ -88,6 +90,8 @@ type CreateContainerDialogProps = {
       | "type"
       | "image"
       | "imagePullPolicy"
+      | "command"
+      | "args"
       | "syncHostTimezone"
       | "cpuRequest"
       | "cpuLimit"
@@ -211,10 +215,9 @@ export function CreateContainerDialog({
   const [extensionState, setExtensionState] = React.useState<Record<ContainerExtensionOptionKey, boolean>>(
     createDefaultExtensionState
   )
-  const [startupCommand, setStartupCommand] = React.useState("")
-  const [startupArgs, setStartupArgs] = React.useState("")
   const containerId = container?.id ?? null
   const syncHostTimezoneEnabled = container?.syncHostTimezone ?? false
+  const startupCommandEnabled = (container?.command.trim().length ?? 0) > 0 || (container?.args.trim().length ?? 0) > 0
 
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
@@ -235,11 +238,10 @@ export function CreateContainerDialog({
     if (!containerId) return
     setExtensionState({
       ...createDefaultExtensionState(),
+      startupCommand: startupCommandEnabled,
       syncHostTimezone: syncHostTimezoneEnabled,
     })
-    setStartupCommand("")
-    setStartupArgs("")
-  }, [containerId, syncHostTimezoneEnabled])
+  }, [containerId, startupCommandEnabled, syncHostTimezoneEnabled])
 
   if (!container) return null
 
@@ -571,6 +573,9 @@ export function CreateContainerDialog({
                             }))
                             if (option.key === "syncHostTimezone") {
                               onChange("syncHostTimezone", nextValue)
+                            } else if (option.key === "startupCommand" && !nextValue) {
+                              onChange("command", "")
+                              onChange("args", "")
                             }
                           }}
                           disabled={isBusy}
@@ -588,9 +593,9 @@ export function CreateContainerDialog({
                                 <FieldLabel htmlFor={`${container.id}-startup-command`}>命令</FieldLabel>
                                 <Textarea
                                   id={`${container.id}-startup-command`}
-                                  value={startupCommand}
-                                  onChange={(event) => setStartupCommand(event.target.value)}
-                                  placeholder='例如：/bin/sh'
+                                  value={container.command}
+                                  onChange={(event) => onChange("command", event.target.value)}
+                                  placeholder='例如：["/bin/sh"]'
                                   className="min-h-20"
                                   disabled={isBusy}
                                 />
@@ -601,9 +606,9 @@ export function CreateContainerDialog({
                                 <FieldLabel htmlFor={`${container.id}-startup-args`}>参数</FieldLabel>
                                 <Textarea
                                   id={`${container.id}-startup-args`}
-                                  value={startupArgs}
-                                  onChange={(event) => setStartupArgs(event.target.value)}
-                                  placeholder='例如：-c,while true; do echo hello; sleep 10;done'
+                                  value={container.args}
+                                  onChange={(event) => onChange("args", event.target.value)}
+                                  placeholder='例如：["-c", "while true; do echo hello; sleep 10;done"]'
                                   className="min-h-20"
                                   disabled={isBusy}
                                 />

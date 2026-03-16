@@ -98,6 +98,8 @@ export type JobDialogInitialValues = {
       type?: ContainerType
       image: string
       imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+      command?: string[]
+      args?: string[]
       syncHostTimezone?: boolean
       ports?: Array<{
         protocol?: ContainerPortProtocol
@@ -137,6 +139,8 @@ type CreateJobDialogProps = {
         type?: ContainerType
         image: string
         imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+        command?: string[]
+        args?: string[]
         syncHostTimezone?: boolean
         ports?: Array<{
           protocol?: ContainerPortProtocol
@@ -237,6 +241,35 @@ function toMemoryMiText(value: unknown): string {
   return /^\d+$/.test(raw) ? raw : ""
 }
 
+function formatStringListAsEditorText(value: unknown): string {
+  if (!Array.isArray(value)) return ""
+  const list = value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => item.length > 0)
+  return list.length > 0 ? JSON.stringify(list) : ""
+}
+
+function parseEditorTextToStringList(value: string): string[] {
+  const text = value.trim()
+  if (!text) return []
+  if (text.startsWith("[") && text.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(text)
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => (typeof item === "string" ? item.trim() : ""))
+          .filter((item) => item.length > 0)
+      }
+    } catch {
+      // fallback to plain split mode below
+    }
+  }
+  return text
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+}
+
 function createContainerDraftFromInitial(
   value: NonNullable<NonNullable<JobDialogInitialValues["pod"]>["containers"]>[number],
   index: number
@@ -250,6 +283,8 @@ function createContainerDraftFromInitial(
       value.imagePullPolicy === "Always" || value.imagePullPolicy === "Never"
         ? value.imagePullPolicy
         : "IfNotPresent",
+    command: formatStringListAsEditorText(value.command),
+    args: formatStringListAsEditorText(value.args),
     syncHostTimezone: value.syncHostTimezone === true,
     cpuRequest: asString(value.cpuRequest),
     cpuLimit: asString(value.cpuLimit),
@@ -312,6 +347,12 @@ function buildPodSpecFromContainers(
         name: item.name.trim() || `task-${index + 1}`,
         image: item.image.trim(),
         ...(item.imagePullPolicy ? { imagePullPolicy: item.imagePullPolicy } : {}),
+        ...(parseEditorTextToStringList(item.command).length > 0
+          ? { command: parseEditorTextToStringList(item.command) }
+          : {}),
+        ...(parseEditorTextToStringList(item.args).length > 0
+          ? { args: parseEditorTextToStringList(item.args) }
+          : {}),
         ...(Object.keys(requests).length > 0 || Object.keys(limits).length > 0
           ? {
               resources: {
@@ -341,20 +382,9 @@ function buildPodSpecFromContainers(
       }
     })
 
-  const fallbackContainer =
-    workload.length > 0
-      ? workload
-      : [
-          {
-            name: "task",
-            image: "busybox:1.36",
-            command: ["sh", "-c", "echo task-created"],
-          },
-        ]
-
   return {
     restartPolicy,
-    containers: fallbackContainer,
+    ...(workload.length > 0 ? { containers: workload } : {}),
     ...(init.length > 0 ? { initContainers: init } : {}),
     ...(withHostTimezone
       ? {
@@ -512,6 +542,8 @@ function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnaps
           type,
           image: asString(item.image),
           imagePullPolicy,
+          command: formatStringListAsEditorText(item.command),
+          args: formatStringListAsEditorText(item.args),
           syncHostTimezone: withTimezone,
           cpuRequest: asString(requests.cpu),
           cpuLimit: asString(limits.cpu),
@@ -551,6 +583,8 @@ function createContainerDraft(): ContainerDraft {
     type: "container",
     image: "",
     imagePullPolicy: "IfNotPresent",
+    command: "",
+    args: "",
     syncHostTimezone: false,
     cpuRequest: "",
     cpuLimit: "",
@@ -905,6 +939,8 @@ export function CreateJobDialog({
         | "type"
         | "image"
         | "imagePullPolicy"
+        | "command"
+        | "args"
         | "syncHostTimezone"
         | "cpuRequest"
         | "cpuLimit"
@@ -1254,12 +1290,16 @@ export function CreateJobDialog({
                 containerPort: port.containerPort.trim(),
               }))
               .filter((port) => /^\d+$/.test(port.containerPort))
+            const normalizedCommand = parseEditorTextToStringList(item.command)
+            const normalizedArgs = parseEditorTextToStringList(item.args)
 
             return {
               name: item.name.trim(),
               type: item.type,
               image: item.image.trim(),
               imagePullPolicy: item.imagePullPolicy,
+              ...(normalizedCommand.length > 0 ? { command: normalizedCommand } : {}),
+              ...(normalizedArgs.length > 0 ? { args: normalizedArgs } : {}),
               ...(item.syncHostTimezone ? { syncHostTimezone: true } : {}),
               cpuRequest: item.cpuRequest.trim(),
               cpuLimit: item.cpuLimit.trim(),
