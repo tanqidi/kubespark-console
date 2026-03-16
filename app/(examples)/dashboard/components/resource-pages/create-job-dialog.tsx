@@ -246,7 +246,7 @@ function formatStringListAsEditorText(value: unknown): string {
   const list = value
     .map((item) => (typeof item === "string" ? item.trim() : ""))
     .filter((item) => item.length > 0)
-  return list.length > 0 ? JSON.stringify(list) : ""
+  return list.length > 0 ? list.join(",") : ""
 }
 
 function parseEditorTextToStringList(value: string): string[] {

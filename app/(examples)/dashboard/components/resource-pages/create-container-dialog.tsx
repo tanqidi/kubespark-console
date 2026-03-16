@@ -595,7 +595,7 @@ export function CreateContainerDialog({
                                   id={`${container.id}-startup-command`}
                                   value={container.command}
                                   onChange={(event) => onChange("command", event.target.value)}
-                                  placeholder='例如：["/bin/sh"]'
+                                  placeholder="例如：/bin/sh"
                                   className="min-h-20"
                                   disabled={isBusy}
                                 />
@@ -608,7 +608,7 @@ export function CreateContainerDialog({
                                   id={`${container.id}-startup-args`}
                                   value={container.args}
                                   onChange={(event) => onChange("args", event.target.value)}
-                                  placeholder='例如：["-c", "while true; do echo hello; sleep 10;done"]'
+                                  placeholder="例如：-c,while true; do echo hello; sleep 10;done"
                                   className="min-h-20"
                                   disabled={isBusy}
                                 />
