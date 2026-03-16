@@ -715,12 +715,16 @@ function createContainerEnvDraft(defaults?: {
   source?: ContainerEnvVarSource
   name?: string
   value?: string
+  sourceResource?: string
+  sourceKey?: string
 }) {
   return {
     id: crypto.randomUUID(),
     source: defaults?.source ?? "custom",
     name: defaults?.name ?? "",
     value: defaults?.value ?? "",
+    sourceResource: defaults?.sourceResource ?? "",
+    sourceKey: defaults?.sourceKey ?? "",
   }
 }
 
@@ -1232,7 +1236,13 @@ export function CreateJobDialog({
   const addContainerEnv = React.useCallback(
     (
       containerId: string,
-      defaults?: { source?: ContainerEnvVarSource; name?: string; value?: string }
+      defaults?: {
+        source?: ContainerEnvVarSource
+        name?: string
+        value?: string
+        sourceResource?: string
+        sourceKey?: string
+      }
     ) => {
       setContainers((current) =>
         current.map((item) =>
@@ -1253,7 +1263,7 @@ export function CreateJobDialog({
     (
       containerId: string,
       envId: string,
-      field: "source" | "name" | "value",
+      field: "source" | "name" | "value" | "sourceResource" | "sourceKey",
       value: string
     ) => {
       setContainers((current) =>

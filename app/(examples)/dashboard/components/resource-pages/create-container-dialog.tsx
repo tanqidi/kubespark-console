@@ -68,6 +68,8 @@ export type ContainerEnvVarDraft = {
   source: ContainerEnvVarSource
   name: string
   value: string
+  sourceResource: string
+  sourceKey: string
 }
 
 export type ContainerDraft = {
@@ -116,9 +118,19 @@ type CreateContainerDialogProps = {
     value: string
   ) => void
   onRemovePort: (portId: string) => void
-  onAddEnv: (defaults?: { source?: ContainerEnvVarSource; name?: string; value?: string }) => void
+  onAddEnv: (defaults?: {
+    source?: ContainerEnvVarSource
+    name?: string
+    value?: string
+    sourceResource?: string
+    sourceKey?: string
+  }) => void
   onClearEnv: () => void
-  onUpdateEnv: (envId: string, field: "source" | "name" | "value", value: string) => void
+  onUpdateEnv: (
+    envId: string,
+    field: "source" | "name" | "value" | "sourceResource" | "sourceKey",
+    value: string
+  ) => void
   onRemoveEnv: (envId: string) => void
   onCancel: () => void
   onConfirm: () => void
@@ -654,12 +666,24 @@ export function CreateContainerDialog({
                             <FieldGroup className="flex flex-col gap-3">
                               {container.env.length > 0 ? (
                                 container.env.map((item) => (
-                                  <div key={item.id} className="grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+                                  <div
+                                    key={item.id}
+                                    className={
+                                      item.source === "custom"
+                                        ? "grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_auto]"
+                                        : "grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]"
+                                    }
+                                  >
                                     <Select
                                       value={item.source}
                                       onValueChange={(value) => {
                                         if (value === "custom" || value === "configMap" || value === "secret") {
                                           onUpdateEnv(item.id, "source", value)
+                                          // 切换来源后清空当前行内容，避免不同来源字段混用
+                                          onUpdateEnv(item.id, "name", "")
+                                          onUpdateEnv(item.id, "value", "")
+                                          onUpdateEnv(item.id, "sourceResource", "")
+                                          onUpdateEnv(item.id, "sourceKey", "")
                                         }
                                       }}
                                       disabled={isBusy}
@@ -676,19 +700,78 @@ export function CreateContainerDialog({
                                       </SelectContent>
                                     </Select>
                                     <Input
-                                      value={item.name}
+                                      value={item.source === "custom" ? item.name : item.sourceKey}
                                       onChange={(event) => onUpdateEnv(item.id, "name", event.target.value)}
                                       placeholder="键"
                                       autoComplete="off"
+                                      readOnly={item.source !== "custom"}
                                       disabled={isBusy}
                                     />
-                                    <Input
-                                      value={item.value}
-                                      onChange={(event) => onUpdateEnv(item.id, "value", event.target.value)}
-                                      placeholder="值"
-                                      autoComplete="off"
-                                      disabled={isBusy}
-                                    />
+                                    {item.source === "custom" ? (
+                                      <Input
+                                        value={item.value}
+                                        onChange={(event) => onUpdateEnv(item.id, "value", event.target.value)}
+                                        placeholder="值"
+                                        autoComplete="off"
+                                        disabled={isBusy}
+                                      />
+                                    ) : (
+                                      <>
+                                        <Select
+                                          value={item.sourceResource}
+                                          onValueChange={(value) => {
+                                            onUpdateEnv(item.id, "sourceResource", value)
+                                            // 资源变更后清空已选 key 和键名，避免与旧资源不一致
+                                            onUpdateEnv(item.id, "sourceKey", "")
+                                            onUpdateEnv(item.id, "name", "")
+                                          }}
+                                          disabled={isBusy}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue
+                                              placeholder={
+                                                item.source === "configMap" ? "选择配置字典" : "选择保密字典"
+                                              }
+                                            />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectGroup>
+                                              {item.source === "configMap" ? (
+                                                <>
+                                                  <SelectItem value="app-config">app-config</SelectItem>
+                                                  <SelectItem value="default-config">default-config</SelectItem>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <SelectItem value="app-secret">app-secret</SelectItem>
+                                                  <SelectItem value="default-secret">default-secret</SelectItem>
+                                                </>
+                                              )}
+                                            </SelectGroup>
+                                          </SelectContent>
+                                        </Select>
+                                        <Select
+                                          value={item.sourceKey}
+                                          onValueChange={(value) => {
+                                            onUpdateEnv(item.id, "sourceKey", value)
+                                            // 选择资源中的键后，同步写入环境变量名
+                                            onUpdateEnv(item.id, "name", value)
+                                          }}
+                                          disabled={isBusy}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="选择资源中的键" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectGroup>
+                                              <SelectItem value="key-1">key-1</SelectItem>
+                                              <SelectItem value="key-2">key-2</SelectItem>
+                                              <SelectItem value="key-3">key-3</SelectItem>
+                                            </SelectGroup>
+                                          </SelectContent>
+                                        </Select>
+                                      </>
+                                    )}
                                     <Button
                                       type="button"
                                       variant="ghost"
