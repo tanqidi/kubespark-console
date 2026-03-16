@@ -241,6 +241,35 @@ function toMemoryMiText(value: unknown): string {
   return /^\d+$/.test(raw) ? raw : ""
 }
 
+function toDnsLabelFragment(value: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]/g, "-")
+    .replace(/\.+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+  return normalized.slice(0, 63)
+}
+
+function resolveContainerNameFromImage(image: string): string {
+  const raw = image.trim()
+  if (!raw) return ""
+  const withoutDigest = raw.includes("@") ? raw.split("@")[0] ?? raw : raw
+  const lastSegment = withoutDigest.split("/").filter(Boolean).pop() ?? withoutDigest
+  const tagIndex = lastSegment.lastIndexOf(":")
+  const withoutTag = tagIndex > 0 ? lastSegment.slice(0, tagIndex) : lastSegment
+  return toDnsLabelFragment(withoutTag)
+}
+
+function resolveContainerName(name: string, image: string, index: number): string {
+  const typed = toDnsLabelFragment(name)
+  if (typed) return typed
+  const imageDerived = resolveContainerNameFromImage(image)
+  if (imageDerived) return imageDerived
+  return `container-${index + 1}`
+}
+
 function formatStringListAsEditorText(value: unknown): string {
   if (!Array.isArray(value)) return ""
   const list = value
@@ -344,7 +373,7 @@ function buildPodSpecFromContainers(
         )
 
       const spec: JsonObject = {
-        name: item.name.trim() || `task-${index + 1}`,
+        name: resolveContainerName(item.name, item.image, index),
         image: item.image.trim(),
         ...(item.imagePullPolicy ? { imagePullPolicy: item.imagePullPolicy } : {}),
         ...(parseEditorTextToStringList(item.command).length > 0
@@ -643,6 +672,15 @@ function buildAutoPortName(protocol: ContainerPortProtocol, portText: string): s
   const normalized = portText.trim()
   if (!/^\d+$/.test(normalized)) return null
   return `${resolveProtocolNamePrefix(protocol)}-${normalized}`
+}
+
+function isAutoPortNameForProtocol(name: string, protocol: ContainerPortProtocol): boolean {
+  const trimmed = name.trim().toLowerCase()
+  if (!trimmed) return false
+  const prefix = resolveProtocolNamePrefix(protocol)
+  if (!trimmed.startsWith(`${prefix}-`)) return false
+  const suffix = trimmed.slice(prefix.length + 1)
+  return /^\d+$/.test(suffix)
 }
 
 function replaceProtocolPrefixInName(
@@ -951,10 +989,28 @@ export function CreateJobDialog({
       setContainers((current) =>
         current.map((item) =>
           item.id === id
-            ? {
-                ...item,
-                [field]: field === "syncHostTimezone" ? value === true : value,
-              }
+            ? (() => {
+                if (field === "image") {
+                  const nextImage = typeof value === "string" ? value : ""
+                  const previousAutoName = resolveContainerNameFromImage(item.image)
+                  const nextAutoName = resolveContainerNameFromImage(nextImage)
+                  const currentName = item.name.trim()
+                  const shouldAutoSyncName =
+                    currentName.length === 0 ||
+                    (previousAutoName.length > 0 && currentName === previousAutoName)
+
+                  return {
+                    ...item,
+                    image: nextImage,
+                    ...(shouldAutoSyncName ? { name: nextAutoName } : {}),
+                  }
+                }
+
+                return {
+                  ...item,
+                  [field]: field === "syncHostTimezone" ? value === true : value,
+                }
+              })()
             : item
         )
       )
@@ -1015,8 +1071,12 @@ export function CreateJobDialog({
               if (field === "containerPort") {
                 const autoNameBefore = buildAutoPortName(port.protocol, port.containerPort)
                 const autoNameAfter = buildAutoPortName(port.protocol, value)
+                const currentName = port.name.trim()
+                const hasAutoPatternName = isAutoPortNameForProtocol(currentName, port.protocol)
                 const shouldAutoRename =
-                  Boolean(autoNameBefore) && port.name.trim() === autoNameBefore
+                  currentName.length === 0 ||
+                  hasAutoPatternName ||
+                  (Boolean(autoNameBefore) && currentName === autoNameBefore)
                 return {
                   ...port,
                   containerPort: value,

@@ -67,10 +67,22 @@ function toDnsLabelFragment(value: string): string {
   return normalized.slice(0, 63)
 }
 
-function resolveContainerName(name: string | undefined, index: number): string {
+function resolveContainerNameFromImage(image: string): string {
+  const raw = image.trim()
+  if (!raw) return ""
+  const withoutDigest = raw.includes("@") ? raw.split("@")[0] ?? raw : raw
+  const lastSegment = withoutDigest.split("/").filter(Boolean).pop() ?? withoutDigest
+  const tagIndex = lastSegment.lastIndexOf(":")
+  const withoutTag = tagIndex > 0 ? lastSegment.slice(0, tagIndex) : lastSegment
+  return toDnsLabelFragment(withoutTag)
+}
+
+function resolveContainerName(name: string | undefined, image: string, index: number): string {
   const candidate = toDnsLabelFragment(name ?? "")
   if (candidate) return candidate
-  return `task-${index + 1}`
+  const imageDerived = resolveContainerNameFromImage(image)
+  if (imageDerived) return imageDerived
+  return `container-${index + 1}`
 }
 
 function pickCpuQuantity(value: string | undefined): string | undefined {
@@ -165,7 +177,7 @@ function buildPodContainerSpec(pod?: JobPodInput) {
       .filter((port): port is { containerPort: number; name?: string; protocol?: "TCP" | "UDP" | "SCTP" } => Boolean(port))
 
     const containerSpec: Record<string, unknown> = {
-      name: resolveContainerName(item.name, index),
+      name: resolveContainerName(item.name, image, index),
       image,
       ...(imagePullPolicy ? { imagePullPolicy } : {}),
       ...(Array.isArray(item.command) && item.command.length > 0 ? { command: item.command } : {}),

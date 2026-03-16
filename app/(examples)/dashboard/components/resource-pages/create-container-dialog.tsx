@@ -334,7 +334,9 @@ export function CreateContainerDialog({
                       autoComplete="off"
                       disabled={isBusy}
                     />
-                    <FieldDescription>选填。留空时系统会按规则自动生成容器名称。</FieldDescription>
+                    <FieldDescription>
+                      留空时会基于镜像地址自动生成。
+                    </FieldDescription>
                   </Field>
 
                   <Field>
