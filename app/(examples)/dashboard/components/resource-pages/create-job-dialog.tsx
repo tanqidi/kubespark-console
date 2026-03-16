@@ -14,6 +14,7 @@ import {
 } from "@tabler/icons-react"
 
 import { checkJobExists, type JobCreateKind } from "@/app/lib/kubespark/jobs"
+import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -262,12 +263,43 @@ function resolveContainerNameFromImage(image: string): string {
   return toDnsLabelFragment(withoutTag)
 }
 
-function resolveContainerName(name: string, image: string, index: number): string {
+function ensureUniqueContainerName(baseName: string, usedNames: Set<string>): string {
+  const normalizedBase = toDnsLabelFragment(baseName) || "container"
+  if (!usedNames.has(normalizedBase)) {
+    usedNames.add(normalizedBase)
+    return normalizedBase
+  }
+
+  let suffix = 2
+  while (true) {
+    const suffixText = `-${suffix}`
+    const maxBaseLength = Math.max(1, 63 - suffixText.length)
+    const trimmedBase = normalizedBase.slice(0, maxBaseLength).replace(/-+$/g, "") || "container"
+    const candidate = `${trimmedBase}${suffixText}`
+    if (!usedNames.has(candidate)) {
+      usedNames.add(candidate)
+      return candidate
+    }
+    suffix += 1
+  }
+}
+
+function isAutoContainerNameForImage(name: string, image: string): boolean {
+  const normalizedName = toDnsLabelFragment(name)
+  const base = resolveContainerNameFromImage(image)
+  if (!normalizedName || !base) return false
+  if (normalizedName === base) return true
+  if (!normalizedName.startsWith(`${base}-`)) return false
+  const suffix = normalizedName.slice(base.length + 1)
+  return /^\d+$/.test(suffix) && Number(suffix) >= 2
+}
+
+function resolveContainerName(name: string, image: string, index: number, usedNames?: Set<string>): string {
   const typed = toDnsLabelFragment(name)
-  if (typed) return typed
-  const imageDerived = resolveContainerNameFromImage(image)
-  if (imageDerived) return imageDerived
-  return `container-${index + 1}`
+  const fallback = `container-${index + 1}`
+  const baseName = typed || resolveContainerNameFromImage(image) || fallback
+  if (!usedNames) return baseName
+  return ensureUniqueContainerName(baseName, usedNames)
 }
 
 function formatStringListAsEditorText(value: unknown): string {
@@ -341,6 +373,8 @@ function buildPodSpecFromContainers(
   const init: JsonObject[] = []
   let withHostTimezone = false
 
+  const usedContainerNames = new Set<string>()
+
   containers
     .filter((item) => item.image.trim())
     .forEach((item, index) => {
@@ -373,7 +407,7 @@ function buildPodSpecFromContainers(
         )
 
       const spec: JsonObject = {
-        name: resolveContainerName(item.name, item.image, index),
+        name: resolveContainerName(item.name, item.image, index, usedContainerNames),
         image: item.image.trim(),
         ...(item.imagePullPolicy ? { imagePullPolicy: item.imagePullPolicy } : {}),
         ...(parseEditorTextToStringList(item.command).length > 0
@@ -764,6 +798,7 @@ export function CreateJobDialog({
   const [containers, setContainers] = React.useState<ContainerDraft[]>([])
   const [containerDialogOpen, setContainerDialogOpen] = React.useState(false)
   const [editingContainerId, setEditingContainerId] = React.useState<string | null>(null)
+  const [pendingDeleteContainerId, setPendingDeleteContainerId] = React.useState<string | null>(null)
   const [editingImageError, setEditingImageError] = React.useState<string | null>(null)
   const [editingPortFieldErrors, setEditingPortFieldErrors] = React.useState<ContainerPortFieldErrors>({})
   const [nameError, setNameError] = React.useState<string | null>(null)
@@ -814,6 +849,7 @@ export function CreateJobDialog({
       setContainers([])
       setContainerDialogOpen(false)
       setEditingContainerId(null)
+      setPendingDeleteContainerId(null)
       setEditingImageError(null)
       setEditingPortFieldErrors({})
       setNameError(null)
@@ -846,6 +882,7 @@ export function CreateJobDialog({
     )
     setContainerDialogOpen(false)
     setEditingContainerId(null)
+    setPendingDeleteContainerId(null)
     setEditingImageError(null)
     setEditingPortFieldErrors({})
     setNameError(null)
@@ -868,8 +905,18 @@ export function CreateJobDialog({
     [containers, editingContainerId]
   )
 
+  const pendingDeleteContainer = React.useMemo(
+    () => containers.find((item) => item.id === pendingDeleteContainerId) ?? null,
+    [containers, pendingDeleteContainerId]
+  )
+
   const configuredContainers = React.useMemo(
-    () => containers.filter((item) => item.image.trim()),
+    () => {
+      const visible = containers.filter((item) => item.image.trim())
+      const initContainers = visible.filter((item) => item.type === "initContainer")
+      const workloadContainers = visible.filter((item) => item.type !== "initContainer")
+      return [...initContainers, ...workloadContainers]
+    },
     [containers]
   )
 
@@ -992,12 +1039,20 @@ export function CreateJobDialog({
             ? (() => {
                 if (field === "image") {
                   const nextImage = typeof value === "string" ? value : ""
-                  const previousAutoName = resolveContainerNameFromImage(item.image)
-                  const nextAutoName = resolveContainerNameFromImage(nextImage)
                   const currentName = item.name.trim()
+                  const siblingNames = new Set(
+                    current
+                      .filter((container) => container.id !== item.id)
+                      .map((container) => toDnsLabelFragment(container.name))
+                      .filter(Boolean)
+                  )
+                  const nextAutoBaseName = resolveContainerNameFromImage(nextImage)
+                  const nextAutoName = nextAutoBaseName
+                    ? ensureUniqueContainerName(nextAutoBaseName, siblingNames)
+                    : ""
                   const shouldAutoSyncName =
                     currentName.length === 0 ||
-                    (previousAutoName.length > 0 && currentName === previousAutoName)
+                    isAutoContainerNameForImage(currentName, item.image)
 
                   return {
                     ...item,
@@ -1151,6 +1206,7 @@ export function CreateJobDialog({
     (id: string) => {
       setContainers((current) => current.filter((item) => item.id !== id))
       setEditingContainerId((current) => (current === id ? null : current))
+      setPendingDeleteContainerId((current) => (current === id ? null : current))
       if (editingImageError) setEditingImageError(null)
       setEditingPortFieldErrors({})
       if (submitError) setSubmitError(null)
@@ -1754,7 +1810,11 @@ export function CreateJobDialog({
                                   <ItemDescription className="min-w-0 truncate">
                                     {item.image.trim()}
                                     {" · "}
-                                    {item.type === "initContainer" ? "初始化容器" : "工作容器"}
+                                    {item.type === "initContainer" ? (
+                                      <span className="font-semibold text-foreground">初始化容器</span>
+                                    ) : (
+                                      "工作容器"
+                                    )}
                                     {" · "}
                                     {item.imagePullPolicy}
                                   </ItemDescription>
@@ -1764,7 +1824,7 @@ export function CreateJobDialog({
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => removeContainer(item.id)}
+                                    onClick={() => setPendingDeleteContainerId(item.id)}
                                     disabled={isBusy}
                                   >
                                     <IconTrash data-icon="inline-start" />
@@ -1909,6 +1969,24 @@ export function CreateJobDialog({
           }}
           onCancel={cancelEditContainer}
           onConfirm={returnToPodList}
+        />
+        <DeleteConfirmDialog
+          open={Boolean(pendingDeleteContainer)}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setPendingDeleteContainerId(null)
+          }}
+          title="删除容器"
+          description={
+            pendingDeleteContainer
+              ? `确定删除容器 ${pendingDeleteContainer.name.trim() || "未命名容器"} 吗？`
+              : ""
+          }
+          deleting={isBusy}
+          onConfirm={() => {
+            if (!pendingDeleteContainer) return
+            removeContainer(pendingDeleteContainer.id)
+            setPendingDeleteContainerId(null)
+          }}
         />
       </DialogContent>
     </Dialog>
