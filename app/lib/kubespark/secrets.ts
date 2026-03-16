@@ -2,6 +2,7 @@ import {
   buildResourceCollectionEndpoint,
   buildResourceItemEndpoint,
   fetchJsonDeduped,
+  fetchResourceCollection,
   fetchResourceByName,
 } from "./common"
 import {
@@ -21,6 +22,55 @@ export type CreateSecretInput = BaseCreateInput & {
 export type UpdateSecretInput = BaseCreateInput & {
   type?: string
   stringData?: Record<string, string>
+}
+
+export type SecretKeyRefOption = {
+  name: string
+  keys: string[]
+}
+
+type RawSecretForKeyRef = {
+  metadata?: {
+    name?: string
+  }
+  data?: Record<string, unknown>
+  stringData?: Record<string, unknown>
+}
+
+function toSortedUniqueKeys(keys: string[]): string[] {
+  return Array.from(
+    new Set(
+      keys
+        .map((key) => key.trim())
+        .filter((key) => key.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b))
+}
+
+export async function fetchSecretKeyRefOptions(
+  namespace: string
+): Promise<SecretKeyRefOption[]> {
+  const ns = namespace.trim()
+  if (!ns) return []
+
+  const { items } = await fetchResourceCollection<RawSecretForKeyRef>("core", "v1", "secrets", {
+    namespace: ns,
+  })
+
+  return items
+    .map((item) => {
+      const metadata = asObject(item.metadata)
+      const name = typeof metadata.name === "string" ? metadata.name.trim() : ""
+      if (!name) return null
+
+      const dataKeys = Object.keys(asObject(item.data))
+      const stringDataKeys = Object.keys(asObject(item.stringData))
+      return {
+        name,
+        keys: toSortedUniqueKeys([...dataKeys, ...stringDataKeys]),
+      }
+    })
+    .filter((item): item is SecretKeyRefOption => Boolean(item))
 }
 
 function encodeBase64Utf8(value: string): string {
@@ -128,4 +178,3 @@ export async function updateSecret(input: UpdateSecretInput): Promise<void> {
     body: JSON.stringify(requestBody),
   })
 }
-

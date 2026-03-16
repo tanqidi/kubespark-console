@@ -2,6 +2,7 @@ import {
   buildResourceCollectionEndpoint,
   buildResourceItemEndpoint,
   fetchJsonDeduped,
+  fetchResourceCollection,
   fetchResourceByName,
 } from "./common"
 import {
@@ -19,6 +20,55 @@ export type CreateConfigMapInput = BaseCreateInput & {
 
 export type UpdateConfigMapInput = BaseCreateInput & {
   data?: Record<string, string>
+}
+
+export type ConfigMapKeyRefOption = {
+  name: string
+  keys: string[]
+}
+
+type RawConfigMapForKeyRef = {
+  metadata?: {
+    name?: string
+  }
+  data?: Record<string, unknown>
+  binaryData?: Record<string, unknown>
+}
+
+function toSortedUniqueKeys(keys: string[]): string[] {
+  return Array.from(
+    new Set(
+      keys
+        .map((key) => key.trim())
+        .filter((key) => key.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b))
+}
+
+export async function fetchConfigMapKeyRefOptions(
+  namespace: string
+): Promise<ConfigMapKeyRefOption[]> {
+  const ns = namespace.trim()
+  if (!ns) return []
+
+  const { items } = await fetchResourceCollection<RawConfigMapForKeyRef>("core", "v1", "configmaps", {
+    namespace: ns,
+  })
+
+  return items
+    .map((item) => {
+      const metadata = asObject(item.metadata)
+      const name = typeof metadata.name === "string" ? metadata.name.trim() : ""
+      if (!name) return null
+
+      const dataKeys = Object.keys(asObject(item.data))
+      const binaryDataKeys = Object.keys(asObject(item.binaryData))
+      return {
+        name,
+        keys: toSortedUniqueKeys([...dataKeys, ...binaryDataKeys]),
+      }
+    })
+    .filter((item): item is ConfigMapKeyRefOption => Boolean(item))
 }
 
 export async function checkConfigMapExists(
@@ -103,4 +153,3 @@ export async function updateConfigMap(input: UpdateConfigMapInput): Promise<void
     body: JSON.stringify(requestBody),
   })
 }
-

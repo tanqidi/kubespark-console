@@ -162,6 +162,49 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
             }
           })
           .filter((port): port is { protocol: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"; name: string; containerPort: string } => Boolean(port))
+        const env = (Array.isArray(item.env) ? item.env : [])
+          .map((entry) => {
+            const envItem = asObject(entry)
+            const name = asString(envItem.name).trim()
+            if (!name) return null
+
+            const valueFrom = asObject(envItem.valueFrom)
+            const configMapKeyRef = asObject(valueFrom.configMapKeyRef)
+            const secretKeyRef = asObject(valueFrom.secretKeyRef)
+            const configMapName = asString(configMapKeyRef.name).trim()
+            const configMapKey = asString(configMapKeyRef.key).trim()
+            const secretName = asString(secretKeyRef.name).trim()
+            const secretKey = asString(secretKeyRef.key).trim()
+
+            if (configMapName && configMapKey) {
+              return {
+                name,
+                valueFrom: {
+                  configMapKeyRef: {
+                    name: configMapName,
+                    key: configMapKey,
+                  },
+                },
+              }
+            }
+            if (secretName && secretKey) {
+              return {
+                name,
+                valueFrom: {
+                  secretKeyRef: {
+                    name: secretName,
+                    key: secretKey,
+                  },
+                },
+              }
+            }
+
+            return {
+              name,
+              value: asString(envItem.value),
+            }
+          })
+          .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
 
         const image = asString(item.image).trim()
         if (!image.trim()) return null
@@ -181,6 +224,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
           imagePullPolicy: normalizedImagePullPolicy,
           ...(command.length > 0 ? { command } : {}),
           ...(args.length > 0 ? { args } : {}),
+          ...(env.length > 0 ? { env } : {}),
           syncHostTimezone,
           ...(ports.length > 0 ? { ports } : {}),
           cpuRequest: asString(requests.cpu),

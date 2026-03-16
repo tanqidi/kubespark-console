@@ -35,6 +35,16 @@ export type JobPodInput = {
     env?: Array<{
       name?: string
       value?: string
+      valueFrom?: {
+        configMapKeyRef?: {
+          name?: string
+          key?: string
+        }
+        secretKeyRef?: {
+          name?: string
+          key?: string
+        }
+      }
     }>
     ports?: Array<{
       protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
@@ -183,12 +193,63 @@ function buildPodContainerSpec(pod?: JobPodInput) {
       .map((entry) => {
         const name = typeof entry.name === "string" ? entry.name.trim() : ""
         if (!name) return null
+        const valueFrom =
+          typeof entry.valueFrom === "object" && entry.valueFrom !== null
+            ? (entry.valueFrom as Record<string, unknown>)
+            : {}
+        const configMapKeyRef =
+          typeof valueFrom.configMapKeyRef === "object" && valueFrom.configMapKeyRef !== null
+            ? (valueFrom.configMapKeyRef as Record<string, unknown>)
+            : {}
+        const secretKeyRef =
+          typeof valueFrom.secretKeyRef === "object" && valueFrom.secretKeyRef !== null
+            ? (valueFrom.secretKeyRef as Record<string, unknown>)
+            : {}
+        const configMapName =
+          typeof configMapKeyRef.name === "string" ? configMapKeyRef.name.trim() : ""
+        const configMapKey =
+          typeof configMapKeyRef.key === "string" ? configMapKeyRef.key.trim() : ""
+        const secretName =
+          typeof secretKeyRef.name === "string" ? secretKeyRef.name.trim() : ""
+        const secretKey =
+          typeof secretKeyRef.key === "string" ? secretKeyRef.key.trim() : ""
+
+        if (configMapName && configMapKey) {
+          return {
+            name,
+            valueFrom: {
+              configMapKeyRef: {
+                name: configMapName,
+                key: configMapKey,
+              },
+            },
+          }
+        }
+        if (secretName && secretKey) {
+          return {
+            name,
+            valueFrom: {
+              secretKeyRef: {
+                name: secretName,
+                key: secretKey,
+              },
+            },
+          }
+        }
+
         return {
           name,
           value: typeof entry.value === "string" ? entry.value : "",
         }
       })
-      .filter((entry): entry is { name: string; value: string } => Boolean(entry))
+      .filter((entry): entry is {
+        name: string
+        value?: string
+        valueFrom?: {
+          configMapKeyRef?: { name: string; key: string }
+          secretKeyRef?: { name: string; key: string }
+        }
+      } => Boolean(entry))
 
     const containerSpec: Record<string, unknown> = {
       name: resolveContainerName(item.name, image, index),

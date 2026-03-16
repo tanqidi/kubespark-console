@@ -106,6 +106,16 @@ export type JobDialogInitialValues = {
       env?: Array<{
         name?: string
         value?: string
+        valueFrom?: {
+          configMapKeyRef?: {
+            name?: string
+            key?: string
+          }
+          secretKeyRef?: {
+            name?: string
+            key?: string
+          }
+        }
       }>
       ports?: Array<{
         protocol?: ContainerPortProtocol
@@ -151,6 +161,16 @@ type CreateJobDialogProps = {
         env?: Array<{
           name?: string
           value?: string
+          valueFrom?: {
+            configMapKeyRef?: {
+              name?: string
+              key?: string
+            }
+            secretKeyRef?: {
+              name?: string
+              key?: string
+            }
+          }
         }>
         ports?: Array<{
           protocol?: ContainerPortProtocol
@@ -347,8 +367,34 @@ function createContainerDraftFromInitial(
   const env = (Array.isArray(value.env) ? value.env : [])
     .map((item) => {
       const name = asString(item.name)
+      const valueFrom = asObject(item.valueFrom)
+      const configMapKeyRef = asObject(valueFrom.configMapKeyRef)
+      const secretKeyRef = asObject(valueFrom.secretKeyRef)
+      const configMapName = asString(configMapKeyRef.name).trim()
+      const configMapKey = asString(configMapKeyRef.key).trim()
+      const secretName = asString(secretKeyRef.name).trim()
+      const secretKey = asString(secretKeyRef.key).trim()
+
+      if (configMapName && configMapKey) {
+        return createContainerEnvDraft({
+          source: "configMap",
+          name: name.trim() || configMapKey,
+          sourceResource: configMapName,
+          sourceKey: configMapKey,
+        })
+      }
+      if (secretName && secretKey) {
+        return createContainerEnvDraft({
+          source: "secret",
+          name: name.trim() || secretKey,
+          sourceResource: secretName,
+          sourceKey: secretKey,
+        })
+      }
+
       if (!name.trim()) return null
       return createContainerEnvDraft({
+        source: "custom",
         name,
         value: asString(item.value),
       })
@@ -428,14 +474,52 @@ function buildPodSpecFromContainers(
         )
       const env = item.env
         .map((entry) => {
-          const name = entry.name.trim()
+          const name =
+            entry.source === "custom"
+              ? entry.name.trim()
+              : entry.sourceKey.trim() || entry.name.trim()
           if (!name) return null
+          if (entry.source === "configMap") {
+            const sourceName = entry.sourceResource.trim()
+            const sourceKey = entry.sourceKey.trim()
+            if (!sourceName || !sourceKey) return null
+            return {
+              name,
+              valueFrom: {
+                configMapKeyRef: {
+                  name: sourceName,
+                  key: sourceKey,
+                },
+              },
+            }
+          }
+          if (entry.source === "secret") {
+            const sourceName = entry.sourceResource.trim()
+            const sourceKey = entry.sourceKey.trim()
+            if (!sourceName || !sourceKey) return null
+            return {
+              name,
+              valueFrom: {
+                secretKeyRef: {
+                  name: sourceName,
+                  key: sourceKey,
+                },
+              },
+            }
+          }
           return {
             name,
             value: entry.value,
           }
         })
-        .filter((entry): entry is { name: string; value: string } => Boolean(entry))
+        .filter((entry): entry is {
+          name: string
+          value?: string
+          valueFrom?: {
+            configMapKeyRef?: { name: string; key: string }
+            secretKeyRef?: { name: string; key: string }
+          }
+        } => Boolean(entry))
 
       const spec: JsonObject = {
         name: resolveContainerName(item.name, item.image, index, usedContainerNames),
@@ -618,8 +702,33 @@ function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnaps
           .map((entry) => {
             const envItem = asObject(entry)
             const name = asString(envItem.name)
+            const valueFrom = asObject(envItem.valueFrom)
+            const configMapKeyRef = asObject(valueFrom.configMapKeyRef)
+            const secretKeyRef = asObject(valueFrom.secretKeyRef)
+            const configMapName = asString(configMapKeyRef.name).trim()
+            const configMapKey = asString(configMapKeyRef.key).trim()
+            const secretName = asString(secretKeyRef.name).trim()
+            const secretKey = asString(secretKeyRef.key).trim()
+
+            if (configMapName && configMapKey) {
+              return createContainerEnvDraft({
+                source: "configMap",
+                name: name.trim() || configMapKey,
+                sourceResource: configMapName,
+                sourceKey: configMapKey,
+              })
+            }
+            if (secretName && secretKey) {
+              return createContainerEnvDraft({
+                source: "secret",
+                name: name.trim() || secretKey,
+                sourceResource: secretName,
+                sourceKey: secretKey,
+              })
+            }
             if (!name.trim()) return null
             return createContainerEnvDraft({
+              source: "custom",
               name,
               value: asString(envItem.value),
             })
@@ -1551,11 +1660,56 @@ export function CreateJobDialog({
         const normalizedContainers = source.pod.containers
           .map((item) => {
             const normalizedEnv = item.env
-              .map((entry) => ({
-                name: entry.name.trim(),
-                value: entry.value,
-              }))
-              .filter((entry) => entry.name.length > 0)
+              .map((entry) => {
+                const name =
+                  entry.source === "custom"
+                    ? entry.name.trim()
+                    : entry.sourceKey.trim() || entry.name.trim()
+                if (!name) return null
+
+                if (entry.source === "configMap") {
+                  const sourceName = entry.sourceResource.trim()
+                  const sourceKey = entry.sourceKey.trim()
+                  if (!sourceName || !sourceKey) return null
+                  return {
+                    name,
+                    valueFrom: {
+                      configMapKeyRef: {
+                        name: sourceName,
+                        key: sourceKey,
+                      },
+                    },
+                  }
+                }
+
+                if (entry.source === "secret") {
+                  const sourceName = entry.sourceResource.trim()
+                  const sourceKey = entry.sourceKey.trim()
+                  if (!sourceName || !sourceKey) return null
+                  return {
+                    name,
+                    valueFrom: {
+                      secretKeyRef: {
+                        name: sourceName,
+                        key: sourceKey,
+                      },
+                    },
+                  }
+                }
+
+                return {
+                  name,
+                  value: entry.value,
+                }
+              })
+              .filter((entry): entry is {
+                name: string
+                value?: string
+                valueFrom?: {
+                  configMapKeyRef?: { name: string; key: string }
+                  secretKeyRef?: { name: string; key: string }
+                }
+              } => Boolean(entry))
             const normalizedPorts = item.ports
               .map((port) => ({
                 protocol: port.protocol,
@@ -2105,6 +2259,7 @@ export function CreateJobDialog({
         <CreateContainerDialog
           open={containerDialogOpen}
           onOpenChange={setContainerDialogOpen}
+          namespace={lockedIdentity?.namespace ?? namespace}
           container={editingContainer}
           imageError={editingImageError}
           portFieldErrors={editingPortFieldErrors}

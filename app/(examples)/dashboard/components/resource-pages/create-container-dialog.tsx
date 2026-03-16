@@ -2,10 +2,18 @@
 
 import * as React from "react"
 import {
+  fetchConfigMapKeyRefOptions,
+  type ConfigMapKeyRefOption,
+} from "@/app/lib/kubespark/configmaps"
+import {
   resolveFirstContainerEditorErrorFieldId,
   type ContainerPortFieldErrors,
   scrollAndFocusFieldById,
 } from "@/app/lib/kubespark/form-validation"
+import {
+  fetchSecretKeyRefOptions,
+  type SecretKeyRefOption,
+} from "@/app/lib/kubespark/secrets"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -92,6 +100,7 @@ export type ContainerDraft = {
 type CreateContainerDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  namespace: string
   container: ContainerDraft | null
   imageError: string | null
   portFieldErrors: ContainerPortFieldErrors
@@ -227,6 +236,7 @@ function resolveImagePullPolicyDescription(value: "Always" | "IfNotPresent" | "N
 export function CreateContainerDialog({
   open,
   onOpenChange,
+  namespace,
   container,
   imageError,
   portFieldErrors,
@@ -242,6 +252,8 @@ export function CreateContainerDialog({
   onCancel,
   onConfirm,
 }: CreateContainerDialogProps) {
+  const [configMapKeyRefOptions, setConfigMapKeyRefOptions] = React.useState<ConfigMapKeyRefOption[]>([])
+  const [secretKeyRefOptions, setSecretKeyRefOptions] = React.useState<SecretKeyRefOption[]>([])
   const [extensionState, setExtensionState] = React.useState<Record<ContainerExtensionOptionKey, boolean>>(
     createDefaultExtensionState
   )
@@ -274,6 +286,37 @@ export function CreateContainerDialog({
       syncHostTimezone: syncHostTimezoneEnabled,
     })
   }, [containerId, envEnabled, startupCommandEnabled, syncHostTimezoneEnabled])
+
+  React.useEffect(() => {
+    if (!open) return
+    const ns = namespace.trim()
+    if (!ns) {
+      setConfigMapKeyRefOptions([])
+      setSecretKeyRefOptions([])
+      return
+    }
+
+    let cancelled = false
+
+    void Promise.all([
+      fetchConfigMapKeyRefOptions(ns),
+      fetchSecretKeyRefOptions(ns),
+    ])
+      .then(([configMapOptions, secretOptions]) => {
+        if (cancelled) return
+        setConfigMapKeyRefOptions(configMapOptions)
+        setSecretKeyRefOptions(secretOptions)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setConfigMapKeyRefOptions([])
+        setSecretKeyRefOptions([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, namespace])
 
   if (!container) return null
 
@@ -666,6 +709,19 @@ export function CreateContainerDialog({
                             <FieldGroup className="flex flex-col gap-3">
                               {container.env.length > 0 ? (
                                 container.env.map((item) => (
+                                  (() => {
+                                    const sourceOptions =
+                                      item.source === "configMap"
+                                        ? configMapKeyRefOptions
+                                        : item.source === "secret"
+                                          ? secretKeyRefOptions
+                                          : []
+                                    const selectedSource = sourceOptions.find(
+                                      (option) => option.name === item.sourceResource
+                                    )
+                                    const sourceKeyOptions = selectedSource?.keys ?? []
+
+                                    return (
                                   <div
                                     key={item.id}
                                     className={
@@ -736,16 +792,18 @@ export function CreateContainerDialog({
                                           </SelectTrigger>
                                           <SelectContent>
                                             <SelectGroup>
-                                              {item.source === "configMap" ? (
-                                                <>
-                                                  <SelectItem value="app-config">app-config</SelectItem>
-                                                  <SelectItem value="default-config">default-config</SelectItem>
-                                                </>
+                                              {sourceOptions.length > 0 ? (
+                                                sourceOptions.map((option) => (
+                                                  <SelectItem key={option.name} value={option.name}>
+                                                    {option.name}
+                                                  </SelectItem>
+                                                ))
                                               ) : (
-                                                <>
-                                                  <SelectItem value="app-secret">app-secret</SelectItem>
-                                                  <SelectItem value="default-secret">default-secret</SelectItem>
-                                                </>
+                                                <SelectItem value="__empty__" disabled>
+                                                  {item.source === "configMap"
+                                                    ? "当前项目暂无配置字典"
+                                                    : "当前项目暂无保密字典"}
+                                                </SelectItem>
                                               )}
                                             </SelectGroup>
                                           </SelectContent>
@@ -757,16 +815,24 @@ export function CreateContainerDialog({
                                             // 选择资源中的键后，同步写入环境变量名
                                             onUpdateEnv(item.id, "name", value)
                                           }}
-                                          disabled={isBusy}
+                                          disabled={isBusy || !item.sourceResource}
                                         >
                                           <SelectTrigger className="w-full">
                                             <SelectValue placeholder="选择资源中的键" />
                                           </SelectTrigger>
                                           <SelectContent>
                                             <SelectGroup>
-                                              <SelectItem value="key-1">key-1</SelectItem>
-                                              <SelectItem value="key-2">key-2</SelectItem>
-                                              <SelectItem value="key-3">key-3</SelectItem>
+                                              {sourceKeyOptions.length > 0 ? (
+                                                sourceKeyOptions.map((keyName) => (
+                                                  <SelectItem key={keyName} value={keyName}>
+                                                    {keyName}
+                                                  </SelectItem>
+                                                ))
+                                              ) : (
+                                                <SelectItem value="__empty__" disabled>
+                                                  {item.sourceResource ? "该资源暂无可选键" : "请先选择资源"}
+                                                </SelectItem>
+                                              )}
                                             </SelectGroup>
                                           </SelectContent>
                                         </Select>
@@ -781,6 +847,8 @@ export function CreateContainerDialog({
                                       删除
                                     </Button>
                                   </div>
+                                    )
+                                  })()
                                 ))
                               ) : (
                                 <FieldDescription>暂无环境变量，点击右下角添加。</FieldDescription>
