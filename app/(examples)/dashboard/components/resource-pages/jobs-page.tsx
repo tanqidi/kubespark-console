@@ -1,17 +1,21 @@
 ﻿"use client"
 
 import * as React from "react"
-import { IconEye, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
-import { CreateJobDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog"
+import {
+  CreateJobDialog,
+  type JobDialogInitialValues,
+} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
   renderNameDescriptionCell,
   type ColumnConfig,
 } from "@/app/(examples)/dashboard/components/table/columns-factory"
-import { createJob } from "@/app/lib/kubespark/jobs"
+import { fetchResourceByName } from "@/app/lib/kubespark/common"
+import { createJob, updateJob } from "@/app/lib/kubespark/jobs"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { fetchJobRows, type JobResourceRow } from "@/app/lib/kubespark/resource-rows"
 import { deleteJob } from "@/app/lib/kubespark/resource-delete"
@@ -45,9 +49,166 @@ const JOB_RESOURCE_BY_KIND: Record<JobRow["kind"], string> = {
   CronJob: "cronjobs",
 }
 
+const CONTAINER_PORT_PROTOCOL_SET = new Set([
+  "GRPC",
+  "HTTP",
+  "HTTP2",
+  "HTTPS",
+  "MONGO",
+  "REDIS",
+  "TCP",
+  "TLS",
+  "UDP",
+  "SCTP",
+])
+
+type JsonObject = Record<string, unknown>
+type JobDialogContainer = NonNullable<NonNullable<JobDialogInitialValues["pod"]>["containers"]>[number]
+
+function asObject(value: unknown): JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {}
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+function toOptionalIntegerString(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return String(Math.trunc(value))
+  }
+  const text = asString(value).trim()
+  return /^\d+$/.test(text) ? text : ""
+}
+
+function toMemoryMiText(value: unknown): string {
+  const text = asString(value).trim()
+  if (!text) return ""
+  const mi = text.match(/^(\d+)mi$/i)
+  if (mi?.[1]) return mi[1]
+  return /^\d+$/.test(text) ? text : ""
+}
+
+function toPortProtocol(
+  value: unknown
+): "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP" {
+  const text = asString(value).trim().toUpperCase()
+  return CONTAINER_PORT_PROTOCOL_SET.has(text)
+    ? (text as "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP")
+    : "TCP"
+}
+
+function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unknown): JobDialogInitialValues {
+  const resource = asObject(payload)
+  const metadata = asObject(resource.metadata)
+  const annotations = asObject(metadata.annotations)
+  const spec = asObject(resource.spec)
+  const strategySource =
+    kind === "CronJob" ? asObject(asObject(asObject(spec.jobTemplate).spec)) : spec
+  const podSpec =
+    kind === "CronJob"
+      ? asObject(asObject(asObject(strategySource.template).spec))
+      : asObject(asObject(spec.template).spec)
+
+  const hostTimeVolumeNames = new Set(
+    (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
+      .map((vol) => asObject(vol))
+      .filter((vol) => asString(asObject(vol.hostPath).path) === "/etc/localtime")
+      .map((vol) => asString(vol.name))
+      .filter((name) => name.length > 0)
+  )
+
+  const parseContainers = (
+    source: unknown,
+    type: "container" | "initContainer"
+  ): JobDialogContainer[] =>
+    (Array.isArray(source) ? source : [])
+      .map((entry) => {
+        const item = asObject(entry)
+        const resources = asObject(item.resources)
+        const requests = asObject(resources.requests)
+        const limits = asObject(resources.limits)
+        const mounts = Array.isArray(item.volumeMounts) ? item.volumeMounts : []
+        const syncHostTimezone = mounts.some((mount) => {
+          const mountObj = asObject(mount)
+          const mountPath = asString(mountObj.mountPath)
+          const mountName = asString(mountObj.name)
+          return (
+            mountPath === "/etc/localtime" ||
+            (mountName.length > 0 && hostTimeVolumeNames.has(mountName))
+          )
+        })
+        const ports = (Array.isArray(item.ports) ? item.ports : [])
+          .map((port) => {
+            const portObj = asObject(port)
+            const containerPort =
+              typeof portObj.containerPort === "number"
+                ? String(portObj.containerPort)
+                : asString(portObj.containerPort)
+            if (!containerPort.trim()) return null
+            return {
+              protocol: toPortProtocol(portObj.protocol),
+              name: asString(portObj.name),
+              containerPort,
+            }
+          })
+          .filter((port): port is { protocol: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"; name: string; containerPort: string } => Boolean(port))
+
+        const image = asString(item.image).trim()
+        if (!image.trim()) return null
+
+        const imagePullPolicy = asString(item.imagePullPolicy)
+        const normalizedImagePullPolicy: "Always" | "IfNotPresent" | "Never" =
+          imagePullPolicy === "Always" || imagePullPolicy === "Never"
+            ? imagePullPolicy
+            : "IfNotPresent"
+
+        const normalized: JobDialogContainer = {
+          name: asString(item.name),
+          type,
+          image,
+          imagePullPolicy: normalizedImagePullPolicy,
+          syncHostTimezone,
+          ...(ports.length > 0 ? { ports } : {}),
+          cpuRequest: asString(requests.cpu),
+          cpuLimit: asString(limits.cpu),
+          memoryRequestMi: toMemoryMiText(requests.memory),
+          memoryLimitMi: toMemoryMiText(limits.memory),
+        }
+        return normalized
+      })
+      .filter((item): item is JobDialogContainer => item !== null)
+
+  const containers = [
+    ...parseContainers(podSpec.containers, "container"),
+    ...parseContainers(podSpec.initContainers, "initContainer"),
+  ]
+
+  return {
+    name: asString(metadata.name) || row.name,
+    namespace: asString(metadata.namespace) || row.namespace,
+    description: asString(annotations.description),
+    strategy: {
+      backoffLimit: toOptionalIntegerString(strategySource.backoffLimit),
+      completions: toOptionalIntegerString(strategySource.completions),
+      parallelism: toOptionalIntegerString(strategySource.parallelism),
+      activeDeadlineSeconds: toOptionalIntegerString(strategySource.activeDeadlineSeconds),
+    },
+    pod: {
+      restartPolicy: asString(podSpec.restartPolicy) === "OnFailure" ? "OnFailure" : "Never",
+      containers,
+    },
+  }
+}
+
 export function JobsPageClient() {
   const [rows, setRows] = React.useState<JobRow[]>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false)
+  const [editInitialValues, setEditInitialValues] = React.useState<JobDialogInitialValues | null>(null)
+  const [editKind, setEditKind] = React.useState<JobRow["kind"]>("Job")
   const [createNamespaceOptions, setCreateNamespaceOptions] = React.useState<
     Array<{ id: string; name: string }>
   >([])
@@ -140,6 +301,22 @@ export function JobsPageClient() {
     })
   }, [])
 
+  const handleEdit = React.useCallback((row: JobRow) => {
+    const resource = JOB_RESOURCE_BY_KIND[row.kind]
+    void fetchResourceByName<unknown>("batch", "v1", resource, row.name, {
+      namespace: row.namespace,
+    })
+      .then(({ payload }) => {
+        setEditKind(row.kind)
+        setEditInitialValues(parseJobInitialValues(row.kind, row, payload))
+        setEditDialogOpen(true)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载任务详情失败"
+        setError(message)
+      })
+  }, [])
+
   const columns = React.useMemo(
     () =>
       createColumns<JobRow>({
@@ -159,6 +336,17 @@ export function JobsPageClient() {
           {
             label: (
               <>
+                <IconPencil className="size-4" />
+                {"编辑"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleEdit(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconTrash className="size-4" />
                 {"\u5220\u9664"}
               </>
@@ -171,7 +359,7 @@ export function JobsPageClient() {
           },
         ],
       }),
-    [handleViewYaml, requestDelete]
+    [handleEdit, handleViewYaml, requestDelete]
   )
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
@@ -236,6 +424,44 @@ export function JobsPageClient() {
       }
     }) => {
       await createJob(payload)
+      await refreshRows(false)
+    },
+    [refreshRows]
+  )
+
+  const handleEditSubmit = React.useCallback(
+    async (payload: {
+      kind: "Job" | "CronJob"
+      name: string
+      namespace: string
+      description: string
+      strategy?: {
+        backoffLimit?: number
+        completions?: number
+        parallelism?: number
+        activeDeadlineSeconds?: number
+      }
+      pod?: {
+        restartPolicy?: "Never" | "OnFailure"
+        containers?: Array<{
+          name?: string
+          type?: "container" | "initContainer"
+          image: string
+          imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+          syncHostTimezone?: boolean
+          ports?: Array<{
+            protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
+            name?: string
+            containerPort: string
+          }>
+          cpuRequest?: string
+          cpuLimit?: string
+          memoryRequestMi?: string
+          memoryLimitMi?: string
+        }>
+      }
+    }) => {
+      await updateJob(payload)
       await refreshRows(false)
     },
     [refreshRows]
@@ -325,6 +551,20 @@ export function JobsPageClient() {
         kind={jobType}
         namespaceOptions={createNamespaceOptions}
         onSubmit={handleCreateSubmit}
+      />
+      <CreateJobDialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open)
+          if (!open) {
+            setEditInitialValues(null)
+          }
+        }}
+        mode="edit"
+        kind={editKind}
+        namespaceOptions={createNamespaceOptions}
+        initialValues={editInitialValues}
+        onSubmit={handleEditSubmit}
       />
       <MonacoViewerDialog
         title="查看YAML"

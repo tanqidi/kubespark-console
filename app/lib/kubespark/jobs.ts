@@ -1,5 +1,12 @@
-import { buildResourceCollectionEndpoint, fetchJsonDeduped } from "./common"
 import {
+  buildResourceCollectionEndpoint,
+  buildResourceItemEndpoint,
+  fetchJsonDeduped,
+  fetchResourceByName,
+} from "./common"
+import {
+  asObject,
+  buildDescriptionPatch,
   buildMetadata,
   checkNamespacedResourceExists,
   type BaseCreateInput,
@@ -36,6 +43,12 @@ export type JobPodInput = {
 }
 
 export type CreateJobInput = BaseCreateInput & {
+  kind: JobCreateKind
+  strategy?: JobStrategyInput
+  pod?: JobPodInput
+}
+
+export type UpdateJobInput = BaseCreateInput & {
   kind: JobCreateKind
   strategy?: JobStrategyInput
   pod?: JobPodInput
@@ -292,6 +305,91 @@ export async function createJob(input: CreateJobInput): Promise<void> {
 
   await fetchJsonDeduped<unknown>(url, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  })
+}
+
+export async function updateJob(input: UpdateJobInput): Promise<void> {
+  const metadata = buildMetadata(input)
+  const resource = input.kind === "CronJob" ? "cronjobs" : "jobs"
+  const strategySpec = buildJobStrategySpec(input.strategy)
+  const restartPolicy = resolveRestartPolicy(input.pod)
+  const podContainerSpec = buildPodContainerSpec(input.pod)
+
+  const { payload } = await fetchResourceByName<unknown>("batch", "v1", resource, metadata.name, {
+    namespace: metadata.namespace,
+  })
+
+  const existing = asObject(payload)
+  const existingMetadata = asObject(existing.metadata)
+  const existingAnnotations = asObject(existingMetadata.annotations)
+  const mergedAnnotations = {
+    ...existingAnnotations,
+    ...buildDescriptionPatch(input.description).annotations,
+  }
+  if (mergedAnnotations.description === null) {
+    delete mergedAnnotations.description
+  }
+
+  const nextSpec =
+    input.kind === "CronJob"
+      ? (() => {
+          const existingSpec = asObject(existing.spec)
+          const existingJobTemplate = asObject(existingSpec.jobTemplate)
+          const existingJobTemplateSpec = asObject(existingJobTemplate.spec)
+
+          return {
+            ...existingSpec,
+            jobTemplate: {
+              ...existingJobTemplate,
+              spec: {
+                ...existingJobTemplateSpec,
+                ...strategySpec,
+                template: {
+                  spec: {
+                    restartPolicy,
+                    ...podContainerSpec,
+                  },
+                },
+              },
+            },
+          }
+        })()
+      : {
+          ...asObject(existing.spec),
+          ...strategySpec,
+          template: {
+            spec: {
+              restartPolicy,
+              ...podContainerSpec,
+            },
+          },
+        }
+
+  const requestBody = {
+    apiVersion: "batch/v1",
+    kind: input.kind,
+    metadata: {
+      name: metadata.name,
+      namespace: metadata.namespace,
+      resourceVersion:
+        typeof existingMetadata.resourceVersion === "string"
+          ? existingMetadata.resourceVersion
+          : undefined,
+      ...(Object.keys(mergedAnnotations).length > 0 ? { annotations: mergedAnnotations } : {}),
+      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
+        ? { labels: existingMetadata.labels }
+        : {}),
+    },
+    spec: nextSpec,
+  }
+
+  const url = buildResourceItemEndpoint("batch", "v1", resource, metadata.name, metadata.namespace)
+  await fetchJsonDeduped<unknown>(url, {
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },

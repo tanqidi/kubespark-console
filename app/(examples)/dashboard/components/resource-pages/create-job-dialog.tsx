@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import type { EditorProps } from "@monaco-editor/react"
+import dynamic from "next/dynamic"
 import {
   IconAdjustments,
   IconBraces,
@@ -54,11 +56,60 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { parse, stringify } from "yaml"
 
 type NamespaceOption = {
   id: string
   name: string
+}
+
+type JsonObject = Record<string, unknown>
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+})
+
+const MONACO_OPTIONS: EditorProps["options"] = {
+  automaticLayout: true,
+  fontSize: 13,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  stickyScroll: { enabled: false },
+  tabSize: 2,
+  wordWrap: "on",
+}
+
+export type JobDialogInitialValues = {
+  name: string
+  namespace: string
+  description?: string
+  strategy?: {
+    backoffLimit?: string
+    completions?: string
+    parallelism?: string
+    activeDeadlineSeconds?: string
+  }
+  pod?: {
+    restartPolicy?: "Never" | "OnFailure"
+    containers?: Array<{
+      name?: string
+      type?: ContainerType
+      image: string
+      imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+      syncHostTimezone?: boolean
+      ports?: Array<{
+        protocol?: ContainerPortProtocol
+        name?: string
+        containerPort: string
+      }>
+      cpuRequest?: string
+      cpuLimit?: string
+      memoryRequestMi?: string
+      memoryLimitMi?: string
+    }>
+  }
 }
 
 type CreateJobDialogProps = {
@@ -66,6 +117,8 @@ type CreateJobDialogProps = {
   onOpenChange: (open: boolean) => void
   kind: JobCreateKind
   namespaceOptions: NamespaceOption[]
+  mode?: "create" | "edit"
+  initialValues?: JobDialogInitialValues | null
   onSubmit: (payload: {
     kind: JobCreateKind
     name: string
@@ -134,6 +187,362 @@ const STEP_ORDER: CreateStep[] = ["basic", "strategy", "pod", "storage", "advanc
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 const POD_REQUIRED_MESSAGE = "请至少添加一个容器配置后再进入下一步"
+
+type JobDialogSnapshot = {
+  name: string
+  namespace: string
+  description: string
+  strategy: {
+    backoffLimit: string
+    completions: string
+    parallelism: string
+    activeDeadlineSeconds: string
+  }
+  pod: {
+    restartPolicy: "Never" | "OnFailure"
+    containers: ContainerDraft[]
+  }
+}
+
+function asObject(value: unknown): JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {}
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+function toOptionalPortProtocol(value: unknown): ContainerPortProtocol | undefined {
+  const normalized = asString(value).trim().toUpperCase()
+  return CONTAINER_PORT_PROTOCOL_SET.has(normalized)
+    ? (normalized as ContainerPortProtocol)
+    : undefined
+}
+
+function toOptionalIntegerString(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return String(Math.trunc(value))
+  }
+  const text = asString(value).trim()
+  return /^\d+$/.test(text) ? text : ""
+}
+
+function toMemoryMiText(value: unknown): string {
+  const raw = asString(value).trim()
+  if (!raw) return ""
+  const miMatch = raw.match(/^(\d+)mi$/i)
+  if (miMatch?.[1]) return miMatch[1]
+  return /^\d+$/.test(raw) ? raw : ""
+}
+
+function createContainerDraftFromInitial(
+  value: NonNullable<NonNullable<JobDialogInitialValues["pod"]>["containers"]>[number],
+  index: number
+): ContainerDraft {
+  return {
+    id: crypto.randomUUID(),
+    name: asString(value.name),
+    type: value.type === "initContainer" ? "initContainer" : "container",
+    image: asString(value.image),
+    imagePullPolicy:
+      value.imagePullPolicy === "Always" || value.imagePullPolicy === "Never"
+        ? value.imagePullPolicy
+        : "IfNotPresent",
+    syncHostTimezone: value.syncHostTimezone === true,
+    cpuRequest: asString(value.cpuRequest),
+    cpuLimit: asString(value.cpuLimit),
+    memoryRequestMi: asString(value.memoryRequestMi),
+    memoryLimitMi: asString(value.memoryLimitMi),
+    ports:
+      Array.isArray(value.ports) && value.ports.length > 0
+        ? value.ports.map((port) => ({
+            id: crypto.randomUUID(),
+            protocol: toOptionalPortProtocol(port.protocol) ?? "TCP",
+            name: asString(port.name),
+            containerPort: asString(port.containerPort),
+          }))
+        : index === 0
+          ? [createContainerPortDraft(0)]
+          : [],
+  }
+}
+
+function buildPodSpecFromContainers(
+  restartPolicy: "Never" | "OnFailure",
+  containers: ContainerDraft[]
+): JsonObject {
+  const workload: JsonObject[] = []
+  const init: JsonObject[] = []
+  let withHostTimezone = false
+
+  containers
+    .filter((item) => item.image.trim())
+    .forEach((item, index) => {
+      const requests = {
+        ...(item.cpuRequest.trim() ? { cpu: item.cpuRequest.trim() } : {}),
+        ...(item.memoryRequestMi.trim() ? { memory: `${item.memoryRequestMi.trim()}Mi` } : {}),
+      }
+      const limits = {
+        ...(item.cpuLimit.trim() ? { cpu: item.cpuLimit.trim() } : {}),
+        ...(item.memoryLimitMi.trim() ? { memory: `${item.memoryLimitMi.trim()}Mi` } : {}),
+      }
+      const ports = item.ports
+        .map((port) => {
+          const num = Number.parseInt(port.containerPort.trim(), 10)
+          if (!Number.isFinite(num) || num < 0 || num > 65535) return null
+          return {
+            ...(port.name.trim() ? { name: port.name.trim() } : {}),
+            ...(port.protocol ? { protocol: port.protocol } : {}),
+            containerPort: num,
+          }
+        })
+        .filter(
+          (
+            port
+          ): port is {
+            containerPort: number
+            name?: string
+            protocol?: ContainerPortProtocol
+          } => Boolean(port)
+        )
+
+      const spec: JsonObject = {
+        name: item.name.trim() || `task-${index + 1}`,
+        image: item.image.trim(),
+        ...(item.imagePullPolicy ? { imagePullPolicy: item.imagePullPolicy } : {}),
+        ...(Object.keys(requests).length > 0 || Object.keys(limits).length > 0
+          ? {
+              resources: {
+                ...(Object.keys(requests).length > 0 ? { requests } : {}),
+                ...(Object.keys(limits).length > 0 ? { limits } : {}),
+              },
+            }
+          : {}),
+        ...(ports.length > 0 ? { ports } : {}),
+      }
+
+      if (item.syncHostTimezone) {
+        withHostTimezone = true
+        spec.volumeMounts = [
+          {
+            name: "host-time",
+            readOnly: true,
+            mountPath: "/etc/localtime",
+          },
+        ]
+      }
+
+      if (item.type === "initContainer") {
+        init.push(spec)
+      } else {
+        workload.push(spec)
+      }
+    })
+
+  const fallbackContainer =
+    workload.length > 0
+      ? workload
+      : [
+          {
+            name: "task",
+            image: "busybox:1.36",
+            command: ["sh", "-c", "echo task-created"],
+          },
+        ]
+
+  return {
+    restartPolicy,
+    containers: fallbackContainer,
+    ...(init.length > 0 ? { initContainers: init } : {}),
+    ...(withHostTimezone
+      ? {
+          volumes: [
+            {
+              name: "host-time",
+              hostPath: {
+                path: "/etc/localtime",
+                type: "",
+              },
+            },
+          ],
+        }
+      : {}),
+  }
+}
+
+function buildJobYamlText(kind: JobCreateKind, snapshot: JobDialogSnapshot): string {
+  const strategy = {
+    ...(toOptionalIntegerString(snapshot.strategy.backoffLimit)
+      ? { backoffLimit: Number.parseInt(snapshot.strategy.backoffLimit, 10) }
+      : {}),
+    ...(toOptionalIntegerString(snapshot.strategy.completions)
+      ? { completions: Number.parseInt(snapshot.strategy.completions, 10) }
+      : {}),
+    ...(toOptionalIntegerString(snapshot.strategy.parallelism)
+      ? { parallelism: Number.parseInt(snapshot.strategy.parallelism, 10) }
+      : {}),
+    ...(toOptionalIntegerString(snapshot.strategy.activeDeadlineSeconds)
+      ? { activeDeadlineSeconds: Number.parseInt(snapshot.strategy.activeDeadlineSeconds, 10) }
+      : {}),
+  }
+  const metadata: JsonObject = {
+    name: snapshot.name.trim().toLowerCase(),
+    namespace: snapshot.namespace.trim(),
+    ...(snapshot.description.trim()
+      ? { annotations: { description: snapshot.description.trim() } }
+      : {}),
+  }
+  const podSpec = buildPodSpecFromContainers(
+    snapshot.pod.restartPolicy,
+    snapshot.pod.containers
+  )
+
+  const manifest: JsonObject =
+    kind === "CronJob"
+      ? {
+          apiVersion: "batch/v1",
+          kind: "CronJob",
+          metadata,
+          spec: {
+            schedule: "*/5 * * * *",
+            concurrencyPolicy: "Forbid",
+            successfulJobsHistoryLimit: 3,
+            failedJobsHistoryLimit: 1,
+            jobTemplate: {
+              spec: {
+                ...strategy,
+                template: {
+                  spec: podSpec,
+                },
+              },
+            },
+          },
+        }
+      : {
+          apiVersion: "batch/v1",
+          kind: "Job",
+          metadata,
+          spec: {
+            ...strategy,
+            template: {
+              spec: podSpec,
+            },
+          },
+        }
+
+  return stringify(manifest, {
+    indent: 2,
+    lineWidth: 0,
+    sortMapEntries: false,
+  })
+}
+
+function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnapshot {
+  const root = asObject(parse(yamlText))
+  if (Object.keys(root).length === 0) throw new Error("YAML 内容格式无效")
+  const actualKind = asString(root.kind).trim()
+  if (actualKind && actualKind !== kind) {
+    throw new Error(`YAML 资源类型必须是 ${kind}`)
+  }
+
+  const metadata = asObject(root.metadata)
+  const annotations = asObject(metadata.annotations)
+  const spec = asObject(root.spec)
+  const strategySource =
+    kind === "CronJob"
+      ? asObject(asObject(asObject(spec.jobTemplate).spec))
+      : spec
+  const podSpec =
+    kind === "CronJob"
+      ? asObject(asObject(asObject(strategySource.template).spec))
+      : asObject(asObject(spec.template).spec)
+
+  const hostTimeVolumeNames = new Set(
+    (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
+      .map((vol) => asObject(vol))
+      .filter((vol) => asString(vol.name) && asString(asObject(vol.hostPath).path) === "/etc/localtime")
+      .map((vol) => asString(vol.name))
+  )
+
+  const parseContainers = (
+    raw: unknown,
+    type: ContainerType
+  ): ContainerDraft[] =>
+    (Array.isArray(raw) ? raw : [])
+      .map((entry, index) => {
+        const item = asObject(entry)
+        const resources = asObject(item.resources)
+        const requests = asObject(resources.requests)
+        const limits = asObject(resources.limits)
+        const ports = (Array.isArray(item.ports) ? item.ports : [])
+          .map((port) => {
+            const portObj = asObject(port)
+            const containerPortText = toOptionalIntegerString(portObj.containerPort)
+            if (!containerPortText) return null
+            return {
+              id: crypto.randomUUID(),
+              protocol: toOptionalPortProtocol(portObj.protocol) ?? "TCP",
+              name: asString(portObj.name),
+              containerPort: containerPortText,
+            }
+          })
+          .filter((port): port is ContainerPortDraft => Boolean(port))
+        const mounts = Array.isArray(item.volumeMounts) ? item.volumeMounts : []
+        const withTimezone = mounts.some((mount) => {
+          const mountObj = asObject(mount)
+          const mountPath = asString(mountObj.mountPath)
+          const mountName = asString(mountObj.name)
+          return (
+            mountPath === "/etc/localtime" ||
+            (mountName.length > 0 && hostTimeVolumeNames.has(mountName))
+          )
+        })
+
+        const imagePullPolicy: "Always" | "IfNotPresent" | "Never" =
+          asString(item.imagePullPolicy) === "Always" ||
+          asString(item.imagePullPolicy) === "Never"
+            ? (asString(item.imagePullPolicy) as "Always" | "Never")
+            : "IfNotPresent"
+
+        return {
+          id: crypto.randomUUID(),
+          name: asString(item.name),
+          type,
+          image: asString(item.image),
+          imagePullPolicy,
+          syncHostTimezone: withTimezone,
+          cpuRequest: asString(requests.cpu),
+          cpuLimit: asString(limits.cpu),
+          memoryRequestMi: toMemoryMiText(requests.memory),
+          memoryLimitMi: toMemoryMiText(limits.memory),
+          ports: ports.length > 0 ? ports : index === 0 ? [createContainerPortDraft(0)] : [],
+        }
+      })
+      .filter((item) => item.image.trim())
+
+  const containers = [
+    ...parseContainers(podSpec.containers, "container"),
+    ...parseContainers(podSpec.initContainers, "initContainer"),
+  ]
+
+  return {
+    name: asString(metadata.name),
+    namespace: asString(metadata.namespace),
+    description: asString(annotations.description),
+    strategy: {
+      backoffLimit: toOptionalIntegerString(strategySource.backoffLimit),
+      completions: toOptionalIntegerString(strategySource.completions),
+      parallelism: toOptionalIntegerString(strategySource.parallelism),
+      activeDeadlineSeconds: toOptionalIntegerString(strategySource.activeDeadlineSeconds),
+    },
+    pod: {
+      restartPolicy: asString(podSpec.restartPolicy) === "OnFailure" ? "OnFailure" : "Never",
+      containers: containers.length > 0 ? containers : [],
+    },
+  }
+}
 
 function createContainerDraft(): ContainerDraft {
   return {
@@ -266,8 +675,11 @@ export function CreateJobDialog({
   onOpenChange,
   kind,
   namespaceOptions,
+  mode = "create",
+  initialValues = null,
   onSubmit,
 }: CreateJobDialogProps) {
+  const isEditMode = mode === "edit"
   const [activeStep, setActiveStep] = React.useState<CreateStep>("basic")
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
@@ -285,6 +697,9 @@ export function CreateJobDialog({
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
+  const [yamlMode, setYamlMode] = React.useState(false)
+  const [yamlText, setYamlText] = React.useState("")
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [checkingNext, setCheckingNext] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
 
@@ -297,11 +712,21 @@ export function CreateJobDialog({
   const isEditingPodView = containerDialogOpen
   const canNavigateStep = !isBusy && !isEditingPodView
 
-  const dialogTitle = kind === "CronJob" ? "创建定时任务" : "创建任务"
+  const dialogTitle = isEditMode
+    ? kind === "CronJob"
+      ? "编辑定时任务"
+      : "编辑任务"
+    : kind === "CronJob"
+      ? "创建定时任务"
+      : "创建任务"
   const dialogDescription =
-    kind === "CronJob"
-      ? "使用 Kubernetes CronJob 创建按周期执行的任务。"
-      : "使用 Kubernetes Job 创建一次性任务。"
+    isEditMode
+      ? kind === "CronJob"
+        ? "编辑 Kubernetes CronJob 的配置内容。"
+        : "编辑 Kubernetes Job 的配置内容。"
+      : kind === "CronJob"
+        ? "使用 Kubernetes CronJob 创建按周期执行的任务。"
+        : "使用 Kubernetes Job 创建一次性任务。"
 
   React.useEffect(() => {
     if (!open) {
@@ -322,10 +747,42 @@ export function CreateJobDialog({
       setNameError(null)
       setNamespaceError(null)
       setSubmitError(null)
+      setYamlMode(false)
+      setYamlText("")
+      setYamlError(null)
       setCheckingNext(false)
       setCreating(false)
     }
   }, [open, kind])
+
+  React.useEffect(() => {
+    if (!open || !isEditMode || !initialValues) return
+
+    setActiveStep("basic")
+    setName(initialValues.name)
+    setNamespace(initialValues.namespace)
+    setDescription(initialValues.description ?? "")
+    setBackoffLimit(initialValues.strategy?.backoffLimit ?? "")
+    setCompletions(initialValues.strategy?.completions ?? "")
+    setParallelism(initialValues.strategy?.parallelism ?? "")
+    setActiveDeadlineSeconds(initialValues.strategy?.activeDeadlineSeconds ?? "")
+    setRestartPolicy(initialValues.pod?.restartPolicy === "OnFailure" ? "OnFailure" : "Never")
+    setContainers(
+      Array.isArray(initialValues.pod?.containers)
+        ? initialValues.pod.containers.map((item, index) => createContainerDraftFromInitial(item, index))
+        : []
+    )
+    setContainerDialogOpen(false)
+    setEditingContainerId(null)
+    setEditingImageError(null)
+    setEditingPortFieldErrors({})
+    setNameError(null)
+    setNamespaceError(null)
+    setSubmitError(null)
+    setYamlMode(false)
+    setYamlText("")
+    setYamlError(null)
+  }, [initialValues, isEditMode, open])
 
   const goPrev = React.useCallback(() => {
     if (isBusy || isBasicStep) return
@@ -349,6 +806,96 @@ export function CreateJobDialog({
     setSubmitError(POD_REQUIRED_MESSAGE)
     return false
   }, [configuredContainers.length])
+
+  const lockedIdentity = React.useMemo(
+    () =>
+      isEditMode && initialValues
+        ? {
+            name: initialValues.name.trim().toLowerCase(),
+            namespace: initialValues.namespace.trim(),
+          }
+        : null,
+    [initialValues, isEditMode]
+  )
+
+  const getSnapshot = React.useCallback(
+    (): JobDialogSnapshot => ({
+      name,
+      namespace,
+      description,
+      strategy: {
+        backoffLimit,
+        completions,
+        parallelism,
+        activeDeadlineSeconds,
+      },
+      pod: {
+        restartPolicy,
+        containers,
+      },
+    }),
+    [
+      activeDeadlineSeconds,
+      backoffLimit,
+      completions,
+      containers,
+      description,
+      name,
+      namespace,
+      parallelism,
+      restartPolicy,
+    ]
+  )
+
+  const applySnapshot = React.useCallback((snapshot: JobDialogSnapshot) => {
+    setName(snapshot.name)
+    setNamespace(snapshot.namespace)
+    setDescription(snapshot.description)
+    setBackoffLimit(snapshot.strategy.backoffLimit)
+    setCompletions(snapshot.strategy.completions)
+    setParallelism(snapshot.strategy.parallelism)
+    setActiveDeadlineSeconds(snapshot.strategy.activeDeadlineSeconds)
+    setRestartPolicy(snapshot.pod.restartPolicy)
+    setContainers(snapshot.pod.containers)
+    setNameError(null)
+    setNamespaceError(null)
+    setSubmitError(null)
+  }, [])
+
+  const withLockedIdentity = React.useCallback(
+    (snapshot: JobDialogSnapshot): JobDialogSnapshot => {
+      if (!lockedIdentity) return snapshot
+      return {
+        ...snapshot,
+        name: lockedIdentity.name,
+        namespace: lockedIdentity.namespace,
+      }
+    },
+    [lockedIdentity]
+  )
+
+  const handleYamlModeChange = React.useCallback(
+    (checked: boolean) => {
+      if (isBusy) return
+
+      if (checked) {
+        setYamlText(buildJobYamlText(kind, withLockedIdentity(getSnapshot())))
+        setYamlError(null)
+        setYamlMode(true)
+        return
+      }
+
+      try {
+        const parsed = parseJobYamlText(kind, yamlText)
+        applySnapshot(withLockedIdentity(parsed))
+        setYamlError(null)
+        setYamlMode(false)
+      } catch (error) {
+        setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      }
+    },
+    [applySnapshot, getSnapshot, isBusy, kind, withLockedIdentity, yamlText]
+  )
 
   const updateContainer = React.useCallback(
     (
@@ -571,14 +1118,16 @@ export function CreateJobDialog({
     setEditingContainerId(null)
   }, [editingContainerId])
 
-  const runBasicValidation = React.useCallback(async () => {
-    const nextName = name.trim().toLowerCase()
-    const nextNamespace = namespace.trim()
+  const runBasicValidation = React.useCallback(async (source?: Pick<JobDialogSnapshot, "name" | "namespace">) => {
+    const nextName = (lockedIdentity?.name ?? source?.name ?? name).trim().toLowerCase()
+    const nextNamespace = (lockedIdentity?.namespace ?? source?.namespace ?? namespace).trim()
     const nextNameError = validateName(nextName)
     const nextNamespaceError = nextNamespace ? null : "请选择项目"
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
     if (nextNameError || nextNamespaceError) return false
+
+    if (isEditMode) return true
 
     const exists = await checkJobExists({
       kind,
@@ -591,10 +1140,10 @@ export function CreateJobDialog({
     }
 
     return true
-  }, [kind, name, namespace])
+  }, [isEditMode, kind, lockedIdentity?.name, lockedIdentity?.namespace, name, namespace])
 
   const goNext = React.useCallback(async () => {
-    if (isBusy || isFinalStep || isEditingPodView) return
+    if (isBusy || isFinalStep || isEditingPodView || yamlMode) return
     setSubmitError(null)
 
     if (isBasicStep) {
@@ -624,25 +1173,69 @@ export function CreateJobDialog({
     isEditingPodView,
     isFinalStep,
     isPodStep,
+    yamlMode,
     runBasicValidation,
     runPodValidation,
   ])
 
   const handleCreate = React.useCallback(
     async () => {
-      if (isBusy || !isFinalStep) return
+      if (isBusy || (!isFinalStep && !yamlMode)) return
 
       setSubmitError(null)
       setCreating(true)
       try {
-        const passed = await runBasicValidation()
-        if (!passed) return
+        let source = getSnapshot()
+        if (yamlMode) {
+          try {
+            source = withLockedIdentity(parseJobYamlText(kind, yamlText))
+            applySnapshot(source)
+            setYamlError(null)
+          } catch (error) {
+            setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+            return
+          }
+        }
+
+        const normalizedName = (lockedIdentity?.name ?? source.name).trim().toLowerCase()
+        const normalizedNamespace = (lockedIdentity?.namespace ?? source.namespace).trim()
+        const nextNameError = validateName(normalizedName)
+        const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
+        setNameError(nextNameError)
+        setNamespaceError(nextNamespaceError)
+        if (nextNameError || nextNamespaceError) {
+          if (yamlMode) {
+            setYamlError(nextNameError ?? nextNamespaceError)
+          } else {
+            setActiveStep("basic")
+          }
+          return
+        }
+
+        if (!isEditMode) {
+          const exists = await checkJobExists({
+            kind,
+            name: normalizedName,
+            namespace: normalizedNamespace,
+          })
+          if (exists) {
+            const existsError =
+              kind === "CronJob" ? "定时任务名称已存在，请更换后重试" : "任务名称已存在，请更换后重试"
+            setNameError(existsError)
+            if (yamlMode) {
+              setYamlError(existsError)
+            } else {
+              setActiveStep("basic")
+            }
+            return
+          }
+        }
 
         const strategyDraft = {
-          backoffLimit: toOptionalNonNegativeInt(backoffLimit),
-          completions: toOptionalNonNegativeInt(completions),
-          parallelism: toOptionalNonNegativeInt(parallelism),
-          activeDeadlineSeconds: toOptionalNonNegativeInt(activeDeadlineSeconds),
+          backoffLimit: toOptionalNonNegativeInt(source.strategy.backoffLimit),
+          completions: toOptionalNonNegativeInt(source.strategy.completions),
+          parallelism: toOptionalNonNegativeInt(source.strategy.parallelism),
+          activeDeadlineSeconds: toOptionalNonNegativeInt(source.strategy.activeDeadlineSeconds),
         }
         const strategy =
           typeof strategyDraft.backoffLimit === "number" ||
@@ -652,7 +1245,7 @@ export function CreateJobDialog({
             ? strategyDraft
             : undefined
 
-        const normalizedContainers = containers
+        const normalizedContainers = source.pod.containers
           .map((item) => {
             const normalizedPorts = item.ports
               .map((port) => ({
@@ -678,9 +1271,11 @@ export function CreateJobDialog({
           .filter((item) => item.image.length > 0)
 
         const pod =
-          restartPolicy === "OnFailure" || normalizedContainers.length > 0
+          source.pod.restartPolicy === "OnFailure" || normalizedContainers.length > 0
             ? {
-                ...(restartPolicy === "OnFailure" ? { restartPolicy } : {}),
+                ...(source.pod.restartPolicy === "OnFailure"
+                  ? { restartPolicy: source.pod.restartPolicy }
+                  : {}),
                 ...(normalizedContainers.length > 0
                   ? {
                       containers: normalizedContainers,
@@ -691,9 +1286,9 @@ export function CreateJobDialog({
 
         await onSubmit({
           kind,
-          name: name.trim().toLowerCase(),
-          namespace: namespace.trim(),
-          description: description.trim(),
+          name: normalizedName,
+          namespace: normalizedNamespace,
+          description: source.description.trim(),
           strategy,
           pod,
         })
@@ -706,21 +1301,19 @@ export function CreateJobDialog({
       }
     },
     [
-      activeDeadlineSeconds,
-      backoffLimit,
-      completions,
-      description,
+      applySnapshot,
+      getSnapshot,
       isBusy,
       isFinalStep,
+      isEditMode,
       kind,
-      name,
-      namespace,
+      lockedIdentity?.name,
+      lockedIdentity?.namespace,
       onOpenChange,
       onSubmit,
-      parallelism,
-      containers,
-      restartPolicy,
-      runBasicValidation,
+      withLockedIdentity,
+      yamlMode,
+      yamlText,
     ]
   )
 
@@ -739,12 +1332,26 @@ export function CreateJobDialog({
       >
         <div className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
-            <DialogTitle>{dialogTitle}</DialogTitle>
-            <DialogDescription>{dialogDescription}</DialogDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <DialogTitle>{dialogTitle}</DialogTitle>
+                <DialogDescription>{dialogDescription}</DialogDescription>
+              </div>
+              <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                <span className="text-sm font-medium">编辑 YAML</span>
+                <Switch
+                  checked={yamlMode}
+                  onCheckedChange={handleYamlModeChange}
+                  disabled={isBusy}
+                  aria-label="编辑 YAML"
+                />
+              </div>
+            </div>
           </DialogHeader>
 
-          <StepHeaderNav
-            items={[
+          {!yamlMode ? (
+            <StepHeaderNav
+              items={[
               {
                 id: "basic",
                 title: "基本信息",
@@ -818,11 +1425,29 @@ export function CreateJobDialog({
                   setSubmitError(null)
                 },
               },
-            ]}
-          />
+              ]}
+            />
+          ) : null}
 
-          <div className="min-h-0 flex-1 px-6 py-6">
-            {isBasicStep ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+            {yamlMode ? (
+              <div className="flex h-full min-h-[56vh] flex-col">
+                <div className="overflow-hidden rounded-lg border">
+                  <MonacoEditor
+                    language="yaml"
+                    theme="vs-dark"
+                    value={yamlText}
+                    onChange={(value) => {
+                      setYamlText(value ?? "")
+                      if (yamlError) setYamlError(null)
+                    }}
+                    options={MONACO_OPTIONS}
+                    height="56vh"
+                  />
+                </div>
+                {yamlError ? <FieldError className="mt-3">{yamlError}</FieldError> : null}
+              </div>
+            ) : isBasicStep ? (
               <div>
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">基本信息</h3>
@@ -845,7 +1470,7 @@ export function CreateJobDialog({
                       placeholder={kind === "CronJob" ? "请输入定时任务名称" : "请输入任务名称"}
                       autoComplete="off"
                       aria-invalid={Boolean(nameError)}
-                      disabled={isBusy}
+                      disabled={isBusy || isEditMode}
                     />
                     {nameError ? (
                       <FieldError>{nameError}</FieldError>
@@ -859,11 +1484,12 @@ export function CreateJobDialog({
                     <Select
                       value={namespace}
                       onValueChange={(value) => {
+                        if (isEditMode) return
                         setNamespace(value)
                         if (namespaceError) setNamespaceError(null)
                         if (submitError) setSubmitError(null)
                       }}
-                      disabled={isBusy}
+                      disabled={isBusy || isEditMode}
                     >
                       <SelectTrigger id="create-job-namespace" aria-invalid={Boolean(namespaceError)}>
                         <SelectValue placeholder="请选择项目" />
@@ -1096,13 +1722,7 @@ export function CreateJobDialog({
               <div>
                 <div className="mb-3">
                   <h3 className="text-[15px] font-semibold">
-                    {activeStep === "strategy"
-                      ? "策略设置"
-                      : activeStep === "pod"
-                        ? "容器组设置"
-                        : activeStep === "storage"
-                          ? "存储设置"
-                          : "高级设置"}
+                    {activeStep === "storage" ? "存储设置" : "高级设置"}
                   </h3>
                   <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
                 </div>
@@ -1114,7 +1734,20 @@ export function CreateJobDialog({
             ) : null}
           </div>
 
-          {isBasicStep ? (
+          {yamlMode ? (
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+              <div className="flex w-full items-center justify-between gap-3">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={isBusy}>
+                    取消
+                  </Button>
+                </DialogClose>
+                <Button type="button" onClick={() => void handleCreate()} disabled={isBusy}>
+                  {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                </Button>
+              </div>
+            </DialogFooter>
+          ) : isBasicStep ? (
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <DialogClose asChild>
@@ -1134,7 +1767,7 @@ export function CreateJobDialog({
                   上一步
                 </Button>
                 <Button type="button" onClick={() => void handleCreate()} disabled={isBusy}>
-                  {creating ? "创建中..." : "创建"}
+                  {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                 </Button>
               </div>
             </DialogFooter>
