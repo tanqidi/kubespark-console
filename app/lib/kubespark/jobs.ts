@@ -14,6 +14,7 @@ import {
 } from "./create-utils"
 
 export type JobCreateKind = "Job" | "CronJob"
+const DEFAULT_CRON_SCHEDULE = "0 0 1 * *"
 
 export type JobStrategyInput = {
   backoffLimit?: number
@@ -60,12 +61,14 @@ export type JobPodInput = {
 
 export type CreateJobInput = BaseCreateInput & {
   kind: JobCreateKind
+  schedule?: string
   strategy?: JobStrategyInput
   pod?: JobPodInput
 }
 
 export type UpdateJobInput = BaseCreateInput & {
   kind: JobCreateKind
+  schedule?: string
   strategy?: JobStrategyInput
   pod?: JobPodInput
 }
@@ -326,6 +329,15 @@ function resolveRestartPolicy(pod?: JobPodInput): "Never" | "OnFailure" {
   return pod?.restartPolicy === "OnFailure" ? "OnFailure" : "Never"
 }
 
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+function normalizeCronSchedule(value: unknown): string {
+  const text = asString(value).trim()
+  return text || DEFAULT_CRON_SCHEDULE
+}
+
 export async function checkJobExists(
   input: ExistenceCheckInput & { kind: JobCreateKind }
 ): Promise<boolean> {
@@ -343,6 +355,7 @@ export async function createJob(input: CreateJobInput): Promise<void> {
   const strategySpec = buildJobStrategySpec(input.strategy)
   const restartPolicy = resolveRestartPolicy(input.pod)
   const podContainerSpec = buildPodContainerSpec(input.pod)
+  const schedule = normalizeCronSchedule(input.schedule)
 
   const requestBody =
     input.kind === "CronJob"
@@ -351,7 +364,7 @@ export async function createJob(input: CreateJobInput): Promise<void> {
           kind: "CronJob",
           metadata,
           spec: {
-            schedule: "*/5 * * * *",
+            schedule,
             concurrencyPolicy: "Forbid",
             successfulJobsHistoryLimit: 3,
             failedJobsHistoryLimit: 1,
@@ -431,9 +444,11 @@ export async function updateJob(input: UpdateJobInput): Promise<void> {
           const existingSpec = asObject(existing.spec)
           const existingJobTemplate = asObject(existingSpec.jobTemplate)
           const existingJobTemplateSpec = asObject(existingJobTemplate.spec)
+          const schedule = normalizeCronSchedule(input.schedule ?? asString(existingSpec.schedule))
 
           return {
             ...existingSpec,
+            schedule,
             jobTemplate: {
               ...existingJobTemplate,
               spec: {

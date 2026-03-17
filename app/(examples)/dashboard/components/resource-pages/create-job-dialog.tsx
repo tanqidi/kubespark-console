@@ -87,6 +87,7 @@ export type JobDialogInitialValues = {
   name: string
   namespace: string
   description?: string
+  schedule?: string
   strategy?: {
     backoffLimit?: string
     completions?: string
@@ -142,6 +143,7 @@ type CreateJobDialogProps = {
     name: string
     namespace: string
     description: string
+    schedule?: string
     strategy?: {
       backoffLimit?: number
       completions?: number
@@ -221,11 +223,14 @@ const STEP_ORDER: CreateStep[] = ["basic", "strategy", "pod", "storage", "advanc
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 const POD_REQUIRED_MESSAGE = "请至少添加一个容器配置后再进入下一步"
+const DEFAULT_CRON_SCHEDULE = "0 0 1 * *"
+const CRON_SCHEDULE_REQUIRED_MESSAGE = "请输入定时计划"
 
 type JobDialogSnapshot = {
   name: string
   namespace: string
   description: string
+  schedule: string
   strategy: {
     backoffLimit: string
     completions: string
@@ -615,7 +620,7 @@ function buildJobYamlText(kind: JobCreateKind, snapshot: JobDialogSnapshot): str
           kind: "CronJob",
           metadata,
           spec: {
-            schedule: "*/5 * * * *",
+            schedule: snapshot.schedule.trim() || DEFAULT_CRON_SCHEDULE,
             concurrencyPolicy: "Forbid",
             successfulJobsHistoryLimit: 3,
             failedJobsHistoryLimit: 1,
@@ -779,6 +784,7 @@ function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnaps
     name: asString(metadata.name),
     namespace: asString(metadata.namespace),
     description: asString(annotations.description),
+    schedule: kind === "CronJob" ? asString(spec.schedule).trim() || DEFAULT_CRON_SCHEDULE : "",
     strategy: {
       backoffLimit: toOptionalIntegerString(strategySource.backoffLimit),
       completions: toOptionalIntegerString(strategySource.completions),
@@ -975,6 +981,7 @@ export function CreateJobDialog({
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [schedule, setSchedule] = React.useState(kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : "")
   const [backoffLimit, setBackoffLimit] = React.useState("")
   const [completions, setCompletions] = React.useState("")
   const [parallelism, setParallelism] = React.useState("")
@@ -989,6 +996,7 @@ export function CreateJobDialog({
   const [editingEnvDuplicateIds, setEditingEnvDuplicateIds] = React.useState<string[]>([])
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
+  const [scheduleError, setScheduleError] = React.useState<string | null>(null)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
   const [yamlMode, setYamlMode] = React.useState(false)
   const [yamlText, setYamlText] = React.useState("")
@@ -1027,6 +1035,7 @@ export function CreateJobDialog({
       setName("")
       setNamespace("")
       setDescription("")
+      setSchedule(kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : "")
       setBackoffLimit("")
       setCompletions("")
       setParallelism("")
@@ -1041,6 +1050,7 @@ export function CreateJobDialog({
       setEditingEnvDuplicateIds([])
       setNameError(null)
       setNamespaceError(null)
+      setScheduleError(null)
       setSubmitError(null)
       setYamlMode(false)
       setYamlText("")
@@ -1057,6 +1067,7 @@ export function CreateJobDialog({
     setName(initialValues.name)
     setNamespace(initialValues.namespace)
     setDescription(initialValues.description ?? "")
+    setSchedule((initialValues.schedule ?? "").trim() || (kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : ""))
     setBackoffLimit(initialValues.strategy?.backoffLimit ?? "")
     setCompletions(initialValues.strategy?.completions ?? "")
     setParallelism(initialValues.strategy?.parallelism ?? "")
@@ -1075,11 +1086,12 @@ export function CreateJobDialog({
     setEditingEnvDuplicateIds([])
     setNameError(null)
     setNamespaceError(null)
+    setScheduleError(null)
     setSubmitError(null)
     setYamlMode(false)
     setYamlText("")
     setYamlError(null)
-  }, [initialValues, isEditMode, open])
+  }, [initialValues, isEditMode, kind, open])
 
   const goPrev = React.useCallback(() => {
     if (isBusy || isBasicStep) return
@@ -1130,6 +1142,7 @@ export function CreateJobDialog({
       name,
       namespace,
       description,
+      schedule,
       strategy: {
         backoffLimit,
         completions,
@@ -1149,6 +1162,7 @@ export function CreateJobDialog({
       description,
       name,
       namespace,
+      schedule,
       parallelism,
       restartPolicy,
     ]
@@ -1158,6 +1172,7 @@ export function CreateJobDialog({
     setName(snapshot.name)
     setNamespace(snapshot.namespace)
     setDescription(snapshot.description)
+    setSchedule(snapshot.schedule)
     setBackoffLimit(snapshot.strategy.backoffLimit)
     setCompletions(snapshot.strategy.completions)
     setParallelism(snapshot.strategy.parallelism)
@@ -1166,6 +1181,7 @@ export function CreateJobDialog({
     setContainers(snapshot.pod.containers)
     setNameError(null)
     setNamespaceError(null)
+    setScheduleError(null)
     setSubmitError(null)
   }, [])
 
@@ -1573,14 +1589,36 @@ export function CreateJobDialog({
     setEditingContainerId(null)
   }, [editingContainerId])
 
-  const runBasicValidation = React.useCallback(async (source?: Pick<JobDialogSnapshot, "name" | "namespace">) => {
+  const runBasicValidation = React.useCallback(async (source?: Pick<JobDialogSnapshot, "name" | "namespace" | "schedule">) => {
     const nextName = (lockedIdentity?.name ?? source?.name ?? name).trim().toLowerCase()
     const nextNamespace = (lockedIdentity?.namespace ?? source?.namespace ?? namespace).trim()
+    const nextSchedule = kind === "CronJob" ? (source?.schedule ?? schedule).trim() : ""
     const nextNameError = validateName(nextName)
     const nextNamespaceError = nextNamespace ? null : "请选择项目"
+    const nextScheduleError = kind === "CronJob" && !nextSchedule ? CRON_SCHEDULE_REQUIRED_MESSAGE : null
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
-    if (nextNameError || nextNamespaceError) return false
+    setScheduleError(nextScheduleError)
+    if (nextNameError || nextNamespaceError || nextScheduleError) {
+      const firstInvalidFieldId = resolveFirstInvalidFieldId([
+        {
+          invalid: Boolean(nextNameError),
+          fieldId: "create-job-name",
+        },
+        {
+          invalid: Boolean(nextNamespaceError),
+          fieldId: "create-job-namespace",
+        },
+        {
+          invalid: Boolean(nextScheduleError),
+          fieldId: "create-job-schedule",
+        },
+      ])
+      if (firstInvalidFieldId) {
+        scrollAndFocusFieldById(firstInvalidFieldId)
+      }
+      return false
+    }
 
     if (isEditMode) return true
 
@@ -1595,7 +1633,7 @@ export function CreateJobDialog({
     }
 
     return true
-  }, [isEditMode, kind, lockedIdentity?.name, lockedIdentity?.namespace, name, namespace])
+  }, [isEditMode, kind, lockedIdentity?.name, lockedIdentity?.namespace, name, namespace, schedule])
 
   const goNext = React.useCallback(async () => {
     if (isBusy || isFinalStep || isEditingPodView || yamlMode) return
@@ -1654,13 +1692,16 @@ export function CreateJobDialog({
 
         const normalizedName = (lockedIdentity?.name ?? source.name).trim().toLowerCase()
         const normalizedNamespace = (lockedIdentity?.namespace ?? source.namespace).trim()
+        const normalizedSchedule = kind === "CronJob" ? source.schedule.trim() : ""
         const nextNameError = validateName(normalizedName)
         const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
+        const nextScheduleError = kind === "CronJob" && !normalizedSchedule ? CRON_SCHEDULE_REQUIRED_MESSAGE : null
         setNameError(nextNameError)
         setNamespaceError(nextNamespaceError)
-        if (nextNameError || nextNamespaceError) {
+        setScheduleError(nextScheduleError)
+        if (nextNameError || nextNamespaceError || nextScheduleError) {
           if (yamlMode) {
-            setYamlError(nextNameError ?? nextNamespaceError)
+            setYamlError(nextNameError ?? nextNamespaceError ?? nextScheduleError)
           } else {
             setActiveStep("basic")
           }
@@ -1800,6 +1841,7 @@ export function CreateJobDialog({
           name: normalizedName,
           namespace: normalizedNamespace,
           description: source.description.trim(),
+          ...(kind === "CronJob" ? { schedule: normalizedSchedule } : {}),
           strategy,
           pod,
         })
@@ -2021,6 +2063,33 @@ export function CreateJobDialog({
                       <FieldDescription>选择任务所属项目。</FieldDescription>
                     )}
                   </Field>
+
+                  {kind === "CronJob" ? (
+                    <Field data-invalid={Boolean(scheduleError)}>
+                      <FieldLabel htmlFor="create-job-schedule">定时计划</FieldLabel>
+                      <Input
+                        id="create-job-schedule"
+                        value={schedule}
+                        onChange={(event) => {
+                          setSchedule(event.target.value)
+                          if (scheduleError) setScheduleError(null)
+                          if (submitError) setSubmitError(null)
+                        }}
+                        placeholder="例如：0 0 1 * *（每月）"
+                        autoComplete="off"
+                        aria-invalid={Boolean(scheduleError)}
+                        disabled={isBusy}
+                      />
+                      {scheduleError ? (
+                        <FieldError>{scheduleError}</FieldError>
+                      ) : (
+                        <FieldDescription>
+                          为定时任务设置 Cron 表达式，例如 `0 0 1 * *`（每月执行）。
+                        </FieldDescription>
+                      )}
+                    </Field>
+                  ) : null}
+                  {kind === "CronJob" ? <div className="hidden md:block" aria-hidden /> : null}
 
                   <Field className="md:col-span-2">
                     <FieldLabel htmlFor="create-job-description">描述</FieldLabel>

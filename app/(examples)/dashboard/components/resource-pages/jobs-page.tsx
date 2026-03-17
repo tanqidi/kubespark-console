@@ -61,6 +61,7 @@ const CONTAINER_PORT_PROTOCOL_SET = new Set([
   "UDP",
   "SCTP",
 ])
+const DEFAULT_CRON_SCHEDULE = "0 0 1 * *"
 
 type JsonObject = Record<string, unknown>
 type JobDialogContainer = NonNullable<NonNullable<JobDialogInitialValues["pod"]>["containers"]>[number]
@@ -245,6 +246,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
     name: asString(metadata.name) || row.name,
     namespace: asString(metadata.namespace) || row.namespace,
     description: asString(annotations.description),
+    schedule: kind === "CronJob" ? asString(spec.schedule).trim() || DEFAULT_CRON_SCHEDULE : undefined,
     strategy: {
       backoffLimit: toOptionalIntegerString(strategySource.backoffLimit),
       completions: toOptionalIntegerString(strategySource.completions),
@@ -453,6 +455,7 @@ export function JobsPageClient() {
       name: string
       namespace: string
       description: string
+      schedule?: string
       strategy?: {
         backoffLimit?: number
         completions?: number
@@ -492,6 +495,7 @@ export function JobsPageClient() {
       name: string
       namespace: string
       description: string
+      schedule?: string
       strategy?: {
         backoffLimit?: number
         completions?: number
