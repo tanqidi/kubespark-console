@@ -29,6 +29,11 @@ export type SecretKeyRefOption = {
   keys: string[]
 }
 
+export type SecretEntry = {
+  key: string
+  value: string
+}
+
 type RawSecretForKeyRef = {
   metadata?: {
     name?: string
@@ -45,6 +50,28 @@ function toSortedUniqueKeys(keys: string[]): string[] {
         .filter((key) => key.length > 0)
     )
   ).sort((a, b) => a.localeCompare(b))
+}
+
+function decodeBase64ToUtf8(value: string): string {
+  try {
+    if (typeof window !== "undefined" && typeof window.atob === "function") {
+      const binary = window.atob(value)
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+      return new TextDecoder().decode(bytes)
+    }
+    if (typeof Buffer !== "undefined") {
+      return Buffer.from(value, "base64").toString("utf8")
+    }
+  } catch {
+    return value
+  }
+  return value
+}
+
+function normalizeSecretEntryValue(value: unknown): string {
+  if (typeof value === "string") return decodeBase64ToUtf8(value)
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return ""
 }
 
 export async function fetchSecretKeyRefOptions(
@@ -71,6 +98,36 @@ export async function fetchSecretKeyRefOptions(
       }
     })
     .filter((item): item is SecretKeyRefOption => Boolean(item))
+}
+
+export async function fetchSecretEntries(
+  namespace: string,
+  name: string
+): Promise<SecretEntry[]> {
+  const ns = namespace.trim()
+  const resourceName = name.trim()
+  if (!ns || !resourceName) return []
+
+  const { payload } = await fetchResourceByName<RawSecretForKeyRef>(
+    "core",
+    "v1",
+    "secrets",
+    resourceName,
+    { namespace: ns }
+  )
+
+  const stringData = asObject(payload.stringData)
+  const data = asObject(payload.data)
+  const keySet = new Set([...Object.keys(stringData), ...Object.keys(data)])
+
+  return Array.from(keySet)
+    .map((key) => key.trim())
+    .filter((key) => key.length > 0)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => ({
+      key,
+      value: key in stringData ? String(stringData[key] ?? "") : normalizeSecretEntryValue(data[key]),
+    }))
 }
 
 function encodeBase64Utf8(value: string): string {

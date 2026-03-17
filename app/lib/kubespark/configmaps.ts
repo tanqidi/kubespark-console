@@ -27,6 +27,11 @@ export type ConfigMapKeyRefOption = {
   keys: string[]
 }
 
+export type ConfigMapEntry = {
+  key: string
+  value: string
+}
+
 type RawConfigMapForKeyRef = {
   metadata?: {
     name?: string
@@ -43,6 +48,12 @@ function toSortedUniqueKeys(keys: string[]): string[] {
         .filter((key) => key.length > 0)
     )
   ).sort((a, b) => a.localeCompare(b))
+}
+
+function normalizeEntryValue(value: unknown): string {
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return ""
 }
 
 export async function fetchConfigMapKeyRefOptions(
@@ -69,6 +80,36 @@ export async function fetchConfigMapKeyRefOptions(
       }
     })
     .filter((item): item is ConfigMapKeyRefOption => Boolean(item))
+}
+
+export async function fetchConfigMapEntries(
+  namespace: string,
+  name: string
+): Promise<ConfigMapEntry[]> {
+  const ns = namespace.trim()
+  const resourceName = name.trim()
+  if (!ns || !resourceName) return []
+
+  const { payload } = await fetchResourceByName<RawConfigMapForKeyRef>(
+    "core",
+    "v1",
+    "configmaps",
+    resourceName,
+    { namespace: ns }
+  )
+
+  const data = asObject(payload.data)
+  const binaryData = asObject(payload.binaryData)
+  const keySet = new Set([...Object.keys(data), ...Object.keys(binaryData)])
+
+  return Array.from(keySet)
+    .map((key) => key.trim())
+    .filter((key) => key.length > 0)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => ({
+      key,
+      value: normalizeEntryValue(key in data ? data[key] : binaryData[key]),
+    }))
 }
 
 export async function checkConfigMapExists(

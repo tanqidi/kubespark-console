@@ -15,6 +15,10 @@ import {
   fetchSecretKeyRefOptions,
   type SecretKeyRefOption,
 } from "@/app/lib/kubespark/secrets"
+import {
+  EnvBatchImportDialog,
+  type EnvBatchImportItem,
+} from "@/app/(examples)/dashboard/components/resource-pages/env-batch-import-dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -255,6 +259,7 @@ export function CreateContainerDialog({
 }: CreateContainerDialogProps) {
   const [configMapKeyRefOptions, setConfigMapKeyRefOptions] = React.useState<ConfigMapKeyRefOption[]>([])
   const [secretKeyRefOptions, setSecretKeyRefOptions] = React.useState<SecretKeyRefOption[]>([])
+  const [envBatchDialogOpen, setEnvBatchDialogOpen] = React.useState(false)
   const [extensionState, setExtensionState] = React.useState<Record<ContainerExtensionOptionKey, boolean>>(
     createDefaultExtensionState
   )
@@ -318,6 +323,12 @@ export function CreateContainerDialog({
       cancelled = true
     }
   }, [open, namespace])
+
+  React.useEffect(() => {
+    if (!open) {
+      setEnvBatchDialogOpen(false)
+    }
+  }, [open])
 
   if (!container) return null
 
@@ -862,7 +873,15 @@ export function CreateContainerDialog({
                               ) : (
                                 <FieldDescription>暂无环境变量，点击右下角添加。</FieldDescription>
                               )}
-                              <div className="flex justify-end">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => setEnvBatchDialogOpen(true)}
+                                  disabled={isBusy}
+                                >
+                                  批量添加
+                                </Button>
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -883,6 +902,26 @@ export function CreateContainerDialog({
             </div>
           </FieldGroup>
         </div>
+
+        <EnvBatchImportDialog
+          open={envBatchDialogOpen}
+          onOpenChange={setEnvBatchDialogOpen}
+          namespace={namespace}
+          configMapOptions={configMapKeyRefOptions}
+          secretOptions={secretKeyRefOptions}
+          isBusy={isBusy}
+          onImport={(items: EnvBatchImportItem[]) => {
+            items.forEach((item) => {
+              onAddEnv({
+                source: item.source,
+                name: item.name,
+                sourceResource: item.sourceResource,
+                sourceKey: item.sourceKey,
+                value: "",
+              })
+            })
+          }}
+        />
 
         <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
           <div className="flex w-full items-center justify-between gap-3">
