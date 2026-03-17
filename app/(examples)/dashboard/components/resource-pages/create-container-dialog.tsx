@@ -958,14 +958,8 @@ export function CreateContainerDialog({
                                       批量添加
                                     </Button>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-[680px] p-0" align="end">
-                                    <div className="border-b px-4 py-3">
-                                      <div className="text-sm font-semibold">批量引用</div>
-                                      <div className="mt-1 text-sm text-muted-foreground">
-                                        从配置字典或保密字典中引用多个键。
-                                      </div>
-                                    </div>
-                                    <div className="space-y-4 p-4">
+                                  <PopoverContent className="w-[520px] p-3" align="end">
+                                    <div className="space-y-3">
                                       <Tabs
                                         value={envBatchSource}
                                         onValueChange={(value) => {
@@ -1070,7 +1064,7 @@ export function CreateContainerDialog({
                                         </div>
                                       </div>
                                     </div>
-                                    <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
+                                    <div className="flex items-center justify-end gap-2 border-t pt-3">
                                       <Button
                                         type="button"
                                         variant="outline"
