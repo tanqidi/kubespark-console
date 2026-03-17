@@ -185,7 +185,10 @@ export function EnvBatchImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270">
+      <DialogContent
+        overlayClassName="!bg-transparent !backdrop-blur-none"
+        className="flex h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+      >
         <DialogHeader className="border-b bg-muted/15 px-6 py-4">
           <DialogTitle>批量添加环境变量</DialogTitle>
           <DialogDescription>
