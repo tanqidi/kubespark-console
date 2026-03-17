@@ -534,7 +534,7 @@ export function CreateContainerDialog({
                 </div>
               </div>
               <div className="grid gap-5 p-4 md:grid-cols-2">
-                <div className="flex flex-col gap-3">
+                                  <div className="flex flex-col gap-3">
                   <Field>
                     <FieldLabel htmlFor={`${container.id}-cpu-request`}>CPU 预留</FieldLabel>
                     <InputGroup>
@@ -812,8 +812,8 @@ export function CreateContainerDialog({
                                     key={item.id}
                                     className={
                                       item.source === "custom"
-                                        ? "grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_auto]"
-                                        : "grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]"
+                                        ? "grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
+                                        : "grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
                                     }
                                   >
                                     <Select
@@ -830,7 +830,7 @@ export function CreateContainerDialog({
                                       }}
                                       disabled={isBusy}
                                     >
-                                      <SelectTrigger className="w-full">
+                                      <SelectTrigger className="w-full min-w-0">
                                         <span className="flex items-center gap-2">
                                           {item.source === "configMap" ? (
                                             <IconFileText className="size-4 text-muted-foreground" />
@@ -853,6 +853,7 @@ export function CreateContainerDialog({
                                       onChange={(event) => onUpdateEnv(item.id, "name", event.target.value)}
                                       placeholder="键"
                                       autoComplete="off"
+                                      className="min-w-0"
                                       disabled={isBusy}
                                     />
                                     {item.source === "custom" ? (
@@ -861,6 +862,7 @@ export function CreateContainerDialog({
                                         onChange={(event) => onUpdateEnv(item.id, "value", event.target.value)}
                                         placeholder="值"
                                         autoComplete="off"
+                                        className="min-w-0"
                                         disabled={isBusy}
                                       />
                                     ) : (
@@ -875,7 +877,7 @@ export function CreateContainerDialog({
                                           }}
                                           disabled={isBusy}
                                         >
-                                          <SelectTrigger className="w-full">
+                                          <SelectTrigger className="w-full min-w-0">
                                             <SelectValue
                                               placeholder={
                                                 item.source === "configMap"
@@ -911,7 +913,7 @@ export function CreateContainerDialog({
                                           }}
                                           disabled={isBusy || !item.sourceResource}
                                         >
-                                          <SelectTrigger className="w-full">
+                                          <SelectTrigger className="w-full min-w-0">
                                             <SelectValue placeholder="选择资源中的键" />
                                           </SelectTrigger>
                                           <SelectContent>
@@ -935,6 +937,7 @@ export function CreateContainerDialog({
                                     <Button
                                       type="button"
                                       variant="ghost"
+                                      className="shrink-0"
                                       onClick={() => onRemoveEnv(item.id)}
                                       disabled={isBusy}
                                     >
