@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { IconFileText, IconKey } from "@tabler/icons-react"
 import {
   fetchConfigMapKeyRefOptions,
   type ConfigMapKeyRefOption,
@@ -745,7 +746,14 @@ export function CreateContainerDialog({
                                       disabled={isBusy}
                                     >
                                       <SelectTrigger className="w-full">
-                                        <SelectValue />
+                                        <span className="flex items-center gap-2">
+                                          {item.source === "configMap" ? (
+                                            <IconFileText className="size-4 text-muted-foreground" />
+                                          ) : item.source === "secret" ? (
+                                            <IconKey className="size-4 text-muted-foreground" />
+                                          ) : null}
+                                          <SelectValue />
+                                        </span>
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectGroup>
@@ -756,11 +764,10 @@ export function CreateContainerDialog({
                                       </SelectContent>
                                     </Select>
                                     <Input
-                                      value={item.source === "custom" ? item.name : item.sourceKey}
+                                      value={item.name}
                                       onChange={(event) => onUpdateEnv(item.id, "name", event.target.value)}
                                       placeholder="键"
                                       autoComplete="off"
-                                      readOnly={item.source !== "custom"}
                                       disabled={isBusy}
                                     />
                                     {item.source === "custom" ? (
@@ -786,7 +793,9 @@ export function CreateContainerDialog({
                                           <SelectTrigger className="w-full">
                                             <SelectValue
                                               placeholder={
-                                                item.source === "configMap" ? "选择配置字典" : "选择保密字典"
+                                                item.source === "configMap"
+                                                  ? "选择配置字典"
+                                                  : "选择保密字典"
                                               }
                                             />
                                           </SelectTrigger>
