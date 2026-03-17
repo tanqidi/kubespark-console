@@ -837,6 +837,20 @@ function createContainerEnvDraft(defaults?: {
   }
 }
 
+function resolveDuplicateContainerEnvNameIds(entries: ContainerDraft["env"]): string[] {
+  const grouped = new Map<string, string[]>()
+  entries.forEach((entry) => {
+    const key = entry.name.trim().toLowerCase()
+    if (!key) return
+    const ids = grouped.get(key) ?? []
+    ids.push(entry.id)
+    grouped.set(key, ids)
+  })
+  return Array.from(grouped.values())
+    .filter((ids) => ids.length > 1)
+    .flat()
+}
+
 function validateContainerPorts(ports: ContainerPortDraft[]): ContainerPortFieldErrors {
   if (ports.length === 0) return {}
 
@@ -972,6 +986,7 @@ export function CreateJobDialog({
   const [pendingDeleteContainerId, setPendingDeleteContainerId] = React.useState<string | null>(null)
   const [editingImageError, setEditingImageError] = React.useState<string | null>(null)
   const [editingPortFieldErrors, setEditingPortFieldErrors] = React.useState<ContainerPortFieldErrors>({})
+  const [editingEnvDuplicateIds, setEditingEnvDuplicateIds] = React.useState<string[]>([])
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
@@ -1023,6 +1038,7 @@ export function CreateJobDialog({
       setPendingDeleteContainerId(null)
       setEditingImageError(null)
       setEditingPortFieldErrors({})
+      setEditingEnvDuplicateIds([])
       setNameError(null)
       setNamespaceError(null)
       setSubmitError(null)
@@ -1056,6 +1072,7 @@ export function CreateJobDialog({
     setPendingDeleteContainerId(null)
     setEditingImageError(null)
     setEditingPortFieldErrors({})
+    setEditingEnvDuplicateIds([])
     setNameError(null)
     setNamespaceError(null)
     setSubmitError(null)
@@ -1353,16 +1370,18 @@ export function CreateJobDialog({
         sourceKey?: string
       }
     ) => {
-      setContainers((current) =>
-        current.map((item) =>
-          item.id === containerId
-            ? {
-                ...item,
-                env: [...item.env, createContainerEnvDraft(defaults)],
-              }
-            : item
-        )
-      )
+      setContainers((current) => {
+        const nextContainers = current.map((item) => {
+          if (item.id !== containerId) return item
+          return {
+            ...item,
+            env: [...item.env, createContainerEnvDraft(defaults)],
+          }
+        })
+        const target = nextContainers.find((item) => item.id === containerId)
+        setEditingEnvDuplicateIds(target ? resolveDuplicateContainerEnvNameIds(target.env) : [])
+        return nextContainers
+      })
       if (submitError) setSubmitError(null)
     },
     [submitError]
@@ -1375,23 +1394,25 @@ export function CreateJobDialog({
       field: "source" | "name" | "value" | "sourceResource" | "sourceKey",
       value: string
     ) => {
-      setContainers((current) =>
-        current.map((item) =>
-          item.id === containerId
-            ? {
-                ...item,
-                env: item.env.map((entry) =>
-                  entry.id === envId
-                    ? {
-                        ...entry,
-                        [field]: value,
-                      }
-                    : entry
-                ),
-              }
-            : item
-        )
-      )
+      setContainers((current) => {
+        const nextContainers = current.map((item) => {
+          if (item.id !== containerId) return item
+          return {
+            ...item,
+            env: item.env.map((entry) =>
+              entry.id === envId
+                ? {
+                    ...entry,
+                    [field]: value,
+                  }
+                : entry
+            ),
+          }
+        })
+        const target = nextContainers.find((item) => item.id === containerId)
+        setEditingEnvDuplicateIds(target ? resolveDuplicateContainerEnvNameIds(target.env) : [])
+        return nextContainers
+      })
       if (submitError) setSubmitError(null)
     },
     [submitError]
@@ -1399,16 +1420,18 @@ export function CreateJobDialog({
 
   const removeContainerEnv = React.useCallback(
     (containerId: string, envId: string) => {
-      setContainers((current) =>
-        current.map((item) =>
-          item.id === containerId
-            ? {
-                ...item,
-                env: item.env.filter((entry) => entry.id !== envId),
-              }
-            : item
-        )
-      )
+      setContainers((current) => {
+        const nextContainers = current.map((item) => {
+          if (item.id !== containerId) return item
+          return {
+            ...item,
+            env: item.env.filter((entry) => entry.id !== envId),
+          }
+        })
+        const target = nextContainers.find((item) => item.id === containerId)
+        setEditingEnvDuplicateIds(target ? resolveDuplicateContainerEnvNameIds(target.env) : [])
+        return nextContainers
+      })
       if (submitError) setSubmitError(null)
     },
     [submitError]
@@ -1426,6 +1449,7 @@ export function CreateJobDialog({
             : item
         )
       )
+      setEditingEnvDuplicateIds([])
       if (submitError) setSubmitError(null)
     },
     [submitError]
@@ -1433,8 +1457,8 @@ export function CreateJobDialog({
 
   const beginEditContainer = React.useCallback(
     (id: string) => {
-      setContainers((current) =>
-        current.map((item) =>
+      setContainers((current) => {
+        const nextContainers = current.map((item) =>
           item.id === id && item.ports.length === 0
             ? {
                 ...item,
@@ -1442,7 +1466,10 @@ export function CreateJobDialog({
               }
             : item
         )
-      )
+        const target = nextContainers.find((item) => item.id === id)
+        setEditingEnvDuplicateIds(target ? resolveDuplicateContainerEnvNameIds(target.env) : [])
+        return nextContainers
+      })
       setEditingContainerId(id)
       setContainerDialogOpen(true)
       if (editingImageError) setEditingImageError(null)
@@ -1459,6 +1486,7 @@ export function CreateJobDialog({
     setContainerDialogOpen(true)
     if (editingImageError) setEditingImageError(null)
     setEditingPortFieldErrors({})
+    setEditingEnvDuplicateIds([])
     if (submitError) setSubmitError(null)
   }, [editingImageError, submitError])
 
@@ -1469,6 +1497,7 @@ export function CreateJobDialog({
       setPendingDeleteContainerId((current) => (current === id ? null : current))
       if (editingImageError) setEditingImageError(null)
       setEditingPortFieldErrors({})
+      setEditingEnvDuplicateIds([])
       if (submitError) setSubmitError(null)
     },
     [editingImageError, submitError]
@@ -1481,12 +1510,17 @@ export function CreateJobDialog({
       return
     }
 
-    // Required checks follow visual order: image -> ports (row by row).
+    // Required checks follow visual order: image -> ports (row by row) -> env duplicate names.
     const nextImageError = editingContainer.image.trim() ? null : "请输入镜像地址"
     const nextPortFieldErrors = nextImageError ? {} : validateContainerPorts(editingContainer.ports)
+    const nextEnvDuplicateIds =
+      nextImageError || Object.keys(nextPortFieldErrors).length > 0
+        ? []
+        : resolveDuplicateContainerEnvNameIds(editingContainer.env)
 
     setEditingImageError(nextImageError)
     setEditingPortFieldErrors(nextPortFieldErrors)
+    setEditingEnvDuplicateIds(nextEnvDuplicateIds)
 
     const firstPortErrorFieldId = resolveFirstContainerPortErrorFieldId(
       editingContainer.id,
@@ -1496,6 +1530,13 @@ export function CreateJobDialog({
     const firstInvalidFieldId = resolveFirstInvalidFieldId([
       { invalid: Boolean(nextImageError), fieldId: `${editingContainer.id}-image` },
       { invalid: Boolean(firstPortErrorFieldId), fieldId: firstPortErrorFieldId },
+      {
+        invalid: nextEnvDuplicateIds.length > 0,
+        fieldId:
+          nextEnvDuplicateIds.length > 0
+            ? `${editingContainer.id}-env-${nextEnvDuplicateIds[0]}-name`
+            : null,
+      },
     ])
     if (firstInvalidFieldId) {
       scrollAndFocusFieldById(firstInvalidFieldId)
@@ -1504,6 +1545,7 @@ export function CreateJobDialog({
 
     setEditingImageError(null)
     setEditingPortFieldErrors({})
+    setEditingEnvDuplicateIds([])
     setContainerDialogOpen(false)
     setEditingContainerId(null)
   }, [editingContainer])
@@ -1526,6 +1568,7 @@ export function CreateJobDialog({
     }
     setEditingImageError(null)
     setEditingPortFieldErrors({})
+    setEditingEnvDuplicateIds([])
     setContainerDialogOpen(false)
     setEditingContainerId(null)
   }, [editingContainerId])
@@ -2263,6 +2306,7 @@ export function CreateJobDialog({
           container={editingContainer}
           imageError={editingImageError}
           portFieldErrors={editingPortFieldErrors}
+          envDuplicateIds={editingEnvDuplicateIds}
           isBusy={isBusy}
           onChange={(field, value) => {
             if (!editingContainer) return

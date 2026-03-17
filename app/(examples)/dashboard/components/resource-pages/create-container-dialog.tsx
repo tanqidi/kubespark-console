@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/popover"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 
 export type ContainerType = "container" | "initContainer"
 export type ContainerPortProtocol =
@@ -111,6 +112,7 @@ type CreateContainerDialogProps = {
   container: ContainerDraft | null
   imageError: string | null
   portFieldErrors: ContainerPortFieldErrors
+  envDuplicateIds?: string[]
   isBusy: boolean
   onChange: (
     field:
@@ -242,6 +244,20 @@ function resolveImagePullPolicyDescription(value: "Always" | "IfNotPresent" | "N
   return "如果本地存在所需的镜像，则优先使用本地镜像。"
 }
 
+function resolveDuplicateEnvNameIds(entries: ContainerEnvVarDraft[]): string[] {
+  const grouped = new Map<string, string[]>()
+  entries.forEach((entry) => {
+    const key = entry.name.trim().toLowerCase()
+    if (!key) return
+    const ids = grouped.get(key) ?? []
+    ids.push(entry.id)
+    grouped.set(key, ids)
+  })
+  return Array.from(grouped.values())
+    .filter((ids) => ids.length > 1)
+    .flat()
+}
+
 export function CreateContainerDialog({
   open,
   onOpenChange,
@@ -249,6 +265,7 @@ export function CreateContainerDialog({
   container,
   imageError,
   portFieldErrors,
+  envDuplicateIds = [],
   isBusy,
   onChange,
   onAddPort,
@@ -285,6 +302,14 @@ export function CreateContainerDialog({
   )
   const envBatchKeySet = React.useMemo(() => new Set(envBatchSelectedKeys), [envBatchSelectedKeys])
   const envBatchAllChecked = envBatchKeys.length > 0 && envBatchSelectedKeys.length === envBatchKeys.length
+  const localDuplicateEnvIds = React.useMemo(
+    () => resolveDuplicateEnvNameIds(container?.env ?? []),
+    [container?.env]
+  )
+  const envDuplicateIdSet = React.useMemo(
+    () => new Set([...envDuplicateIds, ...localDuplicateEnvIds]),
+    [envDuplicateIds, localDuplicateEnvIds]
+  )
 
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
@@ -810,11 +835,12 @@ export function CreateContainerDialog({
                                     return (
                                   <div
                                     key={item.id}
-                                    className={
+                                    className={cn(
                                       item.source === "custom"
                                         ? "grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
-                                        : "grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
-                                    }
+                                        : "grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]",
+                                      envDuplicateIdSet.has(item.id) && "rounded-md border border-destructive/80 bg-destructive/5 p-2"
+                                    )}
                                   >
                                     <Select
                                       value={item.source}
@@ -848,14 +874,21 @@ export function CreateContainerDialog({
                                         </SelectGroup>
                                       </SelectContent>
                                     </Select>
-                                    <Input
-                                      value={item.name}
-                                      onChange={(event) => onUpdateEnv(item.id, "name", event.target.value)}
-                                      placeholder="键"
-                                      autoComplete="off"
-                                      className="min-w-0"
-                                      disabled={isBusy}
-                                    />
+                                    <div className="flex min-w-0 flex-col gap-1">
+                                      <Input
+                                        id={`${container.id}-env-${item.id}-name`}
+                                        value={item.name}
+                                        onChange={(event) => onUpdateEnv(item.id, "name", event.target.value)}
+                                        placeholder="键"
+                                        autoComplete="off"
+                                        className="min-w-0"
+                                        aria-invalid={envDuplicateIdSet.has(item.id)}
+                                        disabled={isBusy}
+                                      />
+                                      {envDuplicateIdSet.has(item.id) ? (
+                                        <p className="text-xs text-destructive">环境变量名称重复</p>
+                                      ) : null}
+                                    </div>
                                     {item.source === "custom" ? (
                                       <Input
                                         value={item.value}
@@ -951,29 +984,39 @@ export function CreateContainerDialog({
                                 <FieldDescription>暂无环境变量，点击右下角添加。</FieldDescription>
                               )}
                               <div className="flex justify-end gap-2">
+
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => onAddEnv()}
+                                  disabled={isBusy}
+                                >
+                                  添加环境变量
+                                </Button>
+
                                 <Popover open={envBatchPopoverOpen} onOpenChange={setEnvBatchPopoverOpen}>
                                   <PopoverTrigger asChild>
                                     <Button
-                                      type="button"
-                                      variant="outline"
-                                      disabled={isBusy}
+                                        type="button"
+                                        variant="outline"
+                                        disabled={isBusy}
                                     >
-                                      批量添加
+                                      批量引用
                                     </Button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[520px] p-3" align="end">
                                     <div className="space-y-3">
                                       <Tabs
-                                        value={envBatchSource}
-                                        onValueChange={(value) => {
-                                          if (value !== "configMap" && value !== "secret") return
-                                          setEnvBatchSource(value)
-                                          const nextOptions =
-                                            value === "configMap" ? configMapKeyRefOptions : secretKeyRefOptions
-                                          setEnvBatchResourceName(nextOptions[0]?.name ?? "")
-                                          setEnvBatchSelectedKeys([])
-                                        }}
-                                        className="w-full"
+                                          value={envBatchSource}
+                                          onValueChange={(value) => {
+                                            if (value !== "configMap" && value !== "secret") return
+                                            setEnvBatchSource(value)
+                                            const nextOptions =
+                                                value === "configMap" ? configMapKeyRefOptions : secretKeyRefOptions
+                                            setEnvBatchResourceName(nextOptions[0]?.name ?? "")
+                                            setEnvBatchSelectedKeys([])
+                                          }}
+                                          className="w-full"
                                       >
                                         <TabsList className="grid w-full grid-cols-2">
                                           <TabsTrigger value="configMap">配置字典</TabsTrigger>
@@ -986,36 +1029,36 @@ export function CreateContainerDialog({
                                           {envBatchSource === "configMap" ? "配置字典" : "保密字典"}
                                         </div>
                                         <Select
-                                          value={envBatchResourceName}
-                                          onValueChange={(value) => {
-                                            setEnvBatchResourceName(value)
-                                            setEnvBatchSelectedKeys([])
-                                          }}
-                                          disabled={isBusy || envBatchResources.length === 0}
+                                            value={envBatchResourceName}
+                                            onValueChange={(value) => {
+                                              setEnvBatchResourceName(value)
+                                              setEnvBatchSelectedKeys([])
+                                            }}
+                                            disabled={isBusy || envBatchResources.length === 0}
                                         >
                                           <SelectTrigger className="w-full">
                                             <SelectValue
-                                              placeholder={
-                                                envBatchSource === "configMap"
-                                                  ? "选择配置字典"
-                                                  : "选择保密字典"
-                                              }
+                                                placeholder={
+                                                  envBatchSource === "configMap"
+                                                      ? "选择配置字典"
+                                                      : "选择保密字典"
+                                                }
                                             />
                                           </SelectTrigger>
                                           <SelectContent>
                                             <SelectGroup>
                                               {envBatchResources.length > 0 ? (
-                                                envBatchResources.map((option) => (
-                                                  <SelectItem key={option.name} value={option.name}>
-                                                    {option.name}
-                                                  </SelectItem>
-                                                ))
+                                                  envBatchResources.map((option) => (
+                                                      <SelectItem key={option.name} value={option.name}>
+                                                        {option.name}
+                                                      </SelectItem>
+                                                  ))
                                               ) : (
-                                                <SelectItem value="__empty__" disabled>
-                                                  {envBatchSource === "configMap"
-                                                    ? "当前项目暂无配置字典"
-                                                    : "当前项目暂无保密字典"}
-                                                </SelectItem>
+                                                  <SelectItem value="__empty__" disabled>
+                                                    {envBatchSource === "configMap"
+                                                        ? "当前项目暂无配置字典"
+                                                        : "当前项目暂无保密字典"}
+                                                  </SelectItem>
                                               )}
                                             </SelectGroup>
                                           </SelectContent>
@@ -1026,81 +1069,74 @@ export function CreateContainerDialog({
                                         <div className="flex items-center justify-between">
                                           <div className="text-sm font-medium">键</div>
                                           <button
-                                            type="button"
-                                            className="text-sm text-primary hover:underline"
-                                            disabled={isBusy || envBatchKeys.length === 0}
-                                            onClick={() =>
-                                              setEnvBatchSelectedKeys(
-                                                envBatchAllChecked ? [] : envBatchKeys
-                                              )
-                                            }
+                                              type="button"
+                                              className="text-sm text-primary hover:underline"
+                                              disabled={isBusy || envBatchKeys.length === 0}
+                                              onClick={() =>
+                                                  setEnvBatchSelectedKeys(
+                                                      envBatchAllChecked ? [] : envBatchKeys
+                                                  )
+                                              }
                                           >
                                             {envBatchAllChecked ? "取消全选" : "选择全部"}
                                           </button>
                                         </div>
                                         <div className="max-h-56 overflow-y-auto rounded-md bg-muted/40 p-2">
                                           {envBatchKeys.length > 0 ? (
-                                            <div className="space-y-1">
-                                              {envBatchKeys.map((keyName) => (
-                                                <label
-                                                  key={keyName}
-                                                  className="flex cursor-pointer items-center gap-2 rounded-md bg-background px-3 py-2"
-                                                >
-                                                  <Checkbox
-                                                    checked={envBatchKeySet.has(keyName)}
-                                                    onCheckedChange={(checked) =>
-                                                      toggleEnvBatchKey(keyName, checked === true)
-                                                    }
-                                                    disabled={isBusy}
-                                                  />
-                                                  <span className="text-sm">{keyName}</span>
-                                                </label>
-                                              ))}
-                                            </div>
+                                              <div className="space-y-1">
+                                                {envBatchKeys.map((keyName) => (
+                                                    <label
+                                                        key={keyName}
+                                                        className="flex cursor-pointer items-center gap-2 rounded-md bg-background px-3 py-2"
+                                                    >
+                                                      <Checkbox
+                                                          checked={envBatchKeySet.has(keyName)}
+                                                          onCheckedChange={(checked) =>
+                                                              toggleEnvBatchKey(keyName, checked === true)
+                                                          }
+                                                          disabled={isBusy}
+                                                      />
+                                                      <span className="text-sm">{keyName}</span>
+                                                    </label>
+                                                ))}
+                                              </div>
                                           ) : (
-                                            <div className="px-2 py-4 text-sm text-muted-foreground">
-                                              {envBatchResourceName
-                                                ? "该资源暂无可选键。"
-                                                : "请先选择资源。"}
-                                            </div>
+                                              <div className="px-2 py-4 text-sm text-muted-foreground">
+                                                {envBatchResourceName
+                                                    ? "该资源暂无可选键。"
+                                                    : "请先选择资源。"}
+                                              </div>
                                           )}
                                         </div>
                                       </div>
                                     </div>
                                     <div className="flex items-center justify-end gap-2 border-t pt-3">
                                       <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => {
-                                          setEnvBatchPopoverOpen(false)
-                                          setEnvBatchSelectedKeys([])
-                                        }}
-                                        disabled={isBusy}
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => {
+                                            setEnvBatchPopoverOpen(false)
+                                            setEnvBatchSelectedKeys([])
+                                          }}
+                                          disabled={isBusy}
                                       >
                                         取消
                                       </Button>
                                       <Button
-                                        type="button"
-                                        onClick={confirmEnvBatchImport}
-                                        disabled={
-                                          isBusy ||
-                                          !envBatchResourceName.trim() ||
-                                          envBatchSelectedKeys.length === 0
-                                        }
+                                          type="button"
+                                          onClick={confirmEnvBatchImport}
+                                          disabled={
+                                              isBusy ||
+                                              !envBatchResourceName.trim() ||
+                                              envBatchSelectedKeys.length === 0
+                                          }
                                       >
                                         确定
                                       </Button>
                                     </div>
                                   </PopoverContent>
                                 </Popover>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => onAddEnv()}
-                                  disabled={isBusy}
-                                >
-                                  添加环境变量
-                                </Button>
+
                               </div>
                             </FieldGroup>
                           </div>
