@@ -108,6 +108,65 @@ function toStringArray(value: unknown): string[] {
     .filter((item) => item.length > 0)
 }
 
+function formatStringListAsEditorText(value: unknown): string {
+  const list = toStringArray(value)
+  return list.length > 0 ? list.join(",") : ""
+}
+
+function toProbeScheme(value: unknown): "HTTP" | "HTTPS" {
+  return asString(value).trim().toUpperCase() === "HTTPS" ? "HTTPS" : "HTTP"
+}
+
+function toProbePortText(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 65535) {
+    return String(Math.trunc(value))
+  }
+  return toOptionalIntegerString(value)
+}
+
+function parseProbeDraftFromSpec(raw: unknown) {
+  const spec = asObject(raw)
+  if (Object.keys(spec).length === 0) return null
+
+  const httpGet = asObject(spec.httpGet)
+  const tcpSocket = asObject(spec.tcpSocket)
+  const exec = asObject(spec.exec)
+  const commandText = formatStringListAsEditorText(exec.command)
+
+  let mode: "http" | "command" | "tcp" = "http"
+  if (commandText) {
+    mode = "command"
+  } else if (Object.keys(tcpSocket).length > 0) {
+    mode = "tcp"
+  }
+
+  return {
+    mode,
+    httpScheme: toProbeScheme(httpGet.scheme),
+    httpPath: asString(httpGet.path).trim() || "/",
+    httpPort: toProbePortText(httpGet.port) || "80",
+    command: commandText,
+    tcpPort: toProbePortText(tcpSocket.port) || "80",
+    initialDelaySeconds: toOptionalIntegerString(spec.initialDelaySeconds) || "0",
+    timeoutSeconds: toOptionalIntegerString(spec.timeoutSeconds) || "1",
+    periodSeconds: toOptionalIntegerString(spec.periodSeconds) || "10",
+    successThreshold: toOptionalIntegerString(spec.successThreshold) || "1",
+    failureThreshold: toOptionalIntegerString(spec.failureThreshold) || "3",
+  }
+}
+
+function parseProbeMapFromContainer(item: JsonObject) {
+  const liveness = parseProbeDraftFromSpec(item.livenessProbe)
+  const readiness = parseProbeDraftFromSpec(item.readinessProbe)
+  const startup = parseProbeDraftFromSpec(item.startupProbe)
+
+  return {
+    ...(liveness ? { liveness } : {}),
+    ...(readiness ? { readiness } : {}),
+    ...(startup ? { startup } : {}),
+  }
+}
+
 function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unknown): JobDialogInitialValues {
   const resource = asObject(payload)
   const metadata = asObject(resource.metadata)
@@ -232,6 +291,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
           cpuLimit: asString(limits.cpu),
           memoryRequestMi: toMemoryMiText(requests.memory),
           memoryLimitMi: toMemoryMiText(limits.memory),
+          probes: parseProbeMapFromContainer(item),
         }
         return normalized
       })
@@ -450,39 +510,7 @@ export function JobsPageClient() {
   }, [])
 
   const handleCreateSubmit = React.useCallback(
-    async (payload: {
-      kind: "Job" | "CronJob"
-      name: string
-      namespace: string
-      description: string
-      schedule?: string
-      strategy?: {
-        backoffLimit?: number
-        completions?: number
-        parallelism?: number
-        activeDeadlineSeconds?: number
-      }
-      pod?: {
-        restartPolicy?: "Never" | "OnFailure"
-        containers?: Array<{
-          name?: string
-          type?: "container" | "initContainer"
-          image: string
-          imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
-          command?: string[]
-          args?: string[]
-          ports?: Array<{
-            protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
-            name?: string
-            containerPort: string
-          }>
-          cpuRequest?: string
-          cpuLimit?: string
-          memoryRequestMi?: string
-          memoryLimitMi?: string
-        }>
-      }
-    }) => {
+    async (payload: Parameters<typeof createJob>[0]) => {
       await createJob(payload)
       await refreshRows(false)
     },
@@ -490,40 +518,7 @@ export function JobsPageClient() {
   )
 
   const handleEditSubmit = React.useCallback(
-    async (payload: {
-      kind: "Job" | "CronJob"
-      name: string
-      namespace: string
-      description: string
-      schedule?: string
-      strategy?: {
-        backoffLimit?: number
-        completions?: number
-        parallelism?: number
-        activeDeadlineSeconds?: number
-      }
-      pod?: {
-        restartPolicy?: "Never" | "OnFailure"
-        containers?: Array<{
-          name?: string
-          type?: "container" | "initContainer"
-          image: string
-          imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
-          command?: string[]
-          args?: string[]
-          syncHostTimezone?: boolean
-          ports?: Array<{
-            protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
-            name?: string
-            containerPort: string
-          }>
-          cpuRequest?: string
-          cpuLimit?: string
-          memoryRequestMi?: string
-          memoryLimitMi?: string
-        }>
-      }
-    }) => {
+    async (payload: Parameters<typeof updateJob>[0]) => {
       await updateJob(payload)
       await refreshRows(false)
     },

@@ -23,6 +23,20 @@ export type JobStrategyInput = {
   activeDeadlineSeconds?: number
 }
 
+export type JobPodProbeInput = {
+  mode?: "http" | "command" | "tcp"
+  httpScheme?: "HTTP" | "HTTPS"
+  httpPath?: string
+  httpPort?: string
+  command?: string
+  tcpPort?: string
+  initialDelaySeconds?: string
+  timeoutSeconds?: string
+  periodSeconds?: string
+  successThreshold?: string
+  failureThreshold?: string
+}
+
 export type JobPodInput = {
   restartPolicy?: "Never" | "OnFailure"
   containers?: Array<{
@@ -56,6 +70,11 @@ export type JobPodInput = {
     cpuLimit?: string
     memoryRequestMi?: string
     memoryLimitMi?: string
+    probes?: {
+      liveness?: JobPodProbeInput
+      readiness?: JobPodProbeInput
+      startup?: JobPodProbeInput
+    }
   }>
 }
 
@@ -133,6 +152,79 @@ function pickContainerPortNumber(value: unknown): number | undefined {
   if (!Number.isFinite(parsed)) return undefined
   if (parsed < 0 || parsed > 65535) return undefined
   return parsed
+}
+
+function pickOptionalNonNegativeIntFromUnknown(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return Math.trunc(value)
+  }
+  const text = typeof value === "string" ? value.trim() : ""
+  if (!/^\d+$/.test(text)) return undefined
+  const parsed = Number(text)
+  if (!Number.isFinite(parsed) || parsed < 0) return undefined
+  return Math.trunc(parsed)
+}
+
+function parseCommaSeparatedList(value: unknown): string[] {
+  const text = typeof value === "string" ? value.trim() : ""
+  if (!text) return []
+  return text
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+}
+
+function buildProbeSpec(probe?: JobPodProbeInput): Record<string, unknown> | undefined {
+  if (!probe) return undefined
+
+  const mode = typeof probe.mode === "string" ? probe.mode.trim().toLowerCase() : "http"
+  const initialDelaySeconds = pickOptionalNonNegativeIntFromUnknown(probe.initialDelaySeconds)
+  const timeoutSeconds = pickOptionalNonNegativeIntFromUnknown(probe.timeoutSeconds)
+  const periodSeconds = pickOptionalNonNegativeIntFromUnknown(probe.periodSeconds)
+  const successThreshold = pickOptionalNonNegativeIntFromUnknown(probe.successThreshold)
+  const failureThreshold = pickOptionalNonNegativeIntFromUnknown(probe.failureThreshold)
+
+  const modeSpec =
+    mode === "command"
+      ? (() => {
+          const command = parseCommaSeparatedList(probe.command)
+          if (command.length === 0) return undefined
+          return { exec: { command } }
+        })()
+      : mode === "tcp"
+        ? (() => {
+            const port = pickContainerPortNumber(probe.tcpPort)
+            if (typeof port !== "number") return undefined
+            return { tcpSocket: { port } }
+          })()
+        : (() => {
+            const port = pickContainerPortNumber(probe.httpPort)
+            if (typeof port !== "number") return undefined
+            const scheme = typeof probe.httpScheme === "string" && probe.httpScheme.toUpperCase() === "HTTPS"
+              ? "HTTPS"
+              : "HTTP"
+            const path = typeof probe.httpPath === "string" && probe.httpPath.trim()
+              ? probe.httpPath.trim()
+              : "/"
+            return {
+              httpGet: {
+                scheme,
+                path,
+                port,
+              },
+            }
+          })()
+
+  if (!modeSpec) return undefined
+
+  return {
+    ...modeSpec,
+    ...(typeof initialDelaySeconds === "number" ? { initialDelaySeconds } : {}),
+    ...(typeof timeoutSeconds === "number" ? { timeoutSeconds } : {}),
+    ...(typeof periodSeconds === "number" ? { periodSeconds } : {}),
+    ...(typeof successThreshold === "number" ? { successThreshold } : {}),
+    ...(typeof failureThreshold === "number" ? { failureThreshold } : {}),
+  }
 }
 
 function buildPodContainerSpec(pod?: JobPodInput) {
@@ -245,14 +337,17 @@ function buildPodContainerSpec(pod?: JobPodInput) {
           value: typeof entry.value === "string" ? entry.value : "",
         }
       })
-      .filter((entry): entry is {
+      .filter(Boolean) as Array<{
         name: string
         value?: string
         valueFrom?: {
           configMapKeyRef?: { name: string; key: string }
           secretKeyRef?: { name: string; key: string }
         }
-      } => Boolean(entry))
+      }>
+    const livenessProbe = buildProbeSpec(item.probes?.liveness)
+    const readinessProbe = buildProbeSpec(item.probes?.readiness)
+    const startupProbe = buildProbeSpec(item.probes?.startup)
 
     const containerSpec: Record<string, unknown> = {
       name: resolveContainerName(item.name, image, index),
@@ -262,6 +357,9 @@ function buildPodContainerSpec(pod?: JobPodInput) {
       ...(Array.isArray(item.args) && item.args.length > 0 ? { args: item.args } : {}),
       ...(resources ? { resources } : {}),
       ...(env.length > 0 ? { env } : {}),
+      ...(livenessProbe ? { livenessProbe } : {}),
+      ...(readinessProbe ? { readinessProbe } : {}),
+      ...(startupProbe ? { startupProbe } : {}),
       ...(item.syncHostTimezone
         ? {
             volumeMounts: [

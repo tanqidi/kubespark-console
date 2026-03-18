@@ -88,6 +88,25 @@ export type ContainerEnvVarDraft = {
   sourceKey: string
 }
 
+export type ProbeSectionKey = "liveness" | "readiness" | "startup"
+export type ProbeMode = "http" | "command" | "tcp"
+
+export type ContainerProbeDraft = {
+  mode: ProbeMode
+  httpScheme: "HTTP" | "HTTPS"
+  httpPath: string
+  httpPort: string
+  command: string
+  tcpPort: string
+  initialDelaySeconds: string
+  timeoutSeconds: string
+  periodSeconds: string
+  successThreshold: string
+  failureThreshold: string
+}
+
+export type ContainerProbeMap = Partial<Record<ProbeSectionKey, ContainerProbeDraft>>
+
 export type ContainerDraft = {
   id: string
   name: string
@@ -103,6 +122,7 @@ export type ContainerDraft = {
   memoryLimitMi: string
   ports: ContainerPortDraft[]
   env: ContainerEnvVarDraft[]
+  probes: ContainerProbeMap
 }
 
 type CreateContainerDialogProps = {
@@ -126,8 +146,9 @@ type CreateContainerDialogProps = {
       | "cpuRequest"
       | "cpuLimit"
       | "memoryRequestMi"
-      | "memoryLimitMi",
-    value: string | boolean
+      | "memoryLimitMi"
+      | "probes",
+    value: string | boolean | ContainerProbeMap
   ) => void
   onAddPort: () => void
   onUpdatePort: (
@@ -163,9 +184,6 @@ type ContainerExtensionOptionKey =
   | "syncHostTimezone"
 
 type EnvBatchSource = "configMap" | "secret"
-type ProbeSectionKey = "liveness" | "readiness" | "startup"
-type ProbeMode = "http" | "command" | "tcp"
-
 const CONTAINER_EXTENSION_OPTIONS: Array<{
   key: ContainerExtensionOptionKey
   title: string
@@ -225,28 +243,14 @@ const HEALTH_CHECK_SECTIONS: Array<{
   },
 ]
 
-type ProbeDraft = {
-  mode: ProbeMode
-  httpScheme: "HTTP" | "HTTPS"
-  httpPath: string
-  httpPort: string
-  command: string
-  tcpPort: string
-  initialDelaySeconds: string
-  timeoutSeconds: string
-  periodSeconds: string
-  successThreshold: string
-  failureThreshold: string
-}
-
 type ProbeSectionState = {
   enabled: boolean
-  draft: ProbeDraft
+  draft: ContainerProbeDraft
 }
 
-type ProbeDraftField = keyof ProbeDraft
+type ProbeDraftField = keyof ContainerProbeDraft
 
-function createDefaultProbeDraft(): ProbeDraft {
+function createDefaultProbeDraft(): ContainerProbeDraft {
   return {
     mode: "http",
     httpScheme: "HTTP",
@@ -267,6 +271,34 @@ function createDefaultProbeState(): Record<ProbeSectionKey, ProbeSectionState> {
     liveness: { enabled: false, draft: createDefaultProbeDraft() },
     readiness: { enabled: false, draft: createDefaultProbeDraft() },
     startup: { enabled: false, draft: createDefaultProbeDraft() },
+  }
+}
+
+function createProbeStateFromContainer(probes: ContainerProbeMap | undefined): Record<ProbeSectionKey, ProbeSectionState> {
+  const defaults = createDefaultProbeState()
+  if (!probes) return defaults
+
+  return {
+    liveness: {
+      enabled: Boolean(probes.liveness),
+      draft: probes.liveness ? { ...defaults.liveness.draft, ...probes.liveness } : defaults.liveness.draft,
+    },
+    readiness: {
+      enabled: Boolean(probes.readiness),
+      draft: probes.readiness ? { ...defaults.readiness.draft, ...probes.readiness } : defaults.readiness.draft,
+    },
+    startup: {
+      enabled: Boolean(probes.startup),
+      draft: probes.startup ? { ...defaults.startup.draft, ...probes.startup } : defaults.startup.draft,
+    },
+  }
+}
+
+function buildProbeMapFromState(state: Record<ProbeSectionKey, ProbeSectionState>): ContainerProbeMap {
+  return {
+    ...(state.liveness.enabled ? { liveness: state.liveness.draft } : {}),
+    ...(state.readiness.enabled ? { readiness: state.readiness.draft } : {}),
+    ...(state.startup.enabled ? { startup: state.startup.draft } : {}),
   }
 }
 
@@ -321,7 +353,7 @@ function resolveImagePullPolicyDescription(value: "Always" | "IfNotPresent" | "N
   return "如果本地存在所需的镜像，则优先使用本地镜像。"
 }
 
-function resolveProbeSummary(draft: ProbeDraft): string {
+function resolveProbeSummary(draft: ContainerProbeDraft): string {
   if (draft.mode === "http") {
     const path = draft.httpPath.trim() || "/"
     const port = draft.httpPort.trim() || "-"
@@ -388,6 +420,11 @@ export function CreateContainerDialog({
   const syncHostTimezoneEnabled = container?.syncHostTimezone ?? false
   const startupCommandEnabled = (container?.command.trim().length ?? 0) > 0 || (container?.args.trim().length ?? 0) > 0
   const envEnabled = (container?.env.length ?? 0) > 0
+  const probeEnabled = React.useMemo(() => {
+    const probes = container?.probes
+    if (!probes) return false
+    return Boolean(probes.liveness || probes.readiness || probes.startup)
+  }, [container?.probes])
   const envBatchResources = envBatchSource === "configMap" ? configMapKeyRefOptions : secretKeyRefOptions
   const envBatchCurrentResource = React.useMemo(
     () => envBatchResources.find((item) => item.name === envBatchResourceName),
@@ -399,7 +436,7 @@ export function CreateContainerDialog({
   )
   const envBatchKeySet = React.useMemo(() => new Set(envBatchSelectedKeys), [envBatchSelectedKeys])
   const envBatchAllChecked = envBatchKeys.length > 0 && envBatchSelectedKeys.length === envBatchKeys.length
-  const probeDraftSnapshotRef = React.useRef<Record<ProbeSectionKey, ProbeDraft>>({
+  const probeDraftSnapshotRef = React.useRef<Record<ProbeSectionKey, ContainerProbeDraft>>({
     liveness: createDefaultProbeDraft(),
     readiness: createDefaultProbeDraft(),
     startup: createDefaultProbeDraft(),
@@ -457,18 +494,22 @@ export function CreateContainerDialog({
   }, [])
 
   const confirmProbeEdit = React.useCallback((section: ProbeSectionKey) => {
-    setProbeState((current) => ({
-      ...current,
-      [section]: {
-        ...current[section],
-        enabled: true,
-      },
-    }))
+    setProbeState((current) => {
+      const next = {
+        ...current,
+        [section]: {
+          ...current[section],
+          enabled: true,
+        },
+      }
+      onChange("probes", buildProbeMapFromState(next))
+      return next
+    })
     setProbePopoverOpen((current) => ({
       ...current,
       [section]: false,
     }))
-  }, [])
+  }, [onChange])
 
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
@@ -489,13 +530,14 @@ export function CreateContainerDialog({
     if (!containerId) return
     setExtensionState({
       ...createDefaultExtensionState(),
+      healthCheck: probeEnabled,
       startupCommand: startupCommandEnabled,
       env: envEnabled,
       syncHostTimezone: syncHostTimezoneEnabled,
     })
-    setProbeState(createDefaultProbeState())
+    setProbeState(createProbeStateFromContainer(container?.probes))
     setProbePopoverOpen(createDefaultProbePopoverOpenState())
-  }, [containerId, envEnabled, startupCommandEnabled, syncHostTimezoneEnabled])
+  }, [containerId, envEnabled, probeEnabled, startupCommandEnabled, syncHostTimezoneEnabled, container?.probes])
 
   React.useEffect(() => {
     if (!open) return
@@ -925,6 +967,7 @@ export function CreateContainerDialog({
                             } else if (option.key === "healthCheck" && !nextValue) {
                               setProbeState(createDefaultProbeState())
                               setProbePopoverOpen(createDefaultProbePopoverOpenState())
+                              onChange("probes", {})
                             } else if (option.key === "startupCommand" && !nextValue) {
                               onChange("command", "")
                               onChange("args", "")

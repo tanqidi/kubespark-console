@@ -33,6 +33,8 @@ import {
   type ContainerEnvVarSource,
   type ContainerPortDraft,
   type ContainerPortProtocol,
+  type ContainerProbeDraft,
+  type ContainerProbeMap,
   type ContainerType,
 } from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog"
 import {
@@ -127,6 +129,47 @@ export type JobDialogInitialValues = {
       cpuLimit?: string
       memoryRequestMi?: string
       memoryLimitMi?: string
+      probes?: {
+        liveness?: {
+          mode?: "http" | "command" | "tcp"
+          httpScheme?: "HTTP" | "HTTPS"
+          httpPath?: string
+          httpPort?: string
+          command?: string
+          tcpPort?: string
+          initialDelaySeconds?: string
+          timeoutSeconds?: string
+          periodSeconds?: string
+          successThreshold?: string
+          failureThreshold?: string
+        }
+        readiness?: {
+          mode?: "http" | "command" | "tcp"
+          httpScheme?: "HTTP" | "HTTPS"
+          httpPath?: string
+          httpPort?: string
+          command?: string
+          tcpPort?: string
+          initialDelaySeconds?: string
+          timeoutSeconds?: string
+          periodSeconds?: string
+          successThreshold?: string
+          failureThreshold?: string
+        }
+        startup?: {
+          mode?: "http" | "command" | "tcp"
+          httpScheme?: "HTTP" | "HTTPS"
+          httpPath?: string
+          httpPort?: string
+          command?: string
+          tcpPort?: string
+          initialDelaySeconds?: string
+          timeoutSeconds?: string
+          periodSeconds?: string
+          successThreshold?: string
+          failureThreshold?: string
+        }
+      }
     }>
   }
 }
@@ -183,6 +226,47 @@ type CreateJobDialogProps = {
         cpuLimit?: string
         memoryRequestMi?: string
         memoryLimitMi?: string
+        probes?: {
+          liveness?: {
+            mode?: "http" | "command" | "tcp"
+            httpScheme?: "HTTP" | "HTTPS"
+            httpPath?: string
+            httpPort?: string
+            command?: string
+            tcpPort?: string
+            initialDelaySeconds?: string
+            timeoutSeconds?: string
+            periodSeconds?: string
+            successThreshold?: string
+            failureThreshold?: string
+          }
+          readiness?: {
+            mode?: "http" | "command" | "tcp"
+            httpScheme?: "HTTP" | "HTTPS"
+            httpPath?: string
+            httpPort?: string
+            command?: string
+            tcpPort?: string
+            initialDelaySeconds?: string
+            timeoutSeconds?: string
+            periodSeconds?: string
+            successThreshold?: string
+            failureThreshold?: string
+          }
+          startup?: {
+            mode?: "http" | "command" | "tcp"
+            httpScheme?: "HTTP" | "HTTPS"
+            httpPath?: string
+            httpPort?: string
+            command?: string
+            tcpPort?: string
+            initialDelaySeconds?: string
+            timeoutSeconds?: string
+            periodSeconds?: string
+            successThreshold?: string
+            failureThreshold?: string
+          }
+        }
       }>
     }
   }) => Promise<void>
@@ -365,6 +449,171 @@ function parseEditorTextToStringList(value: string): string[] {
     .filter((item) => item.length > 0)
 }
 
+function createDefaultProbeDraft(): ContainerProbeDraft {
+  return {
+    mode: "http",
+    httpScheme: "HTTP",
+    httpPath: "/",
+    httpPort: "80",
+    command: "",
+    tcpPort: "80",
+    initialDelaySeconds: "0",
+    timeoutSeconds: "1",
+    periodSeconds: "10",
+    successThreshold: "1",
+    failureThreshold: "3",
+  }
+}
+
+function toProbeMode(value: unknown): "http" | "command" | "tcp" {
+  const text = asString(value).trim().toLowerCase()
+  if (text === "command" || text === "tcp" || text === "http") return text
+  return "http"
+}
+
+function toProbeScheme(value: unknown): "HTTP" | "HTTPS" {
+  return asString(value).trim().toUpperCase() === "HTTPS" ? "HTTPS" : "HTTP"
+}
+
+function toProbePortText(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 65535) {
+    return String(Math.trunc(value))
+  }
+  return toOptionalIntegerString(value)
+}
+
+function parseProbeDraftFromSpec(raw: unknown): ContainerProbeDraft | null {
+  const spec = asObject(raw)
+  if (Object.keys(spec).length === 0) return null
+
+  const defaults = createDefaultProbeDraft()
+  const httpGet = asObject(spec.httpGet)
+  const tcpSocket = asObject(spec.tcpSocket)
+  const exec = asObject(spec.exec)
+  const execCommand = formatStringListAsEditorText(exec.command)
+
+  let mode: "http" | "command" | "tcp" = "http"
+  if (execCommand) {
+    mode = "command"
+  } else if (Object.keys(tcpSocket).length > 0) {
+    mode = "tcp"
+  }
+
+  return {
+    mode,
+    httpScheme: toProbeScheme(httpGet.scheme),
+    httpPath: asString(httpGet.path).trim() || defaults.httpPath,
+    httpPort: toProbePortText(httpGet.port) || defaults.httpPort,
+    command: execCommand,
+    tcpPort: toProbePortText(tcpSocket.port) || defaults.tcpPort,
+    initialDelaySeconds: toOptionalIntegerString(spec.initialDelaySeconds) || defaults.initialDelaySeconds,
+    timeoutSeconds: toOptionalIntegerString(spec.timeoutSeconds) || defaults.timeoutSeconds,
+    periodSeconds: toOptionalIntegerString(spec.periodSeconds) || defaults.periodSeconds,
+    successThreshold: toOptionalIntegerString(spec.successThreshold) || defaults.successThreshold,
+    failureThreshold: toOptionalIntegerString(spec.failureThreshold) || defaults.failureThreshold,
+  }
+}
+
+function parseProbeMapFromContainerSpec(container: JsonObject): ContainerProbeMap {
+  const liveness = parseProbeDraftFromSpec(container.livenessProbe)
+  const readiness = parseProbeDraftFromSpec(container.readinessProbe)
+  const startup = parseProbeDraftFromSpec(container.startupProbe)
+
+  return {
+    ...(liveness ? { liveness } : {}),
+    ...(readiness ? { readiness } : {}),
+    ...(startup ? { startup } : {}),
+  }
+}
+
+function buildProbeSpecFromDraft(draft: ContainerProbeDraft): JsonObject | null {
+  const mode = toProbeMode(draft.mode)
+  const initialDelaySeconds = toOptionalIntegerString(draft.initialDelaySeconds)
+  const timeoutSeconds = toOptionalIntegerString(draft.timeoutSeconds)
+  const periodSeconds = toOptionalIntegerString(draft.periodSeconds)
+  const successThreshold = toOptionalIntegerString(draft.successThreshold)
+  const failureThreshold = toOptionalIntegerString(draft.failureThreshold)
+
+  const modeSpec: JsonObject | null =
+    mode === "command"
+      ? (() => {
+          const command = parseEditorTextToStringList(draft.command)
+          if (command.length === 0) return null
+          return { exec: { command } }
+        })()
+      : mode === "tcp"
+        ? (() => {
+            const tcpPort = toOptionalIntegerString(draft.tcpPort)
+            if (!tcpPort) return null
+            return { tcpSocket: { port: Number.parseInt(tcpPort, 10) } }
+          })()
+        : (() => {
+            const httpPort = toOptionalIntegerString(draft.httpPort)
+            if (!httpPort) return null
+            return {
+              httpGet: {
+                scheme: toProbeScheme(draft.httpScheme),
+                path: draft.httpPath.trim() || "/",
+                port: Number.parseInt(httpPort, 10),
+              },
+            }
+          })()
+
+  if (!modeSpec) return null
+
+  return {
+    ...modeSpec,
+    ...(initialDelaySeconds ? { initialDelaySeconds: Number.parseInt(initialDelaySeconds, 10) } : {}),
+    ...(timeoutSeconds ? { timeoutSeconds: Number.parseInt(timeoutSeconds, 10) } : {}),
+    ...(periodSeconds ? { periodSeconds: Number.parseInt(periodSeconds, 10) } : {}),
+    ...(successThreshold ? { successThreshold: Number.parseInt(successThreshold, 10) } : {}),
+    ...(failureThreshold ? { failureThreshold: Number.parseInt(failureThreshold, 10) } : {}),
+  }
+}
+
+function buildProbeSpecMap(
+  probes: ContainerProbeMap | undefined
+): {
+  livenessProbe?: JsonObject
+  readinessProbe?: JsonObject
+  startupProbe?: JsonObject
+} {
+  const liveness = probes?.liveness ? buildProbeSpecFromDraft(probes.liveness) : null
+  const readiness = probes?.readiness ? buildProbeSpecFromDraft(probes.readiness) : null
+  const startup = probes?.startup ? buildProbeSpecFromDraft(probes.startup) : null
+
+  return {
+    ...(liveness ? { livenessProbe: liveness } : {}),
+    ...(readiness ? { readinessProbe: readiness } : {}),
+    ...(startup ? { startupProbe: startup } : {}),
+  }
+}
+
+function normalizeProbeDraft(draft: ContainerProbeDraft): ContainerProbeDraft {
+  return {
+    mode: toProbeMode(draft.mode),
+    httpScheme: toProbeScheme(draft.httpScheme),
+    httpPath: draft.httpPath.trim() || "/",
+    httpPort: toOptionalIntegerString(draft.httpPort),
+    command: draft.command.trim(),
+    tcpPort: toOptionalIntegerString(draft.tcpPort),
+    initialDelaySeconds: toOptionalIntegerString(draft.initialDelaySeconds),
+    timeoutSeconds: toOptionalIntegerString(draft.timeoutSeconds),
+    periodSeconds: toOptionalIntegerString(draft.periodSeconds),
+    successThreshold: toOptionalIntegerString(draft.successThreshold),
+    failureThreshold: toOptionalIntegerString(draft.failureThreshold),
+  }
+}
+
+function normalizeProbeMap(probes: ContainerProbeMap | undefined): ContainerProbeMap {
+  if (!probes) return {}
+  return {
+    ...(probes.liveness ? { liveness: normalizeProbeDraft(probes.liveness) } : {}),
+    ...(probes.readiness ? { readiness: normalizeProbeDraft(probes.readiness) } : {}),
+    ...(probes.startup ? { startup: normalizeProbeDraft(probes.startup) } : {}),
+  }
+}
+
 function createContainerDraftFromInitial(
   value: NonNullable<NonNullable<JobDialogInitialValues["pod"]>["containers"]>[number],
   index: number
@@ -423,6 +672,7 @@ function createContainerDraftFromInitial(
     memoryRequestMi: asString(value.memoryRequestMi),
     memoryLimitMi: asString(value.memoryLimitMi),
     env,
+    probes: normalizeProbeMap(value.probes as ContainerProbeMap | undefined),
     ports:
       Array.isArray(value.ports) && value.ports.length > 0
         ? value.ports.map((port) => ({
@@ -517,14 +767,14 @@ function buildPodSpecFromContainers(
             value: entry.value,
           }
         })
-        .filter((entry): entry is {
+        .filter(Boolean) as Array<{
           name: string
           value?: string
           valueFrom?: {
             configMapKeyRef?: { name: string; key: string }
             secretKeyRef?: { name: string; key: string }
           }
-        } => Boolean(entry))
+        }>
 
       const spec: JsonObject = {
         name: resolveContainerName(item.name, item.image, index, usedContainerNames),
@@ -546,6 +796,7 @@ function buildPodSpecFromContainers(
           : {}),
         ...(env.length > 0 ? { env } : {}),
         ...(ports.length > 0 ? { ports } : {}),
+        ...buildProbeSpecMap(item.probes),
       }
 
       if (item.syncHostTimezone) {
@@ -770,6 +1021,7 @@ function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnaps
           memoryRequestMi: toMemoryMiText(requests.memory),
           memoryLimitMi: toMemoryMiText(limits.memory),
           env,
+          probes: parseProbeMapFromContainerSpec(item),
           ports: ports.length > 0 ? ports : index === 0 ? [createContainerPortDraft(0)] : [],
         }
       })
@@ -813,6 +1065,7 @@ function createContainerDraft(): ContainerDraft {
     memoryRequestMi: "",
     memoryLimitMi: "",
     env: [],
+    probes: {},
     ports: [createContainerPortDraft(0)],
   }
 }
@@ -1234,8 +1487,9 @@ export function CreateJobDialog({
         | "cpuRequest"
         | "cpuLimit"
         | "memoryRequestMi"
-        | "memoryLimitMi",
-      value: string | boolean
+        | "memoryLimitMi"
+        | "probes",
+      value: string | boolean | ContainerProbeMap
     ) => {
       setContainers((current) =>
         current.map((item) =>
@@ -1267,7 +1521,12 @@ export function CreateJobDialog({
 
                 return {
                   ...item,
-                  [field]: field === "syncHostTimezone" ? value === true : value,
+                  [field]:
+                    field === "syncHostTimezone"
+                      ? value === true
+                      : field === "probes"
+                        ? normalizeProbeMap(value as ContainerProbeMap)
+                        : value,
                 }
               })()
             : item
@@ -1786,14 +2045,14 @@ export function CreateJobDialog({
                   value: entry.value,
                 }
               })
-              .filter((entry): entry is {
+              .filter(Boolean) as Array<{
                 name: string
                 value?: string
                 valueFrom?: {
                   configMapKeyRef?: { name: string; key: string }
                   secretKeyRef?: { name: string; key: string }
                 }
-              } => Boolean(entry))
+              }>
             const normalizedPorts = item.ports
               .map((port) => ({
                 protocol: port.protocol,
@@ -1803,6 +2062,7 @@ export function CreateJobDialog({
               .filter((port) => /^\d+$/.test(port.containerPort))
             const normalizedCommand = parseEditorTextToStringList(item.command)
             const normalizedArgs = parseEditorTextToStringList(item.args)
+            const normalizedProbes = normalizeProbeMap(item.probes)
 
             return {
               name: item.name.trim(),
@@ -1818,6 +2078,7 @@ export function CreateJobDialog({
               memoryRequestMi: item.memoryRequestMi.trim(),
               memoryLimitMi: item.memoryLimitMi.trim(),
               ...(normalizedPorts.length > 0 ? { ports: normalizedPorts } : {}),
+              ...(Object.keys(normalizedProbes).length > 0 ? { probes: normalizedProbes } : {}),
             }
           })
           .filter((item) => item.image.length > 0)
