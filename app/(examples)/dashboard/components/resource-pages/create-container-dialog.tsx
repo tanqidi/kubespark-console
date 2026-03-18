@@ -163,6 +163,8 @@ type ContainerExtensionOptionKey =
   | "syncHostTimezone"
 
 type EnvBatchSource = "configMap" | "secret"
+type ProbeSectionKey = "liveness" | "readiness" | "startup"
+type ProbeMode = "http" | "command" | "tcp"
 
 const CONTAINER_EXTENSION_OPTIONS: Array<{
   key: ContainerExtensionOptionKey
@@ -202,7 +204,7 @@ const CONTAINER_EXTENSION_OPTIONS: Array<{
 ]
 
 const HEALTH_CHECK_SECTIONS: Array<{
-  key: "liveness" | "readiness" | "startup"
+  key: ProbeSectionKey
   title: string
   description: string
 }> = [
@@ -222,6 +224,59 @@ const HEALTH_CHECK_SECTIONS: Array<{
     description: "检查容器是否启动成功。",
   },
 ]
+
+type ProbeDraft = {
+  mode: ProbeMode
+  httpScheme: "HTTP" | "HTTPS"
+  httpPath: string
+  httpPort: string
+  command: string
+  tcpPort: string
+  initialDelaySeconds: string
+  timeoutSeconds: string
+  periodSeconds: string
+  successThreshold: string
+  failureThreshold: string
+}
+
+type ProbeSectionState = {
+  enabled: boolean
+  draft: ProbeDraft
+}
+
+type ProbeDraftField = keyof ProbeDraft
+
+function createDefaultProbeDraft(): ProbeDraft {
+  return {
+    mode: "http",
+    httpScheme: "HTTP",
+    httpPath: "/",
+    httpPort: "80",
+    command: "",
+    tcpPort: "80",
+    initialDelaySeconds: "0",
+    timeoutSeconds: "1",
+    periodSeconds: "10",
+    successThreshold: "1",
+    failureThreshold: "3",
+  }
+}
+
+function createDefaultProbeState(): Record<ProbeSectionKey, ProbeSectionState> {
+  return {
+    liveness: { enabled: false, draft: createDefaultProbeDraft() },
+    readiness: { enabled: false, draft: createDefaultProbeDraft() },
+    startup: { enabled: false, draft: createDefaultProbeDraft() },
+  }
+}
+
+function createDefaultProbePopoverOpenState(): Record<ProbeSectionKey, boolean> {
+  return {
+    liveness: false,
+    readiness: false,
+    startup: false,
+  }
+}
 
 function createDefaultExtensionState(): Record<ContainerExtensionOptionKey, boolean> {
   return {
@@ -266,6 +321,20 @@ function resolveImagePullPolicyDescription(value: "Always" | "IfNotPresent" | "N
   return "如果本地存在所需的镜像，则优先使用本地镜像。"
 }
 
+function resolveProbeSummary(draft: ProbeDraft): string {
+  if (draft.mode === "http") {
+    const path = draft.httpPath.trim() || "/"
+    const port = draft.httpPort.trim() || "-"
+    return `${draft.httpScheme} ${path}:${port}`
+  }
+  if (draft.mode === "tcp") {
+    const port = draft.tcpPort.trim() || "-"
+    return `TCP ${port}`
+  }
+  const command = draft.command.trim()
+  return command ? `命令：${command}` : "命令探针"
+}
+
 function resolveDuplicateEnvNameIds(entries: ContainerEnvVarDraft[]): string[] {
   const grouped = new Map<string, string[]>()
   entries.forEach((entry) => {
@@ -303,6 +372,12 @@ export function CreateContainerDialog({
   const [configMapKeyRefOptions, setConfigMapKeyRefOptions] = React.useState<ConfigMapKeyRefOption[]>([])
   const [secretKeyRefOptions, setSecretKeyRefOptions] = React.useState<SecretKeyRefOption[]>([])
   const [envBatchPopoverOpen, setEnvBatchPopoverOpen] = React.useState(false)
+  const [probeState, setProbeState] = React.useState<Record<ProbeSectionKey, ProbeSectionState>>(
+    createDefaultProbeState
+  )
+  const [probePopoverOpen, setProbePopoverOpen] = React.useState<Record<ProbeSectionKey, boolean>>(
+    createDefaultProbePopoverOpenState
+  )
   const [envBatchSource, setEnvBatchSource] = React.useState<EnvBatchSource>("configMap")
   const [envBatchResourceName, setEnvBatchResourceName] = React.useState("")
   const [envBatchSelectedKeys, setEnvBatchSelectedKeys] = React.useState<string[]>([])
@@ -324,6 +399,11 @@ export function CreateContainerDialog({
   )
   const envBatchKeySet = React.useMemo(() => new Set(envBatchSelectedKeys), [envBatchSelectedKeys])
   const envBatchAllChecked = envBatchKeys.length > 0 && envBatchSelectedKeys.length === envBatchKeys.length
+  const probeDraftSnapshotRef = React.useRef<Record<ProbeSectionKey, ProbeDraft>>({
+    liveness: createDefaultProbeDraft(),
+    readiness: createDefaultProbeDraft(),
+    startup: createDefaultProbeDraft(),
+  })
   const localDuplicateEnvIds = React.useMemo(
     () => resolveDuplicateEnvNameIds(container?.env ?? []),
     [container?.env]
@@ -332,6 +412,63 @@ export function CreateContainerDialog({
     () => new Set([...envDuplicateIds, ...localDuplicateEnvIds]),
     [envDuplicateIds, localDuplicateEnvIds]
   )
+
+  const updateProbeDraft = React.useCallback(
+    (section: ProbeSectionKey, field: ProbeDraftField, value: string | ProbeMode | "HTTP" | "HTTPS") => {
+      setProbeState((current) => ({
+        ...current,
+        [section]: {
+          ...current[section],
+          draft: {
+            ...current[section].draft,
+            [field]: value,
+          },
+        },
+      }))
+    },
+    []
+  )
+
+  const handleProbePopoverOpenChange = React.useCallback(
+    (section: ProbeSectionKey, nextOpen: boolean) => {
+      if (nextOpen) {
+        probeDraftSnapshotRef.current[section] = { ...probeState[section].draft }
+      }
+      setProbePopoverOpen((current) => ({
+        ...current,
+        [section]: nextOpen,
+      }))
+    },
+    [probeState]
+  )
+
+  const cancelProbeEdit = React.useCallback((section: ProbeSectionKey) => {
+    setProbeState((current) => ({
+      ...current,
+      [section]: {
+        ...current[section],
+        draft: { ...probeDraftSnapshotRef.current[section] },
+      },
+    }))
+    setProbePopoverOpen((current) => ({
+      ...current,
+      [section]: false,
+    }))
+  }, [])
+
+  const confirmProbeEdit = React.useCallback((section: ProbeSectionKey) => {
+    setProbeState((current) => ({
+      ...current,
+      [section]: {
+        ...current[section],
+        enabled: true,
+      },
+    }))
+    setProbePopoverOpen((current) => ({
+      ...current,
+      [section]: false,
+    }))
+  }, [])
 
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
@@ -356,6 +493,8 @@ export function CreateContainerDialog({
       env: envEnabled,
       syncHostTimezone: syncHostTimezoneEnabled,
     })
+    setProbeState(createDefaultProbeState())
+    setProbePopoverOpen(createDefaultProbePopoverOpenState())
   }, [containerId, envEnabled, startupCommandEnabled, syncHostTimezoneEnabled])
 
   React.useEffect(() => {
@@ -783,6 +922,9 @@ export function CreateContainerDialog({
                             }))
                             if (option.key === "syncHostTimezone") {
                               onChange("syncHostTimezone", nextValue)
+                            } else if (option.key === "healthCheck" && !nextValue) {
+                              setProbeState(createDefaultProbeState())
+                              setProbePopoverOpen(createDefaultProbePopoverOpenState())
                             } else if (option.key === "startupCommand" && !nextValue) {
                               onChange("command", "")
                               onChange("args", "")
@@ -840,15 +982,249 @@ export function CreateContainerDialog({
                         {option.key === "healthCheck" && checked ? (
                           <div className="basis-full rounded-md bg-muted/60 p-4">
                             <div className="flex flex-col gap-6">
-                              {HEALTH_CHECK_SECTIONS.map((section) => (
-                                <div key={section.key} className="flex flex-col gap-2">
-                                  <p className="text-sm text-foreground">{section.title}</p>
-                                  <div className="cursor-pointer rounded-md border border-dashed bg-background px-4 py-3 text-sm text-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/40">
-                                    添加探针
+                              {HEALTH_CHECK_SECTIONS.map((section) => {
+                                const sectionState = probeState[section.key]
+                                const draft = sectionState.draft
+                                const isOpen = probePopoverOpen[section.key]
+                                return (
+                                  <div key={section.key} className="flex flex-col gap-2">
+                                    <p className="text-sm text-foreground">{section.title}</p>
+                                    <Popover
+                                      open={isOpen}
+                                      onOpenChange={(nextOpen) =>
+                                        handleProbePopoverOpenChange(section.key, nextOpen)
+                                      }
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className={cn(
+                                            "w-full cursor-pointer rounded-md border border-dashed bg-background px-4 py-3 text-left text-sm transition-colors hover:border-muted-foreground/40 hover:bg-muted/40",
+                                            sectionState.enabled && "border-primary/40"
+                                          )}
+                                          disabled={isBusy}
+                                        >
+                                          {sectionState.enabled ? resolveProbeSummary(draft) : "添加探针"}
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent
+                                        className="w-[min(86vw,760px)] p-4"
+                                        align="start"
+                                        side="bottom"
+                                        sideOffset={8}
+                                      >
+                                        <div className="space-y-4">
+                                          <Tabs
+                                            value={draft.mode}
+                                            onValueChange={(value) => {
+                                              if (value === "http" || value === "command" || value === "tcp") {
+                                                updateProbeDraft(section.key, "mode", value)
+                                              }
+                                            }}
+                                          >
+                                            <TabsList className="grid w-full grid-cols-3">
+                                              <TabsTrigger value="http">HTTP 请求</TabsTrigger>
+                                              <TabsTrigger value="command">命令</TabsTrigger>
+                                              <TabsTrigger value="tcp">TCP 端口</TabsTrigger>
+                                            </TabsList>
+                                          </Tabs>
+
+                                          {draft.mode === "http" ? (
+                                            <div className="space-y-3">
+                                              <div className="text-sm">路径</div>
+                                              <div className="grid gap-3 md:grid-cols-3">
+                                                <div className="w-full">
+                                                  <Select
+                                                    value={draft.httpScheme}
+                                                    onValueChange={(value) => {
+                                                      if (value === "HTTP" || value === "HTTPS") {
+                                                        updateProbeDraft(section.key, "httpScheme", value)
+                                                      }
+                                                    }}
+                                                    disabled={isBusy}
+                                                  >
+                                                    <SelectTrigger className="w-full">
+                                                      <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      <SelectGroup>
+                                                        <SelectItem value="HTTP">HTTP</SelectItem>
+                                                        <SelectItem value="HTTPS">HTTPS</SelectItem>
+                                                      </SelectGroup>
+                                                    </SelectContent>
+                                                  </Select>
+                                                </div>
+                                                <Input
+                                                  value={draft.httpPath}
+                                                  onChange={(event) =>
+                                                    updateProbeDraft(section.key, "httpPath", event.target.value)
+                                                  }
+                                                  placeholder="/"
+                                                  autoComplete="off"
+                                                  disabled={isBusy}
+                                                />
+                                                <Input
+                                                  value={draft.httpPort}
+                                                  onChange={(event) =>
+                                                    updateProbeDraft(
+                                                      section.key,
+                                                      "httpPort",
+                                                      normalizePortInput(event.target.value)
+                                                    )
+                                                  }
+                                                  placeholder="80"
+                                                  inputMode="numeric"
+                                                  maxLength={5}
+                                                  autoComplete="off"
+                                                  disabled={isBusy}
+                                                />
+                                              </div>
+                                            </div>
+                                          ) : null}
+
+                                          {draft.mode === "command" ? (
+                                            <div className="space-y-3">
+                                              <div className="text-sm">命令</div>
+                                              <Input
+                                                value={draft.command}
+                                                onChange={(event) =>
+                                                  updateProbeDraft(section.key, "command", event.target.value)
+                                                }
+                                                placeholder='/bin/sh -c "echo ok"'
+                                                disabled={isBusy}
+                                              />
+                                            </div>
+                                          ) : null}
+
+                                          {draft.mode === "tcp" ? (
+                                            <div className="space-y-3">
+                                              <div className="text-sm">TCP 端口</div>
+                                              <Input
+                                                value={draft.tcpPort}
+                                                onChange={(event) =>
+                                                  updateProbeDraft(
+                                                    section.key,
+                                                    "tcpPort",
+                                                    normalizePortInput(event.target.value)
+                                                  )
+                                                }
+                                                placeholder="80"
+                                                inputMode="numeric"
+                                                maxLength={5}
+                                                autoComplete="off"
+                                                disabled={isBusy}
+                                              />
+                                            </div>
+                                          ) : null}
+
+                                          <div className="grid gap-3 md:grid-cols-3">
+                                            <Field>
+                                              <FieldLabel>初始延迟（s）</FieldLabel>
+                                              <Input
+                                                value={draft.initialDelaySeconds}
+                                                onChange={(event) =>
+                                                  updateProbeDraft(
+                                                    section.key,
+                                                    "initialDelaySeconds",
+                                                    normalizeMemoryInput(event.target.value)
+                                                  )
+                                                }
+                                                inputMode="numeric"
+                                                autoComplete="off"
+                                                disabled={isBusy}
+                                              />
+                                            </Field>
+                                            <Field>
+                                              <FieldLabel>超时时间（s）</FieldLabel>
+                                              <Input
+                                                value={draft.timeoutSeconds}
+                                                onChange={(event) =>
+                                                  updateProbeDraft(
+                                                    section.key,
+                                                    "timeoutSeconds",
+                                                    normalizeMemoryInput(event.target.value)
+                                                  )
+                                                }
+                                                inputMode="numeric"
+                                                autoComplete="off"
+                                                disabled={isBusy}
+                                              />
+                                            </Field>
+                                            <Field>
+                                              <FieldLabel>检查间隔（s）</FieldLabel>
+                                              <Input
+                                                value={draft.periodSeconds}
+                                                onChange={(event) =>
+                                                  updateProbeDraft(
+                                                    section.key,
+                                                    "periodSeconds",
+                                                    normalizeMemoryInput(event.target.value)
+                                                  )
+                                                }
+                                                inputMode="numeric"
+                                                autoComplete="off"
+                                                disabled={isBusy}
+                                              />
+                                            </Field>
+                                            <Field>
+                                              <FieldLabel>成功阈值</FieldLabel>
+                                              <Input
+                                                value={draft.successThreshold}
+                                                onChange={(event) =>
+                                                  updateProbeDraft(
+                                                    section.key,
+                                                    "successThreshold",
+                                                    normalizeMemoryInput(event.target.value)
+                                                  )
+                                                }
+                                                inputMode="numeric"
+                                                autoComplete="off"
+                                                disabled={isBusy}
+                                              />
+                                            </Field>
+                                            <Field>
+                                              <FieldLabel>失败阈值</FieldLabel>
+                                              <Input
+                                                value={draft.failureThreshold}
+                                                onChange={(event) =>
+                                                  updateProbeDraft(
+                                                    section.key,
+                                                    "failureThreshold",
+                                                    normalizeMemoryInput(event.target.value)
+                                                  )
+                                                }
+                                                inputMode="numeric"
+                                                autoComplete="off"
+                                                disabled={isBusy}
+                                              />
+                                            </Field>
+                                            <div aria-hidden className="hidden md:block" />
+                                          </div>
+
+                                          <div className="flex justify-end gap-2 border-t pt-3">
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              onClick={() => cancelProbeEdit(section.key)}
+                                              disabled={isBusy}
+                                            >
+                                              取消
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              onClick={() => confirmProbeEdit(section.key)}
+                                              disabled={isBusy}
+                                            >
+                                              确定
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                    <p className="text-sm text-muted-foreground">{section.description}</p>
                                   </div>
-                                  <p className="text-sm text-muted-foreground">{section.description}</p>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </div>
                         ) : null}
