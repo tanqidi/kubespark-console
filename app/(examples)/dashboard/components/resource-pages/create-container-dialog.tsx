@@ -201,6 +201,28 @@ const CONTAINER_EXTENSION_OPTIONS: Array<{
   },
 ]
 
+const HEALTH_CHECK_SECTIONS: Array<{
+  key: "liveness" | "readiness" | "startup"
+  title: string
+  description: string
+}> = [
+  {
+    key: "liveness",
+    title: "存活检查",
+    description: "检查容器是否存活。",
+  },
+  {
+    key: "readiness",
+    title: "就绪检查",
+    description: "检查容器是否可以处理请求。",
+  },
+  {
+    key: "startup",
+    title: "启动检查",
+    description: "检查容器是否启动成功。",
+  },
+]
+
 function createDefaultExtensionState(): Record<ContainerExtensionOptionKey, boolean> {
   return {
     healthCheck: false,
@@ -812,6 +834,22 @@ export function CreateContainerDialog({
                                 </FieldDescription>
                               </Field>
                             </FieldGroup>
+                          </div>
+                        ) : null}
+
+                        {option.key === "healthCheck" && checked ? (
+                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                            <div className="flex flex-col gap-6">
+                              {HEALTH_CHECK_SECTIONS.map((section) => (
+                                <div key={section.key} className="flex flex-col gap-2">
+                                  <p className="text-sm text-foreground">{section.title}</p>
+                                  <div className="rounded-md border border-dashed bg-background px-4 py-3 text-sm text-foreground">
+                                    添加探针
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">{section.description}</p>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         ) : null}
 
