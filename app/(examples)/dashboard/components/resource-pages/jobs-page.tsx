@@ -272,6 +272,19 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
         const imagePullPolicy = asString(item.imagePullPolicy)
         const command = toStringArray(item.command)
         const args = toStringArray(item.args)
+        const securityContextRaw = asObject(item.securityContext)
+        const securityContext = {
+          ...(securityContextRaw.privileged === true ? { privileged: true } : {}),
+          ...(securityContextRaw.allowPrivilegeEscalation === true ? { allowPrivilegeEscalation: true } : {}),
+          ...(securityContextRaw.readOnlyRootFilesystem === true ? { readOnlyRootFilesystem: true } : {}),
+          ...(securityContextRaw.runAsNonRoot === true ? { runAsNonRoot: true } : {}),
+          ...(toOptionalIntegerString(securityContextRaw.runAsUser)
+            ? { runAsUser: toOptionalIntegerString(securityContextRaw.runAsUser) }
+            : {}),
+          ...(toOptionalIntegerString(securityContextRaw.runAsGroup)
+            ? { runAsGroup: toOptionalIntegerString(securityContextRaw.runAsGroup) }
+            : {}),
+        }
         const normalizedImagePullPolicy: "Always" | "IfNotPresent" | "Never" =
           imagePullPolicy === "Always" || imagePullPolicy === "Never"
             ? imagePullPolicy
@@ -291,6 +304,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
           cpuLimit: asString(limits.cpu),
           memoryRequestMi: toMemoryMiText(requests.memory),
           memoryLimitMi: toMemoryMiText(limits.memory),
+          ...(Object.keys(securityContext).length > 0 ? { securityContext } : {}),
           probes: parseProbeMapFromContainer(item),
         }
         return normalized

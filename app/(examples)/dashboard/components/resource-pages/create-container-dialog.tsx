@@ -48,6 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import {
   Popover,
   PopoverContent,
@@ -107,6 +108,15 @@ export type ContainerProbeDraft = {
 
 export type ContainerProbeMap = Partial<Record<ProbeSectionKey, ContainerProbeDraft>>
 
+export type ContainerSecurityContextDraft = {
+  privileged: boolean
+  allowPrivilegeEscalation: boolean
+  readOnlyRootFilesystem: boolean
+  runAsNonRoot: boolean
+  runAsUser: string
+  runAsGroup: string
+}
+
 export type ContainerDraft = {
   id: string
   name: string
@@ -123,6 +133,7 @@ export type ContainerDraft = {
   ports: ContainerPortDraft[]
   env: ContainerEnvVarDraft[]
   probes: ContainerProbeMap
+  securityContext: ContainerSecurityContextDraft
 }
 
 type CreateContainerDialogProps = {
@@ -147,8 +158,9 @@ type CreateContainerDialogProps = {
       | "cpuLimit"
       | "memoryRequestMi"
       | "memoryLimitMi"
-      | "probes",
-    value: string | boolean | ContainerProbeMap
+      | "probes"
+      | "securityContext",
+    value: string | boolean | ContainerProbeMap | ContainerSecurityContextDraft
   ) => void
   onAddPort: () => void
   onUpdatePort: (
@@ -310,6 +322,17 @@ function createDefaultProbePopoverOpenState(): Record<ProbeSectionKey, boolean> 
   }
 }
 
+function createDefaultSecurityContextDraft(): ContainerSecurityContextDraft {
+  return {
+    privileged: false,
+    allowPrivilegeEscalation: false,
+    readOnlyRootFilesystem: false,
+    runAsNonRoot: false,
+    runAsUser: "",
+    runAsGroup: "",
+  }
+}
+
 function createDefaultExtensionState(): Record<ContainerExtensionOptionKey, boolean> {
   return {
     healthCheck: false,
@@ -319,6 +342,22 @@ function createDefaultExtensionState(): Record<ContainerExtensionOptionKey, bool
     securityContext: false,
     syncHostTimezone: false,
   }
+}
+
+function normalizeIdentityInput(value: string): string {
+  return value.replace(/\D+/g, "")
+}
+
+function hasEnabledSecurityContext(value: ContainerSecurityContextDraft | undefined): boolean {
+  if (!value) return false
+  return (
+    value.privileged ||
+    value.allowPrivilegeEscalation ||
+    value.readOnlyRootFilesystem ||
+    value.runAsNonRoot ||
+    value.runAsUser.trim().length > 0 ||
+    value.runAsGroup.trim().length > 0
+  )
 }
 
 function normalizeCpuInput(value: string): string {
@@ -420,6 +459,14 @@ export function CreateContainerDialog({
   const syncHostTimezoneEnabled = container?.syncHostTimezone ?? false
   const startupCommandEnabled = (container?.command.trim().length ?? 0) > 0 || (container?.args.trim().length ?? 0) > 0
   const envEnabled = (container?.env.length ?? 0) > 0
+  const securityContextEnabled = React.useMemo(
+    () => hasEnabledSecurityContext(container?.securityContext),
+    [container?.securityContext]
+  )
+  const securityContextDraft = React.useMemo(
+    () => container?.securityContext ?? createDefaultSecurityContextDraft(),
+    [container?.securityContext]
+  )
   const probeEnabled = React.useMemo(() => {
     const probes = container?.probes
     if (!probes) return false
@@ -533,11 +580,20 @@ export function CreateContainerDialog({
       healthCheck: probeEnabled,
       startupCommand: startupCommandEnabled,
       env: envEnabled,
+      securityContext: securityContextEnabled,
       syncHostTimezone: syncHostTimezoneEnabled,
     })
     setProbeState(createProbeStateFromContainer(container?.probes))
     setProbePopoverOpen(createDefaultProbePopoverOpenState())
-  }, [containerId, envEnabled, probeEnabled, startupCommandEnabled, syncHostTimezoneEnabled, container?.probes])
+  }, [
+    containerId,
+    envEnabled,
+    probeEnabled,
+    securityContextEnabled,
+    startupCommandEnabled,
+    syncHostTimezoneEnabled,
+    container?.probes,
+  ])
 
   React.useEffect(() => {
     if (!open) return
@@ -964,6 +1020,8 @@ export function CreateContainerDialog({
                             }))
                             if (option.key === "syncHostTimezone") {
                               onChange("syncHostTimezone", nextValue)
+                            } else if (option.key === "securityContext" && !nextValue) {
+                              onChange("securityContext", createDefaultSecurityContextDraft())
                             } else if (option.key === "healthCheck" && !nextValue) {
                               setProbeState(createDefaultProbeState())
                               setProbePopoverOpen(createDefaultProbePopoverOpenState())
@@ -1596,6 +1654,136 @@ export function CreateContainerDialog({
 
                               </div>
                             </FieldGroup>
+                          </div>
+                        ) : null}
+
+                        {option.key === "securityContext" && checked ? (
+                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                            <div className="space-y-4">
+                              <div className="space-y-3">
+                                <p className="text-sm text-foreground">访问控制</p>
+                                <div className="space-y-3 rounded-md border bg-background p-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm">特权模式</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        允许容器以特权方式运行进程。
+                                      </p>
+                                    </div>
+                                    <Switch
+                                      checked={securityContextDraft.privileged}
+                                      onCheckedChange={(nextValue) =>
+                                        onChange("securityContext", {
+                                          ...securityContextDraft,
+                                          privileged: nextValue === true,
+                                        })
+                                      }
+                                      disabled={isBusy}
+                                    />
+                                  </div>
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm">允许特权提升</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        允许进程获得比父进程更高权限。
+                                      </p>
+                                    </div>
+                                    <Switch
+                                      checked={securityContextDraft.allowPrivilegeEscalation}
+                                      onCheckedChange={(nextValue) =>
+                                        onChange("securityContext", {
+                                          ...securityContextDraft,
+                                          allowPrivilegeEscalation: nextValue === true,
+                                        })
+                                      }
+                                      disabled={isBusy}
+                                    />
+                                  </div>
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm">根目录只读</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        将容器根文件系统挂载为只读。
+                                      </p>
+                                    </div>
+                                    <Switch
+                                      checked={securityContextDraft.readOnlyRootFilesystem}
+                                      onCheckedChange={(nextValue) =>
+                                        onChange("securityContext", {
+                                          ...securityContextDraft,
+                                          readOnlyRootFilesystem: nextValue === true,
+                                        })
+                                      }
+                                      disabled={isBusy}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <p className="text-sm text-foreground">用户和用户组</p>
+                                <div className="space-y-4 rounded-md border bg-background p-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm">仅允许非 root 运行</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        开启后会拒绝 root 用户运行容器。
+                                      </p>
+                                    </div>
+                                    <Switch
+                                      checked={securityContextDraft.runAsNonRoot}
+                                      onCheckedChange={(nextValue) =>
+                                        onChange("securityContext", {
+                                          ...securityContextDraft,
+                                          runAsNonRoot: nextValue === true,
+                                        })
+                                      }
+                                      disabled={isBusy}
+                                    />
+                                  </div>
+                                  <div className="grid gap-3 md:grid-cols-2">
+                                    <Field>
+                                      <FieldLabel htmlFor={`${container.id}-security-run-as-user`}>用户 UID</FieldLabel>
+                                      <Input
+                                        id={`${container.id}-security-run-as-user`}
+                                        value={securityContextDraft.runAsUser}
+                                        onChange={(event) =>
+                                          onChange("securityContext", {
+                                            ...securityContextDraft,
+                                            runAsUser: normalizeIdentityInput(event.target.value),
+                                          })
+                                        }
+                                        placeholder="1000"
+                                        inputMode="numeric"
+                                        maxLength={10}
+                                        autoComplete="off"
+                                        disabled={isBusy}
+                                      />
+                                    </Field>
+                                    <Field>
+                                      <FieldLabel htmlFor={`${container.id}-security-run-as-group`}>
+                                        用户组 GID
+                                      </FieldLabel>
+                                      <Input
+                                        id={`${container.id}-security-run-as-group`}
+                                        value={securityContextDraft.runAsGroup}
+                                        onChange={(event) =>
+                                          onChange("securityContext", {
+                                            ...securityContextDraft,
+                                            runAsGroup: normalizeIdentityInput(event.target.value),
+                                          })
+                                        }
+                                        placeholder="1000"
+                                        inputMode="numeric"
+                                        maxLength={10}
+                                        autoComplete="off"
+                                        disabled={isBusy}
+                                      />
+                                    </Field>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         ) : null}
                       </Item>

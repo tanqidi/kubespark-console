@@ -37,6 +37,15 @@ export type JobPodProbeInput = {
   failureThreshold?: string
 }
 
+export type JobPodContainerSecurityContextInput = {
+  privileged?: boolean
+  runAsUser?: string
+  runAsGroup?: string
+  runAsNonRoot?: boolean
+  readOnlyRootFilesystem?: boolean
+  allowPrivilegeEscalation?: boolean
+}
+
 export type JobPodInput = {
   restartPolicy?: "Never" | "OnFailure"
   containers?: Array<{
@@ -70,6 +79,7 @@ export type JobPodInput = {
     cpuLimit?: string
     memoryRequestMi?: string
     memoryLimitMi?: string
+    securityContext?: JobPodContainerSecurityContextInput
     probes?: {
       liveness?: JobPodProbeInput
       readiness?: JobPodProbeInput
@@ -227,6 +237,25 @@ function buildProbeSpec(probe?: JobPodProbeInput): Record<string, unknown> | und
   }
 }
 
+function buildContainerSecurityContextSpec(
+  value: JobPodContainerSecurityContextInput | undefined
+): Record<string, unknown> | undefined {
+  if (!value) return undefined
+
+  const runAsUser = pickOptionalNonNegativeIntFromUnknown(value.runAsUser)
+  const runAsGroup = pickOptionalNonNegativeIntFromUnknown(value.runAsGroup)
+  const spec = {
+    ...(value.privileged === true ? { privileged: true } : {}),
+    ...(value.allowPrivilegeEscalation === true ? { allowPrivilegeEscalation: true } : {}),
+    ...(value.readOnlyRootFilesystem === true ? { readOnlyRootFilesystem: true } : {}),
+    ...(value.runAsNonRoot === true ? { runAsNonRoot: true } : {}),
+    ...(typeof runAsUser === "number" ? { runAsUser } : {}),
+    ...(typeof runAsGroup === "number" ? { runAsGroup } : {}),
+  }
+
+  return Object.keys(spec).length > 0 ? spec : undefined
+}
+
 function buildPodContainerSpec(pod?: JobPodInput) {
   const raw = Array.isArray(pod?.containers) ? pod.containers : []
   const containers: Array<Record<string, unknown>> = []
@@ -348,6 +377,7 @@ function buildPodContainerSpec(pod?: JobPodInput) {
     const livenessProbe = buildProbeSpec(item.probes?.liveness)
     const readinessProbe = buildProbeSpec(item.probes?.readiness)
     const startupProbe = buildProbeSpec(item.probes?.startup)
+    const securityContext = buildContainerSecurityContextSpec(item.securityContext)
 
     const containerSpec: Record<string, unknown> = {
       name: resolveContainerName(item.name, image, index),
@@ -360,6 +390,7 @@ function buildPodContainerSpec(pod?: JobPodInput) {
       ...(livenessProbe ? { livenessProbe } : {}),
       ...(readinessProbe ? { readinessProbe } : {}),
       ...(startupProbe ? { startupProbe } : {}),
+      ...(securityContext ? { securityContext } : {}),
       ...(item.syncHostTimezone
         ? {
             volumeMounts: [

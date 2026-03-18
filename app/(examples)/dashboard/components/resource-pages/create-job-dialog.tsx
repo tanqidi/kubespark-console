@@ -35,6 +35,7 @@ import {
   type ContainerPortProtocol,
   type ContainerProbeDraft,
   type ContainerProbeMap,
+  type ContainerSecurityContextDraft,
   type ContainerType,
 } from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog"
 import {
@@ -129,6 +130,14 @@ export type JobDialogInitialValues = {
       cpuLimit?: string
       memoryRequestMi?: string
       memoryLimitMi?: string
+      securityContext?: {
+        privileged?: boolean
+        runAsUser?: string
+        runAsGroup?: string
+        runAsNonRoot?: boolean
+        readOnlyRootFilesystem?: boolean
+        allowPrivilegeEscalation?: boolean
+      }
       probes?: {
         liveness?: {
           mode?: "http" | "command" | "tcp"
@@ -226,6 +235,14 @@ type CreateJobDialogProps = {
         cpuLimit?: string
         memoryRequestMi?: string
         memoryLimitMi?: string
+        securityContext?: {
+          privileged?: boolean
+          runAsUser?: string
+          runAsGroup?: string
+          runAsNonRoot?: boolean
+          readOnlyRootFilesystem?: boolean
+          allowPrivilegeEscalation?: boolean
+        }
         probes?: {
           liveness?: {
             mode?: "http" | "command" | "tcp"
@@ -614,6 +631,47 @@ function normalizeProbeMap(probes: ContainerProbeMap | undefined): ContainerProb
   }
 }
 
+function normalizeSecurityContextDraft(value: unknown): ContainerSecurityContextDraft {
+  const source = asObject(value)
+  return {
+    privileged: source.privileged === true,
+    allowPrivilegeEscalation: source.allowPrivilegeEscalation === true,
+    readOnlyRootFilesystem: source.readOnlyRootFilesystem === true,
+    runAsNonRoot: source.runAsNonRoot === true,
+    runAsUser: toOptionalIntegerString(source.runAsUser),
+    runAsGroup: toOptionalIntegerString(source.runAsGroup),
+  }
+}
+
+function hasSecurityContextValue(value: ContainerSecurityContextDraft | undefined): boolean {
+  if (!value) return false
+  return (
+    value.privileged ||
+    value.allowPrivilegeEscalation ||
+    value.readOnlyRootFilesystem ||
+    value.runAsNonRoot ||
+    value.runAsUser.trim().length > 0 ||
+    value.runAsGroup.trim().length > 0
+  )
+}
+
+function buildSecurityContextSpecFromDraft(
+  draft: ContainerSecurityContextDraft | undefined
+): JsonObject | null {
+  if (!draft) return null
+  const runAsUser = toOptionalIntegerString(draft.runAsUser)
+  const runAsGroup = toOptionalIntegerString(draft.runAsGroup)
+  const spec: JsonObject = {
+    ...(draft.privileged ? { privileged: true } : {}),
+    ...(draft.allowPrivilegeEscalation ? { allowPrivilegeEscalation: true } : {}),
+    ...(draft.readOnlyRootFilesystem ? { readOnlyRootFilesystem: true } : {}),
+    ...(draft.runAsNonRoot ? { runAsNonRoot: true } : {}),
+    ...(runAsUser ? { runAsUser: Number.parseInt(runAsUser, 10) } : {}),
+    ...(runAsGroup ? { runAsGroup: Number.parseInt(runAsGroup, 10) } : {}),
+  }
+  return Object.keys(spec).length > 0 ? spec : null
+}
+
 function createContainerDraftFromInitial(
   value: NonNullable<NonNullable<JobDialogInitialValues["pod"]>["containers"]>[number],
   index: number
@@ -671,6 +729,7 @@ function createContainerDraftFromInitial(
     cpuLimit: asString(value.cpuLimit),
     memoryRequestMi: asString(value.memoryRequestMi),
     memoryLimitMi: asString(value.memoryLimitMi),
+    securityContext: normalizeSecurityContextDraft(value.securityContext),
     env,
     probes: normalizeProbeMap(value.probes as ContainerProbeMap | undefined),
     ports:
@@ -775,6 +834,7 @@ function buildPodSpecFromContainers(
             secretKeyRef?: { name: string; key: string }
           }
         }>
+      const securityContext = buildSecurityContextSpecFromDraft(item.securityContext)
 
       const spec: JsonObject = {
         name: resolveContainerName(item.name, item.image, index, usedContainerNames),
@@ -796,6 +856,7 @@ function buildPodSpecFromContainers(
           : {}),
         ...(env.length > 0 ? { env } : {}),
         ...(ports.length > 0 ? { ports } : {}),
+        ...(securityContext ? { securityContext } : {}),
         ...buildProbeSpecMap(item.probes),
       }
 
@@ -1020,6 +1081,7 @@ function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnaps
           cpuLimit: asString(limits.cpu),
           memoryRequestMi: toMemoryMiText(requests.memory),
           memoryLimitMi: toMemoryMiText(limits.memory),
+          securityContext: normalizeSecurityContextDraft(item.securityContext),
           env,
           probes: parseProbeMapFromContainerSpec(item),
           ports: ports.length > 0 ? ports : index === 0 ? [createContainerPortDraft(0)] : [],
@@ -1064,6 +1126,7 @@ function createContainerDraft(): ContainerDraft {
     cpuLimit: "",
     memoryRequestMi: "",
     memoryLimitMi: "",
+    securityContext: normalizeSecurityContextDraft({}),
     env: [],
     probes: {},
     ports: [createContainerPortDraft(0)],
@@ -1488,8 +1551,9 @@ export function CreateJobDialog({
         | "cpuLimit"
         | "memoryRequestMi"
         | "memoryLimitMi"
-        | "probes",
-      value: string | boolean | ContainerProbeMap
+        | "probes"
+        | "securityContext",
+      value: string | boolean | ContainerProbeMap | ContainerSecurityContextDraft
     ) => {
       setContainers((current) =>
         current.map((item) =>
@@ -1526,6 +1590,8 @@ export function CreateJobDialog({
                       ? value === true
                       : field === "probes"
                         ? normalizeProbeMap(value as ContainerProbeMap)
+                        : field === "securityContext"
+                          ? normalizeSecurityContextDraft(value)
                         : value,
                 }
               })()
@@ -2063,6 +2129,7 @@ export function CreateJobDialog({
             const normalizedCommand = parseEditorTextToStringList(item.command)
             const normalizedArgs = parseEditorTextToStringList(item.args)
             const normalizedProbes = normalizeProbeMap(item.probes)
+            const normalizedSecurityContext = normalizeSecurityContextDraft(item.securityContext)
 
             return {
               name: item.name.trim(),
@@ -2077,6 +2144,9 @@ export function CreateJobDialog({
               cpuLimit: item.cpuLimit.trim(),
               memoryRequestMi: item.memoryRequestMi.trim(),
               memoryLimitMi: item.memoryLimitMi.trim(),
+              ...(hasSecurityContextValue(normalizedSecurityContext)
+                ? { securityContext: normalizedSecurityContext }
+                : {}),
               ...(normalizedPorts.length > 0 ? { ports: normalizedPorts } : {}),
               ...(Object.keys(normalizedProbes).length > 0 ? { probes: normalizedProbes } : {}),
             }
