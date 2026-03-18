@@ -843,7 +843,7 @@ export function CreateContainerDialog({
                               {HEALTH_CHECK_SECTIONS.map((section) => (
                                 <div key={section.key} className="flex flex-col gap-2">
                                   <p className="text-sm text-foreground">{section.title}</p>
-                                  <div className="rounded-md border border-dashed bg-background px-4 py-3 text-sm text-foreground">
+                                  <div className="cursor-pointer rounded-md border border-dashed bg-background px-4 py-3 text-sm text-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/40">
                                     添加探针
                                   </div>
                                   <p className="text-sm text-muted-foreground">{section.description}</p>
