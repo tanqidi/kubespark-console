@@ -27,10 +27,12 @@ import {
 } from "@/components/ui/dialog"
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldTitle,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
@@ -455,6 +457,7 @@ export function CreateContainerDialog({
   const [extensionState, setExtensionState] = React.useState<Record<ContainerExtensionOptionKey, boolean>>(
     createDefaultExtensionState
   )
+  const extensionStateContainerIdRef = React.useRef<string | null>(null)
   const containerId = container?.id ?? null
   const syncHostTimezoneEnabled = container?.syncHostTimezone ?? false
   const startupCommandEnabled = (container?.command.trim().length ?? 0) > 0 || (container?.args.trim().length ?? 0) > 0
@@ -575,14 +578,18 @@ export function CreateContainerDialog({
 
   React.useEffect(() => {
     if (!containerId) return
-    setExtensionState({
+    const isContainerChanged = extensionStateContainerIdRef.current !== containerId
+    extensionStateContainerIdRef.current = containerId
+    setExtensionState((current) => ({
       ...createDefaultExtensionState(),
       healthCheck: probeEnabled,
       startupCommand: startupCommandEnabled,
       env: envEnabled,
-      securityContext: securityContextEnabled,
+      securityContext: isContainerChanged
+        ? securityContextEnabled
+        : current.securityContext || securityContextEnabled,
       syncHostTimezone: syncHostTimezoneEnabled,
-    })
+    }))
     setProbeState(createProbeStateFromContainer(container?.probes))
     setProbePopoverOpen(createDefaultProbePopoverOpenState())
   }, [
@@ -628,6 +635,7 @@ export function CreateContainerDialog({
 
   React.useEffect(() => {
     if (!open) {
+      extensionStateContainerIdRef.current = null
       setEnvBatchPopoverOpen(false)
       setEnvBatchSelectedKeys([])
       return
@@ -1663,13 +1671,11 @@ export function CreateContainerDialog({
                               <div className="space-y-3">
                                 <p className="text-sm text-foreground">访问控制</p>
                                 <div className="space-y-3 rounded-md border bg-background p-3">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-sm">特权模式</p>
-                                      <p className="text-sm text-muted-foreground">
-                                        允许容器以特权方式运行进程。
-                                      </p>
-                                    </div>
+                                  <Field orientation="horizontal" >
+                                    <FieldContent>
+                                      <FieldTitle>特权模式</FieldTitle>
+                                      <FieldDescription>允许容器以特权方式运行进程。</FieldDescription>
+                                    </FieldContent>
                                     <Switch
                                       checked={securityContextDraft.privileged}
                                       onCheckedChange={(nextValue) =>
@@ -1680,14 +1686,12 @@ export function CreateContainerDialog({
                                       }
                                       disabled={isBusy}
                                     />
-                                  </div>
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-sm">允许特权提升</p>
-                                      <p className="text-sm text-muted-foreground">
-                                        允许进程获得比父进程更高权限。
-                                      </p>
-                                    </div>
+                                  </Field>
+                                  <Field orientation="horizontal" className="mt-4">
+                                    <FieldContent>
+                                      <FieldTitle>允许特权提升</FieldTitle>
+                                      <FieldDescription>允许进程获得比父进程更高权限。</FieldDescription>
+                                    </FieldContent>
                                     <Switch
                                       checked={securityContextDraft.allowPrivilegeEscalation}
                                       onCheckedChange={(nextValue) =>
@@ -1698,14 +1702,12 @@ export function CreateContainerDialog({
                                       }
                                       disabled={isBusy}
                                     />
-                                  </div>
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-sm">根目录只读</p>
-                                      <p className="text-sm text-muted-foreground">
-                                        将容器根文件系统挂载为只读。
-                                      </p>
-                                    </div>
+                                  </Field>
+                                  <Field orientation="horizontal" className="mt-4">
+                                    <FieldContent>
+                                      <FieldTitle>根目录只读</FieldTitle>
+                                      <FieldDescription>将容器根文件系统挂载为只读。</FieldDescription>
+                                    </FieldContent>
                                     <Switch
                                       checked={securityContextDraft.readOnlyRootFilesystem}
                                       onCheckedChange={(nextValue) =>
@@ -1716,20 +1718,18 @@ export function CreateContainerDialog({
                                       }
                                       disabled={isBusy}
                                     />
-                                  </div>
+                                  </Field>
                                 </div>
                               </div>
 
                               <div className="space-y-3">
                                 <p className="text-sm text-foreground">用户和用户组</p>
                                 <div className="space-y-4 rounded-md border bg-background p-3">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-sm">仅允许非 root 运行</p>
-                                      <p className="text-sm text-muted-foreground">
-                                        开启后会拒绝 root 用户运行容器。
-                                      </p>
-                                    </div>
+                                  <Field orientation="horizontal">
+                                    <FieldContent>
+                                      <FieldTitle>仅允许非 root 运行</FieldTitle>
+                                      <FieldDescription>开启后会拒绝 root 用户运行容器。</FieldDescription>
+                                    </FieldContent>
                                     <Switch
                                       checked={securityContextDraft.runAsNonRoot}
                                       onCheckedChange={(nextValue) =>
@@ -1740,7 +1740,7 @@ export function CreateContainerDialog({
                                       }
                                       disabled={isBusy}
                                     />
-                                  </div>
+                                  </Field>
                                   <div className="grid gap-3 md:grid-cols-2">
                                     <Field>
                                       <FieldLabel htmlFor={`${container.id}-security-run-as-user`}>用户 UID</FieldLabel>
