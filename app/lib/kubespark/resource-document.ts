@@ -26,10 +26,237 @@ export type ResourceDocumentResult = {
 
 type JsonObject = Record<string, unknown>
 
+const ROOT_KEY_ORDER = [
+  "kind",
+  "apiVersion",
+  "metadata",
+  "spec",
+  "type",
+  "data",
+  "stringData",
+  "binaryData",
+  "immutable",
+  "status",
+]
+
+const METADATA_KEY_ORDER = [
+  "name",
+  "generateName",
+  "namespace",
+  "labels",
+  "annotations",
+  "finalizers",
+  "ownerReferences",
+  "resourceVersion",
+  "creationTimestamp",
+  "uid",
+]
+
+const SPEC_KEY_ORDER = [
+  "schedule",
+  "concurrencyPolicy",
+  "suspend",
+  "successfulJobsHistoryLimit",
+  "failedJobsHistoryLimit",
+  "parallelism",
+  "completions",
+  "backoffLimit",
+  "activeDeadlineSeconds",
+  "ttlSecondsAfterFinished",
+  "selector",
+  "template",
+  "jobTemplate",
+  "restartPolicy",
+  "containers",
+  "initContainers",
+  "volumes",
+  "ports",
+  "clusterIP",
+  "clusterIPs",
+  "type",
+  "sessionAffinity",
+  "ipFamilies",
+  "ipFamilyPolicy",
+  "internalTrafficPolicy",
+  "externalTrafficPolicy",
+  "rules",
+  "tls",
+  "storageClassName",
+  "accessModes",
+  "resources",
+  "volumeName",
+  "persistentVolumeReclaimPolicy",
+  "volumeBindingMode",
+  "allowVolumeExpansion",
+  "provisioner",
+  "parameters",
+]
+
+const CONTAINER_KEY_ORDER = [
+  "name",
+  "image",
+  "imagePullPolicy",
+  "command",
+  "args",
+  "workingDir",
+  "env",
+  "envFrom",
+  "ports",
+  "resources",
+  "volumeMounts",
+  "livenessProbe",
+  "readinessProbe",
+  "startupProbe",
+  "lifecycle",
+  "securityContext",
+]
+
+const PROBE_KEY_ORDER = [
+  "httpGet",
+  "tcpSocket",
+  "exec",
+  "initialDelaySeconds",
+  "periodSeconds",
+  "timeoutSeconds",
+  "successThreshold",
+  "failureThreshold",
+  "terminationGracePeriodSeconds",
+]
+
+const PORT_KEY_ORDER = [
+  "name",
+  "protocol",
+  "port",
+  "targetPort",
+  "nodePort",
+  "containerPort",
+  "appProtocol",
+]
+
+const ENV_KEY_ORDER = ["name", "value", "valueFrom"]
+
+const VALUE_FROM_KEY_ORDER = [
+  "fieldRef",
+  "resourceFieldRef",
+  "configMapKeyRef",
+  "secretKeyRef",
+]
+
+const REF_KEY_ORDER = ["name", "key", "optional"]
+
+const RESOURCES_KEY_ORDER = ["requests", "limits"]
+
+const RESOURCE_UNIT_KEY_ORDER = ["cpu", "memory", "ephemeral-storage", "storage"]
+
+const VOLUME_KEY_ORDER = [
+  "name",
+  "hostPath",
+  "emptyDir",
+  "configMap",
+  "secret",
+  "projected",
+  "persistentVolumeClaim",
+  "downwardAPI",
+  "csi",
+  "nfs",
+]
+
+const VOLUME_MOUNT_KEY_ORDER = ["name", "mountPath", "subPath", "readOnly", "mountPropagation"]
+
+const HOST_PATH_KEY_ORDER = ["path", "type"]
+
+const HTTP_GET_KEY_ORDER = ["path", "port", "host", "scheme", "httpHeaders"]
+
+const TCP_SOCKET_KEY_ORDER = ["port", "host"]
+
+const SECURITY_CONTEXT_KEY_ORDER = [
+  "privileged",
+  "allowPrivilegeEscalation",
+  "readOnlyRootFilesystem",
+  "runAsNonRoot",
+  "runAsUser",
+  "runAsGroup",
+  "capabilities",
+]
+
+const MAP_ALPHA_SORT_PARENTS = new Set([
+  "data",
+  "stringData",
+  "binaryData",
+  "labels",
+  "annotations",
+  "matchLabels",
+])
+
 function asObject(value: unknown): JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as JsonObject)
     : {}
+}
+
+function orderKeysByPriority(keys: string[], priority: string[]): string[] {
+  const keySet = new Set(keys)
+  const ordered = priority.filter((key) => keySet.has(key))
+  const rest = keys.filter((key) => !priority.includes(key))
+  return [...ordered, ...rest]
+}
+
+function isContainerLikeObject(value: JsonObject): boolean {
+  return "image" in value || "imagePullPolicy" in value || "env" in value || "volumeMounts" in value
+}
+
+function resolveKeyOrder(value: JsonObject, parentKey?: string): string[] | null {
+  if (!parentKey) return ROOT_KEY_ORDER
+  if (parentKey === "metadata") return METADATA_KEY_ORDER
+  if (parentKey === "spec") return SPEC_KEY_ORDER
+  if (parentKey === "template" || parentKey === "jobTemplate") return ["metadata", "spec"]
+  if (parentKey === "selector") return ["matchLabels", "matchExpressions"]
+  if (parentKey === "containers" || parentKey === "initContainers") return CONTAINER_KEY_ORDER
+  if (parentKey === "ports") return PORT_KEY_ORDER
+  if (parentKey === "env") return ENV_KEY_ORDER
+  if (parentKey === "valueFrom") return VALUE_FROM_KEY_ORDER
+  if (parentKey === "configMapKeyRef" || parentKey === "secretKeyRef") return REF_KEY_ORDER
+  if (parentKey === "resources") return RESOURCES_KEY_ORDER
+  if (parentKey === "requests" || parentKey === "limits") return RESOURCE_UNIT_KEY_ORDER
+  if (parentKey === "volumes") return VOLUME_KEY_ORDER
+  if (parentKey === "volumeMounts") return VOLUME_MOUNT_KEY_ORDER
+  if (parentKey === "hostPath") return HOST_PATH_KEY_ORDER
+  if (parentKey === "httpGet") return HTTP_GET_KEY_ORDER
+  if (parentKey === "tcpSocket") return TCP_SOCKET_KEY_ORDER
+  if (parentKey === "exec") return ["command"]
+  if (parentKey === "livenessProbe" || parentKey === "readinessProbe" || parentKey === "startupProbe") {
+    return PROBE_KEY_ORDER
+  }
+  if (parentKey === "securityContext") return SECURITY_CONTEXT_KEY_ORDER
+  if (isContainerLikeObject(value)) return CONTAINER_KEY_ORDER
+  return null
+}
+
+function reorderDocumentValue(value: unknown, parentKey?: string): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => reorderDocumentValue(item, parentKey))
+  }
+
+  const objectValue = asObject(value)
+  if (Object.keys(objectValue).length === 0 && (typeof value !== "object" || value === null)) {
+    return value
+  }
+
+  const keys = Object.keys(objectValue)
+  if (keys.length === 0) return objectValue
+
+  const orderedKeys = MAP_ALPHA_SORT_PARENTS.has(parentKey ?? "")
+    ? [...keys].sort((a, b) => a.localeCompare(b))
+    : (() => {
+        const keyOrder = resolveKeyOrder(objectValue, parentKey)
+        return keyOrder ? orderKeysByPriority(keys, keyOrder) : keys
+      })()
+
+  const reordered: JsonObject = {}
+  orderedKeys.forEach((key) => {
+    reordered[key] = reorderDocumentValue(objectValue[key], key)
+  })
+  return reordered
 }
 
 function asNonEmptyString(value: unknown): string | null {
@@ -481,7 +708,7 @@ export function buildResourceDocument(params: {
   output?: ResourceDocumentOutput
 }): ResourceDocumentResult {
   const { type, payload, output = "yaml" } = params
-  const normalized = normalizeDocumentByType(type, payload)
+  const normalized = reorderDocumentValue(normalizeDocumentByType(type, payload))
 
   if (output === "json") {
     return {
