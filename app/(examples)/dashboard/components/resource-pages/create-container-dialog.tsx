@@ -93,6 +93,7 @@ export type ContainerEnvVarDraft = {
 
 export type ProbeSectionKey = "liveness" | "readiness" | "startup"
 export type ProbeMode = "http" | "command" | "tcp"
+export type LifecycleSectionKey = "postStart" | "preStop"
 
 export type ContainerProbeDraft = {
   mode: ProbeMode
@@ -109,6 +110,15 @@ export type ContainerProbeDraft = {
 }
 
 export type ContainerProbeMap = Partial<Record<ProbeSectionKey, ContainerProbeDraft>>
+
+export type ContainerLifecycleActionDraft = {
+  mode: ProbeMode
+  httpScheme: "HTTP" | "HTTPS"
+  httpPath: string
+  httpPort: string
+  command: string
+  tcpPort: string
+}
 
 export type ContainerSecurityContextDraft = {
   privileged: boolean
@@ -257,12 +267,34 @@ const HEALTH_CHECK_SECTIONS: Array<{
   },
 ]
 
+const LIFECYCLE_SECTIONS: Array<{
+  key: LifecycleSectionKey
+  title: string
+  description: string
+}> = [
+  {
+    key: "postStart",
+    title: "启动后动作",
+    description: "设置容器启动后需要执行的动作。",
+  },
+  {
+    key: "preStop",
+    title: "终止前动作",
+    description: "设置容器终止前需要执行的动作。",
+  },
+]
+
 type ProbeSectionState = {
   enabled: boolean
   draft: ContainerProbeDraft
 }
 
 type ProbeDraftField = keyof ContainerProbeDraft
+type LifecycleSectionState = {
+  enabled: boolean
+  draft: ContainerLifecycleActionDraft
+}
+type LifecycleDraftField = keyof ContainerLifecycleActionDraft
 
 function createDefaultProbeDraft(): ContainerProbeDraft {
   return {
@@ -280,11 +312,29 @@ function createDefaultProbeDraft(): ContainerProbeDraft {
   }
 }
 
+function createDefaultLifecycleActionDraft(): ContainerLifecycleActionDraft {
+  return {
+    mode: "http",
+    httpScheme: "HTTP",
+    httpPath: "/",
+    httpPort: "80",
+    command: "",
+    tcpPort: "80",
+  }
+}
+
 function createDefaultProbeState(): Record<ProbeSectionKey, ProbeSectionState> {
   return {
     liveness: { enabled: false, draft: createDefaultProbeDraft() },
     readiness: { enabled: false, draft: createDefaultProbeDraft() },
     startup: { enabled: false, draft: createDefaultProbeDraft() },
+  }
+}
+
+function createDefaultLifecycleState(): Record<LifecycleSectionKey, LifecycleSectionState> {
+  return {
+    postStart: { enabled: false, draft: createDefaultLifecycleActionDraft() },
+    preStop: { enabled: false, draft: createDefaultLifecycleActionDraft() },
   }
 }
 
@@ -321,6 +371,13 @@ function createDefaultProbePopoverOpenState(): Record<ProbeSectionKey, boolean> 
     liveness: false,
     readiness: false,
     startup: false,
+  }
+}
+
+function createDefaultLifecyclePopoverOpenState(): Record<LifecycleSectionKey, boolean> {
+  return {
+    postStart: false,
+    preStop: false,
   }
 }
 
@@ -409,6 +466,21 @@ function resolveProbeSummary(draft: ContainerProbeDraft): string {
   return command ? `命令：${command}` : "命令探针"
 }
 
+function resolveLifecycleSummary(draft: ContainerLifecycleActionDraft): string {
+  if (draft.mode === "http") {
+    const pathValue = draft.httpPath.trim() || "/"
+    const normalizedPath = pathValue.startsWith("/") ? pathValue : `/${pathValue}`
+    const port = draft.httpPort.trim() || "-"
+    return `${draft.httpScheme} ${port}${normalizedPath}`
+  }
+  if (draft.mode === "tcp") {
+    const port = draft.tcpPort.trim() || "-"
+    return `TCP ${port}`
+  }
+  const command = draft.command.trim()
+  return command ? `命令：${command}` : "命令动作"
+}
+
 function resolveDuplicateEnvNameIds(entries: ContainerEnvVarDraft[]): string[] {
   const grouped = new Map<string, string[]>()
   entries.forEach((entry) => {
@@ -452,6 +524,12 @@ export function CreateContainerDialog({
   const [probePopoverOpen, setProbePopoverOpen] = React.useState<Record<ProbeSectionKey, boolean>>(
     createDefaultProbePopoverOpenState
   )
+  const [lifecycleState, setLifecycleState] = React.useState<Record<LifecycleSectionKey, LifecycleSectionState>>(
+    createDefaultLifecycleState
+  )
+  const [lifecyclePopoverOpen, setLifecyclePopoverOpen] = React.useState<
+    Record<LifecycleSectionKey, boolean>
+  >(createDefaultLifecyclePopoverOpenState)
   const [envBatchSource, setEnvBatchSource] = React.useState<EnvBatchSource>("configMap")
   const [envBatchResourceName, setEnvBatchResourceName] = React.useState("")
   const [envBatchSelectedKeys, setEnvBatchSelectedKeys] = React.useState<string[]>([])
@@ -476,6 +554,10 @@ export function CreateContainerDialog({
     if (!probes) return false
     return Boolean(probes.liveness || probes.readiness || probes.startup)
   }, [container?.probes])
+  const lifecycleEnabled = React.useMemo(
+    () => Object.values(lifecycleState).some((item) => item.enabled),
+    [lifecycleState]
+  )
   const envBatchResources = envBatchSource === "configMap" ? configMapKeyRefOptions : secretKeyRefOptions
   const envBatchCurrentResource = React.useMemo(
     () => envBatchResources.find((item) => item.name === envBatchResourceName),
@@ -491,6 +573,10 @@ export function CreateContainerDialog({
     liveness: createDefaultProbeDraft(),
     readiness: createDefaultProbeDraft(),
     startup: createDefaultProbeDraft(),
+  })
+  const lifecycleDraftSnapshotRef = React.useRef<Record<LifecycleSectionKey, ContainerLifecycleActionDraft>>({
+    postStart: createDefaultLifecycleActionDraft(),
+    preStop: createDefaultLifecycleActionDraft(),
   })
   const localDuplicateEnvIds = React.useMemo(
     () => resolveDuplicateEnvNameIds(container?.env ?? []),
@@ -582,6 +668,83 @@ export function CreateContainerDialog({
     }))
   }, [onChange])
 
+  const updateLifecycleDraft = React.useCallback(
+    (
+      section: LifecycleSectionKey,
+      field: LifecycleDraftField,
+      value: string | ProbeMode | "HTTP" | "HTTPS"
+    ) => {
+      setLifecycleState((current) => ({
+        ...current,
+        [section]: {
+          ...current[section],
+          draft: {
+            ...current[section].draft,
+            [field]: value,
+          },
+        },
+      }))
+    },
+    []
+  )
+
+  const handleLifecyclePopoverOpenChange = React.useCallback(
+    (section: LifecycleSectionKey, nextOpen: boolean) => {
+      if (nextOpen) {
+        lifecycleDraftSnapshotRef.current[section] = { ...lifecycleState[section].draft }
+      }
+      setLifecyclePopoverOpen((current) => ({
+        ...current,
+        [section]: nextOpen,
+      }))
+    },
+    [lifecycleState]
+  )
+
+  const cancelLifecycleEdit = React.useCallback((section: LifecycleSectionKey) => {
+    setLifecycleState((current) => ({
+      ...current,
+      [section]: {
+        ...current[section],
+        draft: { ...lifecycleDraftSnapshotRef.current[section] },
+      },
+    }))
+    setLifecyclePopoverOpen((current) => ({
+      ...current,
+      [section]: false,
+    }))
+  }, [])
+
+  const confirmLifecycleEdit = React.useCallback((section: LifecycleSectionKey) => {
+    setLifecycleState((current) => ({
+      ...current,
+      [section]: {
+        ...current[section],
+        enabled: true,
+      },
+    }))
+    setLifecyclePopoverOpen((current) => ({
+      ...current,
+      [section]: false,
+    }))
+  }, [])
+
+  const clearLifecycleEdit = React.useCallback((section: LifecycleSectionKey) => {
+    const nextDraft = createDefaultLifecycleActionDraft()
+    lifecycleDraftSnapshotRef.current[section] = { ...nextDraft }
+    setLifecycleState((current) => ({
+      ...current,
+      [section]: {
+        enabled: false,
+        draft: nextDraft,
+      },
+    }))
+    setLifecyclePopoverOpen((current) => ({
+      ...current,
+      [section]: false,
+    }))
+  }, [])
+
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
     return resolveFirstContainerEditorErrorFieldId({
@@ -604,6 +767,7 @@ export function CreateContainerDialog({
     setExtensionState((current) => ({
       ...createDefaultExtensionState(),
       healthCheck: probeEnabled,
+      lifecycle: isContainerChanged ? lifecycleEnabled : current.lifecycle || lifecycleEnabled,
       startupCommand: isContainerChanged
         ? startupCommandEnabled
         : current.startupCommand || startupCommandEnabled,
@@ -615,9 +779,14 @@ export function CreateContainerDialog({
     }))
     setProbeState(createProbeStateFromContainer(container?.probes))
     setProbePopoverOpen(createDefaultProbePopoverOpenState())
+    if (isContainerChanged) {
+      setLifecycleState(createDefaultLifecycleState())
+      setLifecyclePopoverOpen(createDefaultLifecyclePopoverOpenState())
+    }
   }, [
     containerId,
     envEnabled,
+    lifecycleEnabled,
     probeEnabled,
     securityContextEnabled,
     startupCommandEnabled,
@@ -1057,6 +1226,9 @@ export function CreateContainerDialog({
                               setProbeState(createDefaultProbeState())
                               setProbePopoverOpen(createDefaultProbePopoverOpenState())
                               onChange("probes", {})
+                            } else if (option.key === "lifecycle" && !nextValue) {
+                              setLifecycleState(createDefaultLifecycleState())
+                              setLifecyclePopoverOpen(createDefaultLifecyclePopoverOpenState())
                             } else if (option.key === "startupCommand" && !nextValue) {
                               onChange("command", "")
                               onChange("args", "")
@@ -1366,6 +1538,202 @@ export function CreateContainerDialog({
                                               <Button
                                                 type="button"
                                                 onClick={() => confirmProbeEdit(section.key)}
+                                                disabled={isBusy}
+                                              >
+                                                确定
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">{section.description}</p>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {option.key === "lifecycle" && checked ? (
+                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                            <div className="flex flex-col gap-6">
+                              {LIFECYCLE_SECTIONS.map((section) => {
+                                const sectionState = lifecycleState[section.key]
+                                const draft = sectionState.draft
+                                const isOpen = lifecyclePopoverOpen[section.key]
+                                return (
+                                  <div key={section.key} className="flex flex-col gap-2">
+                                    <p className="text-sm text-foreground">{section.title}</p>
+                                    <div className="flex items-center gap-2">
+                                      <Popover
+                                        open={isOpen}
+                                        onOpenChange={(nextOpen) =>
+                                          handleLifecyclePopoverOpenChange(section.key, nextOpen)
+                                        }
+                                      >
+                                        <PopoverTrigger asChild>
+                                          <div
+                                            className={cn(
+                                              "group relative w-full cursor-pointer rounded-md border border-dashed bg-background px-4 py-3 pr-20 text-left text-sm transition-colors hover:border-muted-foreground/40 hover:bg-muted/40",
+                                              sectionState.enabled && "border-primary/40",
+                                              isBusy && "pointer-events-none opacity-60"
+                                            )}
+                                          >
+                                            {sectionState.enabled
+                                              ? resolveLifecycleSummary(draft)
+                                              : "添加动作"}
+                                            {sectionState.enabled ? (
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="absolute top-1/2 right-3 h-7 w-7 -translate-y-1/2 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                                onPointerDown={(event) => {
+                                                  event.preventDefault()
+                                                  event.stopPropagation()
+                                                }}
+                                                onClick={(event) => {
+                                                  event.preventDefault()
+                                                  event.stopPropagation()
+                                                  clearLifecycleEdit(section.key)
+                                                }}
+                                                disabled={isBusy}
+                                              >
+                                                <IconX className="size-4" />
+                                                <span className="sr-only">清空动作</span>
+                                              </Button>
+                                            ) : null}
+                                          </div>
+                                        </PopoverTrigger>
+                                        <PopoverContent
+                                          className="w-[min(86vw,760px)] p-4"
+                                          align="start"
+                                          side="bottom"
+                                          sideOffset={8}
+                                        >
+                                          <div className="space-y-4">
+                                            <Tabs
+                                              value={draft.mode}
+                                              onValueChange={(value) => {
+                                                if (value === "http" || value === "command" || value === "tcp") {
+                                                  updateLifecycleDraft(section.key, "mode", value)
+                                                }
+                                              }}
+                                            >
+                                              <TabsList className="grid w-full grid-cols-3">
+                                                <TabsTrigger value="http">HTTP 请求</TabsTrigger>
+                                                <TabsTrigger value="command">命令</TabsTrigger>
+                                                <TabsTrigger value="tcp">TCP 端口</TabsTrigger>
+                                              </TabsList>
+                                            </Tabs>
+
+                                            {draft.mode === "http" ? (
+                                              <div className="space-y-3">
+                                                <div className="text-sm">路径</div>
+                                                <div className="grid gap-3 md:grid-cols-3">
+                                                  <Select
+                                                    value={draft.httpScheme}
+                                                    onValueChange={(value) => {
+                                                      if (value === "HTTP" || value === "HTTPS") {
+                                                        updateLifecycleDraft(section.key, "httpScheme", value)
+                                                      }
+                                                    }}
+                                                    disabled={isBusy}
+                                                  >
+                                                    <SelectTrigger className="w-full">
+                                                      <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      <SelectGroup>
+                                                        <SelectItem value="HTTP">HTTP</SelectItem>
+                                                        <SelectItem value="HTTPS">HTTPS</SelectItem>
+                                                      </SelectGroup>
+                                                    </SelectContent>
+                                                  </Select>
+                                                  <Input
+                                                    value={draft.httpPath}
+                                                    onChange={(event) =>
+                                                      updateLifecycleDraft(
+                                                        section.key,
+                                                        "httpPath",
+                                                        event.target.value
+                                                      )
+                                                    }
+                                                    placeholder="/"
+                                                    autoComplete="off"
+                                                    disabled={isBusy}
+                                                  />
+                                                  <Input
+                                                    value={draft.httpPort}
+                                                    onChange={(event) =>
+                                                      updateLifecycleDraft(
+                                                        section.key,
+                                                        "httpPort",
+                                                        normalizePortInput(event.target.value)
+                                                      )
+                                                    }
+                                                    placeholder="80"
+                                                    inputMode="numeric"
+                                                    maxLength={5}
+                                                    autoComplete="off"
+                                                    disabled={isBusy}
+                                                  />
+                                                </div>
+                                              </div>
+                                            ) : null}
+
+                                            {draft.mode === "command" ? (
+                                              <div className="space-y-3">
+                                                <div className="text-sm">命令</div>
+                                                <Input
+                                                  value={draft.command}
+                                                  onChange={(event) =>
+                                                    updateLifecycleDraft(
+                                                      section.key,
+                                                      "command",
+                                                      event.target.value
+                                                    )
+                                                  }
+                                                  placeholder='/bin/sh -c "echo ready"'
+                                                  disabled={isBusy}
+                                                />
+                                              </div>
+                                            ) : null}
+
+                                            {draft.mode === "tcp" ? (
+                                              <div className="space-y-3">
+                                                <div className="text-sm">TCP 端口</div>
+                                                <Input
+                                                  value={draft.tcpPort}
+                                                  onChange={(event) =>
+                                                    updateLifecycleDraft(
+                                                      section.key,
+                                                      "tcpPort",
+                                                      normalizePortInput(event.target.value)
+                                                    )
+                                                  }
+                                                  placeholder="80"
+                                                  inputMode="numeric"
+                                                  maxLength={5}
+                                                  autoComplete="off"
+                                                  disabled={isBusy}
+                                                />
+                                              </div>
+                                            ) : null}
+
+                                            <div className="flex justify-end gap-2 border-t pt-3">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => cancelLifecycleEdit(section.key)}
+                                                disabled={isBusy}
+                                              >
+                                                取消
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                onClick={() => confirmLifecycleEdit(section.key)}
                                                 disabled={isBusy}
                                               >
                                                 确定
