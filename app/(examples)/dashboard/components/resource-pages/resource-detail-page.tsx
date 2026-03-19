@@ -1,48 +1,18 @@
-import Link from "next/link"
-import { IconArrowLeft } from "@tabler/icons-react"
 import * as React from "react"
-
-import { Button } from "@/components/ui/button"
 
 type ResourceDetailPageProps = {
   sectionTitle: string
   name: string
   namespace?: string
   backHref: string
-  leftSlot?: React.ReactNode
+  detailContent?: React.ReactNode
   rightSlot?: React.ReactNode
 }
 
 export function ResourceDetailPage({
-  sectionTitle,
-  name,
-  namespace,
-  backHref,
-  leftSlot,
+  detailContent,
   rightSlot,
 }: ResourceDetailPageProps) {
-  const defaultLeftSlot = (
-    <section className="rounded-lg border bg-card p-4">
-      <Button variant="outline" asChild className="mb-4 w-full justify-start">
-        <Link href={backHref}>
-          <IconArrowLeft data-icon="inline-start" />
-          {"\u8fd4\u56de\u5217\u8868"}
-        </Link>
-      </Button>
-      <p className="text-muted-foreground text-xs uppercase tracking-wide">
-        {sectionTitle}
-      </p>
-      <h2 className="mt-2 break-all text-lg font-semibold">
-        {"\u521b\u5efa / \u66f4\u65b0"} {name}
-      </h2>
-      <p className="text-muted-foreground mt-2 text-sm">
-        {namespace
-          ? `\u547d\u540d\u7a7a\u95f4\uff1a${namespace}`
-          : "\u96c6\u7fa4\u7ea7\u8d44\u6e90"}
-      </p>
-    </section>
-  )
-
   const defaultRightSlot = (
     <section className="rounded-lg border bg-card p-6">
       <h1 className="text-xl font-semibold">{"\u4e3b\u8981\u5185\u5bb9"}</h1>
@@ -56,9 +26,10 @@ export function ResourceDetailPage({
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-4 md:py-6">
-      <div className="grid gap-4 px-4 lg:grid-cols-[minmax(210px,20%)_minmax(0,1fr)] lg:px-6">
-        <aside className="flex flex-col gap-4">{leftSlot ?? defaultLeftSlot}</aside>
-        <div className="flex min-h-full flex-col gap-4">{rightSlot ?? defaultRightSlot}</div>
+      <div className="grid gap-4 px-4 lg:px-6">
+        <div className="flex min-h-full flex-col gap-4">
+          {detailContent ?? rightSlot ?? defaultRightSlot}
+        </div>
       </div>
     </div>
   )

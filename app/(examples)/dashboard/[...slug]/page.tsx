@@ -15,8 +15,7 @@ import {
 } from "@/app/(examples)/dashboard/components/resource-pages"
 import { ResourceDetailPage } from "@/app/(examples)/dashboard/components/resource-pages/resource-detail-page"
 import {
-  WorkloadDetailLeftTemplate,
-  WorkloadDetailRightTemplate,
+  WorkloadDetailTemplate,
   type WorkloadDetailKind,
 } from "@/app/(examples)/dashboard/components/resource-pages/workload-detail-templates"
 
@@ -79,16 +78,13 @@ export default async function DashboardSectionPage({
           name={resourceName}
           namespace={namespace}
           backHref="/dashboard/workloads"
-          leftSlot={
-            <WorkloadDetailLeftTemplate
+          detailContent={
+            <WorkloadDetailTemplate
               kind={workloadKind}
               name={resourceName}
               namespace={namespace}
               backHref="/dashboard/workloads"
             />
-          }
-          rightSlot={
-            <WorkloadDetailRightTemplate kind={workloadKind} name={resourceName} />
           }
         />
       )
