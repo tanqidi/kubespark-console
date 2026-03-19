@@ -31,6 +31,8 @@ import {
   CreateContainerDialog,
   type ContainerDraft,
   type ContainerEnvVarSource,
+  type ContainerLifecycleActionDraft,
+  type ContainerLifecycleMap,
   type ContainerPortDraft,
   type ContainerPortProtocol,
   type ContainerProbeDraft,
@@ -71,6 +73,19 @@ type NamespaceOption = {
 }
 
 type JsonObject = Record<string, unknown>
+type LifecycleActionPayload = {
+  mode?: "http" | "command" | "tcp"
+  httpScheme?: "HTTP" | "HTTPS"
+  httpPath?: string
+  httpPort?: string
+  command?: string
+  tcpPort?: string
+}
+
+type LifecycleMapPayload = {
+  postStart?: LifecycleActionPayload
+  preStop?: LifecycleActionPayload
+}
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -179,6 +194,7 @@ export type JobDialogInitialValues = {
           failureThreshold?: string
         }
       }
+      lifecycle?: LifecycleMapPayload
     }>
   }
 }
@@ -284,6 +300,7 @@ type CreateJobDialogProps = {
             failureThreshold?: string
           }
         }
+        lifecycle?: LifecycleMapPayload
       }>
     }
   }) => Promise<void>
@@ -543,6 +560,55 @@ function parseProbeMapFromContainerSpec(container: JsonObject): ContainerProbeMa
   }
 }
 
+function createDefaultLifecycleActionDraft(): ContainerLifecycleActionDraft {
+  return {
+    mode: "http",
+    httpScheme: "HTTP",
+    httpPath: "/",
+    httpPort: "80",
+    command: "",
+    tcpPort: "80",
+  }
+}
+
+function parseLifecycleActionFromSpec(raw: unknown): ContainerLifecycleActionDraft | null {
+  const spec = asObject(raw)
+  if (Object.keys(spec).length === 0) return null
+
+  const defaults = createDefaultLifecycleActionDraft()
+  const httpGet = asObject(spec.httpGet)
+  const tcpSocket = asObject(spec.tcpSocket)
+  const exec = asObject(spec.exec)
+  const execCommand = formatStringListAsEditorText(exec.command)
+
+  let mode: "http" | "command" | "tcp" = "http"
+  if (execCommand) {
+    mode = "command"
+  } else if (Object.keys(tcpSocket).length > 0) {
+    mode = "tcp"
+  }
+
+  return {
+    mode,
+    httpScheme: toProbeScheme(httpGet.scheme),
+    httpPath: asString(httpGet.path).trim() || defaults.httpPath,
+    httpPort: toProbePortText(httpGet.port) || defaults.httpPort,
+    command: execCommand,
+    tcpPort: toProbePortText(tcpSocket.port) || defaults.tcpPort,
+  }
+}
+
+function parseLifecycleMapFromContainerSpec(container: JsonObject): ContainerLifecycleMap {
+  const lifecycle = asObject(container.lifecycle)
+  const postStart = parseLifecycleActionFromSpec(lifecycle.postStart)
+  const preStop = parseLifecycleActionFromSpec(lifecycle.preStop)
+
+  return {
+    ...(postStart ? { postStart } : {}),
+    ...(preStop ? { preStop } : {}),
+  }
+}
+
 function buildProbeSpecFromDraft(draft: ContainerProbeDraft): JsonObject | null {
   const mode = toProbeMode(draft.mode)
   const initialDelaySeconds = toOptionalIntegerString(draft.initialDelaySeconds)
@@ -606,6 +672,43 @@ function buildProbeSpecMap(
   }
 }
 
+function buildLifecycleActionSpecFromDraft(
+  draft: ContainerLifecycleActionDraft
+): JsonObject | null {
+  const mode = toProbeMode(draft.mode)
+  if (mode === "command") {
+    const command = parseEditorTextToStringList(draft.command)
+    if (command.length === 0) return null
+    return { exec: { command } }
+  }
+
+  if (mode === "tcp") {
+    const tcpPort = toOptionalIntegerString(draft.tcpPort)
+    if (!tcpPort) return null
+    return { tcpSocket: { port: Number.parseInt(tcpPort, 10) } }
+  }
+
+  const httpPort = toOptionalIntegerString(draft.httpPort)
+  if (!httpPort) return null
+  return {
+    httpGet: {
+      scheme: toProbeScheme(draft.httpScheme),
+      path: draft.httpPath.trim() || "/",
+      port: Number.parseInt(httpPort, 10),
+    },
+  }
+}
+
+function buildLifecycleSpecMap(lifecycle: ContainerLifecycleMap | undefined): { lifecycle?: JsonObject } {
+  const postStart = lifecycle?.postStart ? buildLifecycleActionSpecFromDraft(lifecycle.postStart) : null
+  const preStop = lifecycle?.preStop ? buildLifecycleActionSpecFromDraft(lifecycle.preStop) : null
+  const lifecycleSpec: JsonObject = {
+    ...(postStart ? { postStart } : {}),
+    ...(preStop ? { preStop } : {}),
+  }
+  return Object.keys(lifecycleSpec).length > 0 ? { lifecycle: lifecycleSpec } : {}
+}
+
 function normalizeProbeDraft(draft: ContainerProbeDraft): ContainerProbeDraft {
   return {
     mode: toProbeMode(draft.mode),
@@ -628,6 +731,27 @@ function normalizeProbeMap(probes: ContainerProbeMap | undefined): ContainerProb
     ...(probes.liveness ? { liveness: normalizeProbeDraft(probes.liveness) } : {}),
     ...(probes.readiness ? { readiness: normalizeProbeDraft(probes.readiness) } : {}),
     ...(probes.startup ? { startup: normalizeProbeDraft(probes.startup) } : {}),
+  }
+}
+
+function normalizeLifecycleActionDraft(
+  draft: ContainerLifecycleActionDraft
+): ContainerLifecycleActionDraft {
+  return {
+    mode: toProbeMode(draft.mode),
+    httpScheme: toProbeScheme(draft.httpScheme),
+    httpPath: draft.httpPath.trim() || "/",
+    httpPort: toOptionalIntegerString(draft.httpPort),
+    command: draft.command.trim(),
+    tcpPort: toOptionalIntegerString(draft.tcpPort),
+  }
+}
+
+function normalizeLifecycleMap(lifecycle: ContainerLifecycleMap | undefined): ContainerLifecycleMap {
+  if (!lifecycle) return {}
+  return {
+    ...(lifecycle.postStart ? { postStart: normalizeLifecycleActionDraft(lifecycle.postStart) } : {}),
+    ...(lifecycle.preStop ? { preStop: normalizeLifecycleActionDraft(lifecycle.preStop) } : {}),
   }
 }
 
@@ -732,6 +856,7 @@ function createContainerDraftFromInitial(
     securityContext: normalizeSecurityContextDraft(value.securityContext),
     env,
     probes: normalizeProbeMap(value.probes as ContainerProbeMap | undefined),
+    lifecycle: normalizeLifecycleMap(value.lifecycle as ContainerLifecycleMap | undefined),
     ports:
       Array.isArray(value.ports) && value.ports.length > 0
         ? value.ports.map((port) => ({
@@ -858,6 +983,7 @@ function buildPodSpecFromContainers(
         ...(ports.length > 0 ? { ports } : {}),
         ...(securityContext ? { securityContext } : {}),
         ...buildProbeSpecMap(item.probes),
+        ...buildLifecycleSpecMap(item.lifecycle),
       }
 
       if (item.syncHostTimezone) {
@@ -1084,6 +1210,7 @@ function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnaps
           securityContext: normalizeSecurityContextDraft(item.securityContext),
           env,
           probes: parseProbeMapFromContainerSpec(item),
+          lifecycle: parseLifecycleMapFromContainerSpec(item),
           ports: ports.length > 0 ? ports : index === 0 ? [createContainerPortDraft(0)] : [],
         }
       })
@@ -1129,6 +1256,7 @@ function createContainerDraft(): ContainerDraft {
     securityContext: normalizeSecurityContextDraft({}),
     env: [],
     probes: {},
+    lifecycle: {},
     ports: [createContainerPortDraft(0)],
   }
 }
@@ -1552,8 +1680,14 @@ export function CreateJobDialog({
         | "memoryRequestMi"
         | "memoryLimitMi"
         | "probes"
+        | "lifecycle"
         | "securityContext",
-      value: string | boolean | ContainerProbeMap | ContainerSecurityContextDraft
+      value:
+        | string
+        | boolean
+        | ContainerProbeMap
+        | ContainerLifecycleMap
+        | ContainerSecurityContextDraft
     ) => {
       setContainers((current) =>
         current.map((item) =>
@@ -1590,9 +1724,11 @@ export function CreateJobDialog({
                       ? value === true
                       : field === "probes"
                         ? normalizeProbeMap(value as ContainerProbeMap)
+                        : field === "lifecycle"
+                          ? normalizeLifecycleMap(value as ContainerLifecycleMap)
                         : field === "securityContext"
                           ? normalizeSecurityContextDraft(value)
-                        : value,
+                          : value,
                 }
               })()
             : item
@@ -2129,6 +2265,7 @@ export function CreateJobDialog({
             const normalizedCommand = parseEditorTextToStringList(item.command)
             const normalizedArgs = parseEditorTextToStringList(item.args)
             const normalizedProbes = normalizeProbeMap(item.probes)
+            const normalizedLifecycle = normalizeLifecycleMap(item.lifecycle)
             const normalizedSecurityContext = normalizeSecurityContextDraft(item.securityContext)
 
             return {
@@ -2149,6 +2286,7 @@ export function CreateJobDialog({
                 : {}),
               ...(normalizedPorts.length > 0 ? { ports: normalizedPorts } : {}),
               ...(Object.keys(normalizedProbes).length > 0 ? { probes: normalizedProbes } : {}),
+              ...(Object.keys(normalizedLifecycle).length > 0 ? { lifecycle: normalizedLifecycle } : {}),
             }
           })
           .filter((item) => item.image.length > 0)

@@ -120,6 +120,8 @@ export type ContainerLifecycleActionDraft = {
   tcpPort: string
 }
 
+export type ContainerLifecycleMap = Partial<Record<LifecycleSectionKey, ContainerLifecycleActionDraft>>
+
 export type ContainerSecurityContextDraft = {
   privileged: boolean
   allowPrivilegeEscalation: boolean
@@ -145,6 +147,7 @@ export type ContainerDraft = {
   ports: ContainerPortDraft[]
   env: ContainerEnvVarDraft[]
   probes: ContainerProbeMap
+  lifecycle: ContainerLifecycleMap
   securityContext: ContainerSecurityContextDraft
 }
 
@@ -171,8 +174,14 @@ type CreateContainerDialogProps = {
       | "memoryRequestMi"
       | "memoryLimitMi"
       | "probes"
+      | "lifecycle"
       | "securityContext",
-    value: string | boolean | ContainerProbeMap | ContainerSecurityContextDraft
+    value:
+      | string
+      | boolean
+      | ContainerProbeMap
+      | ContainerLifecycleMap
+      | ContainerSecurityContextDraft
   ) => void
   onAddPort: () => void
   onUpdatePort: (
@@ -358,6 +367,28 @@ function createProbeStateFromContainer(probes: ContainerProbeMap | undefined): R
   }
 }
 
+function createLifecycleStateFromContainer(
+  lifecycle: ContainerLifecycleMap | undefined
+): Record<LifecycleSectionKey, LifecycleSectionState> {
+  const defaults = createDefaultLifecycleState()
+  if (!lifecycle) return defaults
+
+  return {
+    postStart: {
+      enabled: Boolean(lifecycle.postStart),
+      draft: lifecycle.postStart
+        ? { ...defaults.postStart.draft, ...lifecycle.postStart }
+        : defaults.postStart.draft,
+    },
+    preStop: {
+      enabled: Boolean(lifecycle.preStop),
+      draft: lifecycle.preStop
+        ? { ...defaults.preStop.draft, ...lifecycle.preStop }
+        : defaults.preStop.draft,
+    },
+  }
+}
+
 function buildProbeMapFromState(state: Record<ProbeSectionKey, ProbeSectionState>): ContainerProbeMap {
   return {
     ...(state.liveness.enabled ? { liveness: state.liveness.draft } : {}),
@@ -371,6 +402,15 @@ function createDefaultProbePopoverOpenState(): Record<ProbeSectionKey, boolean> 
     liveness: false,
     readiness: false,
     startup: false,
+  }
+}
+
+function buildLifecycleMapFromState(
+  state: Record<LifecycleSectionKey, LifecycleSectionState>
+): ContainerLifecycleMap {
+  return {
+    ...(state.postStart.enabled ? { postStart: state.postStart.draft } : {}),
+    ...(state.preStop.enabled ? { preStop: state.preStop.draft } : {}),
   }
 }
 
@@ -554,10 +594,11 @@ export function CreateContainerDialog({
     if (!probes) return false
     return Boolean(probes.liveness || probes.readiness || probes.startup)
   }, [container?.probes])
-  const lifecycleEnabled = React.useMemo(
-    () => Object.values(lifecycleState).some((item) => item.enabled),
-    [lifecycleState]
-  )
+  const lifecycleEnabled = React.useMemo(() => {
+    const lifecycle = container?.lifecycle
+    if (!lifecycle) return false
+    return Boolean(lifecycle.postStart || lifecycle.preStop)
+  }, [container?.lifecycle])
   const envBatchResources = envBatchSource === "configMap" ? configMapKeyRefOptions : secretKeyRefOptions
   const envBatchCurrentResource = React.useMemo(
     () => envBatchResources.find((item) => item.name === envBatchResourceName),
@@ -716,34 +757,42 @@ export function CreateContainerDialog({
   }, [])
 
   const confirmLifecycleEdit = React.useCallback((section: LifecycleSectionKey) => {
-    setLifecycleState((current) => ({
-      ...current,
-      [section]: {
-        ...current[section],
-        enabled: true,
-      },
-    }))
+    setLifecycleState((current) => {
+      const next = {
+        ...current,
+        [section]: {
+          ...current[section],
+          enabled: true,
+        },
+      }
+      onChange("lifecycle", buildLifecycleMapFromState(next))
+      return next
+    })
     setLifecyclePopoverOpen((current) => ({
       ...current,
       [section]: false,
     }))
-  }, [])
+  }, [onChange])
 
   const clearLifecycleEdit = React.useCallback((section: LifecycleSectionKey) => {
     const nextDraft = createDefaultLifecycleActionDraft()
     lifecycleDraftSnapshotRef.current[section] = { ...nextDraft }
-    setLifecycleState((current) => ({
-      ...current,
-      [section]: {
-        enabled: false,
-        draft: nextDraft,
-      },
-    }))
+    setLifecycleState((current) => {
+      const next = {
+        ...current,
+        [section]: {
+          enabled: false,
+          draft: nextDraft,
+        },
+      }
+      onChange("lifecycle", buildLifecycleMapFromState(next))
+      return next
+    })
     setLifecyclePopoverOpen((current) => ({
       ...current,
       [section]: false,
     }))
-  }, [])
+  }, [onChange])
 
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
@@ -779,10 +828,8 @@ export function CreateContainerDialog({
     }))
     setProbeState(createProbeStateFromContainer(container?.probes))
     setProbePopoverOpen(createDefaultProbePopoverOpenState())
-    if (isContainerChanged) {
-      setLifecycleState(createDefaultLifecycleState())
-      setLifecyclePopoverOpen(createDefaultLifecyclePopoverOpenState())
-    }
+    setLifecycleState(createLifecycleStateFromContainer(container?.lifecycle))
+    setLifecyclePopoverOpen(createDefaultLifecyclePopoverOpenState())
   }, [
     containerId,
     envEnabled,
@@ -792,6 +839,7 @@ export function CreateContainerDialog({
     startupCommandEnabled,
     syncHostTimezoneEnabled,
     container?.probes,
+    container?.lifecycle,
   ])
 
   React.useEffect(() => {
@@ -1229,6 +1277,7 @@ export function CreateContainerDialog({
                             } else if (option.key === "lifecycle" && !nextValue) {
                               setLifecycleState(createDefaultLifecycleState())
                               setLifecyclePopoverOpen(createDefaultLifecyclePopoverOpenState())
+                              onChange("lifecycle", {})
                             } else if (option.key === "startupCommand" && !nextValue) {
                               onChange("command", "")
                               onChange("args", "")

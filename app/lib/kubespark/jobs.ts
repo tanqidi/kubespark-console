@@ -37,6 +37,15 @@ export type JobPodProbeInput = {
   failureThreshold?: string
 }
 
+export type JobPodLifecycleActionInput = {
+  mode?: "http" | "command" | "tcp"
+  httpScheme?: "HTTP" | "HTTPS"
+  httpPath?: string
+  httpPort?: string
+  command?: string
+  tcpPort?: string
+}
+
 export type JobPodContainerSecurityContextInput = {
   privileged?: boolean
   runAsUser?: string
@@ -84,6 +93,10 @@ export type JobPodInput = {
       liveness?: JobPodProbeInput
       readiness?: JobPodProbeInput
       startup?: JobPodProbeInput
+    }
+    lifecycle?: {
+      postStart?: JobPodLifecycleActionInput
+      preStop?: JobPodLifecycleActionInput
     }
   }>
 }
@@ -237,6 +250,57 @@ function buildProbeSpec(probe?: JobPodProbeInput): Record<string, unknown> | und
   }
 }
 
+function buildLifecycleActionSpec(
+  action?: JobPodLifecycleActionInput
+): Record<string, unknown> | undefined {
+  if (!action) return undefined
+
+  const mode = typeof action.mode === "string" ? action.mode.trim().toLowerCase() : "http"
+  if (mode === "command") {
+    const command = parseCommaSeparatedList(action.command)
+    if (command.length === 0) return undefined
+    return { exec: { command } }
+  }
+  if (mode === "tcp") {
+    const port = pickContainerPortNumber(action.tcpPort)
+    if (typeof port !== "number") return undefined
+    return { tcpSocket: { port } }
+  }
+
+  const port = pickContainerPortNumber(action.httpPort)
+  if (typeof port !== "number") return undefined
+  const scheme =
+    typeof action.httpScheme === "string" && action.httpScheme.toUpperCase() === "HTTPS"
+      ? "HTTPS"
+      : "HTTP"
+  const path = typeof action.httpPath === "string" && action.httpPath.trim()
+    ? action.httpPath.trim()
+    : "/"
+  return {
+    httpGet: {
+      scheme,
+      path,
+      port,
+    },
+  }
+}
+
+function buildLifecycleSpec(
+  lifecycle?: {
+    postStart?: JobPodLifecycleActionInput
+    preStop?: JobPodLifecycleActionInput
+  }
+): Record<string, unknown> | undefined {
+  if (!lifecycle) return undefined
+  const postStart = buildLifecycleActionSpec(lifecycle.postStart)
+  const preStop = buildLifecycleActionSpec(lifecycle.preStop)
+  const lifecycleSpec = {
+    ...(postStart ? { postStart } : {}),
+    ...(preStop ? { preStop } : {}),
+  }
+  return Object.keys(lifecycleSpec).length > 0 ? lifecycleSpec : undefined
+}
+
 function buildContainerSecurityContextSpec(
   value: JobPodContainerSecurityContextInput | undefined
 ): Record<string, unknown> | undefined {
@@ -377,6 +441,7 @@ function buildPodContainerSpec(pod?: JobPodInput) {
     const livenessProbe = buildProbeSpec(item.probes?.liveness)
     const readinessProbe = buildProbeSpec(item.probes?.readiness)
     const startupProbe = buildProbeSpec(item.probes?.startup)
+    const lifecycle = buildLifecycleSpec(item.lifecycle)
     const securityContext = buildContainerSecurityContextSpec(item.securityContext)
 
     const containerSpec: Record<string, unknown> = {
@@ -390,6 +455,7 @@ function buildPodContainerSpec(pod?: JobPodInput) {
       ...(livenessProbe ? { livenessProbe } : {}),
       ...(readinessProbe ? { readinessProbe } : {}),
       ...(startupProbe ? { startupProbe } : {}),
+      ...(lifecycle ? { lifecycle } : {}),
       ...(securityContext ? { securityContext } : {}),
       ...(item.syncHostTimezone
         ? {
