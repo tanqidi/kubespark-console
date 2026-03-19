@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconFileText, IconKey } from "@tabler/icons-react"
+import { IconFileText, IconKey, IconX } from "@tabler/icons-react"
 import {
   fetchConfigMapKeyRefOptions,
   type ConfigMapKeyRefOption,
@@ -396,9 +396,10 @@ function resolveImagePullPolicyDescription(value: "Always" | "IfNotPresent" | "N
 
 function resolveProbeSummary(draft: ContainerProbeDraft): string {
   if (draft.mode === "http") {
-    const path = draft.httpPath.trim() || "/"
+    const pathValue = draft.httpPath.trim() || "/"
+    const normalizedPath = pathValue.startsWith("/") ? pathValue : `/${pathValue}`
     const port = draft.httpPort.trim() || "-"
-    return `${draft.httpScheme} ${path}:${port}`
+    return `${draft.httpScheme} ${port}${normalizedPath}`
   }
   if (draft.mode === "tcp") {
     const port = draft.tcpPort.trim() || "-"
@@ -561,6 +562,26 @@ export function CreateContainerDialog({
     }))
   }, [onChange])
 
+  const clearProbeEdit = React.useCallback((section: ProbeSectionKey) => {
+    const nextDraft = createDefaultProbeDraft()
+    probeDraftSnapshotRef.current[section] = { ...nextDraft }
+    setProbeState((current) => {
+      const next = {
+        ...current,
+        [section]: {
+          enabled: false,
+          draft: nextDraft,
+        },
+      }
+      onChange("probes", buildProbeMapFromState(next))
+      return next
+    })
+    setProbePopoverOpen((current) => ({
+      ...current,
+      [section]: false,
+    }))
+  }, [onChange])
+
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
     return resolveFirstContainerEditorErrorFieldId({
@@ -583,7 +604,9 @@ export function CreateContainerDialog({
     setExtensionState((current) => ({
       ...createDefaultExtensionState(),
       healthCheck: probeEnabled,
-      startupCommand: startupCommandEnabled,
+      startupCommand: isContainerChanged
+        ? startupCommandEnabled
+        : current.startupCommand || startupCommandEnabled,
       env: envEnabled,
       securityContext: isContainerChanged
         ? securityContextEnabled
@@ -1098,31 +1121,52 @@ export function CreateContainerDialog({
                                 return (
                                   <div key={section.key} className="flex flex-col gap-2">
                                     <p className="text-sm text-foreground">{section.title}</p>
-                                    <Popover
-                                      open={isOpen}
-                                      onOpenChange={(nextOpen) =>
-                                        handleProbePopoverOpenChange(section.key, nextOpen)
-                                      }
-                                    >
-                                      <PopoverTrigger asChild>
-                                        <button
-                                          type="button"
-                                          className={cn(
-                                            "w-full cursor-pointer rounded-md border border-dashed bg-background px-4 py-3 text-left text-sm transition-colors hover:border-muted-foreground/40 hover:bg-muted/40",
-                                            sectionState.enabled && "border-primary/40"
-                                          )}
-                                          disabled={isBusy}
-                                        >
-                                          {sectionState.enabled ? resolveProbeSummary(draft) : "添加探针"}
-                                        </button>
-                                      </PopoverTrigger>
-                                      <PopoverContent
-                                        className="w-[min(86vw,760px)] p-4"
-                                        align="start"
-                                        side="bottom"
-                                        sideOffset={8}
+                                    <div className="flex items-center gap-2">
+                                      <Popover
+                                        open={isOpen}
+                                        onOpenChange={(nextOpen) =>
+                                          handleProbePopoverOpenChange(section.key, nextOpen)
+                                        }
                                       >
-                                        <div className="space-y-4">
+                                        <PopoverTrigger asChild>
+                                          <div
+                                            className={cn(
+                                              "group relative w-full cursor-pointer rounded-md border border-dashed bg-background px-4 py-3 pr-20 text-left text-sm transition-colors hover:border-muted-foreground/40 hover:bg-muted/40",
+                                              sectionState.enabled && "border-primary/40",
+                                              isBusy && "pointer-events-none opacity-60"
+                                            )}
+                                          >
+                                            {sectionState.enabled ? resolveProbeSummary(draft) : "添加探针"}
+                                            {sectionState.enabled ? (
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="absolute top-1/2 right-3 h-7 w-7 -translate-y-1/2 p-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                                onPointerDown={(event) => {
+                                                  event.preventDefault()
+                                                  event.stopPropagation()
+                                                }}
+                                                onClick={(event) => {
+                                                  event.preventDefault()
+                                                  event.stopPropagation()
+                                                  clearProbeEdit(section.key)
+                                                }}
+                                                disabled={isBusy}
+                                              >
+                                                <IconX className="size-4" />
+                                                <span className="sr-only">清空探针</span>
+                                              </Button>
+                                            ) : null}
+                                          </div>
+                                        </PopoverTrigger>
+                                        <PopoverContent
+                                          className="w-[min(86vw,760px)] p-4"
+                                          align="start"
+                                          side="bottom"
+                                          sideOffset={8}
+                                        >
+                                          <div className="space-y-4">
                                           <Tabs
                                             value={draft.mode}
                                             onValueChange={(value) => {
@@ -1310,26 +1354,27 @@ export function CreateContainerDialog({
                                             <div aria-hidden className="hidden md:block" />
                                           </div>
 
-                                          <div className="flex justify-end gap-2 border-t pt-3">
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              onClick={() => cancelProbeEdit(section.key)}
-                                              disabled={isBusy}
-                                            >
-                                              取消
-                                            </Button>
-                                            <Button
-                                              type="button"
-                                              onClick={() => confirmProbeEdit(section.key)}
-                                              disabled={isBusy}
-                                            >
-                                              确定
-                                            </Button>
+                                            <div className="flex justify-end gap-2 border-t pt-3">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => cancelProbeEdit(section.key)}
+                                                disabled={isBusy}
+                                              >
+                                                取消
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                onClick={() => confirmProbeEdit(section.key)}
+                                                disabled={isBusy}
+                                              >
+                                                确定
+                                              </Button>
+                                            </div>
                                           </div>
-                                        </div>
-                                      </PopoverContent>
-                                    </Popover>
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
                                     <p className="text-sm text-muted-foreground">{section.description}</p>
                                   </div>
                                 )
