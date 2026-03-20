@@ -55,6 +55,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useCreateJobDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.controller"
 
@@ -80,10 +81,12 @@ export function CreateJobDialog({
     canNavigateStep,
     checkingNext,
     clearContainerEnv,
+    confirmEditStorageVolume,
     completions,
     configuredContainers,
     containerDialogOpen,
     creating,
+    cancelEditStorageVolume,
     currentStepIndex,
     description,
     dialogDescription,
@@ -98,6 +101,7 @@ export function CreateJobDialog({
     handleYamlModeChange,
     isBasicStep,
     isBusy,
+    isEditingStorageView,
     isEditMode,
     isFinalStep,
     isPodStep,
@@ -113,9 +117,11 @@ export function CreateJobDialog({
     removeContainer,
     removeContainerEnv,
     removeContainerPort,
+    removeStorageVolume,
     restartPolicy,
     returnToPodList,
     runPodValidation,
+    savedStorageVolume,
     schedule,
     scheduleError,
     setActiveDeadlineSeconds,
@@ -133,10 +139,13 @@ export function CreateJobDialog({
     setRestartPolicy,
     setSchedule,
     setScheduleError,
+    startEditStorageVolume,
+    storageVolumeDraft,
     setSubmitError,
     setYamlError,
     setYamlText,
     submitError,
+    updateStorageVolumeDraft,
     updateContainer,
     updateContainerEnv,
     updateContainerPort,
@@ -152,6 +161,18 @@ export function CreateJobDialog({
     initialValues,
     onSubmit,
   })
+
+  const hasSavedStorageVolume =
+    savedStorageVolume.volumeName.trim().length > 0 ||
+    savedStorageVolume.containerName.trim().length > 0 ||
+    savedStorageVolume.mountPath.trim().length > 0
+
+  const volumeNameOptions =
+    storageVolumeDraft.volumeKind === "persistent"
+      ? ["pvc-default", "pvc-data", "pvc-logs"]
+      : storageVolumeDraft.volumeKind === "ephemeral"
+        ? ["ephemeral-cache", "ephemeral-tmp"]
+        : ["host-time", "host-logs", "host-data"]
   return (
     <Dialog
       open={open}
@@ -588,61 +609,197 @@ export function CreateJobDialog({
               <div>
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">存储设置</h3>
-                </div>
-
-                <div className="rounded-lg border bg-muted/20 px-4 py-4">
-                  <p className="text-sm text-muted-foreground">
-                    为容器配置存储能力，可选择挂载持久卷、临时卷或 HostPath，并支持挂载配置字典与保密字典内容。
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    配置卷挂载与配置挂载，支持在当前页面直接录入并保存。
                   </p>
                 </div>
-
-                <div className="mt-6 flex flex-col gap-6">
-                  <Field>
-                    <FieldLabel>挂载卷</FieldLabel>
-                    <div className="flex flex-col gap-3">
-                      <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                        <div className="text-sm font-semibold">暂无挂载卷配置</div>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                          可添加持久卷、临时卷或 HostPath 卷。
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
-                        disabled={isBusy}
+                {isEditingStorageView ? (
+                  <FieldGroup className="flex flex-col gap-6">
+                    <Field>
+                      <FieldLabel>卷类型</FieldLabel>
+                      <Tabs
+                        value={storageVolumeDraft.volumeKind}
+                        onValueChange={(value) => {
+                          if (value === "persistent" || value === "ephemeral" || value === "hostPath") {
+                            updateStorageVolumeDraft("volumeKind", value)
+                            updateStorageVolumeDraft("volumeName", "")
+                          }
+                        }}
                       >
-                        <span className="text-sm font-semibold">添加挂载卷</span>
-                        <span className="mt-1 text-sm text-muted-foreground">
-                          新增一条卷挂载配置。
-                        </span>
-                      </button>
-                    </div>
-                  </Field>
+                        <TabsList className="grid w-full max-w-xl grid-cols-3">
+                          <TabsTrigger value="persistent">持久卷</TabsTrigger>
+                          <TabsTrigger value="ephemeral">临时卷</TabsTrigger>
+                          <TabsTrigger value="hostPath">HostPath 卷</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </Field>
 
-                  <Field>
-                    <FieldLabel>挂载配置字典或保密字典</FieldLabel>
-                    <div className="flex flex-col gap-3">
-                      <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                        <div className="text-sm font-semibold">暂无配置挂载</div>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                          可挂载配置字典或保密字典内容到容器。
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
-                        disabled={isBusy}
+                    <Field>
+                      <FieldLabel htmlFor="create-job-storage-volume-name">选择卷</FieldLabel>
+                      <Select
+                        value={storageVolumeDraft.volumeName}
+                        onValueChange={(value) => updateStorageVolumeDraft("volumeName", value)}
                       >
-                        <span className="text-sm font-semibold">添加配置挂载</span>
-                        <span className="mt-1 text-sm text-muted-foreground">
-                          新增一条配置字典/保密字典挂载配置。
-                        </span>
-                      </button>
-                    </div>
-                  </Field>
-                </div>
+                        <SelectTrigger id="create-job-storage-volume-name">
+                          <SelectValue placeholder="请选择卷" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {volumeNameOptions.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <FieldGroup className="grid gap-4 md:grid-cols-3">
+                      <Field>
+                        <FieldLabel htmlFor="create-job-storage-container">容器</FieldLabel>
+                        <Input
+                          id="create-job-storage-container"
+                          value={storageVolumeDraft.containerName}
+                          onChange={(event) => updateStorageVolumeDraft("containerName", event.target.value)}
+                          placeholder="例如：container-0"
+                          autoComplete="off"
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="create-job-storage-mode">挂载模式</FieldLabel>
+                        <Select
+                          value={storageVolumeDraft.mountMode}
+                          onValueChange={(value) => {
+                            if (value === "none" || value === "ro" || value === "rw") {
+                              updateStorageVolumeDraft("mountMode", value)
+                            }
+                          }}
+                        >
+                          <SelectTrigger id="create-job-storage-mode">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="none">不挂载</SelectItem>
+                              <SelectItem value="ro">只读</SelectItem>
+                              <SelectItem value="rw">读写</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="create-job-storage-path">挂载路径</FieldLabel>
+                        <Input
+                          id="create-job-storage-path"
+                          value={storageVolumeDraft.mountPath}
+                          onChange={(event) => updateStorageVolumeDraft("mountPath", event.target.value)}
+                          placeholder="例如：/etc/config"
+                          autoComplete="off"
+                        />
+                      </Field>
+                    </FieldGroup>
+                  </FieldGroup>
+                ) : (
+                  <FieldGroup className="flex flex-col gap-6">
+                    <Field>
+                      <FieldLabel>挂载卷</FieldLabel>
+                      <div className="flex flex-col gap-3">
+                        {hasSavedStorageVolume ? (
+                          <Item
+                            variant="outline"
+                            size="sm"
+                            className="cursor-pointer hover:bg-muted"
+                            role="button"
+                            tabIndex={0}
+                            onClick={startEditStorageVolume}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault()
+                                startEditStorageVolume()
+                              }
+                            }}
+                          >
+                            <ItemContent className="min-w-0">
+                              <ItemTitle className="min-w-0 truncate">
+                                {savedStorageVolume.volumeName || "未命名卷"}
+                              </ItemTitle>
+                              <ItemDescription className="min-w-0 truncate">
+                                {(savedStorageVolume.volumeKind === "persistent"
+                                  ? "持久卷"
+                                  : savedStorageVolume.volumeKind === "ephemeral"
+                                    ? "临时卷"
+                                    : "HostPath 卷") +
+                                  " · " +
+                                  (savedStorageVolume.containerName || "未指定容器") +
+                                  " · " +
+                                  (savedStorageVolume.mountPath || "未设置路径")}
+                              </ItemDescription>
+                            </ItemContent>
+                            <ItemActions className="gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  removeStorageVolume()
+                                }}
+                              >
+                                <IconTrash data-icon="inline-start" />
+                                删除
+                              </Button>
+                            </ItemActions>
+                          </Item>
+                        ) : (
+                          <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                            <div className="text-sm font-semibold">暂无挂载卷配置</div>
+                            <div className="mt-1 text-sm text-muted-foreground">
+                              可添加持久卷、临时卷或 HostPath 卷。
+                            </div>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          className="flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
+                          onClick={startEditStorageVolume}
+                          disabled={isBusy}
+                        >
+                          <span className="text-sm font-semibold">
+                            {hasSavedStorageVolume ? "编辑挂载卷" : "添加挂载卷"}
+                          </span>
+                          <span className="mt-1 text-sm text-muted-foreground">
+                            {hasSavedStorageVolume ? "更新当前卷挂载配置。" : "新增一条卷挂载配置。"}
+                          </span>
+                        </button>
+                      </div>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel>挂载配置字典或保密字典</FieldLabel>
+                      <div className="flex flex-col gap-3">
+                        <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                          <div className="text-sm font-semibold">暂无配置挂载</div>
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            可挂载配置字典或保密字典内容到容器。
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
+                          disabled={isBusy}
+                        >
+                          <span className="text-sm font-semibold">添加配置挂载</span>
+                          <span className="mt-1 text-sm text-muted-foreground">
+                            新增一条配置字典/保密字典挂载配置。
+                          </span>
+                        </button>
+                      </div>
+                    </Field>
+                  </FieldGroup>
+                )}
               </div>
             ) : (
               <div>
@@ -668,6 +825,17 @@ export function CreateJobDialog({
                 </DialogClose>
                 <Button type="button" onClick={() => void handleCreate()} disabled={isBusy}>
                   {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                </Button>
+              </div>
+            </DialogFooter>
+          ) : isEditingStorageView ? (
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+              <div className="flex w-full items-center justify-between gap-3">
+                <Button type="button" variant="outline" onClick={cancelEditStorageVolume} disabled={isBusy}>
+                  取消
+                </Button>
+                <Button type="button" onClick={confirmEditStorageVolume} disabled={isBusy}>
+                  确认保存
                 </Button>
               </div>
             </DialogFooter>

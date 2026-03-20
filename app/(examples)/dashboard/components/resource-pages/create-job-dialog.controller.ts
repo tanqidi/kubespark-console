@@ -51,6 +51,25 @@ import {
   type ContainerPortFieldErrors,
 } from "@/app/lib/kubespark/form-validation"
 
+type StorageVolumeKind = "persistent" | "ephemeral" | "hostPath"
+type StorageMountMode = "none" | "ro" | "rw"
+
+type StorageVolumeDraft = {
+  volumeKind: StorageVolumeKind
+  volumeName: string
+  containerName: string
+  mountMode: StorageMountMode
+  mountPath: string
+}
+
+const EMPTY_STORAGE_VOLUME_DRAFT: StorageVolumeDraft = {
+  volumeKind: "persistent",
+  volumeName: "",
+  containerName: "",
+  mountMode: "none",
+  mountPath: "",
+}
+
 export function useCreateJobDialogController(props: CreateJobDialogProps) {
   const {
     open,
@@ -87,6 +106,9 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [checkingNext, setCheckingNext] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
+  const [storageVolumeDraft, setStorageVolumeDraft] = React.useState<StorageVolumeDraft>(EMPTY_STORAGE_VOLUME_DRAFT)
+  const [savedStorageVolume, setSavedStorageVolume] = React.useState<StorageVolumeDraft>(EMPTY_STORAGE_VOLUME_DRAFT)
+  const [editingStorageVolume, setEditingStorageVolume] = React.useState(false)
 
   const isBusy = checkingNext || creating
   const currentStepIndex = STEP_ORDER.indexOf(activeStep)
@@ -96,7 +118,8 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   const isStorageStep = activeStep === "storage"
   const isFinalStep = activeStep === "advanced"
   const isEditingPodView = containerDialogOpen
-  const canNavigateStep = !isBusy && !isEditingPodView
+  const isEditingStorageView = isStorageStep && editingStorageVolume
+  const canNavigateStep = !isBusy && !isEditingPodView && !isEditingStorageView
 
   const dialogTitle = isEditMode
     ? kind === "CronJob"
@@ -142,6 +165,9 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       setYamlError(null)
       setCheckingNext(false)
       setCreating(false)
+      setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
+      setSavedStorageVolume(EMPTY_STORAGE_VOLUME_DRAFT)
+      setEditingStorageVolume(false)
     }
   }, [open, kind])
 
@@ -176,7 +202,65 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     setYamlMode(false)
     setYamlText("")
     setYamlError(null)
+    setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
+    setSavedStorageVolume(EMPTY_STORAGE_VOLUME_DRAFT)
+    setEditingStorageVolume(false)
   }, [initialValues, isEditMode, kind, open])
+
+  const configuredContainers = React.useMemo(
+    () => {
+      const visible = containers.filter((item) => item.image.trim())
+      const initContainers = visible.filter((item) => item.type === "initContainer")
+      const workloadContainers = visible.filter((item) => item.type !== "initContainer")
+      return [...initContainers, ...workloadContainers]
+    },
+    [containers]
+  )
+
+  const startEditStorageVolume = React.useCallback(() => {
+    setStorageVolumeDraft((current) => {
+      const base = savedStorageVolume.volumeName || savedStorageVolume.mountPath || savedStorageVolume.containerName
+        ? savedStorageVolume
+        : current
+      const fallbackContainer =
+        base.containerName.trim() ||
+        configuredContainers[0]?.name.trim() ||
+        containers[0]?.name.trim() ||
+        ""
+      return {
+        ...base,
+        containerName: fallbackContainer,
+      }
+    })
+    setEditingStorageVolume(true)
+    if (submitError) setSubmitError(null)
+  }, [configuredContainers, containers, savedStorageVolume, submitError])
+
+  const cancelEditStorageVolume = React.useCallback(() => {
+    setStorageVolumeDraft(savedStorageVolume)
+    setEditingStorageVolume(false)
+  }, [savedStorageVolume])
+
+  const confirmEditStorageVolume = React.useCallback(() => {
+    setSavedStorageVolume(storageVolumeDraft)
+    setEditingStorageVolume(false)
+  }, [storageVolumeDraft])
+
+  const updateStorageVolumeDraft = React.useCallback(
+    <K extends keyof StorageVolumeDraft>(field: K, value: StorageVolumeDraft[K]) => {
+      setStorageVolumeDraft((current) => ({
+        ...current,
+        [field]: value,
+      }))
+    },
+    []
+  )
+
+  const removeStorageVolume = React.useCallback(() => {
+    setSavedStorageVolume(EMPTY_STORAGE_VOLUME_DRAFT)
+    setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
+    setEditingStorageVolume(false)
+  }, [])
 
   const goPrev = React.useCallback(() => {
     if (isBusy || isBasicStep) return
@@ -193,16 +277,6 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   const pendingDeleteContainer = React.useMemo(
     () => containers.find((item) => item.id === pendingDeleteContainerId) ?? null,
     [containers, pendingDeleteContainerId]
-  )
-
-  const configuredContainers = React.useMemo(
-    () => {
-      const visible = containers.filter((item) => item.image.trim())
-      const initContainers = visible.filter((item) => item.type === "initContainer")
-      const workloadContainers = visible.filter((item) => item.type !== "initContainer")
-      return [...initContainers, ...workloadContainers]
-    },
-    [containers]
   )
 
   const runPodValidation = React.useCallback(() => {
@@ -992,11 +1066,13 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     canNavigateStep,
     checkingNext,
     clearContainerEnv,
+    confirmEditStorageVolume,
     completions,
     configuredContainers,
     containerDialogOpen,
     creating,
     currentStepIndex,
+    cancelEditStorageVolume,
     description,
     dialogDescription,
     dialogTitle,
@@ -1011,6 +1087,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     isBasicStep,
     isBusy,
     isEditMode,
+    isEditingStorageView,
     isFinalStep,
     isPodStep,
     isStorageStep,
@@ -1025,9 +1102,11 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     removeContainer,
     removeContainerEnv,
     removeContainerPort,
+    removeStorageVolume,
     restartPolicy,
     returnToPodList,
     runPodValidation,
+    savedStorageVolume,
     schedule,
     scheduleError,
     setActiveDeadlineSeconds,
@@ -1045,10 +1124,13 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     setRestartPolicy,
     setSchedule,
     setScheduleError,
+    startEditStorageVolume,
+    storageVolumeDraft,
     setSubmitError,
     setYamlError,
     setYamlText,
     submitError,
+    updateStorageVolumeDraft,
     updateContainer,
     updateContainerEnv,
     updateContainerPort,
