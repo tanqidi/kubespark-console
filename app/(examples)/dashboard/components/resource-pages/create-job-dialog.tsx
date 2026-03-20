@@ -145,6 +145,7 @@ export function CreateJobDialog({
     setYamlError,
     setYamlText,
     submitError,
+    updateStorageVolumeMount,
     updateStorageVolumeDraft,
     updateContainer,
     updateContainerEnv,
@@ -164,8 +165,13 @@ export function CreateJobDialog({
 
   const hasSavedStorageVolume =
     savedStorageVolume.volumeName.trim().length > 0 ||
-    savedStorageVolume.containerName.trim().length > 0 ||
-    savedStorageVolume.mountPath.trim().length > 0
+    savedStorageVolume.mounts.some(
+      (item) => item.mountMode !== "none" || item.mountPath.trim().length > 0
+    )
+
+  const mountedContainerCount = savedStorageVolume.mounts.filter(
+    (item) => item.mountMode !== "none" || item.mountPath.trim().length > 0
+  ).length
 
   const volumeNameOptions =
     storageVolumeDraft.volumeKind === "persistent"
@@ -655,50 +661,58 @@ export function CreateJobDialog({
                       </Select>
                     </Field>
 
-                    <FieldGroup className="grid gap-4 md:grid-cols-3">
-                      <Field>
-                        <FieldLabel htmlFor="create-job-storage-container">容器</FieldLabel>
-                        <Input
-                          id="create-job-storage-container"
-                          value={storageVolumeDraft.containerName}
-                          onChange={(event) => updateStorageVolumeDraft("containerName", event.target.value)}
-                          placeholder="例如：container-0"
-                          autoComplete="off"
-                        />
-                      </Field>
-                      <Field>
-                        <FieldLabel htmlFor="create-job-storage-mode">挂载模式</FieldLabel>
-                        <Select
-                          value={storageVolumeDraft.mountMode}
-                          onValueChange={(value) => {
-                            if (value === "none" || value === "ro" || value === "rw") {
-                              updateStorageVolumeDraft("mountMode", value)
-                            }
-                          }}
-                        >
-                          <SelectTrigger id="create-job-storage-mode">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectItem value="none">不挂载</SelectItem>
-                              <SelectItem value="ro">只读</SelectItem>
-                              <SelectItem value="rw">读写</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                      <Field>
-                        <FieldLabel htmlFor="create-job-storage-path">挂载路径</FieldLabel>
-                        <Input
-                          id="create-job-storage-path"
-                          value={storageVolumeDraft.mountPath}
-                          onChange={(event) => updateStorageVolumeDraft("mountPath", event.target.value)}
-                          placeholder="例如：/etc/config"
-                          autoComplete="off"
-                        />
-                      </Field>
-                    </FieldGroup>
+                    <div className="flex flex-col gap-3">
+                      <div className="grid grid-cols-3 gap-4">
+                        <FieldLabel>容器</FieldLabel>
+                        <FieldLabel>挂载模式</FieldLabel>
+                        <FieldLabel>挂载路径</FieldLabel>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        {storageVolumeDraft.mounts.map((item, index) => (
+                          <div key={item.containerName} className="grid grid-cols-3 gap-4">
+                            <Input
+                              id={`create-job-storage-container-${index}`}
+                              value={item.containerName}
+                              disabled
+                              autoComplete="off"
+                            />
+                            <Select
+                              value={item.mountMode}
+                              onValueChange={(value) => {
+                                if (value === "none" || value === "ro" || value === "rw") {
+                                  updateStorageVolumeMount(item.containerName, "mountMode", value)
+                                }
+                              }}
+                            >
+                              <SelectTrigger
+                                id={`create-job-storage-mode-${index}`}
+                                aria-label="挂载模式"
+                                className="w-full"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  <SelectItem value="none">不挂载</SelectItem>
+                                  <SelectItem value="ro">只读</SelectItem>
+                                  <SelectItem value="rw">读写</SelectItem>
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              id={`create-job-storage-path-${index}`}
+                              value={item.mountPath}
+                              onChange={(event) =>
+                                updateStorageVolumeMount(item.containerName, "mountPath", event.target.value)
+                              }
+                              placeholder="例如：/etc/config"
+                              autoComplete="off"
+                              disabled={item.mountMode === "none"}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </FieldGroup>
                 ) : (
                   <FieldGroup className="flex flex-col gap-6">
@@ -731,9 +745,7 @@ export function CreateJobDialog({
                                     ? "临时卷"
                                     : "HostPath 卷") +
                                   " · " +
-                                  (savedStorageVolume.containerName || "未指定容器") +
-                                  " · " +
-                                  (savedStorageVolume.mountPath || "未设置路径")}
+                                  `${mountedContainerCount} 个容器已配置`}
                               </ItemDescription>
                             </ItemContent>
                             <ItemActions className="gap-1">

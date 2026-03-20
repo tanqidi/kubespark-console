@@ -54,20 +54,22 @@ import {
 type StorageVolumeKind = "persistent" | "ephemeral" | "hostPath"
 type StorageMountMode = "none" | "ro" | "rw"
 
-type StorageVolumeDraft = {
-  volumeKind: StorageVolumeKind
-  volumeName: string
+type StorageContainerMount = {
   containerName: string
   mountMode: StorageMountMode
   mountPath: string
 }
 
+type StorageVolumeDraft = {
+  volumeKind: StorageVolumeKind
+  volumeName: string
+  mounts: StorageContainerMount[]
+}
+
 const EMPTY_STORAGE_VOLUME_DRAFT: StorageVolumeDraft = {
   volumeKind: "persistent",
   volumeName: "",
-  containerName: "",
-  mountMode: "none",
-  mountPath: "",
+  mounts: [],
 }
 
 export function useCreateJobDialogController(props: CreateJobDialogProps) {
@@ -217,24 +219,38 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     [containers]
   )
 
+  const resolveStorageContainerNames = React.useCallback(() => {
+    const names =
+      configuredContainers.length > 0
+        ? configuredContainers.map((item) => item.name.trim())
+        : containers.map((item) => item.name.trim())
+    return Array.from(new Set(names.filter((item) => item.length > 0)))
+  }, [configuredContainers, containers])
+
   const startEditStorageVolume = React.useCallback(() => {
     setStorageVolumeDraft((current) => {
-      const base = savedStorageVolume.volumeName || savedStorageVolume.mountPath || savedStorageVolume.containerName
-        ? savedStorageVolume
-        : current
-      const fallbackContainer =
-        base.containerName.trim() ||
-        configuredContainers[0]?.name.trim() ||
-        containers[0]?.name.trim() ||
-        ""
+      const base =
+        savedStorageVolume.volumeName.trim().length > 0 || savedStorageVolume.mounts.length > 0
+          ? savedStorageVolume
+          : current
+      const containerNames = resolveStorageContainerNames()
+      const previousByName = new Map(base.mounts.map((item) => [item.containerName, item]))
+      const mounts = containerNames.map((containerName) => {
+        const previous = previousByName.get(containerName)
+        return {
+          containerName,
+          mountMode: previous?.mountMode ?? "none",
+          mountPath: previous?.mountPath ?? "",
+        }
+      })
       return {
         ...base,
-        containerName: fallbackContainer,
+        mounts,
       }
     })
     setEditingStorageVolume(true)
     if (submitError) setSubmitError(null)
-  }, [configuredContainers, containers, savedStorageVolume, submitError])
+  }, [resolveStorageContainerNames, savedStorageVolume, submitError])
 
   const cancelEditStorageVolume = React.useCallback(() => {
     setStorageVolumeDraft(savedStorageVolume)
@@ -251,6 +267,27 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       setStorageVolumeDraft((current) => ({
         ...current,
         [field]: value,
+      }))
+    },
+    []
+  )
+
+  const updateStorageVolumeMount = React.useCallback(
+    <K extends keyof Omit<StorageContainerMount, "containerName">>(
+      containerName: string,
+      field: K,
+      value: StorageContainerMount[K]
+    ) => {
+      setStorageVolumeDraft((current) => ({
+        ...current,
+        mounts: current.mounts.map((item) =>
+          item.containerName === containerName
+            ? {
+                ...item,
+                [field]: value,
+              }
+            : item
+        ),
       }))
     },
     []
@@ -1131,6 +1168,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     setYamlText,
     submitError,
     updateStorageVolumeDraft,
+    updateStorageVolumeMount,
     updateContainer,
     updateContainerEnv,
     updateContainerPort,
