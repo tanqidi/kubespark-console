@@ -1390,8 +1390,6 @@ function resolveSubmitErrorMessage(error: unknown, kind: JobCreateKind): string 
 
 function resolveStepDescription(step: CreateStep): string {
   switch (step) {
-    case "storage":
-      return "存储设置功能即将开放。"
     case "advanced":
       return "高级设置功能即将开放。"
     default:
@@ -1453,6 +1451,7 @@ export function CreateJobDialog({
   const isBasicStep = activeStep === "basic"
   const isStrategyStep = activeStep === "strategy"
   const isPodStep = activeStep === "pod"
+  const isStorageStep = activeStep === "storage"
   const isFinalStep = activeStep === "advanced"
   const isEditingPodView = containerDialogOpen
   const canNavigateStep = !isBusy && !isEditingPodView
@@ -2771,12 +2770,70 @@ export function CreateJobDialog({
                   </Field>
                 </FieldGroup>
               </div>
+            ) : isStorageStep ? (
+              <div>
+                <div className="mb-4">
+                  <h3 className="text-[15px] font-semibold">存储设置</h3>
+                </div>
+
+                <div className="rounded-lg border bg-muted/20 px-4 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    为容器配置存储能力，可选择挂载持久卷、临时卷或 HostPath，并支持挂载配置字典与保密字典内容。
+                  </p>
+                </div>
+
+                <div className="mt-6 flex flex-col gap-6">
+                  <Field>
+                    <FieldLabel>挂载卷</FieldLabel>
+                    <div className="flex flex-col gap-3">
+                      <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                        <div className="text-sm font-semibold">暂无挂载卷配置</div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          可添加持久卷、临时卷或 HostPath 卷。
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
+                        disabled={isBusy}
+                      >
+                        <span className="text-sm font-semibold">添加挂载卷</span>
+                        <span className="mt-1 text-sm text-muted-foreground">
+                          新增一条卷挂载配置。
+                        </span>
+                      </button>
+                    </div>
+                  </Field>
+
+                  <Field>
+                    <FieldLabel>挂载配置字典或保密字典</FieldLabel>
+                    <div className="flex flex-col gap-3">
+                      <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                        <div className="text-sm font-semibold">暂无配置挂载</div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          可挂载配置字典或保密字典内容到容器。
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
+                        disabled={isBusy}
+                      >
+                        <span className="text-sm font-semibold">添加配置挂载</span>
+                        <span className="mt-1 text-sm text-muted-foreground">
+                          新增一条配置字典/保密字典挂载配置。
+                        </span>
+                      </button>
+                    </div>
+                  </Field>
+                </div>
+              </div>
             ) : (
               <div>
                 <div className="mb-3">
-                  <h3 className="text-[15px] font-semibold">
-                    {activeStep === "storage" ? "存储设置" : "高级设置"}
-                  </h3>
+                  <h3 className="text-[15px] font-semibold">高级设置</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
                 </div>
               </div>
