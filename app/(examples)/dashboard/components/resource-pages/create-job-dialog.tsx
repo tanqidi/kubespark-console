@@ -164,14 +164,17 @@ export function CreateJobDialog({
   })
 
   const hasSavedStorageVolume =
+    savedStorageVolume.volumeId.trim().length > 0 ||
     savedStorageVolume.volumeName.trim().length > 0 ||
     savedStorageVolume.mounts.some(
       (item) => item.mountMode !== "none" || item.mountPath.trim().length > 0
     )
 
-  const mountedContainerCount = savedStorageVolume.mounts.filter(
-    (item) => item.mountMode !== "none" || item.mountPath.trim().length > 0
-  ).length
+  const mountedContainerMounts = savedStorageVolume.mounts.filter(
+    (item) => item.mountMode !== "none" && item.mountPath.trim().length > 0
+  )
+
+  const mountedContainerCount = mountedContainerMounts.length
 
   const volumeNameOptions =
     storageVolumeDraft.volumeKind === "persistent"

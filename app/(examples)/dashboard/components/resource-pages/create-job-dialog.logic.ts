@@ -170,6 +170,16 @@ export type CreateJobDialogProps = {
     }
     pod?: {
       restartPolicy?: "Never" | "OnFailure"
+      storage?: {
+        volumeId?: string
+        volumeKind?: "persistent" | "ephemeral" | "hostPath"
+        volumeName?: string
+        mounts?: Array<{
+          containerName: string
+          mountMode: "none" | "ro" | "rw"
+          mountPath: string
+        }>
+      }
       containers?: Array<{
         name?: string
         type?: ContainerType

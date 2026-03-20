@@ -61,15 +61,21 @@ type StorageContainerMount = {
 }
 
 type StorageVolumeDraft = {
+  volumeId: string
   volumeKind: StorageVolumeKind
   volumeName: string
   mounts: StorageContainerMount[]
 }
 
 const EMPTY_STORAGE_VOLUME_DRAFT: StorageVolumeDraft = {
+  volumeId: "",
   volumeKind: "persistent",
   volumeName: "",
   mounts: [],
+}
+
+function createStorageVolumeId() {
+  return `volume-${crypto.randomUUID().replace(/-/g, "").slice(0, 6)}`
 }
 
 export function useCreateJobDialogController(props: CreateJobDialogProps) {
@@ -258,7 +264,13 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   }, [savedStorageVolume])
 
   const confirmEditStorageVolume = React.useCallback(() => {
-    setSavedStorageVolume(storageVolumeDraft)
+    setSavedStorageVolume((current) => ({
+      ...storageVolumeDraft,
+      volumeId:
+        storageVolumeDraft.volumeId.trim() ||
+        current.volumeId.trim() ||
+        (storageVolumeDraft.volumeName.trim() ? createStorageVolumeId() : ""),
+    }))
     setEditingStorageVolume(false)
   }, [storageVolumeDraft])
 
@@ -1043,8 +1055,34 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
           })
           .filter((item) => item.image.length > 0)
 
+        const normalizedStorageName = savedStorageVolume.volumeName.trim()
+        const normalizedStorageId =
+          savedStorageVolume.volumeId.trim() ||
+          (normalizedStorageName ? createStorageVolumeId() : "")
+        const normalizedStorageMounts = savedStorageVolume.mounts
+          .map((item) => ({
+            containerName: item.containerName.trim(),
+            mountMode: item.mountMode,
+            mountPath: item.mountPath.trim(),
+          }))
+          .filter(
+            (item) =>
+              item.containerName.length > 0 &&
+              (item.mountMode === "ro" || item.mountMode === "rw") &&
+              item.mountPath.length > 0
+          )
+        const normalizedStorage =
+          normalizedStorageName && normalizedStorageId
+            ? {
+                volumeId: normalizedStorageId,
+                volumeKind: savedStorageVolume.volumeKind,
+                volumeName: normalizedStorageName,
+                mounts: normalizedStorageMounts,
+              }
+            : undefined
+
         const pod =
-          source.pod.restartPolicy === "OnFailure" || normalizedContainers.length > 0
+          source.pod.restartPolicy === "OnFailure" || normalizedContainers.length > 0 || normalizedStorage
             ? {
                 ...(source.pod.restartPolicy === "OnFailure"
                   ? { restartPolicy: source.pod.restartPolicy }
@@ -1054,6 +1092,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
                       containers: normalizedContainers,
                     }
                   : {}),
+                ...(normalizedStorage ? { storage: normalizedStorage } : {}),
               }
             : undefined
 
@@ -1085,6 +1124,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       lockedIdentity?.namespace,
       onOpenChange,
       onSubmit,
+      savedStorageVolume,
       withLockedIdentity,
       yamlMode,
       yamlText,
