@@ -1,6 +1,6 @@
 ﻿# KubeSpark React 项目架构总览
 
-更新时间：2026-03-13
+更新时间：2026-03-20
 
 ## 1. 项目定位
 
@@ -108,6 +108,25 @@ UI 层 (app/(examples)/dashboard/components)
 说明：业务校验规则与错误文案仍保留在各自页面/弹窗内，工具层不承载资源特定提示文案。
 
 后续若新增 `Deployment/CronJob/Service` 复杂表单，可直接沿用该工具，避免重复实现校验与定位逻辑。
+
+## 4.6 大型 TS 文件拆分约定
+
+当前结构只做“TS 逻辑抽取”，不做整页 re-export 拆壳：
+
+- `xxx-dialog.tsx`
+  - 保留主组件与页面结构（JSX 视图、组件出口、必要绑定）。
+  - 不再拆成仅一行导出的壳文件。
+- `xxx-dialog.controller.ts`
+  - 放 `useXxxController`，承载状态、副作用、交互流程、提交前后编排。
+- `xxx-dialog.logic.ts`
+  - 放纯函数、常量、默认值构造、数据映射与格式转换。
+- 通用校验/滚动定位工具（如 `form-validation.ts`）
+  - 只放通用能力，不放具体资源文案与业务判断。
+
+当前按此结构落地：
+
+- `create-container-dialog.tsx` + `create-container-dialog.controller.ts` + `create-container-dialog.logic.ts`
+- `create-job-dialog.tsx` + `create-job-dialog.controller.ts` + `create-job-dialog.logic.ts`
 
 ## 5. 路由与页面组织
 
