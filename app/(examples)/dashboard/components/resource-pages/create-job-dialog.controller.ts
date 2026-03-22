@@ -328,9 +328,10 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   const confirmEditStorageVolume = React.useCallback(() => {
     const normalizedVolumeName = storageVolumeDraft.volumeName.trim()
     if (!normalizedVolumeName) return
+    const currentVolumeId = storageVolumeDraft.volumeId.trim()
     const normalizedVolumeId =
       storageVolumeDraft.volumeKind === "persistent" && normalizedVolumeName
-        ? normalizedVolumeName
+        ? currentVolumeId || normalizedVolumeName
         : storageVolumeDraft.volumeId.trim() ||
           (normalizedVolumeName ? createStorageVolumeId() : "")
 
@@ -444,6 +445,16 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       pod: {
         restartPolicy,
         containers,
+        ...(savedStorageVolumes.length > 0
+          ? {
+              storageList: savedStorageVolumes.map((item) => ({
+                volumeId: item.volumeId,
+                volumeKind: item.volumeKind,
+                volumeName: item.volumeName,
+                mounts: item.mounts,
+              })),
+            }
+          : {}),
       },
     }),
     [
@@ -457,6 +468,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       schedule,
       parallelism,
       restartPolicy,
+      savedStorageVolumes,
     ]
   )
 
@@ -471,6 +483,37 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     setActiveDeadlineSeconds(snapshot.strategy.activeDeadlineSeconds)
     setRestartPolicy(snapshot.pod.restartPolicy)
     setContainers(snapshot.pod.containers)
+    const nextStorageVolumes = Array.isArray(snapshot.pod.storageList)
+      ? snapshot.pod.storageList
+          .map((item) => ({
+            volumeId: typeof item.volumeId === "string" ? item.volumeId.trim() : "",
+            volumeKind:
+              item.volumeKind === "ephemeral" ||
+              item.volumeKind === "hostPath" ||
+              item.volumeKind === "persistent"
+                ? item.volumeKind
+                : "persistent",
+            volumeName: typeof item.volumeName === "string" ? item.volumeName.trim() : "",
+            mounts: Array.isArray(item.mounts)
+              ? item.mounts
+                  .map((mount) => ({
+                    containerName:
+                      typeof mount.containerName === "string" ? mount.containerName.trim() : "",
+                    mountMode:
+                      mount.mountMode === "ro" || mount.mountMode === "rw" || mount.mountMode === "none"
+                        ? mount.mountMode
+                        : "none",
+                    mountPath: typeof mount.mountPath === "string" ? mount.mountPath.trim() : "",
+                  }))
+                  .filter((mount) => mount.containerName.length > 0)
+              : [],
+          }))
+          .filter((item) => item.volumeId.length > 0 || item.volumeName.length > 0 || item.mounts.length > 0)
+      : []
+    setSavedStorageVolumes(nextStorageVolumes)
+    setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
+    setEditingStorageVolumeIndex(null)
+    setEditingStorageVolume(false)
     setNameError(null)
     setNamespaceError(null)
     setScheduleError(null)
@@ -1144,10 +1187,11 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
         const normalizedStorageList = savedStorageVolumes
           .map((storageItem) => {
             const normalizedStorageName = storageItem.volumeName.trim()
+            const currentStorageId = storageItem.volumeId.trim()
             const normalizedStorageId =
               storageItem.volumeKind === "persistent"
-                ? normalizedStorageName
-                : storageItem.volumeId.trim() ||
+                ? currentStorageId || normalizedStorageName
+                : currentStorageId ||
                   (normalizedStorageName ? createStorageVolumeId() : "")
             const normalizedStorageMounts = storageItem.mounts
               .map((item) => ({

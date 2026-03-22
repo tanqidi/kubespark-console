@@ -348,6 +348,7 @@ export type JobDialogSnapshot = {
   pod: {
     restartPolicy: "Never" | "OnFailure"
     containers: ContainerDraft[]
+    storageList?: JobStorageInput[]
   }
 }
 
@@ -1305,6 +1306,76 @@ export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDial
     ...parseContainers(podSpec.initContainers, "initContainer"),
   ]
 
+  const parsedStorageList = (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
+    .map((entry) => asObject(entry))
+    .map((volume) => {
+      const volumeId = asString(volume.name).trim()
+      const hostPath = asObject(volume.hostPath)
+      const pvc = asObject(volume.persistentVolumeClaim)
+      const emptyDir = asObject(volume.emptyDir)
+
+      if (!volumeId || hostTimeVolumeNames.has(volumeId)) return null
+      if (asString(pvc.claimName).trim()) {
+        return {
+          volumeId,
+          volumeKind: "persistent" as const,
+          volumeName: asString(pvc.claimName).trim(),
+        }
+      }
+      if (Object.keys(emptyDir).length > 0) {
+        return {
+          volumeId,
+          volumeKind: "ephemeral" as const,
+          volumeName: volumeId,
+        }
+      }
+      if (asString(hostPath.path).trim()) {
+        return {
+          volumeId,
+          volumeKind: "hostPath" as const,
+          volumeName: asString(hostPath.path).trim(),
+        }
+      }
+      return null
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        volumeId: string
+        volumeKind: "persistent" | "ephemeral" | "hostPath"
+        volumeName: string
+      } => Boolean(item)
+    )
+    .map((storageItem) => {
+      const allContainers = [
+        ...(Array.isArray(podSpec.containers) ? podSpec.containers : []),
+        ...(Array.isArray(podSpec.initContainers) ? podSpec.initContainers : []),
+      ]
+      const mounts = allContainers
+        .map((entry) => asObject(entry))
+        .flatMap((container) => {
+          const containerName = asString(container.name).trim()
+          const volumeMounts = Array.isArray(container.volumeMounts) ? container.volumeMounts : []
+          return volumeMounts
+            .map((mount) => asObject(mount))
+            .filter((mount) => asString(mount.name).trim() === storageItem.volumeId)
+            .map((mount) => ({
+              containerName,
+              mountMode: mount.readOnly === true ? ("ro" as const) : ("rw" as const),
+              mountPath: asString(mount.mountPath).trim(),
+            }))
+        })
+        .filter((mount) => mount.containerName.length > 0 && mount.mountPath.length > 0)
+
+      return {
+        volumeId: storageItem.volumeId,
+        volumeKind: storageItem.volumeKind,
+        volumeName: storageItem.volumeName,
+        mounts,
+      }
+    })
+
   return {
     name: asString(metadata.name),
     namespace: asString(metadata.namespace),
@@ -1319,6 +1390,7 @@ export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDial
     pod: {
       restartPolicy: asString(podSpec.restartPolicy) === "OnFailure" ? "OnFailure" : "Never",
       containers: containers.length > 0 ? containers : [],
+      ...(parsedStorageList.length > 0 ? { storageList: parsedStorageList } : {}),
     },
   }
 }

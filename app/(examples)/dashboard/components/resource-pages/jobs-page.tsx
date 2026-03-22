@@ -380,10 +380,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
       .filter((mount) => mount.containerName && mount.mountPath)
 
     return {
-      volumeId:
-        volume.volumeKind === "persistent"
-          ? volume.volumeName
-          : volume.volumeId,
+      volumeId: volume.volumeId,
       volumeKind: volume.volumeKind,
       volumeName: volume.volumeName,
       mounts,

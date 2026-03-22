@@ -195,17 +195,21 @@ export function CreateJobDialog({
       : storageVolumeDraft.volumeKind === "ephemeral"
         ? ["ephemeral-cache", "ephemeral-tmp"]
         : ["host-time", "host-logs", "host-data"]
-  const storageDuplicateKey = `${storageVolumeDraft.volumeKind}:${storageVolumeDraft.volumeName.trim().toLowerCase()}`
-  const existingStorageKeys = new Set(
+  const currentStorageVolumeId = (
+    storageVolumeDraft.volumeKind === "persistent"
+      ? storageVolumeDraft.volumeId.trim() || storageVolumeDraft.volumeName.trim()
+      : storageVolumeDraft.volumeId.trim()
+  ).toLowerCase()
+  const existingStorageVolumeIds = new Set(
     savedStorageVolumes
       .map((item, index) => ({ item, index }))
       .filter(({ index }) => index !== editingStorageVolumeIndex)
-      .map(({ item }) => `${item.volumeKind}:${item.volumeName.trim().toLowerCase()}`)
-      .filter((value) => !value.endsWith(":"))
+      .map(({ item }) => item.volumeId.trim().toLowerCase())
+      .filter((value) => value.length > 0)
   )
   const hasDuplicateStorageSelection =
-    storageVolumeDraft.volumeName.trim().length > 0 &&
-    existingStorageKeys.has(storageDuplicateKey)
+    currentStorageVolumeId.length > 0 &&
+    existingStorageVolumeIds.has(currentStorageVolumeId)
   const isStorageVolumeNameEmpty = storageVolumeDraft.volumeName.trim().length === 0
 
   const handleConfirmStorageSave = React.useCallback(() => {
@@ -776,18 +780,18 @@ export function CreateJobDialog({
                           <FieldDescription className="text-destructive">{persistentVolumeNameError}</FieldDescription>
                         ) : hasDuplicateStorageSelection ? (
                           <FieldDescription className="text-destructive">
-                            该卷已经配置挂载，请回到上方已添加条目中编辑。
+                            卷名称已存在，请回到上方已添加条目中编辑。
                           </FieldDescription>
                         ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
                           <FieldDescription className="text-destructive">
-                            ???????????
+                            请选择卷，或点击取消返回。
                           </FieldDescription>
                         ) : volumeNameOptions.length === 0 && !persistentVolumeNameLoading ? (
-                          <FieldDescription>??????????? PVC?</FieldDescription>
+                          <FieldDescription>当前命名空间暂无可选 PVC。</FieldDescription>
                         ) : null
                       ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
                         <FieldDescription className="text-destructive">
-                          ???????????
+                          请选择卷，或点击取消返回。
                         </FieldDescription>
                       ) : null}
                     </Field>
@@ -857,13 +861,9 @@ export function CreateJobDialog({
                                 item.mountMode !== "none" && item.mountPath.trim().length > 0
                             ).length
                             const storageDisplayName =
-                              storageItem.volumeKind === "persistent"
-                                ? storageItem.volumeName.trim() ||
-                                  storageItem.volumeId.trim() ||
-                                  "未命名卷"
-                                : storageItem.volumeId.trim() ||
-                                  storageItem.volumeName.trim() ||
-                                  "未命名卷"
+                              storageItem.volumeId.trim() ||
+                              storageItem.volumeName.trim() ||
+                              "未命名卷"
 
                             return (
                               <Item
