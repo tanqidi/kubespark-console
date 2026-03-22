@@ -674,7 +674,12 @@ export function CreateJobDialog({
                             ))}
                           </ItemGroup>
                         ) : (
-                          <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                          <div
+                            className={cn(
+                              "rounded-lg border border-dashed px-4 py-10 text-center",
+                              submitError === POD_REQUIRED_MESSAGE && "border-destructive"
+                            )}
+                          >
                             <div className={cn("text-sm font-semibold", submitError === POD_REQUIRED_MESSAGE && "text-destructive")}>
                               暂无容器配置
                             </div>

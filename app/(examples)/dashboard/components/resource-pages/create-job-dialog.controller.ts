@@ -9,8 +9,10 @@ import type {
   JobDialogSnapshot,
 } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
 import {
+  CONTAINER_PORT_PROTOCOL_SET,
   CRON_SCHEDULE_REQUIRED_MESSAGE,
   DEFAULT_CRON_SCHEDULE,
+  POD_REQUIRED_MESSAGE,
   STEP_ORDER,
   buildAutoPortName,
   buildJobYamlText,
