@@ -120,6 +120,7 @@ export function CreateJobDialog({
     isBasicStep,
     isBusy,
     isEditingStorageView,
+    editingStorageVolumeIndex,
     isEditMode,
     isFinalStep,
     isPodStep,
@@ -193,6 +194,17 @@ export function CreateJobDialog({
       : storageVolumeDraft.volumeKind === "ephemeral"
         ? ["ephemeral-cache", "ephemeral-tmp"]
         : ["host-time", "host-logs", "host-data"]
+  const storageDuplicateKey = `${storageVolumeDraft.volumeKind}:${storageVolumeDraft.volumeName.trim().toLowerCase()}`
+  const existingStorageKeys = new Set(
+    savedStorageVolumes
+      .map((item, index) => ({ item, index }))
+      .filter(({ index }) => index !== editingStorageVolumeIndex)
+      .map(({ item }) => `${item.volumeKind}:${item.volumeName.trim().toLowerCase()}`)
+      .filter((value) => !value.endsWith(":"))
+  )
+  const hasDuplicateStorageSelection =
+    storageVolumeDraft.volumeName.trim().length > 0 &&
+    existingStorageKeys.has(storageDuplicateKey)
 
   React.useEffect(() => {
     if (!open || storageVolumeDraft.volumeKind !== "persistent") return
@@ -725,7 +737,11 @@ export function CreateJobDialog({
                         <SelectContent>
                           <SelectGroup>
                             {volumeNameOptions.map((option) => (
-                              <SelectItem key={option} value={option}>
+                              <SelectItem
+                                key={option}
+                                value={option}
+                                disabled={existingStorageKeys.has(`${storageVolumeDraft.volumeKind}:${option.trim().toLowerCase()}`)}
+                              >
                                 {option}
                               </SelectItem>
                             ))}
@@ -735,6 +751,10 @@ export function CreateJobDialog({
                       {storageVolumeDraft.volumeKind === "persistent" ? (
                         persistentVolumeNameError ? (
                           <FieldDescription className="text-destructive">{persistentVolumeNameError}</FieldDescription>
+                        ) : hasDuplicateStorageSelection ? (
+                          <FieldDescription className="text-destructive">
+                            该卷已存在挂载，请到上方已添加的条目中编辑。
+                          </FieldDescription>
                         ) : volumeNameOptions.length === 0 && !persistentVolumeNameLoading ? (
                           <FieldDescription>当前命名空间下没有可用 PVC。</FieldDescription>
                         ) : null
@@ -944,7 +964,11 @@ export function CreateJobDialog({
                 <Button type="button" variant="outline" onClick={cancelEditStorageVolume} disabled={isBusy}>
                   取消
                 </Button>
-                <Button type="button" onClick={confirmEditStorageVolume} disabled={isBusy}>
+                <Button
+                  type="button"
+                  onClick={confirmEditStorageVolume}
+                  disabled={isBusy || hasDuplicateStorageSelection}
+                >
                   确认保存
                 </Button>
               </div>

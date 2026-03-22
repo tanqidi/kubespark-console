@@ -1267,6 +1267,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     isBusy,
     isEditMode,
     isEditingStorageView,
+    editingStorageVolumeIndex,
     isFinalStep,
     isPodStep,
     isStorageStep,
