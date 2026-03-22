@@ -57,6 +57,16 @@ export type JobPodContainerSecurityContextInput = {
 
 export type JobPodInput = {
   restartPolicy?: "Never" | "OnFailure"
+  storage?: {
+    volumeId?: string
+    volumeKind?: "persistent" | "ephemeral" | "hostPath"
+    volumeName?: string
+    mounts?: Array<{
+      containerName: string
+      mountMode: "none" | "ro" | "rw"
+      mountPath: string
+    }>
+  }
   containers?: Array<{
     name?: string
     type?: "container" | "initContainer"
@@ -324,6 +334,11 @@ function buildPodContainerSpec(pod?: JobPodInput) {
   const raw = Array.isArray(pod?.containers) ? pod.containers : []
   const containers: Array<Record<string, unknown>> = []
   const initContainers: Array<Record<string, unknown>> = []
+  const containerSpecs: Array<{
+    rawName: string
+    resolvedName: string
+    spec: Record<string, unknown>
+  }> = []
   let withHostTimezone = false
 
   raw.forEach((item, index) => {
@@ -444,8 +459,9 @@ function buildPodContainerSpec(pod?: JobPodInput) {
     const lifecycle = buildLifecycleSpec(item.lifecycle)
     const securityContext = buildContainerSecurityContextSpec(item.securityContext)
 
+    const resolvedContainerName = resolveContainerName(item.name, image, index)
     const containerSpec: Record<string, unknown> = {
-      name: resolveContainerName(item.name, image, index),
+      name: resolvedContainerName,
       image,
       ...(imagePullPolicy ? { imagePullPolicy } : {}),
       ...(Array.isArray(item.command) && item.command.length > 0 ? { command: item.command } : {}),
@@ -476,27 +492,97 @@ function buildPodContainerSpec(pod?: JobPodInput) {
 
     if (item.type === "initContainer") {
       initContainers.push(containerSpec)
-      return
+    } else {
+      containers.push(containerSpec)
     }
-    containers.push(containerSpec)
+
+    containerSpecs.push({
+      rawName: typeof item.name === "string" ? item.name.trim() : "",
+      resolvedName: resolvedContainerName,
+      spec: containerSpec,
+    })
   })
+
+  const storageName = typeof pod?.storage?.volumeName === "string" ? pod.storage.volumeName.trim() : ""
+  const storageIdRaw = typeof pod?.storage?.volumeId === "string" ? pod.storage.volumeId.trim() : ""
+  const storageId = storageIdRaw || storageName
+  const storageKind = pod?.storage?.volumeKind
+  const storageSource =
+    storageName && storageId
+      ? storageKind === "persistent"
+        ? ({ persistentVolumeClaim: { claimName: storageName } } as Record<string, unknown>)
+        : storageKind === "ephemeral"
+          ? ({ emptyDir: {} } as Record<string, unknown>)
+          : storageKind === "hostPath"
+            ? ({ hostPath: { path: storageName, type: "" } } as Record<string, unknown>)
+            : null
+      : null
+
+  let hasAppliedStorageMount = false
+  const storageMounts =
+    storageSource && Array.isArray(pod?.storage?.mounts)
+      ? pod.storage.mounts
+          .map((item) => ({
+            containerName: typeof item.containerName === "string" ? item.containerName.trim() : "",
+            mountMode: item.mountMode,
+            mountPath: typeof item.mountPath === "string" ? item.mountPath.trim() : "",
+          }))
+          .filter(
+            (item) =>
+              item.containerName.length > 0 &&
+              (item.mountMode === "ro" || item.mountMode === "rw") &&
+              item.mountPath.length > 0
+          )
+      : []
+
+  if (storageSource) {
+    storageMounts.forEach((mount) => {
+      const target =
+        containerSpecs.find((item) => item.rawName === mount.containerName) ??
+        containerSpecs.find((item) => item.resolvedName === mount.containerName)
+      if (!target) return
+
+      const existingMounts = Array.isArray(target.spec.volumeMounts)
+        ? (target.spec.volumeMounts as Array<{ name?: string; mountPath?: string }>)
+        : []
+      const duplicated = existingMounts.some(
+        (item) => item.name === storageId && item.mountPath === mount.mountPath
+      )
+      if (duplicated) return
+
+      target.spec.volumeMounts = [
+        ...existingMounts,
+        {
+          name: storageId,
+          mountPath: mount.mountPath,
+          ...(mount.mountMode === "ro" ? { readOnly: true } : {}),
+        },
+      ]
+      hasAppliedStorageMount = true
+    })
+  }
+
+  const volumes: Array<Record<string, unknown>> = []
+  if (withHostTimezone) {
+    volumes.push({
+      name: "host-time",
+      hostPath: {
+        path: "/etc/localtime",
+        type: "",
+      },
+    })
+  }
+  if (storageSource && hasAppliedStorageMount) {
+    volumes.push({
+      name: storageId,
+      ...storageSource,
+    })
+  }
 
   return {
     ...(containers.length > 0 ? { containers } : {}),
     ...(initContainers.length > 0 ? { initContainers } : {}),
-    ...(withHostTimezone
-      ? {
-          volumes: [
-            {
-              name: "host-time",
-              hostPath: {
-                path: "/etc/localtime",
-                type: "",
-              },
-            },
-          ],
-        }
-      : {}),
+    ...(volumes.length > 0 ? { volumes } : {}),
   }
 }
 

@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import {
   IconAdjustments,
   IconBraces,
@@ -58,8 +59,25 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useCreateJobDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.controller"
+import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 export type { JobDialogInitialValues } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+function resolvePvcNames(items: unknown[]): string[] {
+  const names = items
+    .map((item) => {
+      if (!item || typeof item !== "object") return ""
+      const metadata =
+        "metadata" in item && item.metadata && typeof item.metadata === "object"
+          ? (item.metadata as Record<string, unknown>)
+          : null
+      const name = metadata?.name
+      return typeof name === "string" ? name.trim() : ""
+    })
+    .filter((name) => name.length > 0)
+
+  return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
+}
+
 export function CreateJobDialog({
   open,
   onOpenChange,
@@ -162,6 +180,9 @@ export function CreateJobDialog({
     initialValues,
     onSubmit,
   })
+  const [persistentVolumeNameOptions, setPersistentVolumeNameOptions] = React.useState<string[]>([])
+  const [persistentVolumeNameLoading, setPersistentVolumeNameLoading] = React.useState(false)
+  const [persistentVolumeNameError, setPersistentVolumeNameError] = React.useState<string | null>(null)
 
   const hasSavedStorageVolume =
     savedStorageVolume.volumeId.trim().length > 0 ||
@@ -175,13 +196,69 @@ export function CreateJobDialog({
   )
 
   const mountedContainerCount = mountedContainerMounts.length
+  const savedStorageDisplayName =
+    savedStorageVolume.volumeKind === "persistent"
+      ? savedStorageVolume.volumeName.trim() ||
+        savedStorageVolume.volumeId.trim() ||
+        "未命名卷"
+      : savedStorageVolume.volumeId.trim() ||
+        savedStorageVolume.volumeName.trim() ||
+        "未命名卷"
 
   const volumeNameOptions =
     storageVolumeDraft.volumeKind === "persistent"
-      ? ["pvc-default", "pvc-data", "pvc-logs"]
+      ? persistentVolumeNameOptions
       : storageVolumeDraft.volumeKind === "ephemeral"
         ? ["ephemeral-cache", "ephemeral-tmp"]
         : ["host-time", "host-logs", "host-data"]
+
+  React.useEffect(() => {
+    if (!open || storageVolumeDraft.volumeKind !== "persistent") return
+
+    let cancelled = false
+    const targetNamespace = namespace.trim()
+    setPersistentVolumeNameLoading(true)
+    setPersistentVolumeNameError(null)
+
+    void fetchResourceCollection(
+      "core",
+      "v1",
+      "persistentvolumeclaims",
+      targetNamespace ? { namespace: targetNamespace } : undefined
+    )
+      .then(({ items }) => {
+        if (cancelled) return
+        setPersistentVolumeNameOptions(resolvePvcNames(items))
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "读取 PVC 失败，请稍后重试。"
+        setPersistentVolumeNameError(message)
+        setPersistentVolumeNameOptions([])
+      })
+      .finally(() => {
+        if (!cancelled) setPersistentVolumeNameLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [namespace, open, storageVolumeDraft.volumeKind])
+
+  React.useEffect(() => {
+    if (storageVolumeDraft.volumeKind !== "persistent") return
+    if (!storageVolumeDraft.volumeName) return
+    if (persistentVolumeNameOptions.includes(storageVolumeDraft.volumeName)) return
+    updateStorageVolumeDraft("volumeName", "")
+  }, [
+    persistentVolumeNameOptions,
+    storageVolumeDraft.volumeKind,
+    storageVolumeDraft.volumeName,
+    updateStorageVolumeDraft,
+  ])
   return (
     <Dialog
       open={open}
@@ -648,9 +725,20 @@ export function CreateJobDialog({
                       <Select
                         value={storageVolumeDraft.volumeName}
                         onValueChange={(value) => updateStorageVolumeDraft("volumeName", value)}
+                        disabled={
+                          storageVolumeDraft.volumeKind === "persistent" &&
+                          (persistentVolumeNameLoading || volumeNameOptions.length === 0)
+                        }
                       >
                         <SelectTrigger id="create-job-storage-volume-name">
-                          <SelectValue placeholder="请选择卷" />
+                          <SelectValue
+                            placeholder={
+                              storageVolumeDraft.volumeKind === "persistent" &&
+                              persistentVolumeNameLoading
+                                ? "PVC 加载中..."
+                                : "请选择卷"
+                            }
+                          />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
@@ -662,6 +750,13 @@ export function CreateJobDialog({
                           </SelectGroup>
                         </SelectContent>
                       </Select>
+                      {storageVolumeDraft.volumeKind === "persistent" ? (
+                        persistentVolumeNameError ? (
+                          <FieldDescription className="text-destructive">{persistentVolumeNameError}</FieldDescription>
+                        ) : volumeNameOptions.length === 0 && !persistentVolumeNameLoading ? (
+                          <FieldDescription>当前命名空间下没有可用 PVC。</FieldDescription>
+                        ) : null
+                      ) : null}
                     </Field>
 
                     <div className="flex flex-col gap-3">
@@ -739,7 +834,7 @@ export function CreateJobDialog({
                           >
                             <ItemContent className="min-w-0">
                               <ItemTitle className="min-w-0 truncate">
-                                {savedStorageVolume.volumeName || "未命名卷"}
+                                {savedStorageDisplayName}
                               </ItemTitle>
                               <ItemDescription className="min-w-0 truncate">
                                 {(savedStorageVolume.volumeKind === "persistent"

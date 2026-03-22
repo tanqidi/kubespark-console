@@ -264,12 +264,16 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   }, [savedStorageVolume])
 
   const confirmEditStorageVolume = React.useCallback(() => {
+    const normalizedVolumeName = storageVolumeDraft.volumeName.trim()
+    const normalizedVolumeId =
+      storageVolumeDraft.volumeKind === "persistent" && normalizedVolumeName
+        ? normalizedVolumeName
+        : storageVolumeDraft.volumeId.trim() ||
+          (normalizedVolumeName ? createStorageVolumeId() : "")
+
     setSavedStorageVolume((current) => ({
       ...storageVolumeDraft,
-      volumeId:
-        storageVolumeDraft.volumeId.trim() ||
-        current.volumeId.trim() ||
-        (storageVolumeDraft.volumeName.trim() ? createStorageVolumeId() : ""),
+      volumeId: normalizedVolumeId || current.volumeId.trim(),
     }))
     setEditingStorageVolume(false)
   }, [storageVolumeDraft])
@@ -410,7 +414,14 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       if (isBusy) return
 
       if (checked) {
-        setYamlText(buildJobYamlText(kind, withLockedIdentity(getSnapshot())))
+        setYamlText(
+          buildJobYamlText(kind, withLockedIdentity(getSnapshot()), {
+            volumeId: savedStorageVolume.volumeId,
+            volumeKind: savedStorageVolume.volumeKind,
+            volumeName: savedStorageVolume.volumeName,
+            mounts: savedStorageVolume.mounts,
+          })
+        )
         setYamlError(null)
         setYamlMode(true)
         return
@@ -425,7 +436,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
         setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
       }
     },
-    [applySnapshot, getSnapshot, isBusy, kind, withLockedIdentity, yamlText]
+    [applySnapshot, getSnapshot, isBusy, kind, savedStorageVolume, withLockedIdentity, yamlText]
   )
 
   const updateContainer = React.useCallback(
@@ -1057,8 +1068,10 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
         const normalizedStorageName = savedStorageVolume.volumeName.trim()
         const normalizedStorageId =
-          savedStorageVolume.volumeId.trim() ||
-          (normalizedStorageName ? createStorageVolumeId() : "")
+          savedStorageVolume.volumeKind === "persistent"
+            ? normalizedStorageName
+            : savedStorageVolume.volumeId.trim() ||
+              (normalizedStorageName ? createStorageVolumeId() : "")
         const normalizedStorageMounts = savedStorageVolume.mounts
           .map((item) => ({
             containerName: item.containerName.trim(),
