@@ -316,6 +316,80 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
     ...parseContainers(podSpec.initContainers, "initContainer"),
   ]
 
+  const parsedVolumes = (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
+    .map((entry) => asObject(entry))
+    .map((volume) => {
+      const name = asString(volume.name).trim()
+      const hostPath = asObject(volume.hostPath)
+      const pvc = asObject(volume.persistentVolumeClaim)
+      const emptyDir = asObject(volume.emptyDir)
+
+      if (!name || hostTimeVolumeNames.has(name)) return null
+      if (asString(pvc.claimName).trim()) {
+        return {
+          volumeId: name,
+          volumeKind: "persistent" as const,
+          volumeName: asString(pvc.claimName).trim(),
+        }
+      }
+      if (Object.keys(emptyDir).length > 0) {
+        return {
+          volumeId: name,
+          volumeKind: "ephemeral" as const,
+          volumeName: name,
+        }
+      }
+      if (asString(hostPath.path).trim()) {
+        return {
+          volumeId: name,
+          volumeKind: "hostPath" as const,
+          volumeName: asString(hostPath.path).trim(),
+        }
+      }
+      return null
+    })
+    .filter(
+      (
+        volume
+      ): volume is {
+        volumeId: string
+        volumeKind: "persistent" | "ephemeral" | "hostPath"
+        volumeName: string
+      } => Boolean(volume)
+    )
+
+  const resolvedStorageList = parsedVolumes.map((volume) => {
+    const source = [
+      ...(Array.isArray(podSpec.containers) ? podSpec.containers : []),
+      ...(Array.isArray(podSpec.initContainers) ? podSpec.initContainers : []),
+    ]
+    const mounts = source
+      .map((entry) => asObject(entry))
+      .flatMap((container) => {
+        const containerName = asString(container.name).trim()
+        const volumeMounts = Array.isArray(container.volumeMounts) ? container.volumeMounts : []
+        return volumeMounts
+          .map((mount) => asObject(mount))
+          .filter((mount) => asString(mount.name).trim() === volume.volumeId)
+          .map((mount) => ({
+            containerName,
+            mountMode: mount.readOnly === true ? ("ro" as const) : ("rw" as const),
+            mountPath: asString(mount.mountPath).trim(),
+          }))
+      })
+      .filter((mount) => mount.containerName && mount.mountPath)
+
+    return {
+      volumeId:
+        volume.volumeKind === "persistent"
+          ? volume.volumeName
+          : volume.volumeId,
+      volumeKind: volume.volumeKind,
+      volumeName: volume.volumeName,
+      mounts,
+    }
+  })
+
   return {
     name: asString(metadata.name) || row.name,
     namespace: asString(metadata.namespace) || row.namespace,
@@ -329,6 +403,8 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
     },
     pod: {
       restartPolicy: asString(podSpec.restartPolicy) === "OnFailure" ? "OnFailure" : "Never",
+      ...(resolvedStorageList.length > 0 ? { storage: resolvedStorageList[0] } : {}),
+      ...(resolvedStorageList.length > 0 ? { storageList: resolvedStorageList } : {}),
       containers,
     },
   }

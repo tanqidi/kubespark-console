@@ -115,7 +115,8 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   const [checkingNext, setCheckingNext] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
   const [storageVolumeDraft, setStorageVolumeDraft] = React.useState<StorageVolumeDraft>(EMPTY_STORAGE_VOLUME_DRAFT)
-  const [savedStorageVolume, setSavedStorageVolume] = React.useState<StorageVolumeDraft>(EMPTY_STORAGE_VOLUME_DRAFT)
+  const [savedStorageVolumes, setSavedStorageVolumes] = React.useState<StorageVolumeDraft[]>([])
+  const [editingStorageVolumeIndex, setEditingStorageVolumeIndex] = React.useState<number | null>(null)
   const [editingStorageVolume, setEditingStorageVolume] = React.useState(false)
 
   const isBusy = checkingNext || creating
@@ -174,7 +175,8 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       setCheckingNext(false)
       setCreating(false)
       setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
-      setSavedStorageVolume(EMPTY_STORAGE_VOLUME_DRAFT)
+      setSavedStorageVolumes([])
+      setEditingStorageVolumeIndex(null)
       setEditingStorageVolume(false)
     }
   }, [open, kind])
@@ -210,8 +212,40 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     setYamlMode(false)
     setYamlText("")
     setYamlError(null)
+    const initialStorageItems = Array.isArray(initialValues.pod?.storageList)
+      ? initialValues.pod?.storageList
+      : initialValues.pod?.storage
+        ? [initialValues.pod.storage]
+        : []
+
+    const normalizedStorageItems = initialStorageItems
+      .map((storageItem) => ({
+        volumeId: typeof storageItem.volumeId === "string" ? storageItem.volumeId : "",
+        volumeKind:
+          storageItem.volumeKind === "ephemeral" ||
+          storageItem.volumeKind === "hostPath" ||
+          storageItem.volumeKind === "persistent"
+            ? storageItem.volumeKind
+            : "persistent",
+        volumeName: typeof storageItem.volumeName === "string" ? storageItem.volumeName : "",
+        mounts: Array.isArray(storageItem.mounts)
+          ? storageItem.mounts
+              .map((item) => ({
+                containerName: typeof item.containerName === "string" ? item.containerName.trim() : "",
+                mountMode:
+                  item.mountMode === "ro" || item.mountMode === "rw" || item.mountMode === "none"
+                    ? item.mountMode
+                    : "none",
+                mountPath: typeof item.mountPath === "string" ? item.mountPath.trim() : "",
+              }))
+              .filter((item) => item.containerName.length > 0)
+          : [],
+      }))
+      .filter((item) => item.volumeName.trim().length > 0 || item.mounts.length > 0)
+
     setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
-    setSavedStorageVolume(EMPTY_STORAGE_VOLUME_DRAFT)
+    setSavedStorageVolumes(normalizedStorageItems)
+    setEditingStorageVolumeIndex(null)
     setEditingStorageVolume(false)
   }, [initialValues, isEditMode, kind, open])
 
@@ -233,11 +267,12 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     return Array.from(new Set(names.filter((item) => item.length > 0)))
   }, [configuredContainers, containers])
 
-  const startEditStorageVolume = React.useCallback(() => {
+  const startEditStorageVolume = React.useCallback((index: number) => {
     setStorageVolumeDraft((current) => {
+      const selected = savedStorageVolumes[index]
       const base =
-        savedStorageVolume.volumeName.trim().length > 0 || savedStorageVolume.mounts.length > 0
-          ? savedStorageVolume
+        selected && (selected.volumeName.trim().length > 0 || selected.mounts.length > 0)
+          ? selected
           : current
       const containerNames = resolveStorageContainerNames()
       const previousByName = new Map(base.mounts.map((item) => [item.containerName, item]))
@@ -254,14 +289,41 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
         mounts,
       }
     })
+    setEditingStorageVolumeIndex(index)
     setEditingStorageVolume(true)
     if (submitError) setSubmitError(null)
-  }, [resolveStorageContainerNames, savedStorageVolume, submitError])
+  }, [resolveStorageContainerNames, savedStorageVolumes, submitError])
+
+  const startAddStorageVolume = React.useCallback(() => {
+    const containerNames = resolveStorageContainerNames()
+    const mounts = containerNames.map((containerName) => ({
+      containerName,
+      mountMode: "none" as const,
+      mountPath: "",
+    }))
+
+    setStorageVolumeDraft({
+      ...EMPTY_STORAGE_VOLUME_DRAFT,
+      mounts,
+    })
+    setEditingStorageVolumeIndex(null)
+    setEditingStorageVolume(true)
+    if (submitError) setSubmitError(null)
+  }, [resolveStorageContainerNames, submitError])
 
   const cancelEditStorageVolume = React.useCallback(() => {
-    setStorageVolumeDraft(savedStorageVolume)
+    if (
+      editingStorageVolumeIndex !== null &&
+      editingStorageVolumeIndex >= 0 &&
+      editingStorageVolumeIndex < savedStorageVolumes.length
+    ) {
+      setStorageVolumeDraft(savedStorageVolumes[editingStorageVolumeIndex] ?? EMPTY_STORAGE_VOLUME_DRAFT)
+    } else {
+      setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
+    }
+    setEditingStorageVolumeIndex(null)
     setEditingStorageVolume(false)
-  }, [savedStorageVolume])
+  }, [editingStorageVolumeIndex, savedStorageVolumes])
 
   const confirmEditStorageVolume = React.useCallback(() => {
     const normalizedVolumeName = storageVolumeDraft.volumeName.trim()
@@ -271,12 +333,24 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
         : storageVolumeDraft.volumeId.trim() ||
           (normalizedVolumeName ? createStorageVolumeId() : "")
 
-    setSavedStorageVolume((current) => ({
+    const nextItem: StorageVolumeDraft = {
       ...storageVolumeDraft,
-      volumeId: normalizedVolumeId || current.volumeId.trim(),
-    }))
+      volumeId: normalizedVolumeId,
+    }
+    setSavedStorageVolumes((current) => {
+      if (
+        editingStorageVolumeIndex !== null &&
+        editingStorageVolumeIndex >= 0 &&
+        editingStorageVolumeIndex < current.length
+      ) {
+        return current.map((item, index) => (index === editingStorageVolumeIndex ? nextItem : item))
+      }
+      return [...current, nextItem]
+    })
+    setEditingStorageVolumeIndex(null)
+    setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
     setEditingStorageVolume(false)
-  }, [storageVolumeDraft])
+  }, [editingStorageVolumeIndex, storageVolumeDraft])
 
   const updateStorageVolumeDraft = React.useCallback(
     <K extends keyof StorageVolumeDraft>(field: K, value: StorageVolumeDraft[K]) => {
@@ -309,11 +383,16 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     []
   )
 
-  const removeStorageVolume = React.useCallback(() => {
-    setSavedStorageVolume(EMPTY_STORAGE_VOLUME_DRAFT)
-    setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
-    setEditingStorageVolume(false)
-  }, [])
+  const removeStorageVolume = React.useCallback((index: number) => {
+    setSavedStorageVolumes((current) => current.filter((_, i) => i !== index))
+    if (editingStorageVolumeIndex === index) {
+      setStorageVolumeDraft(EMPTY_STORAGE_VOLUME_DRAFT)
+      setEditingStorageVolumeIndex(null)
+      setEditingStorageVolume(false)
+    } else if (editingStorageVolumeIndex !== null && editingStorageVolumeIndex > index) {
+      setEditingStorageVolumeIndex(editingStorageVolumeIndex - 1)
+    }
+  }, [editingStorageVolumeIndex])
 
   const goPrev = React.useCallback(() => {
     if (isBusy || isBasicStep) return
@@ -415,12 +494,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
       if (checked) {
         setYamlText(
-          buildJobYamlText(kind, withLockedIdentity(getSnapshot()), {
-            volumeId: savedStorageVolume.volumeId,
-            volumeKind: savedStorageVolume.volumeKind,
-            volumeName: savedStorageVolume.volumeName,
-            mounts: savedStorageVolume.mounts,
-          })
+          buildJobYamlText(kind, withLockedIdentity(getSnapshot()), savedStorageVolumes)
         )
         setYamlError(null)
         setYamlMode(true)
@@ -436,7 +510,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
         setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
       }
     },
-    [applySnapshot, getSnapshot, isBusy, kind, savedStorageVolume, withLockedIdentity, yamlText]
+    [applySnapshot, getSnapshot, isBusy, kind, savedStorageVolumes, withLockedIdentity, yamlText]
   )
 
   const updateContainer = React.useCallback(
@@ -1066,36 +1140,50 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
           })
           .filter((item) => item.image.length > 0)
 
-        const normalizedStorageName = savedStorageVolume.volumeName.trim()
-        const normalizedStorageId =
-          savedStorageVolume.volumeKind === "persistent"
-            ? normalizedStorageName
-            : savedStorageVolume.volumeId.trim() ||
-              (normalizedStorageName ? createStorageVolumeId() : "")
-        const normalizedStorageMounts = savedStorageVolume.mounts
-          .map((item) => ({
-            containerName: item.containerName.trim(),
-            mountMode: item.mountMode,
-            mountPath: item.mountPath.trim(),
-          }))
+        const normalizedStorageList = savedStorageVolumes
+          .map((storageItem) => {
+            const normalizedStorageName = storageItem.volumeName.trim()
+            const normalizedStorageId =
+              storageItem.volumeKind === "persistent"
+                ? normalizedStorageName
+                : storageItem.volumeId.trim() ||
+                  (normalizedStorageName ? createStorageVolumeId() : "")
+            const normalizedStorageMounts = storageItem.mounts
+              .map((item) => ({
+                containerName: item.containerName.trim(),
+                mountMode: item.mountMode,
+                mountPath: item.mountPath.trim(),
+              }))
+              .filter(
+                (item) =>
+                  item.containerName.length > 0 &&
+                  (item.mountMode === "ro" || item.mountMode === "rw") &&
+                  item.mountPath.length > 0
+              )
+            if (!normalizedStorageName || !normalizedStorageId) return null
+            return {
+              volumeId: normalizedStorageId,
+              volumeKind: storageItem.volumeKind,
+              volumeName: normalizedStorageName,
+              mounts: normalizedStorageMounts,
+            }
+          })
           .filter(
-            (item) =>
-              item.containerName.length > 0 &&
-              (item.mountMode === "ro" || item.mountMode === "rw") &&
-              item.mountPath.length > 0
+            (
+              item
+            ): item is {
+              volumeId: string
+              volumeKind: StorageVolumeKind
+              volumeName: string
+              mounts: Array<{ containerName: string; mountMode: "ro" | "rw"; mountPath: string }>
+            } => Boolean(item)
           )
-        const normalizedStorage =
-          normalizedStorageName && normalizedStorageId
-            ? {
-                volumeId: normalizedStorageId,
-                volumeKind: savedStorageVolume.volumeKind,
-                volumeName: normalizedStorageName,
-                mounts: normalizedStorageMounts,
-              }
-            : undefined
+        const normalizedStorage = normalizedStorageList[0]
 
         const pod =
-          source.pod.restartPolicy === "OnFailure" || normalizedContainers.length > 0 || normalizedStorage
+          source.pod.restartPolicy === "OnFailure" ||
+          normalizedContainers.length > 0 ||
+          normalizedStorageList.length > 0
             ? {
                 ...(source.pod.restartPolicy === "OnFailure"
                   ? { restartPolicy: source.pod.restartPolicy }
@@ -1106,6 +1194,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
                     }
                   : {}),
                 ...(normalizedStorage ? { storage: normalizedStorage } : {}),
+                ...(normalizedStorageList.length > 0 ? { storageList: normalizedStorageList } : {}),
               }
             : undefined
 
@@ -1137,7 +1226,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       lockedIdentity?.namespace,
       onOpenChange,
       onSubmit,
-      savedStorageVolume,
+      savedStorageVolumes,
       withLockedIdentity,
       yamlMode,
       yamlText,
@@ -1196,7 +1285,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     restartPolicy,
     returnToPodList,
     runPodValidation,
-    savedStorageVolume,
+    savedStorageVolumes,
     schedule,
     scheduleError,
     setActiveDeadlineSeconds,
@@ -1214,6 +1303,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     setRestartPolicy,
     setSchedule,
     setScheduleError,
+    startAddStorageVolume,
     startEditStorageVolume,
     storageVolumeDraft,
     setSubmitError,

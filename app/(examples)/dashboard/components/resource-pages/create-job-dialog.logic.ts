@@ -64,6 +64,26 @@ export type JobDialogInitialValues = {
   }
   pod?: {
     restartPolicy?: "Never" | "OnFailure"
+    storageList?: Array<{
+      volumeId?: string
+      volumeKind?: "persistent" | "ephemeral" | "hostPath"
+      volumeName?: string
+      mounts?: Array<{
+        containerName: string
+        mountMode: "none" | "ro" | "rw"
+        mountPath: string
+      }>
+    }>
+    storage?: {
+      volumeId?: string
+      volumeKind?: "persistent" | "ephemeral" | "hostPath"
+      volumeName?: string
+      mounts?: Array<{
+        containerName: string
+        mountMode: "none" | "ro" | "rw"
+        mountPath: string
+      }>
+    }
     containers?: Array<{
       name?: string
       type?: ContainerType
@@ -170,6 +190,16 @@ export type CreateJobDialogProps = {
     }
     pod?: {
       restartPolicy?: "Never" | "OnFailure"
+      storageList?: Array<{
+        volumeId?: string
+        volumeKind?: "persistent" | "ephemeral" | "hostPath"
+        volumeName?: string
+        mounts?: Array<{
+          containerName: string
+          mountMode: "none" | "ro" | "rw"
+          mountPath: string
+        }>
+      }>
       storage?: {
         volumeId?: string
         volumeKind?: "persistent" | "ephemeral" | "hostPath"
@@ -845,7 +875,7 @@ export function createContainerDraftFromInitial(
 export function buildPodSpecFromContainers(
   restartPolicy: "Never" | "OnFailure",
   containers: ContainerDraft[],
-  storage?: JobStorageInput
+  storage?: JobStorageInput | JobStorageInput[]
 ): JsonObject {
   const workload: JsonObject[] = []
   const init: JsonObject[] = []
@@ -989,24 +1019,36 @@ export function buildPodSpecFromContainers(
       })
     })
 
-  const storageName = (storage?.volumeName ?? "").trim()
-  const storageId = (storage?.volumeId ?? "").trim() || storageName
-  const storageKind = storage?.volumeKind
-  const storageSource =
-    storageName && storageId
-      ? storageKind === "persistent"
-        ? ({ persistentVolumeClaim: { claimName: storageName } } as JsonObject)
-        : storageKind === "ephemeral"
-          ? ({ emptyDir: {} } as JsonObject)
-          : storageKind === "hostPath"
-            ? ({ hostPath: { path: storageName, type: "" } } as JsonObject)
-            : null
-      : null
+  const volumes: JsonObject[] = []
+  if (withHostTimezone) {
+    volumes.push({
+      name: "host-time",
+      hostPath: {
+        path: "/etc/localtime",
+        type: "",
+      },
+    })
+  }
+  const storageList = Array.isArray(storage) ? storage : storage ? [storage] : []
+  storageList.forEach((storageItem) => {
+    const storageName = (storageItem.volumeName ?? "").trim()
+    const storageId = (storageItem.volumeId ?? "").trim() || storageName
+    const storageKind = storageItem.volumeKind
+    const storageSource =
+      storageName && storageId
+        ? storageKind === "persistent"
+          ? ({ persistentVolumeClaim: { claimName: storageName } } as JsonObject)
+          : storageKind === "ephemeral"
+            ? ({ emptyDir: {} } as JsonObject)
+            : storageKind === "hostPath"
+              ? ({ hostPath: { path: storageName, type: "" } } as JsonObject)
+              : null
+        : null
+    if (!storageSource) return
 
-  let hasAppliedStorageMount = false
-  const storageMounts =
-    storageSource && Array.isArray(storage?.mounts)
-      ? storage.mounts
+    let hasAppliedStorageMount = false
+    const storageMounts = Array.isArray(storageItem?.mounts)
+      ? storageItem.mounts
           .map((item) => ({
             containerName: item.containerName.trim(),
             mountMode: item.mountMode,
@@ -1020,7 +1062,6 @@ export function buildPodSpecFromContainers(
           )
       : []
 
-  if (storageSource) {
     storageMounts.forEach((mount) => {
       const target =
         containerSpecs.find((item) => item.rawName === mount.containerName) ??
@@ -1045,24 +1086,14 @@ export function buildPodSpecFromContainers(
       ]
       hasAppliedStorageMount = true
     })
-  }
 
-  const volumes: JsonObject[] = []
-  if (withHostTimezone) {
-    volumes.push({
-      name: "host-time",
-      hostPath: {
-        path: "/etc/localtime",
-        type: "",
-      },
-    })
-  }
-  if (storageSource && hasAppliedStorageMount) {
-    volumes.push({
-      name: storageId,
-      ...storageSource,
-    })
-  }
+    if (hasAppliedStorageMount && !volumes.some((item) => asString(item.name) === storageId)) {
+      volumes.push({
+        name: storageId,
+        ...storageSource,
+      })
+    }
+  })
 
   return {
     restartPolicy,
@@ -1075,7 +1106,7 @@ export function buildPodSpecFromContainers(
 export function buildJobYamlText(
   kind: JobCreateKind,
   snapshot: JobDialogSnapshot,
-  storage?: JobStorageInput
+  storage?: JobStorageInput | JobStorageInput[]
 ): string {
   const strategy = {
     ...(toOptionalIntegerString(snapshot.strategy.backoffLimit)
