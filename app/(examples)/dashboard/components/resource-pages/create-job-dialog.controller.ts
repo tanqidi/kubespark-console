@@ -327,6 +327,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
   const confirmEditStorageVolume = React.useCallback(() => {
     const normalizedVolumeName = storageVolumeDraft.volumeName.trim()
+    if (!normalizedVolumeName) return
     const normalizedVolumeId =
       storageVolumeDraft.volumeKind === "persistent" && normalizedVolumeName
         ? normalizedVolumeName

@@ -185,6 +185,7 @@ export function CreateJobDialog({
   const [persistentVolumeNameOptions, setPersistentVolumeNameOptions] = React.useState<string[]>([])
   const [persistentVolumeNameLoading, setPersistentVolumeNameLoading] = React.useState(false)
   const [persistentVolumeNameError, setPersistentVolumeNameError] = React.useState<string | null>(null)
+  const [storageSaveAttempted, setStorageSaveAttempted] = React.useState(false)
 
   const hasSavedStorageVolume = savedStorageVolumes.length > 0
 
@@ -205,6 +206,13 @@ export function CreateJobDialog({
   const hasDuplicateStorageSelection =
     storageVolumeDraft.volumeName.trim().length > 0 &&
     existingStorageKeys.has(storageDuplicateKey)
+  const isStorageVolumeNameEmpty = storageVolumeDraft.volumeName.trim().length === 0
+
+  const handleConfirmStorageSave = React.useCallback(() => {
+    setStorageSaveAttempted(true)
+    if (isStorageVolumeNameEmpty) return
+    confirmEditStorageVolume()
+  }, [confirmEditStorageVolume, isStorageVolumeNameEmpty])
 
   React.useEffect(() => {
     if (!open || storageVolumeDraft.volumeKind !== "persistent") return
@@ -229,7 +237,7 @@ export function CreateJobDialog({
         const message =
           error instanceof Error && error.message
             ? error.message
-            : "读取 PVC 失败，请稍后重试。"
+            : "?? PVC ?????????"
         setPersistentVolumeNameError(message)
         setPersistentVolumeNameOptions([])
       })
@@ -253,6 +261,16 @@ export function CreateJobDialog({
     storageVolumeDraft.volumeName,
     updateStorageVolumeDraft,
   ])
+
+  React.useEffect(() => {
+    if (!isEditingStorageView) {
+      setStorageSaveAttempted(false)
+      return
+    }
+    if (!isStorageVolumeNameEmpty) {
+      setStorageSaveAttempted(false)
+    }
+  }, [isEditingStorageView, isStorageVolumeNameEmpty])
   return (
     <Dialog
       open={open}
@@ -724,7 +742,13 @@ export function CreateJobDialog({
                           (persistentVolumeNameLoading || volumeNameOptions.length === 0)
                         }
                       >
-                        <SelectTrigger id="create-job-storage-volume-name">
+                        <SelectTrigger
+                          id="create-job-storage-volume-name"
+                          aria-invalid={
+                            (storageSaveAttempted && isStorageVolumeNameEmpty) ||
+                            hasDuplicateStorageSelection
+                          }
+                        >
                           <SelectValue
                             placeholder={
                               storageVolumeDraft.volumeKind === "persistent" &&
@@ -740,7 +764,6 @@ export function CreateJobDialog({
                               <SelectItem
                                 key={option}
                                 value={option}
-                                disabled={existingStorageKeys.has(`${storageVolumeDraft.volumeKind}:${option.trim().toLowerCase()}`)}
                               >
                                 {option}
                               </SelectItem>
@@ -753,11 +776,19 @@ export function CreateJobDialog({
                           <FieldDescription className="text-destructive">{persistentVolumeNameError}</FieldDescription>
                         ) : hasDuplicateStorageSelection ? (
                           <FieldDescription className="text-destructive">
-                            该卷已存在挂载，请到上方已添加的条目中编辑。
+                            该卷已经配置挂载，请回到上方已添加条目中编辑。
+                          </FieldDescription>
+                        ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
+                          <FieldDescription className="text-destructive">
+                            ???????????
                           </FieldDescription>
                         ) : volumeNameOptions.length === 0 && !persistentVolumeNameLoading ? (
-                          <FieldDescription>当前命名空间下没有可用 PVC。</FieldDescription>
+                          <FieldDescription>??????????? PVC?</FieldDescription>
                         ) : null
+                      ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
+                        <FieldDescription className="text-destructive">
+                          ???????????
+                        </FieldDescription>
                       ) : null}
                     </Field>
 
@@ -966,7 +997,7 @@ export function CreateJobDialog({
                 </Button>
                 <Button
                   type="button"
-                  onClick={confirmEditStorageVolume}
+                  onClick={handleConfirmStorageSave}
                   disabled={isBusy || hasDuplicateStorageSelection}
                 >
                   确认保存
