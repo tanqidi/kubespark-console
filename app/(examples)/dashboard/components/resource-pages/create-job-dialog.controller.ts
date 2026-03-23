@@ -328,9 +328,9 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     if (!normalizedVolumeName) return
     const currentVolumeId = storageVolumeDraft.volumeId.trim()
     const normalizedVolumeId =
-      storageVolumeDraft.volumeKind === "persistent"
-        ? currentVolumeId || normalizedVolumeName
-        : normalizedVolumeName
+      storageVolumeDraft.volumeKind === "ephemeral"
+        ? normalizedVolumeName
+        : currentVolumeId || normalizedVolumeName
 
     const nextItem: StorageVolumeDraft = {
       ...storageVolumeDraft,
@@ -445,9 +445,9 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       if (editingStorageVolume) {
         const normalizedDraftVolumeName = storageVolumeDraft.volumeName.trim()
         const normalizedDraftVolumeId =
-          storageVolumeDraft.volumeKind === "persistent"
-            ? storageVolumeDraft.volumeId.trim() || normalizedDraftVolumeName
-            : normalizedDraftVolumeName
+          storageVolumeDraft.volumeKind === "ephemeral"
+            ? normalizedDraftVolumeName
+            : storageVolumeDraft.volumeId.trim() || normalizedDraftVolumeName
         const normalizedDraftMounts = storageVolumeDraft.mounts
           .map((mount) => ({
             containerName: mount.containerName.trim(),
@@ -1231,9 +1231,9 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
             const normalizedStorageName = storageItem.volumeName.trim()
             const currentStorageId = storageItem.volumeId.trim()
             const normalizedStorageId =
-              storageItem.volumeKind === "persistent"
-                ? currentStorageId || normalizedStorageName
-                : normalizedStorageName
+              storageItem.volumeKind === "ephemeral"
+                ? normalizedStorageName
+                : currentStorageId || normalizedStorageName
             const normalizedStorageMounts = storageItem.mounts
               .map((item) => ({
                 containerName: item.containerName.trim(),

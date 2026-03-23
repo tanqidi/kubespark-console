@@ -1035,8 +1035,12 @@ export function buildPodSpecFromContainers(
     const storageName = (storageItem.volumeName ?? "").trim()
     const storageId = (storageItem.volumeId ?? "").trim() || storageName
     const storageKind = storageItem.volumeKind
+    const resolvedStorageId =
+      storageKind === "ephemeral"
+        ? storageName
+        : storageId
     const storageSource =
-      storageName && storageId
+      storageName && resolvedStorageId
         ? storageKind === "persistent"
           ? ({ persistentVolumeClaim: { claimName: storageName } } as JsonObject)
           : storageKind === "ephemeral"
@@ -1073,14 +1077,14 @@ export function buildPodSpecFromContainers(
         ? (target.spec.volumeMounts as Array<{ name?: string; mountPath?: string }>)
         : []
       const duplicated = existingMounts.some(
-        (item) => item.name === storageId && item.mountPath === mount.mountPath
+        (item) => item.name === resolvedStorageId && item.mountPath === mount.mountPath
       )
       if (duplicated) return
 
       target.spec.volumeMounts = [
         ...existingMounts,
         {
-          name: storageId,
+          name: resolvedStorageId,
           mountPath: mount.mountPath,
           ...(mount.mountMode === "ro" ? { readOnly: true } : {}),
         },
@@ -1088,9 +1092,12 @@ export function buildPodSpecFromContainers(
       hasAppliedStorageMount = true
     })
 
-    if (hasAppliedStorageMount && !volumes.some((item) => asString(item.name) === storageId)) {
+    if (
+      hasAppliedStorageMount &&
+      !volumes.some((item) => asString(item.name) === resolvedStorageId)
+    ) {
       volumes.push({
-        name: storageId,
+        name: resolvedStorageId,
         ...storageSource,
       })
     }

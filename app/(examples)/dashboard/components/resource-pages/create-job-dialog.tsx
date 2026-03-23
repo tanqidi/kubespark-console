@@ -191,9 +191,9 @@ export function CreateJobDialog({
 
   const volumeNameOptions = persistentVolumeNameOptions
   const currentStorageVolumeId = (
-    storageVolumeDraft.volumeKind === "persistent"
-      ? storageVolumeDraft.volumeId.trim() || storageVolumeDraft.volumeName.trim()
-      : storageVolumeDraft.volumeId.trim()
+    storageVolumeDraft.volumeKind === "hostPath"
+      ? storageVolumeDraft.volumeId.trim()
+      : storageVolumeDraft.volumeId.trim() || storageVolumeDraft.volumeName.trim()
   ).toLowerCase()
   const existingStorageVolumeIds = new Set(
     savedStorageVolumes
@@ -209,17 +209,23 @@ export function CreateJobDialog({
   const isPersistentVolumeIdEmpty =
     storageVolumeDraft.volumeKind === "persistent" &&
     storageVolumeDraft.volumeId.trim().length === 0
+  const isHostPathVolumeIdEmpty =
+    storageVolumeDraft.volumeKind === "hostPath" &&
+    storageVolumeDraft.volumeId.trim().length === 0
 
   const handleConfirmStorageSave = React.useCallback(() => {
     setStorageSaveAttempted(true)
     if (storageVolumeDraft.volumeKind === "persistent") {
       if (isPersistentVolumeIdEmpty || isStorageVolumeNameEmpty) return
+    } else if (storageVolumeDraft.volumeKind === "hostPath") {
+      if (isHostPathVolumeIdEmpty || isStorageVolumeNameEmpty) return
     } else if (isStorageVolumeNameEmpty) {
       return
     }
     confirmEditStorageVolume()
   }, [
     confirmEditStorageVolume,
+    isHostPathVolumeIdEmpty,
     isPersistentVolumeIdEmpty,
     isStorageVolumeNameEmpty,
     storageVolumeDraft.volumeKind,
@@ -280,11 +286,16 @@ export function CreateJobDialog({
     }
     if (
       !isStorageVolumeNameEmpty &&
-      (storageVolumeDraft.volumeKind !== "persistent" || !isPersistentVolumeIdEmpty)
+      (storageVolumeDraft.volumeKind === "ephemeral"
+        ? true
+        : storageVolumeDraft.volumeKind === "persistent"
+          ? !isPersistentVolumeIdEmpty
+          : !isHostPathVolumeIdEmpty)
     ) {
       setStorageSaveAttempted(false)
     }
   }, [
+    isHostPathVolumeIdEmpty,
     isEditingStorageView,
     isPersistentVolumeIdEmpty,
     isStorageVolumeNameEmpty,
@@ -833,6 +844,48 @@ export function CreateJobDialog({
                           ) : null}
                         </Field>
                       </div>
+                    ) : storageVolumeDraft.volumeKind === "hostPath" ? (
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <Field>
+                          <FieldLabel htmlFor="create-job-storage-volume-id">卷名称</FieldLabel>
+                          <Input
+                            id="create-job-storage-volume-id"
+                            value={storageVolumeDraft.volumeId}
+                            onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
+                            placeholder="例如：test3"
+                            autoComplete="off"
+                            aria-invalid={
+                              (storageSaveAttempted && isHostPathVolumeIdEmpty) ||
+                              hasDuplicateStorageSelection
+                            }
+                          />
+                          {hasDuplicateStorageSelection ? (
+                            <FieldDescription className="text-destructive">
+                              卷名称已存在，请回到上方已添加条目中编辑。
+                            </FieldDescription>
+                          ) : storageSaveAttempted && isHostPathVolumeIdEmpty ? (
+                            <FieldDescription className="text-destructive">
+                              请输入卷名称，或点击取消返回。
+                            </FieldDescription>
+                          ) : null}
+                        </Field>
+                        <Field>
+                          <FieldLabel htmlFor="create-job-storage-volume-name">主机路径</FieldLabel>
+                          <Input
+                            id="create-job-storage-volume-name"
+                            value={storageVolumeDraft.volumeName}
+                            onChange={(event) => updateStorageVolumeDraft("volumeName", event.target.value)}
+                            placeholder="例如：/test3"
+                            autoComplete="off"
+                            aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
+                          />
+                          {storageSaveAttempted && isStorageVolumeNameEmpty ? (
+                            <FieldDescription className="text-destructive">
+                              请输入主机路径，或点击取消返回。
+                            </FieldDescription>
+                          ) : null}
+                        </Field>
+                      </div>
                     ) : (
                       <Field>
                         <FieldLabel htmlFor="create-job-storage-volume-name">卷名称</FieldLabel>
@@ -844,7 +897,7 @@ export function CreateJobDialog({
                             updateStorageVolumeDraft("volumeName", value)
                             updateStorageVolumeDraft("volumeId", value)
                           }}
-                          placeholder={storageVolumeDraft.volumeKind === "hostPath" ? "例如：host-data" : "例如：emptyDir"}
+                          placeholder="例如：test2"
                           autoComplete="off"
                           aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                         />

@@ -322,7 +322,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
       const name = asString(volume.name).trim()
       const hostPath = asObject(volume.hostPath)
       const pvc = asObject(volume.persistentVolumeClaim)
-      const emptyDir = asObject(volume.emptyDir)
+      const hasEmptyDir = Object.prototype.hasOwnProperty.call(volume, "emptyDir")
 
       if (!name || hostTimeVolumeNames.has(name)) return null
       if (asString(pvc.claimName).trim()) {
@@ -332,7 +332,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
           volumeName: asString(pvc.claimName).trim(),
         }
       }
-      if (Object.keys(emptyDir).length > 0) {
+      if (hasEmptyDir) {
         return {
           volumeId: name,
           volumeKind: "ephemeral" as const,
