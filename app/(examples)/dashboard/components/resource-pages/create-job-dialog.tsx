@@ -189,12 +189,7 @@ export function CreateJobDialog({
 
   const hasSavedStorageVolume = savedStorageVolumes.length > 0
 
-  const volumeNameOptions =
-    storageVolumeDraft.volumeKind === "persistent"
-      ? persistentVolumeNameOptions
-      : storageVolumeDraft.volumeKind === "ephemeral"
-        ? ["ephemeral-cache", "ephemeral-tmp"]
-        : ["host-time", "host-logs", "host-data"]
+  const volumeNameOptions = persistentVolumeNameOptions
   const currentStorageVolumeId = (
     storageVolumeDraft.volumeKind === "persistent"
       ? storageVolumeDraft.volumeId.trim() || storageVolumeDraft.volumeName.trim()
@@ -211,12 +206,24 @@ export function CreateJobDialog({
     currentStorageVolumeId.length > 0 &&
     existingStorageVolumeIds.has(currentStorageVolumeId)
   const isStorageVolumeNameEmpty = storageVolumeDraft.volumeName.trim().length === 0
+  const isPersistentVolumeIdEmpty =
+    storageVolumeDraft.volumeKind === "persistent" &&
+    storageVolumeDraft.volumeId.trim().length === 0
 
   const handleConfirmStorageSave = React.useCallback(() => {
     setStorageSaveAttempted(true)
-    if (isStorageVolumeNameEmpty) return
+    if (storageVolumeDraft.volumeKind === "persistent") {
+      if (isPersistentVolumeIdEmpty || isStorageVolumeNameEmpty) return
+    } else if (isStorageVolumeNameEmpty) {
+      return
+    }
     confirmEditStorageVolume()
-  }, [confirmEditStorageVolume, isStorageVolumeNameEmpty])
+  }, [
+    confirmEditStorageVolume,
+    isPersistentVolumeIdEmpty,
+    isStorageVolumeNameEmpty,
+    storageVolumeDraft.volumeKind,
+  ])
 
   React.useEffect(() => {
     if (!open || storageVolumeDraft.volumeKind !== "persistent") return
@@ -271,10 +278,18 @@ export function CreateJobDialog({
       setStorageSaveAttempted(false)
       return
     }
-    if (!isStorageVolumeNameEmpty) {
+    if (
+      !isStorageVolumeNameEmpty &&
+      (storageVolumeDraft.volumeKind !== "persistent" || !isPersistentVolumeIdEmpty)
+    ) {
       setStorageSaveAttempted(false)
     }
-  }, [isEditingStorageView, isStorageVolumeNameEmpty])
+  }, [
+    isEditingStorageView,
+    isPersistentVolumeIdEmpty,
+    isStorageVolumeNameEmpty,
+    storageVolumeDraft.volumeKind,
+  ])
   return (
     <Dialog
       open={open}
@@ -729,6 +744,7 @@ export function CreateJobDialog({
                         onValueChange={(value) => {
                           if (value === "persistent" || value === "ephemeral" || value === "hostPath") {
                             updateStorageVolumeDraft("volumeKind", value)
+                            updateStorageVolumeDraft("volumeId", "")
                             updateStorageVolumeDraft("volumeName", "")
                           }
                         }}
@@ -741,65 +757,100 @@ export function CreateJobDialog({
                       </Tabs>
                     </Field>
 
-                    <Field>
-                      <FieldLabel htmlFor="create-job-storage-volume-name">选择卷</FieldLabel>
-                      <Select
-                        value={storageVolumeDraft.volumeName}
-                        onValueChange={(value) => updateStorageVolumeDraft("volumeName", value)}
-                        disabled={
-                          storageVolumeDraft.volumeKind === "persistent" &&
-                          (persistentVolumeNameLoading || volumeNameOptions.length === 0)
-                        }
-                      >
-                        <SelectTrigger
-                          id="create-job-storage-volume-name"
-                          aria-invalid={
-                            (storageSaveAttempted && isStorageVolumeNameEmpty) ||
-                            hasDuplicateStorageSelection
-                          }
-                        >
-                          <SelectValue
-                            placeholder={
-                              storageVolumeDraft.volumeKind === "persistent" &&
-                              persistentVolumeNameLoading
-                                ? "PVC 加载中..."
-                                : "请选择卷"
+                    {storageVolumeDraft.volumeKind === "persistent" ? (
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <Field>
+                          <FieldLabel htmlFor="create-job-storage-volume-id">卷名称</FieldLabel>
+                          <Input
+                            id="create-job-storage-volume-id"
+                            value={storageVolumeDraft.volumeId}
+                            onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
+                            placeholder="例如：volume-data"
+                            autoComplete="off"
+                            aria-invalid={
+                              (storageSaveAttempted && isPersistentVolumeIdEmpty) ||
+                              hasDuplicateStorageSelection
                             }
                           />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {volumeNameOptions.map((option) => (
-                              <SelectItem
-                                key={option}
-                                value={option}
-                              >
-                                {option}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      {storageVolumeDraft.volumeKind === "persistent" ? (
-                        persistentVolumeNameError ? (
-                          <FieldDescription className="text-destructive">{persistentVolumeNameError}</FieldDescription>
-                        ) : hasDuplicateStorageSelection ? (
+                          {hasDuplicateStorageSelection ? (
+                            <FieldDescription className="text-destructive">
+                              卷名称已存在，请回到上方已添加条目中编辑。
+                            </FieldDescription>
+                          ) : storageSaveAttempted && isPersistentVolumeIdEmpty ? (
+                            <FieldDescription className="text-destructive">
+                              请输入卷名称，或点击取消返回。
+                            </FieldDescription>
+                          ) : null}
+                        </Field>
+
+                        <Field>
+                          <FieldLabel htmlFor="create-job-storage-volume-name">选择 PVC</FieldLabel>
+                          <Select
+                            value={storageVolumeDraft.volumeName}
+                            onValueChange={(value) => {
+                              const previousSelectedPvc = storageVolumeDraft.volumeName.trim()
+                              const currentVolumeId = storageVolumeDraft.volumeId.trim()
+                              updateStorageVolumeDraft("volumeName", value)
+                              if (!currentVolumeId || currentVolumeId === previousSelectedPvc) {
+                                updateStorageVolumeDraft("volumeId", value)
+                              }
+                            }}
+                            disabled={persistentVolumeNameLoading || volumeNameOptions.length === 0}
+                          >
+                            <SelectTrigger
+                              id="create-job-storage-volume-name"
+                              aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
+                            >
+                              <SelectValue
+                                placeholder={
+                                  persistentVolumeNameLoading
+                                    ? "PVC 加载中..."
+                                    : "请选择 PVC"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {volumeNameOptions.map((option) => (
+                                  <SelectItem
+                                    key={option}
+                                    value={option}
+                                  >
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                          {persistentVolumeNameError ? (
+                            <FieldDescription className="text-destructive">{persistentVolumeNameError}</FieldDescription>
+                          ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
+                            <FieldDescription className="text-destructive">
+                              请选择 PVC，或点击取消返回。
+                            </FieldDescription>
+                          ) : volumeNameOptions.length === 0 && !persistentVolumeNameLoading ? (
+                            <FieldDescription>当前命名空间暂无可选 PVC。</FieldDescription>
+                          ) : null}
+                        </Field>
+                      </div>
+                    ) : (
+                      <Field>
+                        <FieldLabel htmlFor="create-job-storage-volume-name">卷名称</FieldLabel>
+                        <Input
+                          id="create-job-storage-volume-name"
+                          value={storageVolumeDraft.volumeName}
+                          onChange={(event) => updateStorageVolumeDraft("volumeName", event.target.value)}
+                          placeholder={storageVolumeDraft.volumeKind === "hostPath" ? "例如：host-data" : "例如：emptyDir"}
+                          autoComplete="off"
+                          aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
+                        />
+                        {storageSaveAttempted && isStorageVolumeNameEmpty ? (
                           <FieldDescription className="text-destructive">
-                            卷名称已存在，请回到上方已添加条目中编辑。
+                            请输入卷名称，或点击取消返回。
                           </FieldDescription>
-                        ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
-                          <FieldDescription className="text-destructive">
-                            请选择卷，或点击取消返回。
-                          </FieldDescription>
-                        ) : volumeNameOptions.length === 0 && !persistentVolumeNameLoading ? (
-                          <FieldDescription>当前命名空间暂无可选 PVC。</FieldDescription>
-                        ) : null
-                      ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
-                        <FieldDescription className="text-destructive">
-                          请选择卷，或点击取消返回。
-                        </FieldDescription>
-                      ) : null}
-                    </Field>
+                        ) : null}
+                      </Field>
+                    )}
 
                     <div className="flex flex-col gap-3">
                       <div className="grid grid-cols-3 gap-4">
