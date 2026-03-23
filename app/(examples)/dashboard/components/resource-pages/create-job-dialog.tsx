@@ -839,7 +839,11 @@ export function CreateJobDialog({
                         <Input
                           id="create-job-storage-volume-name"
                           value={storageVolumeDraft.volumeName}
-                          onChange={(event) => updateStorageVolumeDraft("volumeName", event.target.value)}
+                          onChange={(event) => {
+                            const value = event.target.value
+                            updateStorageVolumeDraft("volumeName", value)
+                            updateStorageVolumeDraft("volumeId", value)
+                          }}
                           placeholder={storageVolumeDraft.volumeKind === "hostPath" ? "例如：host-data" : "例如：emptyDir"}
                           autoComplete="off"
                           aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}

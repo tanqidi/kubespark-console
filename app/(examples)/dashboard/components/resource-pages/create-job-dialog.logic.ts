@@ -1312,7 +1312,7 @@ export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDial
       const volumeId = asString(volume.name).trim()
       const hostPath = asObject(volume.hostPath)
       const pvc = asObject(volume.persistentVolumeClaim)
-      const emptyDir = asObject(volume.emptyDir)
+      const hasEmptyDir = Object.prototype.hasOwnProperty.call(volume, "emptyDir")
 
       if (!volumeId || hostTimeVolumeNames.has(volumeId)) return null
       if (asString(pvc.claimName).trim()) {
@@ -1322,7 +1322,7 @@ export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDial
           volumeName: asString(pvc.claimName).trim(),
         }
       }
-      if (Object.keys(emptyDir).length > 0) {
+      if (hasEmptyDir) {
         return {
           volumeId,
           volumeKind: "ephemeral" as const,
