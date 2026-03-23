@@ -29,8 +29,6 @@ const tableHeaders = [
   "状态",
   "命名空间",
   "期望",
-  "更新",
-  "可用",
   "就绪",
   "运行时间",
   "更新时间",
@@ -101,8 +99,6 @@ export function WorkloadDetailTemplate({
                   <TableCell><div className="h-4 w-24 rounded bg-muted" /></TableCell>
                   <TableCell><div className="h-4 w-16 rounded bg-muted" /></TableCell>
                   <TableCell><div className="h-4 w-20 rounded bg-muted" /></TableCell>
-                  <TableCell><div className="h-4 w-8 rounded bg-muted" /></TableCell>
-                  <TableCell><div className="h-4 w-8 rounded bg-muted" /></TableCell>
                   <TableCell><div className="h-4 w-8 rounded bg-muted" /></TableCell>
                   <TableCell><div className="h-4 w-8 rounded bg-muted" /></TableCell>
                   <TableCell><div className="h-4 w-12 rounded bg-muted" /></TableCell>

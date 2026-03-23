@@ -36,8 +36,6 @@ const workloadColumns: ColumnConfig<WorkloadRow>[] = [
   { key: "status", label: "\u72b6\u6001", render: "status" as const },
   { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
   { key: "desired", label: "\u671f\u671b", align: "right" as const },
-  { key: "updated", label: "\u66f4\u65b0", align: "right" as const },
-  { key: "available", label: "\u53ef\u7528", align: "right" as const },
   { key: "ready", label: "\u5c31\u7eea", align: "right" as const },
   { key: "age", label: "\u8fd0\u884c\u65f6\u95f4" },
   { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
