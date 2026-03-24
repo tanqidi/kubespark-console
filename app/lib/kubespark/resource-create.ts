@@ -31,3 +31,11 @@ export {
   type JobCreateKind,
 } from "./jobs"
 
+export {
+  checkWorkloadExists,
+  createWorkload,
+  updateWorkload,
+  type CreateWorkloadInput,
+  type UpdateWorkloadInput,
+  type WorkloadCreateKind,
+} from "./workloads"

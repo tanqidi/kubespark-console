@@ -4,6 +4,7 @@ import * as React from "react"
 import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { CreateWorkloadDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -55,6 +56,7 @@ const WORKLOAD_DOCUMENT_BY_KIND: Record<WorkloadRow["kind"], ResourceDocumentTyp
 
 export function WorkloadsPageClient() {
   const [rows, setRows] = React.useState<WorkloadRow[]>([])
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [typeFilter, setTypeFilter] = React.useState<WorkloadRow["kind"]>("Deployment")
@@ -269,6 +271,12 @@ export function WorkloadsPageClient() {
 
   return (
     <>
+      <CreateWorkloadDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        kind={typeFilter}
+        namespaceOptions={namespaceOptions}
+      />
       <MonacoViewerDialog
         title="查看YAML"
         open={yamlOpen}
@@ -295,6 +303,7 @@ export function WorkloadsPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
+        onCreate={() => setCreateDialogOpen(true)}
         getRowHref={(row) =>
           `/dashboard/workloads/${encodeURIComponent(row.namespace)}/${encodeURIComponent(row.name)}?kind=${encodeURIComponent(row.kind)}`
         }
