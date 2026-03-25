@@ -1006,21 +1006,11 @@ export function buildPodSpecFromContainers(
   })
 
   const configMountList = Array.isArray(configMounts) ? configMounts : []
-  configMountList.forEach((configItem, index) => {
+  configMountList.forEach((configItem) => {
     const sourceName = (configItem.sourceName ?? "").trim()
     if (!sourceName) return
     const sourceKind = configItem.sourceKind === "secret" ? "secret" : "configMap"
-    const sourcePrefix = sourceKind === "secret" ? "secret" : "config"
-    const sourceIdBase = toDnsLabelFragment(`${sourcePrefix}-${sourceName}`) || `${sourcePrefix}-${index + 1}`
-    const resolvedSourceId = !volumes.some((item) => asString(item.name) === sourceIdBase)
-      ? sourceIdBase
-      : (() => {
-          let suffix = 2
-          while (volumes.some((item) => asString(item.name) === `${sourceIdBase}-${suffix}`)) {
-            suffix += 1
-          }
-          return `${sourceIdBase}-${suffix}`
-        })()
+    const resolvedSourceId = sourceName
 
     let hasAppliedConfigMount = false
     const mounts = Array.isArray(configItem.mounts)
@@ -1064,6 +1054,8 @@ export function buildPodSpecFromContainers(
     })
 
     if (!hasAppliedConfigMount) return
+
+    if (volumes.some((item) => asString(item.name) === resolvedSourceId)) return
 
     volumes.push({
       name: resolvedSourceId,

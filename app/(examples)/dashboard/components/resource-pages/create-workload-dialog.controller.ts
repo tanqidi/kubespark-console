@@ -561,12 +561,19 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   )
 
   const handleYamlModeChange = React.useCallback(
-    (checked: boolean) => {
+    (checked: boolean, configMounts?: ConfigMountInput[]) => {
       if (isBusy) return
 
       if (checked) {
         const source = withLockedIdentity(getSnapshot())
-        setYamlText(buildWorkloadYamlText(kind, source, source.pod.storageList ?? []))
+        setYamlText(
+          buildWorkloadYamlText(
+            kind,
+            source,
+            source.pod.storageList ?? [],
+            configMounts ?? source.pod.configList ?? []
+          )
+        )
         setYamlError(null)
         setYamlMode(true)
         return

@@ -199,6 +199,8 @@ export function CreateWorkloadDialog({
   const [savedConfigMounts, setSavedConfigMounts] = React.useState<ConfigMountDraft[]>([])
   const [editingConfigMount, setEditingConfigMount] = React.useState(false)
   const [editingConfigMountIndex, setEditingConfigMountIndex] = React.useState<number | null>(null)
+  const [pendingDeleteStorageIndex, setPendingDeleteStorageIndex] = React.useState<number | null>(null)
+  const [pendingDeleteConfigMountIndex, setPendingDeleteConfigMountIndex] = React.useState<number | null>(null)
 
   const hasSavedStorageVolume = savedStorageVolumes.length > 0
 
@@ -377,6 +379,8 @@ export function CreateWorkloadDialog({
       setSavedConfigMounts([])
       setEditingConfigMount(false)
       setEditingConfigMountIndex(null)
+      setPendingDeleteStorageIndex(null)
+      setPendingDeleteConfigMountIndex(null)
     }
   }, [open])
 
@@ -556,7 +560,7 @@ export function CreateWorkloadDialog({
                 <span className="text-sm font-medium">编辑 YAML</span>
                 <Switch
                   checked={yamlMode}
-                  onCheckedChange={handleYamlModeChange}
+                  onCheckedChange={(checked) => handleYamlModeChange(checked, savedConfigMounts)}
                   disabled={isBusy}
                   aria-label="编辑 YAML"
                 />
@@ -1212,16 +1216,7 @@ export function CreateWorkloadDialog({
                                 key={`${storageItem.volumeId}-${storageItem.volumeName}-${storageIndex}`}
                                 variant="outline"
                                 size="sm"
-                                className="cursor-pointer hover:bg-muted"
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => startEditStorageVolume(storageIndex)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault()
-                                    startEditStorageVolume(storageIndex)
-                                  }
-                                }}
+                                className="hover:bg-muted"
                               >
                                 <ItemContent className="min-w-0">
                                   <ItemTitle className="min-w-0 truncate">
@@ -1234,18 +1229,32 @@ export function CreateWorkloadDialog({
                                         ? "临时卷"
                                         : "HostPath 卷") +
                                       " · " +
-                                      `${mountedContainerCount} 个容器已配置`}
+                                    `${mountedContainerCount} 个容器已配置`}
                                   </ItemDescription>
                                 </ItemContent>
-                                <ItemActions className="gap-1">
+                                <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      startEditStorageVolume(storageIndex)
+                                    }}
+                                    disabled={isBusy}
+                                  >
+                                    <IconPencil data-icon="inline-start" />
+                                    编辑
+                                  </Button>
                                   <Button
                                     type="button"
                                     size="sm"
                                     variant="outline"
                                     onClick={(event) => {
                                       event.stopPropagation()
-                                      removeStorageVolume(storageIndex)
+                                      setPendingDeleteStorageIndex(storageIndex)
                                     }}
+                                    disabled={isBusy}
                                   >
                                     <IconTrash data-icon="inline-start" />
                                     删除
@@ -1288,16 +1297,7 @@ export function CreateWorkloadDialog({
                               key={`${item.sourceKind}-${item.sourceName}-${index}`}
                               variant="outline"
                               size="sm"
-                              className="cursor-pointer hover:bg-muted"
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => startEditConfigMount(index)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault()
-                                  startEditConfigMount(index)
-                                }
-                              }}
+                              className="hover:bg-muted"
                             >
                               <ItemContent className="min-w-0">
                                 <ItemTitle className="min-w-0 truncate">{item.sourceName}</ItemTitle>
@@ -1307,14 +1307,27 @@ export function CreateWorkloadDialog({
                                     `${item.mounts.filter((mount) => mount.mountMode !== "none" && mount.mountPath.trim().length > 0).length} 个容器已配置`}
                                 </ItemDescription>
                               </ItemContent>
-                              <ItemActions className="gap-1">
+                              <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    startEditConfigMount(index)
+                                  }}
+                                  disabled={isBusy}
+                                >
+                                  <IconPencil data-icon="inline-start" />
+                                  编辑
+                                </Button>
                                 <Button
                                   type="button"
                                   size="sm"
                                   variant="outline"
                                   onClick={(event) => {
                                     event.stopPropagation()
-                                    removeConfigMount(index)
+                                    setPendingDeleteConfigMountIndex(index)
                                   }}
                                   disabled={isBusy}
                                 >
@@ -1503,6 +1516,42 @@ export function CreateWorkloadDialog({
             if (!pendingDeleteContainer) return
             removeContainer(pendingDeleteContainer.id)
             setPendingDeleteContainerId(null)
+          }}
+        />
+        <DeleteConfirmDialog
+          open={pendingDeleteStorageIndex !== null}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setPendingDeleteStorageIndex(null)
+          }}
+          title="删除挂载卷"
+          description={
+            pendingDeleteStorageIndex !== null
+              ? `确定删除挂载卷 ${(savedStorageVolumes[pendingDeleteStorageIndex]?.volumeId || savedStorageVolumes[pendingDeleteStorageIndex]?.volumeName || "未命名卷").trim()} 吗？`
+              : ""
+          }
+          deleting={isBusy}
+          onConfirm={() => {
+            if (pendingDeleteStorageIndex === null) return
+            removeStorageVolume(pendingDeleteStorageIndex)
+            setPendingDeleteStorageIndex(null)
+          }}
+        />
+        <DeleteConfirmDialog
+          open={pendingDeleteConfigMountIndex !== null}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setPendingDeleteConfigMountIndex(null)
+          }}
+          title="删除配置挂载"
+          description={
+            pendingDeleteConfigMountIndex !== null
+              ? `确定删除配置挂载 ${(savedConfigMounts[pendingDeleteConfigMountIndex]?.sourceName || "未命名配置").trim()} 吗？`
+              : ""
+          }
+          deleting={isBusy}
+          onConfirm={() => {
+            if (pendingDeleteConfigMountIndex === null) return
+            removeConfigMount(pendingDeleteConfigMountIndex)
+            setPendingDeleteConfigMountIndex(null)
           }}
         />
       </DialogContent>
