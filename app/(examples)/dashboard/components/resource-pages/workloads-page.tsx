@@ -1,10 +1,12 @@
 ﻿"use client"
 
 import * as React from "react"
-import { IconEye, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { CreateWorkloadDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog"
+import { parseWorkloadPayload } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
+import type { WorkloadDialogInitialValues } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -17,7 +19,8 @@ import {
   type WorkloadResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
 import { deleteWorkload } from "@/app/lib/kubespark/resource-delete"
-import { createWorkload } from "@/app/lib/kubespark/workloads"
+import { createWorkload, updateWorkload } from "@/app/lib/kubespark/workloads"
+import { fetchResourceByName } from "@/app/lib/kubespark/common"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import type { ResourceDocumentType } from "@/app/lib/kubespark/resource-document"
@@ -60,6 +63,9 @@ export function WorkloadsPageClient() {
   const [rows, setRows] = React.useState<WorkloadRow[]>([])
   const [createNamespaceOptions, setCreateNamespaceOptions] = React.useState<Array<{ id: string; name: string }>>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false)
+  const [editKind, setEditKind] = React.useState<WorkloadRow["kind"]>("Deployment")
+  const [editInitialValues, setEditInitialValues] = React.useState<WorkloadDialogInitialValues | null>(null)
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [typeFilter, setTypeFilter] = React.useState<WorkloadRow["kind"]>("Deployment")
@@ -110,6 +116,14 @@ export function WorkloadsPageClient() {
     [refreshRows]
   )
 
+  const handleEditSubmit = React.useCallback(
+    async (payload: Parameters<typeof updateWorkload>[0]) => {
+      await updateWorkload(payload)
+      await refreshRows(false)
+    },
+    [refreshRows]
+  )
+
   const handleViewYaml = React.useCallback((row: WorkloadRow) => {
     const resource = WORKLOAD_RESOURCE_BY_KIND[row.kind]
     setYamlOpen(true)
@@ -146,6 +160,22 @@ export function WorkloadsPageClient() {
 
   const requestDelete = React.useCallback((row: WorkloadRow) => {
     setPendingDeleteRow(row)
+  }, [])
+
+  const handleEdit = React.useCallback((row: WorkloadRow) => {
+    const resource = WORKLOAD_RESOURCE_BY_KIND[row.kind]
+    void fetchResourceByName<unknown>("apps", "v1", resource, row.name, {
+      namespace: row.namespace,
+    })
+      .then(({ payload }) => {
+        setEditKind(row.kind)
+        setEditInitialValues(parseWorkloadPayload(row.kind, payload))
+        setEditDialogOpen(true)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载工作负载详情失败"
+        setError(message)
+      })
   }, [])
 
   const handleConfirmDelete = React.useCallback(() => {
@@ -200,6 +230,17 @@ export function WorkloadsPageClient() {
           {
             label: (
               <>
+                <IconPencil className="size-4" />
+                {"编辑"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleEdit(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconTrash className="size-4" />
                 {"\u5220\u9664"}
               </>
@@ -212,7 +253,7 @@ export function WorkloadsPageClient() {
           },
         ],
       }),
-    [handleViewYaml, requestDelete]
+    [handleEdit, handleViewYaml, requestDelete]
   )
 
   React.useEffect(() => {
@@ -300,6 +341,20 @@ export function WorkloadsPageClient() {
         kind={typeFilter}
         namespaceOptions={createNamespaceOptions}
         onSubmit={handleCreateSubmit}
+      />
+      <CreateWorkloadDialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open)
+          if (!open) {
+            setEditInitialValues(null)
+          }
+        }}
+        mode="edit"
+        kind={editKind}
+        namespaceOptions={createNamespaceOptions}
+        initialValues={editInitialValues}
+        onSubmit={handleEditSubmit}
       />
       <MonacoViewerDialog
         title="查看YAML"

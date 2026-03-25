@@ -456,14 +456,7 @@ export function CreateContainerDialog({
                             </SelectTrigger>
                             <SelectContent>
                               <SelectGroup>
-                                <SelectItem value="GRPC">GRPC</SelectItem>
-                                <SelectItem value="HTTP">HTTP</SelectItem>
-                                <SelectItem value="HTTP2">HTTP2</SelectItem>
-                                <SelectItem value="HTTPS">HTTPS</SelectItem>
-                                <SelectItem value="MONGO">MONGO</SelectItem>
-                                <SelectItem value="REDIS">REDIS</SelectItem>
                                 <SelectItem value="TCP">TCP</SelectItem>
-                                <SelectItem value="TLS">TLS</SelectItem>
                                 <SelectItem value="UDP">UDP</SelectItem>
                                 <SelectItem value="SCTP">SCTP</SelectItem>
                               </SelectGroup>

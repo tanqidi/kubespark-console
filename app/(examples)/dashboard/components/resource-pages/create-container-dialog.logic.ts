@@ -1,13 +1,6 @@
 export type ContainerType = "container" | "initContainer"
 export type ContainerPortProtocol =
-  | "GRPC"
-  | "HTTP"
-  | "HTTP2"
-  | "HTTPS"
-  | "MONGO"
-  | "REDIS"
   | "TCP"
-  | "TLS"
   | "UDP"
   | "SCTP"
 

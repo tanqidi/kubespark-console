@@ -186,14 +186,7 @@ export type CreateWorkloadDialogProps = {
 
 export type CreateStep = "basic" | "pod" | "storage" | "advanced"
 export const CONTAINER_PORT_PROTOCOL_OPTIONS = [
-  "GRPC",
-  "HTTP",
-  "HTTP2",
-  "HTTPS",
-  "MONGO",
-  "REDIS",
   "TCP",
-  "TLS",
   "UDP",
   "SCTP",
 ] as const
@@ -1076,8 +1069,7 @@ export function buildWorkloadYamlText(
   })
 }
 
-export function parseWorkloadYamlText(kind: WorkloadCreateKind, yamlText: string): WorkloadDialogSnapshot {
-  const root = asObject(parse(yamlText))
+function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): WorkloadDialogSnapshot {
   if (Object.keys(root).length === 0) throw new Error("YAML 内容格式无效")
   const actualKind = asString(root.kind).trim()
   if (actualKind && actualKind !== kind) {
@@ -1290,6 +1282,17 @@ export function parseWorkloadYamlText(kind: WorkloadCreateKind, yamlText: string
   }
 }
 
+export function parseWorkloadPayload(
+  kind: WorkloadCreateKind,
+  payload: unknown
+): WorkloadDialogSnapshot {
+  return parseWorkloadRoot(kind, asObject(payload))
+}
+
+export function parseWorkloadYamlText(kind: WorkloadCreateKind, yamlText: string): WorkloadDialogSnapshot {
+  return parseWorkloadRoot(kind, asObject(parse(yamlText)))
+}
+
 export function createContainerDraft(): ContainerDraft {
   return {
     id: crypto.randomUUID(),
@@ -1315,8 +1318,8 @@ export function createContainerDraft(): ContainerDraft {
 export function createContainerPortDraft(index: number): ContainerPortDraft {
   return {
     id: crypto.randomUUID(),
-    protocol: "HTTP",
-    name: `http-${index}`,
+    protocol: "TCP",
+    name: `tcp-${index}`,
     containerPort: "",
   }
 }
@@ -1385,7 +1388,7 @@ export function validateContainerPorts(ports: ContainerPortDraft[]): ContainerPo
 }
 
 export function resolveProtocolNamePrefix(protocol: ContainerPortProtocol): string {
-  return protocol === "TCP" ? "tpc" : protocol.toLowerCase()
+  return protocol.toLowerCase()
 }
 
 export function buildAutoPortName(protocol: ContainerPortProtocol, portText: string): string | null {
