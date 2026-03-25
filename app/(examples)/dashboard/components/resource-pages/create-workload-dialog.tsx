@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import {
-  IconAdjustments,
   IconBraces,
   IconDatabase,
   IconPencil,
@@ -29,7 +28,7 @@ import {
 } from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog"
 import type {
   CreateWorkloadDialogProps,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
 import {
   MonacoEditor,
   MONACO_OPTIONS,
@@ -37,7 +36,7 @@ import {
   POD_REQUIRED_MESSAGE,
   normalizeIntegerInput,
   resolveStepDescription,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
 import {
   Field,
   FieldDescription,
@@ -58,10 +57,10 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { useCreateWorkloadDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.controller"
+import { useCreateWorkloadDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.controller"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
-export type { WorkloadDialogInitialValues } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+export type { WorkloadDialogInitialValues } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
 function resolvePvcNames(items: unknown[]): string[] {
   const names = items
     .map((item) => {
@@ -88,7 +87,6 @@ export function CreateWorkloadDialog({
   onSubmit,
 }: CreateWorkloadDialogProps) {
   const {
-    activeDeadlineSeconds,
     activeStep,
     addContainer,
     addContainerEnv,
@@ -100,7 +98,6 @@ export function CreateWorkloadDialog({
     checkingNext,
     clearContainerEnv,
     confirmEditStorageVolume,
-    completions,
     configuredContainers,
     containerDialogOpen,
     creating,
@@ -125,39 +122,28 @@ export function CreateWorkloadDialog({
     isFinalStep,
     isPodStep,
     isStorageStep,
-    isStrategyStep,
     lockedIdentity,
     name,
     nameError,
     namespace,
     namespaceError,
-    parallelism,
     pendingDeleteContainer,
     removeContainer,
     removeContainerEnv,
     removeContainerPort,
     removeStorageVolume,
-    restartPolicy,
     returnToPodList,
     runPodValidation,
     savedStorageVolumes,
-    schedule,
-    scheduleError,
-    setActiveDeadlineSeconds,
     setActiveStep,
     setBackoffLimit,
-    setCompletions,
     setContainerDialogOpen,
     setDescription,
     setName,
     setNameError,
     setNamespace,
     setNamespaceError,
-    setParallelism,
     setPendingDeleteContainerId,
-    setRestartPolicy,
-    setSchedule,
-    setScheduleError,
     startAddStorageVolume,
     startEditStorageVolume,
     storageVolumeDraft,
@@ -350,26 +336,9 @@ export function CreateWorkloadDialog({
                 },
               },
               {
-                id: "strategy",
-                title: "策略设置",
-                status: activeStep === "strategy" ? "当前" : currentStepIndex > 1 ? "已设置" : "未设置",
-                active: activeStep === "strategy",
-                icon: <IconAdjustments className="size-4" />,
-                disabled: !canNavigateStep,
-                onClick: () => {
-                  if (!canNavigateStep) return
-                  if (currentStepIndex >= 1) {
-                    setActiveStep("strategy")
-                    setSubmitError(null)
-                    return
-                  }
-                  void goNext()
-                },
-              },
-              {
                 id: "pod",
                 title: "容器组设置",
-                status: activeStep === "pod" ? "当前" : currentStepIndex > 2 ? "已设置" : "未设置",
+                status: activeStep === "pod" ? "当前" : currentStepIndex > 1 ? "已设置" : "未设置",
                 active: activeStep === "pod",
                 icon: <IconBraces className="size-4" />,
                 disabled: !canNavigateStep,
@@ -382,7 +351,7 @@ export function CreateWorkloadDialog({
               {
                 id: "storage",
                 title: "存储设置",
-                status: activeStep === "storage" ? "当前" : currentStepIndex > 3 ? "已设置" : "未设置",
+                status: activeStep === "storage" ? "当前" : currentStepIndex > 2 ? "已设置" : "未设置",
                 active: activeStep === "storage",
                 icon: <IconDatabase className="size-4" />,
                 disabled: !canNavigateStep,
@@ -404,7 +373,7 @@ export function CreateWorkloadDialog({
                 icon: <IconStack2 className="size-4" />,
                 disabled: !canNavigateStep,
                 onClick: () => {
-                  if (!canNavigateStep || currentStepIndex < 3) return
+                  if (!canNavigateStep || currentStepIndex < 2) return
                   setActiveStep("advanced")
                   setSubmitError(null)
                 },
@@ -436,7 +405,7 @@ export function CreateWorkloadDialog({
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">基本信息</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    填写任务名称、所属项目以及描述信息。
+                    填写工作负载名称、所属项目以及描述信息。
                   </p>
                 </div>
 
@@ -451,7 +420,7 @@ export function CreateWorkloadDialog({
                         if (nameError) setNameError(null)
                         if (submitError) setSubmitError(null)
                       }}
-                      placeholder={kind === "CronJob" ? "请输入定时任务名称" : "请输入任务名称"}
+                      placeholder={`请输入${kind}名称`}
                       autoComplete="off"
                       aria-invalid={Boolean(nameError)}
                       disabled={isBusy || isEditMode}
@@ -491,36 +460,9 @@ export function CreateWorkloadDialog({
                     {namespaceError ? (
                       <FieldError>{namespaceError}</FieldError>
                     ) : (
-                      <FieldDescription>选择任务所属项目。</FieldDescription>
+                      <FieldDescription>选择工作负载所属项目。</FieldDescription>
                     )}
                   </Field>
-
-                  {kind === "CronJob" ? (
-                    <Field data-invalid={Boolean(scheduleError)}>
-                      <FieldLabel htmlFor="create-job-schedule">定时计划</FieldLabel>
-                      <Input
-                        id="create-job-schedule"
-                        value={schedule}
-                        onChange={(event) => {
-                          setSchedule(event.target.value)
-                          if (scheduleError) setScheduleError(null)
-                          if (submitError) setSubmitError(null)
-                        }}
-                        placeholder="例如：0 0 1 * *（每月）"
-                        autoComplete="off"
-                        aria-invalid={Boolean(scheduleError)}
-                        disabled={isBusy}
-                      />
-                      {scheduleError ? (
-                        <FieldError>{scheduleError}</FieldError>
-                      ) : (
-                        <FieldDescription>
-                          为定时任务设置 Cron 表达式，例如 `0 0 1 * *`（每月执行）。
-                        </FieldDescription>
-                      )}
-                    </Field>
-                  ) : null}
-                  {kind === "CronJob" ? <div className="hidden md:block" aria-hidden /> : null}
 
                   <Field className="md:col-span-2">
                     <FieldLabel htmlFor="create-job-description">描述</FieldLabel>
@@ -539,114 +481,31 @@ export function CreateWorkloadDialog({
                   </Field>
                 </FieldGroup>
               </div>
-            ) : isStrategyStep ? (
-              <div>
-                <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">策略设置</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    配置任务重试、并发与超时策略。全部为选填，留空将使用默认值。
-                  </p>
-                </div>
-
-                <FieldGroup className="grid gap-6 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="create-job-backoff-limit">最大重试次数</FieldLabel>
-                    <Input
-                      id="create-job-backoff-limit"
-                      value={backoffLimit}
-                      onChange={(event) => setBackoffLimit(normalizeIntegerInput(event.target.value))}
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder="例如：6"
-                      disabled={isBusy}
-                    />
-                    <FieldDescription>
-                      失败前最多可重试的次数。留空时按系统默认策略处理。
-                    </FieldDescription>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor="create-job-completions">容器组完成数量</FieldLabel>
-                    <Input
-                      id="create-job-completions"
-                      value={completions}
-                      onChange={(event) => setCompletions(normalizeIntegerInput(event.target.value))}
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder="例如：1"
-                      disabled={isBusy}
-                    />
-                    <FieldDescription>
-                      任务完成所需的成功执行次数。未填写则使用平台默认行为。
-                    </FieldDescription>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor="create-job-parallelism">并行容器组数量</FieldLabel>
-                    <Input
-                      id="create-job-parallelism"
-                      value={parallelism}
-                      onChange={(event) => setParallelism(normalizeIntegerInput(event.target.value))}
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder="例如：1"
-                      disabled={isBusy}
-                    />
-                    <FieldDescription>同一时刻允许并发运行的容器组数量。</FieldDescription>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor="create-job-active-deadline">最大运行时间（s）</FieldLabel>
-                    <Input
-                      id="create-job-active-deadline"
-                      value={activeDeadlineSeconds}
-                      onChange={(event) =>
-                        setActiveDeadlineSeconds(normalizeIntegerInput(event.target.value))
-                      }
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder="例如：3600"
-                      disabled={isBusy}
-                    />
-                    <FieldDescription>
-                      限制任务最长运行秒数，超时后任务会被系统终止。
-                    </FieldDescription>
-                  </Field>
-                </FieldGroup>
-              </div>
             ) : isPodStep ? (
               <div>
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">容器组设置</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    配置容器组重启行为与容器镜像信息。至少可添加一条容器配置。
+                    配置容器镜像与运行参数。至少可添加一条容器配置。
                   </p>
                 </div>
 
                 <FieldGroup className="flex flex-col gap-6">
                   <Field>
-                    <FieldLabel htmlFor="create-job-restart-policy">重启策略</FieldLabel>
-                    <Select
-                      value={restartPolicy}
-                      onValueChange={(value) => {
-                        if (value === "Never" || value === "OnFailure") {
-                          setRestartPolicy(value)
-                        }
-                      }}
-                      disabled={isBusy}
-                    >
-                      <SelectTrigger id="create-job-restart-policy">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="Never">重新创建容器组</SelectItem>
-                          <SelectItem value="OnFailure">重启容器</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    <FieldLabel htmlFor="create-workload-replicas">容器组副本数</FieldLabel>
+                    <Input
+                      id="create-workload-replicas"
+                      value={backoffLimit}
+                      onChange={(event) => setBackoffLimit(normalizeIntegerInput(event.target.value))}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder={kind === "DaemonSet" ? "DaemonSet 不适用" : "例如：3"}
+                      disabled={isBusy || kind === "DaemonSet"}
+                    />
                     <FieldDescription>
-                      容器退出后采用的处理方式。默认使用“重新创建容器组”。
+                      {kind === "DaemonSet"
+                        ? "DaemonSet 不需要副本数，按节点自动调度。"
+                        : "用于控制工作负载期望副本数量。"}
                     </FieldDescription>
                   </Field>
 

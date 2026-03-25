@@ -245,7 +245,7 @@ export function CreateContainerDialog({
           <DialogDescription>填写镜像、容器名称、容器类型和拉取策略。</DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-2">
           <FieldGroup className="flex flex-col gap-5">
             <div className="rounded-md border bg-card">
               <div className="border-b bg-muted/80 px-4 py-3">

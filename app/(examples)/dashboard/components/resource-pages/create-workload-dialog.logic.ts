@@ -2,7 +2,7 @@
 
 import type { EditorProps } from "@monaco-editor/react"
 import dynamic from "next/dynamic"
-import type { WorkloadCreateKind } from "@/app/lib/kubespark/jobs"
+import type { WorkloadCreateKind } from "@/app/lib/kubespark/workloads"
 import type {
   ContainerDraft,
   ContainerEnvVarSource,
@@ -63,7 +63,7 @@ export type WorkloadDialogInitialValues = {
     activeDeadlineSeconds?: string
   }
   pod?: {
-    restartPolicy?: "Never" | "OnFailure"
+    restartPolicy?: "Always"
     storageList?: Array<{
       volumeId?: string
       volumeKind?: "persistent" | "ephemeral" | "hostPath"
@@ -180,123 +180,11 @@ export type CreateWorkloadDialogProps = {
     kind: WorkloadCreateKind
     name: string
     namespace: string
-    description: string
-    schedule?: string
-    strategy?: {
-      backoffLimit?: number
-      completions?: number
-      parallelism?: number
-      activeDeadlineSeconds?: number
-    }
-    pod?: {
-      restartPolicy?: "Never" | "OnFailure"
-      storageList?: Array<{
-        volumeId?: string
-        volumeKind?: "persistent" | "ephemeral" | "hostPath"
-        volumeName?: string
-        mounts?: Array<{
-          containerName: string
-          mountMode: "none" | "ro" | "rw"
-          mountPath: string
-        }>
-      }>
-      storage?: {
-        volumeId?: string
-        volumeKind?: "persistent" | "ephemeral" | "hostPath"
-        volumeName?: string
-        mounts?: Array<{
-          containerName: string
-          mountMode: "none" | "ro" | "rw"
-          mountPath: string
-        }>
-      }
-      containers?: Array<{
-        name?: string
-        type?: ContainerType
-        image: string
-        imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
-        command?: string[]
-        args?: string[]
-        syncHostTimezone?: boolean
-        env?: Array<{
-          name?: string
-          value?: string
-          valueFrom?: {
-            configMapKeyRef?: {
-              name?: string
-              key?: string
-            }
-            secretKeyRef?: {
-              name?: string
-              key?: string
-            }
-          }
-        }>
-        ports?: Array<{
-          protocol?: ContainerPortProtocol
-          name?: string
-          containerPort: string
-        }>
-        cpuRequest?: string
-        cpuLimit?: string
-        memoryRequestMi?: string
-        memoryLimitMi?: string
-        securityContext?: {
-          privileged?: boolean
-          runAsUser?: string
-          runAsGroup?: string
-          runAsNonRoot?: boolean
-          readOnlyRootFilesystem?: boolean
-          allowPrivilegeEscalation?: boolean
-        }
-        probes?: {
-          liveness?: {
-            mode?: "http" | "command" | "tcp"
-            httpScheme?: "HTTP" | "HTTPS"
-            httpPath?: string
-            httpPort?: string
-            command?: string
-            tcpPort?: string
-            initialDelaySeconds?: string
-            timeoutSeconds?: string
-            periodSeconds?: string
-            successThreshold?: string
-            failureThreshold?: string
-          }
-          readiness?: {
-            mode?: "http" | "command" | "tcp"
-            httpScheme?: "HTTP" | "HTTPS"
-            httpPath?: string
-            httpPort?: string
-            command?: string
-            tcpPort?: string
-            initialDelaySeconds?: string
-            timeoutSeconds?: string
-            periodSeconds?: string
-            successThreshold?: string
-            failureThreshold?: string
-          }
-          startup?: {
-            mode?: "http" | "command" | "tcp"
-            httpScheme?: "HTTP" | "HTTPS"
-            httpPath?: string
-            httpPort?: string
-            command?: string
-            tcpPort?: string
-            initialDelaySeconds?: string
-            timeoutSeconds?: string
-            periodSeconds?: string
-            successThreshold?: string
-            failureThreshold?: string
-          }
-        }
-        lifecycle?: LifecycleMapPayload
-      }>
-    }
+    payload: Record<string, unknown>
   }) => Promise<void>
 }
 
-export type CreateStep = "basic" | "strategy" | "pod" | "storage" | "advanced"
+export type CreateStep = "basic" | "pod" | "storage" | "advanced"
 export const CONTAINER_PORT_PROTOCOL_OPTIONS = [
   "GRPC",
   "HTTP",
@@ -326,7 +214,7 @@ export const AUTO_PROTOCOL_PREFIX_SET = new Set([
   "sctp",
 ])
 
-export const STEP_ORDER: CreateStep[] = ["basic", "strategy", "pod", "storage", "advanced"]
+export const STEP_ORDER: CreateStep[] = ["basic", "pod", "storage", "advanced"]
 
 export const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
@@ -346,7 +234,7 @@ export type WorkloadDialogSnapshot = {
     activeDeadlineSeconds: string
   }
   pod: {
-    restartPolicy: "Never" | "OnFailure"
+    restartPolicy: "Always"
     containers: ContainerDraft[]
     storageList?: JobStorageInput[]
   }
@@ -874,7 +762,7 @@ export function createContainerDraftFromInitial(
 }
 
 export function buildPodSpecFromContainers(
-  restartPolicy: "Never" | "OnFailure",
+  restartPolicy: "Always",
   containers: ContainerDraft[],
   storage?: JobStorageInput | JobStorageInput[]
 ): JsonObject {
@@ -1111,71 +999,76 @@ export function buildPodSpecFromContainers(
   }
 }
 
+export function buildWorkloadManifest(
+  kind: WorkloadCreateKind,
+  snapshot: WorkloadDialogSnapshot,
+  storage?: JobStorageInput | JobStorageInput[]
+): JsonObject {
+  const metadataName = snapshot.name.trim().toLowerCase()
+  const metadataNamespace = snapshot.namespace.trim()
+  const appName = toDnsLabelFragment(metadataName || "workload")
+  const replicas = toOptionalIntegerString(snapshot.strategy.backoffLimit)
+  const minReadySeconds = toOptionalIntegerString(snapshot.strategy.completions)
+  const revisionHistoryLimit = toOptionalIntegerString(snapshot.strategy.parallelism)
+  const progressDeadlineSeconds = toOptionalIntegerString(snapshot.strategy.activeDeadlineSeconds)
+
+  const metadata: JsonObject = {
+    name: metadataName,
+    namespace: metadataNamespace,
+    ...(snapshot.description.trim()
+      ? { annotations: { description: snapshot.description.trim() } }
+      : {}),
+  }
+  const podSpec = buildPodSpecFromContainers("Always", snapshot.pod.containers, storage)
+  const template = {
+    metadata: {
+      labels: {
+        "app.kubernetes.io/name": appName,
+      },
+    },
+    spec: podSpec,
+  }
+
+  const spec: JsonObject = {
+    selector: {
+      matchLabels: {
+        "app.kubernetes.io/name": appName,
+      },
+    },
+    template,
+    ...(minReadySeconds ? { minReadySeconds: Number.parseInt(minReadySeconds, 10) } : {}),
+    ...(revisionHistoryLimit ? { revisionHistoryLimit: Number.parseInt(revisionHistoryLimit, 10) } : {}),
+  }
+
+  if (kind === "Deployment") {
+    if (replicas) {
+      spec.replicas = Number.parseInt(replicas, 10)
+    }
+    if (progressDeadlineSeconds) {
+      spec.progressDeadlineSeconds = Number.parseInt(progressDeadlineSeconds, 10)
+    }
+  }
+  if (kind === "StatefulSet") {
+    spec.serviceName = appName
+    if (replicas) {
+      spec.replicas = Number.parseInt(replicas, 10)
+    }
+  }
+
+  return {
+    apiVersion: "apps/v1",
+    kind,
+    metadata,
+    spec,
+  }
+}
+
 export function buildWorkloadYamlText(
   kind: WorkloadCreateKind,
   snapshot: WorkloadDialogSnapshot,
   storage?: JobStorageInput | JobStorageInput[]
 ): string {
-  const strategy = {
-    ...(toOptionalIntegerString(snapshot.strategy.backoffLimit)
-      ? { backoffLimit: Number.parseInt(snapshot.strategy.backoffLimit, 10) }
-      : {}),
-    ...(toOptionalIntegerString(snapshot.strategy.completions)
-      ? { completions: Number.parseInt(snapshot.strategy.completions, 10) }
-      : {}),
-    ...(toOptionalIntegerString(snapshot.strategy.parallelism)
-      ? { parallelism: Number.parseInt(snapshot.strategy.parallelism, 10) }
-      : {}),
-    ...(toOptionalIntegerString(snapshot.strategy.activeDeadlineSeconds)
-      ? { activeDeadlineSeconds: Number.parseInt(snapshot.strategy.activeDeadlineSeconds, 10) }
-      : {}),
-  }
-  const metadata: JsonObject = {
-    name: snapshot.name.trim().toLowerCase(),
-    namespace: snapshot.namespace.trim(),
-    ...(snapshot.description.trim()
-      ? { annotations: { description: snapshot.description.trim() } }
-      : {}),
-  }
-  const podSpec = buildPodSpecFromContainers(
-    snapshot.pod.restartPolicy,
-    snapshot.pod.containers,
-    storage
-  )
-
-  const manifest: JsonObject =
-    kind === "CronJob"
-      ? {
-          apiVersion: "batch/v1",
-          kind: "CronJob",
-          metadata,
-          spec: {
-            schedule: snapshot.schedule.trim() || DEFAULT_CRON_SCHEDULE,
-            concurrencyPolicy: "Forbid",
-            successfulJobsHistoryLimit: 3,
-            failedJobsHistoryLimit: 1,
-            jobTemplate: {
-              spec: {
-                ...strategy,
-                template: {
-                  spec: podSpec,
-                },
-              },
-            },
-          },
-        }
-      : {
-          apiVersion: "batch/v1",
-          kind: "Job",
-          metadata,
-          spec: {
-            ...strategy,
-            template: {
-              spec: podSpec,
-            },
-          },
-        }
-
+  const manifest = buildWorkloadManifest(kind, snapshot, storage)
   return stringify(manifest, {
     indent: 2,
     lineWidth: 0,
@@ -1194,14 +1087,8 @@ export function parseWorkloadYamlText(kind: WorkloadCreateKind, yamlText: string
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
   const spec = asObject(root.spec)
-  const strategySource =
-    kind === "CronJob"
-      ? asObject(asObject(asObject(spec.jobTemplate).spec))
-      : spec
-  const podSpec =
-    kind === "CronJob"
-      ? asObject(asObject(asObject(strategySource.template).spec))
-      : asObject(asObject(spec.template).spec)
+  const template = asObject(spec.template)
+  const podSpec = asObject(template.spec)
 
   const hostTimeVolumeNames = new Set(
     (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
@@ -1387,15 +1274,16 @@ export function parseWorkloadYamlText(kind: WorkloadCreateKind, yamlText: string
     name: asString(metadata.name),
     namespace: asString(metadata.namespace),
     description: asString(annotations.description),
-    schedule: kind === "CronJob" ? asString(spec.schedule).trim() || DEFAULT_CRON_SCHEDULE : "",
+    schedule: "",
     strategy: {
-      backoffLimit: toOptionalIntegerString(strategySource.backoffLimit),
-      completions: toOptionalIntegerString(strategySource.completions),
-      parallelism: toOptionalIntegerString(strategySource.parallelism),
-      activeDeadlineSeconds: toOptionalIntegerString(strategySource.activeDeadlineSeconds),
+      backoffLimit: kind === "DaemonSet" ? "" : toOptionalIntegerString(spec.replicas),
+      completions: toOptionalIntegerString(spec.minReadySeconds),
+      parallelism: toOptionalIntegerString(spec.revisionHistoryLimit),
+      activeDeadlineSeconds:
+        kind === "Deployment" ? toOptionalIntegerString(spec.progressDeadlineSeconds) : "",
     },
     pod: {
-      restartPolicy: asString(podSpec.restartPolicy) === "OnFailure" ? "OnFailure" : "Never",
+      restartPolicy: "Always",
       containers: containers.length > 0 ? containers : [],
       ...(parsedStorageList.length > 0 ? { storageList: parsedStorageList } : {}),
     },
@@ -1546,9 +1434,9 @@ export function resolveSubmitErrorMessage(error: unknown, kind: WorkloadCreateKi
   const raw = error instanceof Error ? error.message : ""
   const text = raw.toLowerCase()
   if (text.includes("already exists") || text.includes("状态码 409")) {
-    return kind === "CronJob" ? "定时任务名称已存在，请更换后重试" : "任务名称已存在，请更换后重试"
+    return "工作负载名称已存在，请更换后重试"
   }
-  return raw || (kind === "CronJob" ? "创建定时任务失败，请稍后重试" : "创建任务失败，请稍后重试")
+  return raw || `创建${kind}失败，请稍后重试`
 }
 
 export function resolveStepDescription(step: CreateStep): string {

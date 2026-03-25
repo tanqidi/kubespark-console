@@ -17,6 +17,8 @@ import {
   type WorkloadResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
 import { deleteWorkload } from "@/app/lib/kubespark/resource-delete"
+import { createWorkload } from "@/app/lib/kubespark/workloads"
+import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import type { ResourceDocumentType } from "@/app/lib/kubespark/resource-document"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
@@ -56,6 +58,7 @@ const WORKLOAD_DOCUMENT_BY_KIND: Record<WorkloadRow["kind"], ResourceDocumentTyp
 
 export function WorkloadsPageClient() {
   const [rows, setRows] = React.useState<WorkloadRow[]>([])
+  const [createNamespaceOptions, setCreateNamespaceOptions] = React.useState<Array<{ id: string; name: string }>>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -68,6 +71,44 @@ export function WorkloadsPageClient() {
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<WorkloadRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+
+  const refreshRows = React.useCallback(async (silent: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
+    try {
+      const [mapped, namespacesResult] = await Promise.all([
+        fetchWorkloadRows(),
+        fetchNamespaces().catch(() => []),
+      ])
+      const namespaces = namespacesResult
+      setRows(mapped)
+      setCreateNamespaceOptions(
+        namespaces
+          .map((item) => ({ id: item.name, name: item.name }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
+      setError(null)
+    } catch (e: unknown) {
+      if (!silent) {
+        setRows([])
+        setError(e instanceof Error ? e.message : "API request failed")
+      } else {
+        console.error("[Workloads] polling refresh failed", e)
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [])
+
+  const handleCreateSubmit = React.useCallback(
+    async (payload: Parameters<typeof createWorkload>[0]) => {
+      await createWorkload(payload)
+      await refreshRows(false)
+    },
+    [refreshRows]
+  )
 
   const handleViewYaml = React.useCallback((row: WorkloadRow) => {
     const resource = WORKLOAD_RESOURCE_BY_KIND[row.kind]
@@ -178,26 +219,8 @@ export function WorkloadsPageClient() {
     let cancelled = false
 
     const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const mapped = await fetchWorkloadRows()
-        if (cancelled) return
-        setRows(mapped)
-        setError(null)
-      } catch (e: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setRows([])
-          setError(e instanceof Error ? e.message : "API request failed")
-        } else {
-          console.error("[Workloads] polling refresh failed", e)
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
+      await refreshRows(silent)
+      if (cancelled) return
     }
 
     void loadRows(false)
@@ -209,7 +232,7 @@ export function WorkloadsPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [])
+  }, [refreshRows])
 
   const namespaceOptions = React.useMemo(
     () =>
@@ -275,7 +298,8 @@ export function WorkloadsPageClient() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         kind={typeFilter}
-        namespaceOptions={namespaceOptions}
+        namespaceOptions={createNamespaceOptions}
+        onSubmit={handleCreateSubmit}
       />
       <MonacoViewerDialog
         title="查看YAML"

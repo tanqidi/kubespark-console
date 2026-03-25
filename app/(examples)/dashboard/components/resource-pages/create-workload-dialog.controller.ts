@@ -2,42 +2,38 @@
 
 import * as React from "react"
 
-import { checkJobExists } from "@/app/lib/kubespark/jobs"
+import { checkWorkloadExists } from "@/app/lib/kubespark/workloads"
 import type {
   CreateWorkloadDialogProps,
   CreateStep,
   WorkloadDialogSnapshot,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
 import {
   CONTAINER_PORT_PROTOCOL_SET,
-  CRON_SCHEDULE_REQUIRED_MESSAGE,
-  DEFAULT_CRON_SCHEDULE,
   POD_REQUIRED_MESSAGE,
   STEP_ORDER,
   buildAutoPortName,
+  buildWorkloadManifest,
   buildWorkloadYamlText,
   createContainerDraft,
   createContainerDraftFromInitial,
   createContainerEnvDraft,
   createContainerPortDraft,
   ensureUniqueContainerName,
-  hasSecurityContextValue,
   isAutoContainerNameForImage,
   isAutoPortNameForProtocol,
   normalizeLifecycleMap,
   normalizeProbeMap,
   normalizeSecurityContextDraft,
-  parseEditorTextToStringList,
   parseWorkloadYamlText,
   replaceProtocolPrefixInName,
   resolveContainerNameFromImage,
   resolveDuplicateContainerEnvNameIds,
   resolveSubmitErrorMessage,
   toDnsLabelFragment,
-  toOptionalNonNegativeInt,
   validateContainerPorts,
   validateName,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
 import type {
   ContainerDraft,
   ContainerEnvVarSource,
@@ -90,12 +86,12 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
   const [description, setDescription] = React.useState("")
-  const [schedule, setSchedule] = React.useState(kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : "")
+  const [schedule, setSchedule] = React.useState("")
   const [backoffLimit, setBackoffLimit] = React.useState("")
   const [completions, setCompletions] = React.useState("")
   const [parallelism, setParallelism] = React.useState("")
   const [activeDeadlineSeconds, setActiveDeadlineSeconds] = React.useState("")
-  const [restartPolicy, setRestartPolicy] = React.useState<"Never" | "OnFailure">("Never")
+  const [restartPolicy, setRestartPolicy] = React.useState<"Always">("Always")
   const [containers, setContainers] = React.useState<ContainerDraft[]>([])
   const [containerDialogOpen, setContainerDialogOpen] = React.useState(false)
   const [editingContainerId, setEditingContainerId] = React.useState<string | null>(null)
@@ -120,29 +116,17 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const isBusy = checkingNext || creating
   const currentStepIndex = STEP_ORDER.indexOf(activeStep)
   const isBasicStep = activeStep === "basic"
-  const isStrategyStep = activeStep === "strategy"
   const isPodStep = activeStep === "pod"
   const isStorageStep = activeStep === "storage"
-  const isFinalStep = activeStep === "advanced"
+  const isFinalStep = currentStepIndex === STEP_ORDER.length - 1
   const isEditingPodView = containerDialogOpen
   const isEditingStorageView = isStorageStep && editingStorageVolume
   const canNavigateStep = !isBusy && !isEditingPodView && !isEditingStorageView
 
-  const dialogTitle = isEditMode
-    ? kind === "CronJob"
-      ? "编辑定时任务"
-      : "编辑任务"
-    : kind === "CronJob"
-      ? "创建定时任务"
-      : "创建任务"
-  const dialogDescription =
-    isEditMode
-      ? kind === "CronJob"
-        ? "编辑 Kubernetes CronJob 的配置内容。"
-        : "编辑 Kubernetes Job 的配置内容。"
-      : kind === "CronJob"
-        ? "使用 Kubernetes CronJob 创建按周期执行的任务。"
-        : "使用 Kubernetes Job 创建一次性任务。"
+  const dialogTitle = isEditMode ? `编辑 ${kind}` : `创建 ${kind}`
+  const dialogDescription = isEditMode
+    ? `编辑 Kubernetes ${kind} 的配置内容。`
+    : `使用 Kubernetes ${kind} 创建工作负载。`
 
   React.useEffect(() => {
     if (!open) {
@@ -150,12 +134,12 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       setName("")
       setNamespace("")
       setDescription("")
-      setSchedule(kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : "")
+      setSchedule("")
       setBackoffLimit("")
       setCompletions("")
       setParallelism("")
       setActiveDeadlineSeconds("")
-      setRestartPolicy("Never")
+      setRestartPolicy("Always")
       setContainers([])
       setContainerDialogOpen(false)
       setEditingContainerId(null)
@@ -186,12 +170,12 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setName(initialValues.name)
     setNamespace(initialValues.namespace)
     setDescription(initialValues.description ?? "")
-    setSchedule((initialValues.schedule ?? "").trim() || (kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : ""))
+    setSchedule("")
     setBackoffLimit(initialValues.strategy?.backoffLimit ?? "")
     setCompletions(initialValues.strategy?.completions ?? "")
     setParallelism(initialValues.strategy?.parallelism ?? "")
     setActiveDeadlineSeconds(initialValues.strategy?.activeDeadlineSeconds ?? "")
-    setRestartPolicy(initialValues.pod?.restartPolicy === "OnFailure" ? "OnFailure" : "Never")
+    setRestartPolicy("Always")
     setContainers(
       Array.isArray(initialValues.pod?.containers)
         ? initialValues.pod.containers.map((item, index) => createContainerDraftFromInitial(item, index))
@@ -985,17 +969,15 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setEditingContainerId(null)
   }, [editingContainerId])
 
-  const runBasicValidation = React.useCallback(async (source?: Pick<WorkloadDialogSnapshot, "name" | "namespace" | "schedule">) => {
+  const runBasicValidation = React.useCallback(async (source?: Pick<WorkloadDialogSnapshot, "name" | "namespace">) => {
     const nextName = (lockedIdentity?.name ?? source?.name ?? name).trim().toLowerCase()
     const nextNamespace = (lockedIdentity?.namespace ?? source?.namespace ?? namespace).trim()
-    const nextSchedule = kind === "CronJob" ? (source?.schedule ?? schedule).trim() : ""
     const nextNameError = validateName(nextName)
     const nextNamespaceError = nextNamespace ? null : "请选择项目"
-    const nextScheduleError = kind === "CronJob" && !nextSchedule ? CRON_SCHEDULE_REQUIRED_MESSAGE : null
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
-    setScheduleError(nextScheduleError)
-    if (nextNameError || nextNamespaceError || nextScheduleError) {
+    setScheduleError(null)
+    if (nextNameError || nextNamespaceError) {
       const firstInvalidFieldId = resolveFirstInvalidFieldId([
         {
           invalid: Boolean(nextNameError),
@@ -1004,10 +986,6 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         {
           invalid: Boolean(nextNamespaceError),
           fieldId: "create-job-namespace",
-        },
-        {
-          invalid: Boolean(nextScheduleError),
-          fieldId: "create-job-schedule",
         },
       ])
       if (firstInvalidFieldId) {
@@ -1018,18 +996,14 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
 
     if (isEditMode) return true
 
-    const exists = await checkJobExists({
-      kind,
-      name: nextName,
-      namespace: nextNamespace,
-    })
+    const exists = await checkWorkloadExists(kind, nextNamespace, nextName)
     if (exists) {
-      setNameError(kind === "CronJob" ? "定时任务名称已存在，请更换后重试" : "任务名称已存在，请更换后重试")
+      setNameError("工作负载名称已存在，请更换后重试")
       return false
     }
 
     return true
-  }, [isEditMode, kind, lockedIdentity?.name, lockedIdentity?.namespace, name, namespace, schedule])
+  }, [isEditMode, kind, lockedIdentity?.name, lockedIdentity?.namespace, name, namespace])
 
   const goNext = React.useCallback(async () => {
     if (isBusy || isFinalStep || isEditingPodView || yamlMode) return
@@ -1088,16 +1062,14 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
 
         const normalizedName = (lockedIdentity?.name ?? source.name).trim().toLowerCase()
         const normalizedNamespace = (lockedIdentity?.namespace ?? source.namespace).trim()
-        const normalizedSchedule = kind === "CronJob" ? source.schedule.trim() : ""
         const nextNameError = validateName(normalizedName)
         const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
-        const nextScheduleError = kind === "CronJob" && !normalizedSchedule ? CRON_SCHEDULE_REQUIRED_MESSAGE : null
         setNameError(nextNameError)
         setNamespaceError(nextNamespaceError)
-        setScheduleError(nextScheduleError)
-        if (nextNameError || nextNamespaceError || nextScheduleError) {
+        setScheduleError(null)
+        if (nextNameError || nextNamespaceError) {
           if (yamlMode) {
-            setYamlError(nextNameError ?? nextNamespaceError ?? nextScheduleError)
+            setYamlError(nextNameError ?? nextNamespaceError)
           } else {
             setActiveStep("basic")
           }
@@ -1105,14 +1077,9 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         }
 
         if (!isEditMode) {
-          const exists = await checkJobExists({
-            kind,
-            name: normalizedName,
-            namespace: normalizedNamespace,
-          })
+          const exists = await checkWorkloadExists(kind, normalizedNamespace, normalizedName)
           if (exists) {
-            const existsError =
-              kind === "CronJob" ? "定时任务名称已存在，请更换后重试" : "任务名称已存在，请更换后重试"
+            const existsError = "工作负载名称已存在，请更换后重试"
             setNameError(existsError)
             if (yamlMode) {
               setYamlError(existsError)
@@ -1123,175 +1090,22 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
           }
         }
 
-        const strategyDraft = {
-          backoffLimit: toOptionalNonNegativeInt(source.strategy.backoffLimit),
-          completions: toOptionalNonNegativeInt(source.strategy.completions),
-          parallelism: toOptionalNonNegativeInt(source.strategy.parallelism),
-          activeDeadlineSeconds: toOptionalNonNegativeInt(source.strategy.activeDeadlineSeconds),
-        }
-        const strategy =
-          typeof strategyDraft.backoffLimit === "number" ||
-          typeof strategyDraft.completions === "number" ||
-          typeof strategyDraft.parallelism === "number" ||
-          typeof strategyDraft.activeDeadlineSeconds === "number"
-            ? strategyDraft
-            : undefined
-
-        const normalizedContainers = source.pod.containers
-          .map((item) => {
-            const normalizedEnv = item.env
-              .map((entry) => {
-                const name =
-                  entry.source === "custom"
-                    ? entry.name.trim()
-                    : entry.sourceKey.trim() || entry.name.trim()
-                if (!name) return null
-
-                if (entry.source === "configMap") {
-                  const sourceName = entry.sourceResource.trim()
-                  const sourceKey = entry.sourceKey.trim()
-                  if (!sourceName || !sourceKey) return null
-                  return {
-                    name,
-                    valueFrom: {
-                      configMapKeyRef: {
-                        name: sourceName,
-                        key: sourceKey,
-                      },
-                    },
-                  }
-                }
-
-                if (entry.source === "secret") {
-                  const sourceName = entry.sourceResource.trim()
-                  const sourceKey = entry.sourceKey.trim()
-                  if (!sourceName || !sourceKey) return null
-                  return {
-                    name,
-                    valueFrom: {
-                      secretKeyRef: {
-                        name: sourceName,
-                        key: sourceKey,
-                      },
-                    },
-                  }
-                }
-
-                return {
-                  name,
-                  value: entry.value,
-                }
-              })
-              .filter(Boolean) as Array<{
-                name: string
-                value?: string
-                valueFrom?: {
-                  configMapKeyRef?: { name: string; key: string }
-                  secretKeyRef?: { name: string; key: string }
-                }
-              }>
-            const normalizedPorts = item.ports
-              .map((port) => ({
-                protocol: port.protocol,
-                name: port.name.trim(),
-                containerPort: port.containerPort.trim(),
-              }))
-              .filter((port) => /^\d+$/.test(port.containerPort))
-            const normalizedCommand = parseEditorTextToStringList(item.command)
-            const normalizedArgs = parseEditorTextToStringList(item.args)
-            const normalizedProbes = normalizeProbeMap(item.probes)
-            const normalizedLifecycle = normalizeLifecycleMap(item.lifecycle)
-            const normalizedSecurityContext = normalizeSecurityContextDraft(item.securityContext)
-
-            return {
-              name: item.name.trim(),
-              type: item.type,
-              image: item.image.trim(),
-              imagePullPolicy: item.imagePullPolicy,
-              ...(normalizedCommand.length > 0 ? { command: normalizedCommand } : {}),
-              ...(normalizedArgs.length > 0 ? { args: normalizedArgs } : {}),
-              ...(item.syncHostTimezone ? { syncHostTimezone: true } : {}),
-              ...(normalizedEnv.length > 0 ? { env: normalizedEnv } : {}),
-              cpuRequest: item.cpuRequest.trim(),
-              cpuLimit: item.cpuLimit.trim(),
-              memoryRequestMi: item.memoryRequestMi.trim(),
-              memoryLimitMi: item.memoryLimitMi.trim(),
-              ...(hasSecurityContextValue(normalizedSecurityContext)
-                ? { securityContext: normalizedSecurityContext }
-                : {}),
-              ...(normalizedPorts.length > 0 ? { ports: normalizedPorts } : {}),
-              ...(Object.keys(normalizedProbes).length > 0 ? { probes: normalizedProbes } : {}),
-              ...(Object.keys(normalizedLifecycle).length > 0 ? { lifecycle: normalizedLifecycle } : {}),
-            }
-          })
-          .filter((item) => item.image.length > 0)
-
-        const normalizedStorageList = (source.pod.storageList ?? [])
-          .map((storageItem) => {
-            const normalizedStorageName = storageItem.volumeName.trim()
-            const currentStorageId = storageItem.volumeId.trim()
-            const normalizedStorageId =
-              storageItem.volumeKind === "ephemeral"
-                ? normalizedStorageName
-                : currentStorageId || normalizedStorageName
-            const normalizedStorageMounts = storageItem.mounts
-              .map((item) => ({
-                containerName: item.containerName.trim(),
-                mountMode: item.mountMode,
-                mountPath: item.mountPath.trim(),
-              }))
-              .filter(
-                (item) =>
-                  item.containerName.length > 0 &&
-                  (item.mountMode === "ro" || item.mountMode === "rw") &&
-                  item.mountPath.length > 0
-              )
-            if (!normalizedStorageName || !normalizedStorageId) return null
-            return {
-              volumeId: normalizedStorageId,
-              volumeKind: storageItem.volumeKind,
-              volumeName: normalizedStorageName,
-              mounts: normalizedStorageMounts,
-            }
-          })
-          .filter(
-            (
-              item
-            ): item is {
-              volumeId: string
-              volumeKind: StorageVolumeKind
-              volumeName: string
-              mounts: Array<{ containerName: string; mountMode: "ro" | "rw"; mountPath: string }>
-            } => Boolean(item)
-          )
-        const normalizedStorage = normalizedStorageList[0]
-
-        const pod =
-          source.pod.restartPolicy === "OnFailure" ||
-          normalizedContainers.length > 0 ||
-          normalizedStorageList.length > 0
-            ? {
-                ...(source.pod.restartPolicy === "OnFailure"
-                  ? { restartPolicy: source.pod.restartPolicy }
-                  : {}),
-                ...(normalizedContainers.length > 0
-                  ? {
-                      containers: normalizedContainers,
-                    }
-                  : {}),
-                ...(normalizedStorage ? { storage: normalizedStorage } : {}),
-                ...(normalizedStorageList.length > 0 ? { storageList: normalizedStorageList } : {}),
-              }
-            : undefined
-
+        const manifest = buildWorkloadManifest(kind, {
+          ...source,
+          name: normalizedName,
+          namespace: normalizedNamespace,
+          description: source.description.trim(),
+          schedule: "",
+          pod: {
+            ...source.pod,
+            restartPolicy: "Always",
+          },
+        })
         await onSubmit({
           kind,
           name: normalizedName,
           namespace: normalizedNamespace,
-          description: source.description.trim(),
-          ...(kind === "CronJob" ? { schedule: normalizedSchedule } : {}),
-          strategy,
-          pod,
+          payload: manifest,
         })
 
         onOpenChange(false)
@@ -1356,7 +1170,6 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     isFinalStep,
     isPodStep,
     isStorageStep,
-    isStrategyStep,
     lockedIdentity,
     name,
     nameError,
