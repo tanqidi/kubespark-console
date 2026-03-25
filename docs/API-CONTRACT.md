@@ -1,35 +1,36 @@
-﻿# KubeSpark 前端 API 调用约定
+# KubeSpark 前端 API 调用约定
 
-更新时间：2026-03-13
+更新时间：2026-03-25
 
-## 1. 目的
+## 1. 目标
 
-本文定义前端调用 KubeSpark 资源接口时的统一约定，目标是：
+本文定义当前前端与 KubeSpark 资源接口的统一调用约定，覆盖：
 
-- 所有资源统一走 GVR 接口，减少专用旧接口分支。
-- 列表、详情、删除使用一致的路径和参数规则。
-- 便于前后端对齐和后续接口收敛。
+- 统一 GVR 资源路径。
+- 列表/详情/创建/更新/删除的一致规则。
+- 当前项目内 Job/CronJob 与 Workload 的实际提交契约。
 
-## 2. 基础路径
+## 2. 统一入口与基础路径
 
-前端实际请求默认走 Next.js 代理：
+前端默认走 Next.js 代理：
 
 - 代理前缀：`/api/kubespark`
-- 资源基础路径：`/api/kubespark/kapis/resources.kubespark.io/v1alpha1/resources/{group}/{version}/{resource}`
+- 资源基础路径：
+  `/api/kubespark/kapis/resources.kubespark.io/v1alpha1/resources/{group}/{version}/{resource}`
 
-上游真实地址由服务端环境变量控制：
+上游地址由服务端环境变量控制：
 
 - `KUBESPARK_API_BASE`（默认 `http://172.31.0.88:8080`）
 
 ## 3. 认证约定
 
-- 请求头必须携带：`Authorization: Bearer {token}`
-- token 来源：`localStorage` 或 `sessionStorage` 的 `kubespark_token`
-- 未授权（401）时前端会自动跳转登录页并带 `redirect`
+- 请求头：`Authorization: Bearer {token}`
+- token 来源：`localStorage/sessionStorage` 的 `kubespark_token`
+- 401：前端会跳转登录页并携带 `redirect`
 
-## 4. 响应约定
+## 4. 响应解包约定
 
-后端通常返回 envelope：
+后端常见 envelope：
 
 ```json
 {
@@ -39,57 +40,93 @@
 }
 ```
 
-前端按以下规则处理：
+前端处理规则：
 
-- `code === 200` 视为成功
-- 失败时优先使用 `message` 作为错误提示
-- 列表数据默认从 `data.items` 读取
+- `code === 200` 判定成功
+- 失败优先展示 `message`
+- 列表默认从 `data.items` 读取
 
-## 5. 统一资源操作
+## 5. 支持的方法
 
-## 5.1 列表查询（推荐）
+代理层已支持：
+
+- `GET`
+- `POST`
+- `PUT`
+- `DELETE`
+
+当前未支持：
+
+- `PATCH`
+
+## 6. 统一资源读操作
+
+### 6.1 列表
 
 `GET /resources/{group}/{version}/{resource}`
 
-支持参数：
+支持 query：
 
-- `namespace`：命名空间过滤（仅 namespaced 资源）
-- `labelSelector`：标签过滤
-- `fieldSelector`：字段过滤（常用于按名称查单条）
+- `namespace`
+- `labelSelector`
+- `fieldSelector`
 
-示例：
+### 6.2 按名详情（当前主实现）
 
-- 全量 services：`/resources/core/v1/services`
-- 指定命名空间：`/resources/core/v1/services?namespace=default`
-- 按名称查单条：`/resources/core/v1/services?namespace=default&fieldSelector=metadata.name=nginx-service`
-
-## 5.2 单条详情（当前前端采用）
-
-使用“列表 + `fieldSelector`”模式，不直接依赖 item 详情 GET：
+统一使用列表 + `fieldSelector`：
 
 `GET /resources/{group}/{version}/{resource}?namespace={ns}&fieldSelector=metadata.name={name}`
 
-说明：
+说明：当前 `fetchResourceByName` 采用该方式，避免部分后端详情路径 `405`。
 
-- 这是当前前端 `fetchResourceByName` 的统一实现方式。
-- 可避免部分后端对 `/resource/{name}` 的 405 限制。
+## 7. 统一写操作
 
-## 5.3 删除
+### 7.1 删除
 
 `DELETE /resources/{group}/{version}/{resource}/{name}`
 
-参数：
+- namespaced 资源建议带 `namespace`
+- cluster 级资源不带 `namespace`
 
-- namespaced 资源建议附带 `namespace`
-- cluster 级资源不需要 `namespace`
+### 7.2 创建与更新（前端提交形态）
 
-示例：
+当前项目内已稳定的写操作分两类：
 
-- 删除 Pod：`DELETE /resources/core/v1/pods/nginx-xxx?namespace=default`
-- 删除 Namespace：`DELETE /resources/core/v1/namespaces/test`
-- 删除 StorageClass：`DELETE /resources/storage.k8s.io/v1/storageclasses/nfs-client`
+1. 结构化 payload（由领域层组装资源体）
+- `ConfigMap` / `Secret` / `Service` / `Job` / `CronJob`
+- 前端提交业务字段，领域层函数在 `app/lib/kubespark/*.ts` 组装 Kubernetes 资源对象
 
-## 6. 资源 GVR 对照（当前前端已使用）
+2. 直接提交 manifest payload
+- `Workload`（Deployment/StatefulSet/DaemonSet）
+- 前端在弹窗逻辑层先构建完整 manifest，再作为 `payload` 提交
+
+## 8. Job/CronJob 关键契约
+
+当前 `Job/CronJob` 提交字段（简化）：
+
+- 基础：`kind/name/namespace/description`
+- 定时：`schedule`（CronJob）
+- 策略：`backoffLimit/completions/parallelism/activeDeadlineSeconds`
+- Pod：`restartPolicy/containers/storageList`
+
+说明：
+
+- `Job/CronJob` 不使用 Workload 的 `replicas` 语义。
+- 并发执行语义使用 `parallelism/completions`。
+
+## 9. Workload 关键契约
+
+`Workload` 提交字段（简化）：
+
+- `kind/name/namespace`
+- `payload`（完整 workload manifest）
+
+其中 `payload.spec.template.spec` 中可包含：
+
+- `containers/initContainers`
+- `volumes`（由存储与配置挂载逻辑生成）
+
+## 10. GVR 对照（当前前端使用）
 
 - Pods：`core/v1/pods`
 - Services：`core/v1/services`
@@ -107,58 +144,18 @@
 - Ingresses：`networking.k8s.io/v1/ingresses`
 - StorageClasses：`storage.k8s.io/v1/storageclasses`
 
-## 7. 按当前模块可直接调的列表 URL
+## 11. 错误排查建议
 
-- 项目：`/resources/core/v1/namespaces`
-- 节点：`/resources/core/v1/nodes`
-- 工作负载：
-  - `/resources/apps/v1/deployments`
-  - `/resources/apps/v1/statefulsets`
-  - `/resources/apps/v1/daemonsets`
-- 任务：
-  - `/resources/batch/v1/jobs`
-  - `/resources/batch/v1/cronjobs`
-- 容器组：`/resources/core/v1/pods`
-- 服务：`/resources/core/v1/services`
-- 应用路由：`/resources/networking.k8s.io/v1/ingresses`
-- 配置字典：`/resources/core/v1/configmaps`
-- 保密字典：`/resources/core/v1/secrets`
-- 存储：
-  - `/resources/core/v1/persistentvolumeclaims`
-  - `/resources/core/v1/persistentvolumes`
-  - `/resources/storage.k8s.io/v1/storageclasses`
+- `401`：token 缺失或失效
+- `404`：GVR 路径或资源名错误
+- `405`：方法不支持或错误详情路径
+- `502`：代理无法连通上游（检查 `KUBESPARK_API_BASE`）
 
-## 8. 命名空间参数规则
+## 12. 代码对应
 
-- namespaced 资源（pods/services/deployments/...）：
-  - 列表可不传 `namespace`（默认全命名空间）
-  - 删除、按名查询建议传 `namespace`
-- cluster 资源（namespaces/nodes/storageclasses/persistentvolumes）：
-  - 不传 `namespace`
-
-## 9. 当前前端实现边界
-
-当前代理层已实现：
-
-- `GET`
-- `POST`
-- `PUT`
-- `DELETE`
-
-当前代理层未实现：
-
-- `PATCH`
-
-## 10. 错误码排查建议
-
-- `401`：token 无效或缺失
-- `404`：GVR 路径错误、资源不存在、或 group/version/resource 不匹配
-- `405`：调用了后端未开放的方法或错误详情路径（建议改成 `fieldSelector` 查询）
-- `502`：Next 代理无法连接上游（检查 `KUBESPARK_API_BASE`）
-
-## 11. 与前端代码对应关系
-
-- 统一请求封装：`app/lib/kubespark/common.ts`
-- YAML 查询封装：`app/lib/kubespark/resource-yaml.ts`
-- 删除封装：`app/lib/kubespark/resource-delete.ts`
-- 模块列表映射：`app/lib/kubespark/resource-rows.ts`
+- 请求与 GVR：`app/lib/kubespark/common.ts`
+- 创建/更新聚合导出：`app/lib/kubespark/resource-create.ts`
+- 删除：`app/lib/kubespark/resource-delete.ts`
+- YAML：`app/lib/kubespark/resource-yaml.ts`
+- Job/CronJob：`app/lib/kubespark/jobs.ts`
+- Workload：`app/lib/kubespark/workloads.ts`

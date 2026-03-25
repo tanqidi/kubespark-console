@@ -62,12 +62,15 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 - 相关改动已通过 ESLint 检查，详见开发进度文档：
   - [docs/DEVELOPMENT-PROGRESS.md](docs/DEVELOPMENT-PROGRESS.md)
 
-## Shell Requirement
+## Shell Recommendation
 
-All commands in this repository must be run with Git Bash.
+为避免 Windows 终端编码乱码，建议按以下优先级使用：
 
-- Required shell: `C:\Program Files\Git\bin\bash.exe`
-- All command examples in this project assume Git Bash.
+1. PowerShell 7（推荐）  
+2. Git Bash（可选）
+
+- PowerShell 7: `C:\Program Files\PowerShell\7\pwsh.exe`
+- Git Bash: `C:\Program Files\Git\bin\bash.exe`
 
 ## Getting Started
 

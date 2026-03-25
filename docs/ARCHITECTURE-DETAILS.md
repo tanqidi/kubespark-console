@@ -1,31 +1,43 @@
-﻿# KubeSpark React 架构细节
+# KubeSpark React 架构细节
 
-更新时间：2026-03-13
+更新时间：2026-03-25
 
-## 1. 目录细分
+## 1. 目录结构（当前）
 
 ```text
 app/
-├─ api/kubespark/[[...path]]/route.ts         # API 代理层（转发到 KUBESPARK_API_BASE）
+├─ api/kubespark/[[...path]]/route.ts
+│  └─ 代理层：GET/POST/PUT/DELETE 透传到 KUBESPARK_API_BASE
 ├─ (examples)/dashboard/
-│  ├─ [...slug]/page.tsx                      # 资源页面分发器
+│  ├─ [...slug]/page.tsx
+│  │  └─ 资源页面分发器
 │  └─ components/
-│     ├─ resource-pages/*.tsx                 # 各资源页面
-│     ├─ data-table.tsx                       # 通用表格
+│     ├─ resource-pages/
+│     │  ├─ *-page.tsx
+│     │  ├─ create-*-dialog.tsx
+│     │  ├─ create-*-dialog.controller.ts
+│     │  ├─ create-*-dialog.logic.ts
+│     │  ├─ container-list-panel.tsx      # 容器列表共享 UI
+│     │  ├─ storage-volume-list.tsx       # 存储卷列表共享 UI
+│     │  ├─ pod-storage-utils.ts          # 前端存储构建/反解析共享
+│     │  └─ use-container-editor.ts       # 容器编辑交互共享 Hook
+│     ├─ data-table.tsx
 │     └─ table/{columns-factory,table-toolbar}.tsx
 └─ lib/kubespark/
-   ├─ common.ts                               # 请求封装、GVR URL、鉴权、响应解包
-   ├─ resource-rows.ts                        # 列表映射
-   ├─ resource-yaml.ts                        # YAML 拉取
-   ├─ resource-document.ts                    # YAML 规范化
-   ├─ resource-delete.ts                      # 删除封装
-   ├─ pods.ts / nodes.ts / projects.ts        # 部分模块的专用封装
-   └─ auth.ts                                 # 登录与 token 管理
+   ├─ common.ts
+   ├─ resource-rows.ts
+   ├─ resource-yaml.ts
+   ├─ resource-document.ts
+   ├─ resource-delete.ts
+   ├─ resource-create.ts
+   ├─ jobs.ts / workloads.ts / services.ts / configmaps.ts / secrets.ts
+   ├─ pod-storage.ts                      # Job/CronJob 后端存储拼装共享
+   └─ auth.ts
 ```
 
-## 2. 路由到模块映射
+## 2. 路由到页面映射
 
-`app/(examples)/dashboard/[...slug]/page.tsx` 将 `slug[0]` 映射到页面组件：
+`app/(examples)/dashboard/[...slug]/page.tsx` 按 `slug[0]` 映射页面：
 
 - `nodes` -> `NodesPageClient`
 - `projects` -> `ProjectsPageClient`
@@ -39,131 +51,118 @@ app/
 - `volumes` -> `VolumesPageClient`
 - `storageclasses` -> `StorageClassesPageClient`
 
-## 3. 模块能力矩阵
+## 3. 模块能力（当前实现）
 
-| 模块 | 列表数据来源 | 列表 GVR | YAML 能力 | 删除能力 |
-|---|---|---|---|---|
-| 项目 | `fetchNamespaces` (`projects.ts`) | `core/v1/namespaces` | `namespace` 规范化 | 单删 + 批量 |
-| 节点 | `fetchNodeResourceRows` (`nodes.ts`) | `core/v1/nodes` + `core/v1/pods` | 暂无 | 暂无 |
-| 工作负载 | `fetchWorkloadRows` | `apps/v1/{deployments,statefulsets,daemonsets}` | `deployment/statefulset/daemonset` | 单删 + 批量 |
-| 任务 | `fetchJobRows` | `batch/v1/{jobs,cronjobs}` | `job/cronjob` | 单删 + 批量 |
-| 容器组 | `fetchPodResourceRows` (`pods.ts`) | `core/v1/pods` | `pod` | 单删 + 批量 |
-| 服务 | `fetchServiceRows` | `core/v1/services` | `service` | 单删 + 批量 |
-| 应用路由 | `fetchRouteRows` | `networking.k8s.io/v1/ingresses` | `ingress` | 单删 + 批量 |
-| 配置字典 | `fetchConfigMapRows` | `core/v1/configmaps` | `configmap` | 单删 + 批量 |
-| 保密字典 | `fetchSecretRows` | `core/v1/secrets` | `secret`（含可读文本解码到 `stringData`） | 单删 + 批量 |
-| 持久卷声明/持久卷 | `fetchVolumeRows` | `core/v1/persistentvolumeclaims` + `core/v1/persistentvolumes` | `persistentvolumeclaim/persistentvolume` | PVC+PV 单删与批量 |
-| 存储类 | `fetchStorageClassRows` | `storage.k8s.io/v1/storageclasses` | `storageclass` | 单删 + 批量 |
+| 模块 | 列表 | 创建 | 编辑 | 删除 | YAML |
+|---|---|---|---|---|---|
+| Namespace | ✅ | ✅ | ⏳ | ✅ | ✅ |
+| ConfigMap | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Secret | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Service | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Job | ✅ | ✅ | ✅ | ✅ | ✅ |
+| CronJob | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Workload(Deploy/STS/DS) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Pod | ✅ | ⏳ | ⏳ | ✅ | ✅ |
+| Ingress | ✅ | ⏳ | ⏳ | ✅ | ✅ |
+| PV/PVC | ✅ | ⏳ | ⏳ | ✅ | ✅ |
+| StorageClass | ✅ | ⏳ | ⏳ | ✅ | ✅ |
+| Node | ✅ | N/A | N/A | N/A | ⏳ |
 
-说明：所有已实现删除的模块均采用“仅发请求，不本地立即删除表格数据”，等待轮询刷新最终状态。
+## 4. 统一客户端细节（`common.ts`）
 
-## 4. 统一 GVR 客户端细节（`common.ts`）
+### 4.1 URL 与查询
 
-## 4.1 URL 构建
+- 列表路径：`/kapis/resources.kubespark.io/v1alpha1/resources/{group}/{version}/{resource}`
+- 支持 query：`namespace/fieldSelector/labelSelector`
 
-- 列表路径：
-  - `/kapis/resources.kubespark.io/v1alpha1/resources/{group}/{version}/{resource}`
-- 支持 query：
-  - `namespace`
-  - `fieldSelector`
-  - `labelSelector`
+### 4.2 查询封装
 
-## 4.2 查询封装
+- `fetchResourceCollection`
+- `fetchResourceByName`（使用 `fieldSelector=metadata.name=...`）
 
-- `fetchResourceCollection`：返回 `{ requestUrl, payload, items }`
-- `fetchResourceByName`：底层使用 `fieldSelector=metadata.name={name}` + 二次匹配
+### 4.3 请求处理
 
-## 4.3 请求处理
+- 自动读取 `kubespark_token`
+- 注入 `Authorization`
+- GET in-flight 去重
+- envelope 统一解包
+- 401 自动跳登录
 
-- 自动读取 `localStorage/sessionStorage` 的 `kubespark_token`
-- 自动注入 `Authorization: Bearer <token>`
-- `GET` 请求去重（同 URL 同时发起只保留一份 in-flight Promise）
-- 统一解析后端 envelope：`{ code, message, data }`
-- `401` 自动跳转登录页并保留 `redirect`
+## 5. API 代理层（`app/api/kubespark/[[...path]]/route.ts`）
 
-## 5. API 代理层细节（`app/api/kubespark/[[...path]]/route.ts`）
+- 已支持：`GET/POST/PUT/DELETE`
+- 未支持：`PATCH`
+- 透传 `Authorization`、query、body
+- 上游失败返回 `502` + `upstreamUrl`
 
-- 支持方法：`GET`、`POST`、`PUT`、`DELETE`
-- 上游地址：`KUBESPARK_API_BASE`（默认 `http://172.31.0.88:8080`）
-- 透传 `Authorization` 和 query 参数
-- 代理失败返回 `502`，附带 `upstreamUrl`
+## 6. 写操作实现模式
 
-当前缺口：`PATCH` 转发尚未实现。
+### 6.1 结构化输入 -> 领域层组装资源体
 
-## 6. YAML 规范化细节（`resource-document.ts`）
+- `configmaps.ts`
+- `secrets.ts`
+- `services.ts`
+- `jobs.ts`（Job/CronJob）
 
-已支持类型：
+### 6.2 直接提交 manifest payload
 
-- `pod`
-- `job`
-- `cronjob`
-- `service`
-- `ingress`
-- `configmap`
-- `secret`
-- `storageclass`
-- `persistentvolume`
-- `persistentvolumeclaim`
-- `deployment`
-- `statefulset`
-- `daemonset`
-- `namespace`
+- `workloads.ts`（Deployment/StatefulSet/DaemonSet）
+- manifest 在 `create-workload-dialog.logic.ts` 中构建
 
-通用清理策略：
+## 7. Job/CronJob 与 Workload 的共享抽取细节
 
-- 清理 metadata 运行时字段：`uid/resourceVersion/generation/creationTimestamp/managedFields/...`
-- 清理 `status`
-- 保留核心声明字段（如 `spec/data/parameters/provisioner/...`）
+### 7.1 存储能力
 
-## 7. 通用表格与交互细节
+- 共享 UI：`storage-volume-list.tsx`
+- 共享前端转换：`pod-storage-utils.ts`
+- 共享后端拼装：`app/lib/kubespark/pod-storage.ts`
 
-## 7.1 `DataTable`
+### 7.2 容器能力
 
-- 行选择、分页、排序、列过滤（由 TanStack Table 提供）
-- 拖拽排序（dnd-kit，仅前端视图排序）
-- `autoResetPageIndex: false`，并在数据变化时只在越界情况下修正页码
-- 通过 `onDeleteSelectedRows` 接入批量删除回调
+- 共享 UI：`container-list-panel.tsx`
+- 共享交互 Hook：`use-container-editor.ts`
 
-## 7.2 `TableToolbar`
+### 7.3 当前效果
 
-- 正常态：左侧业务筛选/页签 + 右侧“自定义列/创建”
-- 选中态：切换为“删除”按钮并弹出统一批量删除确认框
+- 两类弹窗在容器/存储区交互一致。
+- 改一处共享组件或共享 Hook，可同时作用于 Job/CronJob 与 Workload。
 
-## 7.3 `columns-factory`
+## 8. YAML 规范化（`resource-document.ts`）
 
-- 自动注入：拖拽列 + checkbox 列 + 操作菜单列
-- 状态列渲染：
-  - 健康状态（如 `Running/Normal/Bound/...`）显示绿色图标
-  - 非健康状态显示橙色样式
+已覆盖：`pod/job/cronjob/service/ingress/configmap/secret/storageclass/pv/pvc/deployment/statefulset/daemonset/namespace`。
 
-## 8. 轮询刷新策略
+默认清理：
 
-资源页面普遍采用：
+- 运行时 metadata 字段（uid/resourceVersion/managedFields 等）
+- `status`
 
-- 首次加载：`loadRows(false)`
-- 定时刷新：每 3 秒 `loadRows(true)`
-- 静默刷新失败：仅 `console.error`，不打断当前列表
-- 组件卸载时清理 `setInterval`
+## 9. 表格与交互
 
-## 9. 认证与登录
+- `DataTable`：选择、分页、列控制、批量删除、前端拖拽排序
+- `TableToolbar`：正常态/选中态工具栏切换
+- 删除策略：只发请求，不本地硬删，依赖轮询回收状态
 
-- 登录接口：`POST /kapis/auth.kubespark.io/v1/login`
-- token 存储：
-  - `rememberMe = true` -> `localStorage`
-  - 否则 -> `sessionStorage`
-- 由 `common.ts` 自动读取并注入请求头
+## 10. 轮询策略
 
-## 10. 环境变量
+- 首次加载 + 每 3 秒静默刷新
+- 静默刷新失败仅日志输出，不打断当前页面
+- 组件卸载时清理定时器
 
-- `KUBESPARK_API_BASE`：代理上游地址（服务端）
-- `NEXT_PUBLIC_API_PROXY_BASE`：前端请求前缀（默认 `/api/kubespark`）
-- `NEXT_PUBLIC_LOCALE`：国际化语言键（`zh-cn`/`en-us`）
+## 11. 环境变量
 
-## 11. 扩展新资源模块建议流程
+- `KUBESPARK_API_BASE`
+- `NEXT_PUBLIC_API_PROXY_BASE`
+- `NEXT_PUBLIC_LOCALE`
 
-1. 在 `resource-rows.ts` 新增 `fetchXxxRows`（只做映射，不做 UI）。
-2. 在 `resource-delete.ts` 增加 `deleteXxx`（如需删除能力）。
-3. 在 `resource-document.ts` 增加 `documentType` 与 normalize（如需查看 YAML）。
-4. 新建 `resource-pages/xxx-page.tsx` 复用 `DataTable + DeleteConfirmDialog + MonacoViewerDialog`。
-5. 在 `resource-pages/index.ts` 和 `[...slug]/page.tsx` 注册路由组件。
-6. 在 `sidebar-data.ts` 增加导航入口。
+## 12. 当前未覆盖项
+
+- Ingress / PV(PVC) / StorageClass 的创建编辑链路
+- Node YAML 查看
+- PATCH 透传
+
+## 13. 终端建议（Windows）
+
+为避免编码乱码，命令行建议优先级如下：
+
+1. PowerShell 7（推荐）
+2. Git Bash（可选）

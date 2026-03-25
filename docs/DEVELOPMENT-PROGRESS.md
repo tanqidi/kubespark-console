@@ -1,6 +1,6 @@
 # 开发进度（CRUD 首期）
 
-更新时间：2026-03-16
+更新时间：2026-03-25
 
 ## 1. 范围说明
 
@@ -26,6 +26,20 @@
   - 首个错误字段定位
   - 自动滚动 + 聚焦
   - 不承载业务文案（文案留在页面侧）
+- Job/CronJob 与 Workload 的存储能力完成共享抽取：
+  - 前端共享 `storage-volume-list.tsx`（统一卷列表交互）
+  - 前端共享 `pod-storage-utils.ts`（存储构建/反解析）
+  - 后端共享 `app/lib/kubespark/pod-storage.ts`（Job/CronJob 存储挂载拼装）
+- Job/CronJob 与 Workload 的容器能力完成共享抽取：
+  - 前端共享 `container-list-panel.tsx`（统一容器列表 UI）
+  - 控制层共享 `use-container-editor.ts`（容器增删改、校验、编辑态）
+  - `create-job-dialog.*` 与 `create-workload-dialog.*` 已统一接入
+- Job/CronJob 存储与容器交互一致性修正：
+  - 卷列表改为显式 `编辑/删除` 按钮（不再点整行进入编辑）
+  - Job/CronJob 卷删除补齐确认弹窗
+- Job/CronJob 存储回显与提交链路已稳定：
+  - 支持 `YAML -> 表单 -> YAML` 回显闭环
+  - 兼容自定义卷名（`volumes[].name` 与 `persistentVolumeClaim.claimName` 分离保留）
 
 ## 3. 资源维度进度
 
@@ -37,8 +51,8 @@
 | 配置字典（ConfigMap） | ✅ | ✅ | ✅ | ✅ | ✅ | 支持表单与 YAML 模式 |
 | 保密字典（Secret） | ✅ | ✅ | ✅ | ✅ | ✅ | 使用 `stringData` 录入，更新走 `PUT` |
 | 服务（Service） | ✅ | ✅ | ✅ | ✅ | ✅ | 多步骤，支持 YAML 联动 |
-| 任务（Job） | ✅ | ✅ | ⏳ | ✅ | ✅ | 创建已接入；编辑暂未做 |
-| 定时任务（CronJob） | ✅ | ✅ | ⏳ | ✅ | ✅ | 复用 Job 页面与创建流程 |
+| 任务（Job） | ✅ | ✅ | ✅ | ✅ | ✅ | 创建/编辑共用同一套弹窗链路 |
+| 定时任务（CronJob） | ✅ | ✅ | ✅ | ✅ | ✅ | 复用 Job 页面与创建编辑流程 |
 | 容器组（Pod） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 以运维查看/删除为主 |
 | 应用路由（Ingress） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 当前无创建/编辑弹窗 |
 | 存储卷（PV/PVC） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 当前无创建/编辑弹窗 |
@@ -50,7 +64,6 @@
 
 ### 高优先级
 
-- Job / CronJob 编辑能力（含 YAML 与表单一致性）。
 - Job 创建剩余步骤补全（当前部分步骤为占位文案）。
 - Ingress、PV/PVC、StorageClass 的创建/编辑能力。
 
@@ -72,37 +85,4 @@
 1. 先补齐 CRUD 缺口资源（Job 编辑、Ingress/Volume/StorageClass 创建编辑）。  
 2. 完成 Job/CronJob 表单剩余步骤，确保“从表单到资源体”闭环稳定。  
 3. 最后再评估是否进入监控模块（作为二期，不影响首期上线）。
-
----
-
-## 7. 开发进度更新（2026-03-23）
-
-### Job / CronJob 存储配置（挂载卷）联调完成
-
-- PVC 选项改为读取真实集群数据，不再使用固定示例数据。
-- 存储配置支持完整回显链路：`YAML -> 表单 -> YAML`。
-- 兼容用户直接粘贴 YAML 的自定义卷名（如 `volumn-tanqidi`）：
-  - 识别并回显 `volumes[].name` 作为卷名（`volumeId`）。
-  - `persistentVolumeClaim.claimName` 作为 PVC 名（`volumeName`）保留。
-  - 编辑时不强制改名，提交时保持原有卷名。
-- 列表展示逻辑调整：
-  - 持久卷卡片标题优先显示卷名（`volumeId`），避免被 PVC 名覆盖。
-- 新增/编辑交互修正：
-  - “添加挂载卷”保持新增语义，不再误变成“更新当前条目”。
-  - 点击已有条目才进入编辑态。
-- 校验策略更新：
-  - “未选择卷”改为点击“确认保存”时校验并提示。
-  - 重复判断改为按卷名（`volumeId`）而非 PVC 名，允许同 PVC 被不同卷名引用。
-  - 提示文案统一为“卷名称已存在，请回到上方已添加条目中编辑。”
-
-### 容器步骤校验回归修复
-
-- 修复 `POD_REQUIRED_MESSAGE is not defined` 运行时错误（缺失 import）。
-- 恢复“容器为空点击下一步”时的空态警告表现：
-  - 空态卡片边框与文案进入警告态（红色）。
-  - 阻止进入下一步，提示先添加容器。
-
-### 质量状态
-
-- 以上改动已通过相关文件 ESLint 检查。
 
