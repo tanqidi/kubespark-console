@@ -1090,7 +1090,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
           }
         }
 
-        const manifest = buildWorkloadManifest(kind, {
+        const normalizedSnapshot: WorkloadDialogSnapshot = {
           ...source,
           name: normalizedName,
           namespace: normalizedNamespace,
@@ -1100,7 +1100,12 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
             ...source.pod,
             restartPolicy: "Always",
           },
-        })
+        }
+        const manifest = buildWorkloadManifest(
+          kind,
+          normalizedSnapshot,
+          normalizedSnapshot.pod.storageList ?? []
+        )
         await onSubmit({
           kind,
           name: normalizedName,
