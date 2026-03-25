@@ -12,6 +12,7 @@ import {
   type BaseCreateInput,
   type ExistenceCheckInput,
 } from "./create-utils"
+import { applyStorageToPodSpec, type PodStorageItemInput } from "./pod-storage"
 
 export type JobCreateKind = "Job" | "CronJob"
 const DEFAULT_CRON_SCHEDULE = "0 0 1 * *"
@@ -57,26 +58,8 @@ export type JobPodContainerSecurityContextInput = {
 
 export type JobPodInput = {
   restartPolicy?: "Never" | "OnFailure"
-  storageList?: Array<{
-    volumeId?: string
-    volumeKind?: "persistent" | "ephemeral" | "hostPath"
-    volumeName?: string
-    mounts?: Array<{
-      containerName: string
-      mountMode: "none" | "ro" | "rw"
-      mountPath: string
-    }>
-  }>
-  storage?: {
-    volumeId?: string
-    volumeKind?: "persistent" | "ephemeral" | "hostPath"
-    volumeName?: string
-    mounts?: Array<{
-      containerName: string
-      mountMode: "none" | "ro" | "rw"
-      mountPath: string
-    }>
-  }
+  storageList?: PodStorageItemInput[]
+  storage?: PodStorageItemInput
   containers?: Array<{
     name?: string
     type?: "container" | "initContainer"
@@ -528,73 +511,7 @@ function buildPodContainerSpec(pod?: JobPodInput) {
     : pod?.storage
       ? [pod.storage]
       : []
-
-  storageList.forEach((storageItem) => {
-    const storageName = typeof storageItem?.volumeName === "string" ? storageItem.volumeName.trim() : ""
-    const storageIdRaw = typeof storageItem?.volumeId === "string" ? storageItem.volumeId.trim() : ""
-    const storageId = storageIdRaw || storageName
-    const storageKind = storageItem?.volumeKind
-    const storageSource =
-      storageName && storageId
-        ? storageKind === "persistent"
-          ? ({ persistentVolumeClaim: { claimName: storageName } } as Record<string, unknown>)
-          : storageKind === "ephemeral"
-            ? ({ emptyDir: {} } as Record<string, unknown>)
-            : storageKind === "hostPath"
-              ? ({ hostPath: { path: storageName, type: "" } } as Record<string, unknown>)
-              : null
-        : null
-    if (!storageSource) return
-
-    let hasAppliedStorageMount = false
-    const storageMounts =
-      Array.isArray(storageItem?.mounts)
-        ? storageItem.mounts
-            .map((item) => ({
-              containerName: typeof item.containerName === "string" ? item.containerName.trim() : "",
-              mountMode: item.mountMode,
-              mountPath: typeof item.mountPath === "string" ? item.mountPath.trim() : "",
-            }))
-            .filter(
-              (item) =>
-                item.containerName.length > 0 &&
-                (item.mountMode === "ro" || item.mountMode === "rw") &&
-                item.mountPath.length > 0
-            )
-        : []
-
-    storageMounts.forEach((mount) => {
-      const target =
-        containerSpecs.find((item) => item.rawName === mount.containerName) ??
-        containerSpecs.find((item) => item.resolvedName === mount.containerName)
-      if (!target) return
-
-      const existingMounts = Array.isArray(target.spec.volumeMounts)
-        ? (target.spec.volumeMounts as Array<{ name?: string; mountPath?: string }>)
-        : []
-      const duplicated = existingMounts.some(
-        (item) => item.name === storageId && item.mountPath === mount.mountPath
-      )
-      if (duplicated) return
-
-      target.spec.volumeMounts = [
-        ...existingMounts,
-        {
-          name: storageId,
-          mountPath: mount.mountPath,
-          ...(mount.mountMode === "ro" ? { readOnly: true } : {}),
-        },
-      ]
-      hasAppliedStorageMount = true
-    })
-
-    if (hasAppliedStorageMount && !volumes.some((item) => item.name === storageId)) {
-      volumes.push({
-        name: storageId,
-        ...storageSource,
-      })
-    }
-  })
+  applyStorageToPodSpec(storageList, containerSpecs, volumes)
 
   return {
     ...(containers.length > 0 ? { containers } : {}),

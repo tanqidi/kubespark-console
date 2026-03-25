@@ -59,6 +59,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useCreateJobDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.controller"
+import { StorageVolumeList } from "@/app/(examples)/dashboard/components/resource-pages/storage-volume-list"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 export type { JobDialogInitialValues } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
@@ -186,8 +187,7 @@ export function CreateJobDialog({
   const [persistentVolumeNameLoading, setPersistentVolumeNameLoading] = React.useState(false)
   const [persistentVolumeNameError, setPersistentVolumeNameError] = React.useState<string | null>(null)
   const [storageSaveAttempted, setStorageSaveAttempted] = React.useState(false)
-
-  const hasSavedStorageVolume = savedStorageVolumes.length > 0
+  const [pendingDeleteStorageIndex, setPendingDeleteStorageIndex] = React.useState<number | null>(null)
 
   const volumeNameOptions = persistentVolumeNameOptions
   const currentStorageVolumeId = (
@@ -301,6 +301,9 @@ export function CreateJobDialog({
     isStorageVolumeNameEmpty,
     storageVolumeDraft.volumeKind,
   ])
+  React.useEffect(() => {
+    if (!open) setPendingDeleteStorageIndex(null)
+  }, [open])
   return (
     <Dialog
       open={open}
@@ -966,88 +969,13 @@ export function CreateJobDialog({
                   <FieldGroup className="flex flex-col gap-6">
                     <Field>
                       <FieldLabel>挂载卷</FieldLabel>
-                      <div className="flex flex-col gap-3">
-                        {hasSavedStorageVolume ? (
-                          savedStorageVolumes.map((storageItem, storageIndex) => {
-                            const mountedContainerCount = storageItem.mounts.filter(
-                              (item) =>
-                                item.mountMode !== "none" && item.mountPath.trim().length > 0
-                            ).length
-                            const storageDisplayName =
-                              storageItem.volumeId.trim() ||
-                              storageItem.volumeName.trim() ||
-                              "未命名卷"
-
-                            return (
-                              <Item
-                                key={`${storageItem.volumeId}-${storageItem.volumeName}-${storageIndex}`}
-                                variant="outline"
-                                size="sm"
-                                className="cursor-pointer hover:bg-muted"
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => startEditStorageVolume(storageIndex)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault()
-                                    startEditStorageVolume(storageIndex)
-                                  }
-                                }}
-                              >
-                                <ItemContent className="min-w-0">
-                                  <ItemTitle className="min-w-0 truncate">
-                                    {storageDisplayName}
-                                  </ItemTitle>
-                                  <ItemDescription className="min-w-0 truncate">
-                                    {(storageItem.volumeKind === "persistent"
-                                      ? "持久卷"
-                                      : storageItem.volumeKind === "ephemeral"
-                                        ? "临时卷"
-                                        : "HostPath 卷") +
-                                      " · " +
-                                      `${mountedContainerCount} 个容器已配置`}
-                                  </ItemDescription>
-                                </ItemContent>
-                                <ItemActions className="gap-1">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={(event) => {
-                                      event.stopPropagation()
-                                      removeStorageVolume(storageIndex)
-                                    }}
-                                  >
-                                    <IconTrash data-icon="inline-start" />
-                                    删除
-                                  </Button>
-                                </ItemActions>
-                              </Item>
-                            )
-                          })
-                        ) : (
-                          <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                            <div className="text-sm font-semibold">暂无挂载卷配置</div>
-                            <div className="mt-1 text-sm text-muted-foreground">
-                              可添加持久卷、临时卷或 HostPath 卷。
-                            </div>
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          className="flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
-                          onClick={startAddStorageVolume}
-                          disabled={isBusy}
-                        >
-                          <span className="text-sm font-semibold">
-                            添加挂载卷
-                          </span>
-                          <span className="mt-1 text-sm text-muted-foreground">
-                            新增一条卷挂载配置。
-                          </span>
-                        </button>
-                      </div>
+                      <StorageVolumeList
+                        items={savedStorageVolumes}
+                        onEdit={startEditStorageVolume}
+                        onRequestDelete={setPendingDeleteStorageIndex}
+                        onAdd={startAddStorageVolume}
+                        disabled={isBusy}
+                      />
                     </Field>
 
                     <Field>
@@ -1214,6 +1142,24 @@ export function CreateJobDialog({
             if (!pendingDeleteContainer) return
             removeContainer(pendingDeleteContainer.id)
             setPendingDeleteContainerId(null)
+          }}
+        />
+        <DeleteConfirmDialog
+          open={pendingDeleteStorageIndex !== null}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setPendingDeleteStorageIndex(null)
+          }}
+          title="删除挂载卷"
+          description={
+            pendingDeleteStorageIndex !== null
+              ? `确定删除挂载卷 ${(savedStorageVolumes[pendingDeleteStorageIndex]?.volumeId || savedStorageVolumes[pendingDeleteStorageIndex]?.volumeName || "未命名卷").trim()} 吗？`
+              : ""
+          }
+          deleting={isBusy}
+          onConfirm={() => {
+            if (pendingDeleteStorageIndex === null) return
+            removeStorageVolume(pendingDeleteStorageIndex)
+            setPendingDeleteStorageIndex(null)
           }}
         />
       </DialogContent>

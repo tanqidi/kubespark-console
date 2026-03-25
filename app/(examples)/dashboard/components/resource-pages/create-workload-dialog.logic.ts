@@ -17,6 +17,10 @@ import type {
 } from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog.logic"
 import type { ContainerPortFieldErrors } from "@/app/lib/kubespark/form-validation"
 import { parse, stringify } from "yaml"
+import {
+  applyStorageToVolumesAndMounts,
+  parseStorageListFromPodSpec,
+} from "@/app/(examples)/dashboard/components/resource-pages/pod-storage-utils"
 export type NamespaceOption = {
   id: string
   name: string
@@ -932,78 +936,7 @@ export function buildPodSpecFromContainers(
       },
     })
   }
-  const storageList = Array.isArray(storage) ? storage : storage ? [storage] : []
-  storageList.forEach((storageItem) => {
-    const storageName = (storageItem.volumeName ?? "").trim()
-    const storageId = (storageItem.volumeId ?? "").trim() || storageName
-    const storageKind = storageItem.volumeKind
-    const resolvedStorageId =
-      storageKind === "ephemeral"
-        ? storageName
-        : storageId
-    const storageSource =
-      storageName && resolvedStorageId
-        ? storageKind === "persistent"
-          ? ({ persistentVolumeClaim: { claimName: storageName } } as JsonObject)
-          : storageKind === "ephemeral"
-            ? ({ emptyDir: {} } as JsonObject)
-            : storageKind === "hostPath"
-              ? ({ hostPath: { path: storageName, type: "" } } as JsonObject)
-              : null
-        : null
-    if (!storageSource) return
-
-    let hasAppliedStorageMount = false
-    const storageMounts = Array.isArray(storageItem?.mounts)
-      ? storageItem.mounts
-          .map((item) => ({
-            containerName: item.containerName.trim(),
-            mountMode: item.mountMode,
-            mountPath: item.mountPath.trim(),
-          }))
-          .filter(
-            (item) =>
-              item.containerName.length > 0 &&
-              (item.mountMode === "ro" || item.mountMode === "rw") &&
-              item.mountPath.length > 0
-          )
-      : []
-
-    storageMounts.forEach((mount) => {
-      const target =
-        containerSpecs.find((item) => item.rawName === mount.containerName) ??
-        containerSpecs.find((item) => item.resolvedName === mount.containerName)
-      if (!target) return
-
-      const existingMounts = Array.isArray(target.spec.volumeMounts)
-        ? (target.spec.volumeMounts as Array<{ name?: string; mountPath?: string }>)
-        : []
-      const duplicated = existingMounts.some(
-        (item) => item.name === resolvedStorageId && item.mountPath === mount.mountPath
-      )
-      if (duplicated) return
-
-      target.spec.volumeMounts = [
-        ...existingMounts,
-        {
-          name: resolvedStorageId,
-          mountPath: mount.mountPath,
-          ...(mount.mountMode === "ro" ? { readOnly: true } : {}),
-        },
-      ]
-      hasAppliedStorageMount = true
-    })
-
-    if (
-      hasAppliedStorageMount &&
-      !volumes.some((item) => asString(item.name) === resolvedStorageId)
-    ) {
-      volumes.push({
-        name: resolvedStorageId,
-        ...storageSource,
-      })
-    }
-  })
+  applyStorageToVolumesAndMounts(storage, containerSpecs, volumes)
 
   const configMountList = Array.isArray(configMounts) ? configMounts : []
   configMountList.forEach((configItem) => {
@@ -1275,75 +1208,7 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
     ...parseContainers(podSpec.initContainers, "initContainer"),
   ]
 
-  const parsedStorageList = (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
-    .map((entry) => asObject(entry))
-    .map((volume) => {
-      const volumeId = asString(volume.name).trim()
-      const hostPath = asObject(volume.hostPath)
-      const pvc = asObject(volume.persistentVolumeClaim)
-      const hasEmptyDir = Object.prototype.hasOwnProperty.call(volume, "emptyDir")
-
-      if (!volumeId || hostTimeVolumeNames.has(volumeId)) return null
-      if (asString(pvc.claimName).trim()) {
-        return {
-          volumeId,
-          volumeKind: "persistent" as const,
-          volumeName: asString(pvc.claimName).trim(),
-        }
-      }
-      if (hasEmptyDir) {
-        return {
-          volumeId,
-          volumeKind: "ephemeral" as const,
-          volumeName: volumeId,
-        }
-      }
-      if (asString(hostPath.path).trim()) {
-        return {
-          volumeId,
-          volumeKind: "hostPath" as const,
-          volumeName: asString(hostPath.path).trim(),
-        }
-      }
-      return null
-    })
-    .filter(
-      (
-        item
-      ): item is {
-        volumeId: string
-        volumeKind: "persistent" | "ephemeral" | "hostPath"
-        volumeName: string
-      } => Boolean(item)
-    )
-    .map((storageItem) => {
-      const allContainers = [
-        ...(Array.isArray(podSpec.containers) ? podSpec.containers : []),
-        ...(Array.isArray(podSpec.initContainers) ? podSpec.initContainers : []),
-      ]
-      const mounts = allContainers
-        .map((entry) => asObject(entry))
-        .flatMap((container) => {
-          const containerName = asString(container.name).trim()
-          const volumeMounts = Array.isArray(container.volumeMounts) ? container.volumeMounts : []
-          return volumeMounts
-            .map((mount) => asObject(mount))
-            .filter((mount) => asString(mount.name).trim() === storageItem.volumeId)
-            .map((mount) => ({
-              containerName,
-              mountMode: mount.readOnly === true ? ("ro" as const) : ("rw" as const),
-              mountPath: asString(mount.mountPath).trim(),
-            }))
-        })
-        .filter((mount) => mount.containerName.length > 0 && mount.mountPath.length > 0)
-
-      return {
-        volumeId: storageItem.volumeId,
-        volumeKind: storageItem.volumeKind,
-        volumeName: storageItem.volumeName,
-        mounts,
-      }
-    })
+  const parsedStorageList = parseStorageListFromPodSpec(podSpec, hostTimeVolumeNames)
 
   const parsedConfigList = (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
     .map((entry) => asObject(entry))
