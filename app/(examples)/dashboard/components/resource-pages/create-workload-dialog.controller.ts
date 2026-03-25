@@ -35,20 +35,7 @@ import {
   validateContainerPorts,
   validateName,
 } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
-import type {
-  ContainerDraft,
-  ContainerEnvVarSource,
-  ContainerLifecycleMap,
-  ContainerPortProtocol,
-  ContainerProbeMap,
-  ContainerSecurityContextDraft,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog.logic"
-import {
-  resolveFirstContainerPortErrorFieldId,
-  resolveFirstInvalidFieldId,
-  scrollAndFocusFieldById,
-  type ContainerPortFieldErrors,
-} from "@/app/lib/kubespark/form-validation"
+import { useContainerEditor } from "@/app/(examples)/dashboard/components/resource-pages/use-container-editor"
 
 type StorageVolumeKind = "persistent" | "ephemeral" | "hostPath"
 type StorageMountMode = "none" | "ro" | "rw"
@@ -93,13 +80,6 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const [parallelism, setParallelism] = React.useState("")
   const [activeDeadlineSeconds, setActiveDeadlineSeconds] = React.useState("")
   const [restartPolicy, setRestartPolicy] = React.useState<"Always">("Always")
-  const [containers, setContainers] = React.useState<ContainerDraft[]>([])
-  const [containerDialogOpen, setContainerDialogOpen] = React.useState(false)
-  const [editingContainerId, setEditingContainerId] = React.useState<string | null>(null)
-  const [pendingDeleteContainerId, setPendingDeleteContainerId] = React.useState<string | null>(null)
-  const [editingImageError, setEditingImageError] = React.useState<string | null>(null)
-  const [editingPortFieldErrors, setEditingPortFieldErrors] = React.useState<ContainerPortFieldErrors>({})
-  const [editingEnvDuplicateIds, setEditingEnvDuplicateIds] = React.useState<string[]>([])
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [scheduleError, setScheduleError] = React.useState<string | null>(null)
@@ -113,6 +93,54 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const [savedStorageVolumes, setSavedStorageVolumes] = React.useState<StorageVolumeDraft[]>([])
   const [editingStorageVolumeIndex, setEditingStorageVolumeIndex] = React.useState<number | null>(null)
   const [editingStorageVolume, setEditingStorageVolume] = React.useState(false)
+  const {
+    containers,
+    setContainers,
+    configuredContainers,
+    containerDialogOpen,
+    setContainerDialogOpen,
+    pendingDeleteContainer,
+    setPendingDeleteContainerId,
+    editingContainer,
+    editingImageError,
+    editingPortFieldErrors,
+    editingEnvDuplicateIds,
+    resetEditorUiState,
+    updateContainer,
+    addContainerPort,
+    updateContainerPort,
+    removeContainerPort,
+    addContainerEnv,
+    updateContainerEnv,
+    removeContainerEnv,
+    clearContainerEnv,
+    beginEditContainer,
+    addContainer,
+    removeContainer,
+    returnToPodList,
+    cancelEditContainer,
+  } = useContainerEditor({
+    submitError,
+    setSubmitError,
+    deps: {
+      CONTAINER_PORT_PROTOCOL_SET,
+      buildAutoPortName,
+      createContainerDraft,
+      createContainerEnvDraft,
+      createContainerPortDraft,
+      ensureUniqueContainerName,
+      isAutoContainerNameForImage,
+      isAutoPortNameForProtocol,
+      normalizeLifecycleMap,
+      normalizeProbeMap,
+      normalizeSecurityContextDraft,
+      replaceProtocolPrefixInName,
+      resolveContainerNameFromImage,
+      resolveDuplicateContainerEnvNameIds,
+      toDnsLabelFragment,
+      validateContainerPorts,
+    },
+  })
 
   const isBusy = checkingNext || creating
   const currentStepIndex = STEP_ORDER.indexOf(activeStep)
@@ -142,12 +170,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       setActiveDeadlineSeconds("")
       setRestartPolicy("Always")
       setContainers([])
-      setContainerDialogOpen(false)
-      setEditingContainerId(null)
-      setPendingDeleteContainerId(null)
-      setEditingImageError(null)
-      setEditingPortFieldErrors({})
-      setEditingEnvDuplicateIds([])
+      resetEditorUiState()
       setNameError(null)
       setNamespaceError(null)
       setScheduleError(null)
@@ -162,7 +185,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       setEditingStorageVolumeIndex(null)
       setEditingStorageVolume(false)
     }
-  }, [open, kind])
+  }, [open, kind, resetEditorUiState, setContainers])
 
   React.useEffect(() => {
     if (!open || !isEditMode || !initialValues) return
@@ -182,12 +205,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         ? initialValues.pod.containers.map((item, index) => createContainerDraftFromInitial(item, index))
         : []
     )
-    setContainerDialogOpen(false)
-    setEditingContainerId(null)
-    setPendingDeleteContainerId(null)
-    setEditingImageError(null)
-    setEditingPortFieldErrors({})
-    setEditingEnvDuplicateIds([])
+    resetEditorUiState()
     setNameError(null)
     setNamespaceError(null)
     setScheduleError(null)
@@ -230,17 +248,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setSavedStorageVolumes(normalizedStorageItems)
     setEditingStorageVolumeIndex(null)
     setEditingStorageVolume(false)
-  }, [initialValues, isEditMode, kind, open])
-
-  const configuredContainers = React.useMemo(
-    () => {
-      const visible = containers.filter((item) => item.image.trim())
-      const initContainers = visible.filter((item) => item.type === "initContainer")
-      const workloadContainers = visible.filter((item) => item.type !== "initContainer")
-      return [...initContainers, ...workloadContainers]
-    },
-    [containers]
-  )
+  }, [initialValues, isEditMode, kind, open, resetEditorUiState, setContainers])
 
   const resolveStorageContainerNames = React.useCallback(() => {
     const names =
@@ -384,16 +392,6 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setActiveStep(previousStep)
     setSubmitError(null)
   }, [currentStepIndex, isBasicStep, isBusy])
-
-  const editingContainer = React.useMemo(
-    () => containers.find((item) => item.id === editingContainerId) ?? null,
-    [containers, editingContainerId]
-  )
-
-  const pendingDeleteContainer = React.useMemo(
-    () => containers.find((item) => item.id === pendingDeleteContainerId) ?? null,
-    [containers, pendingDeleteContainerId]
-  )
 
   const runPodValidation = React.useCallback(() => {
     if (configuredContainers.length > 0) return true
@@ -546,7 +544,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setNamespaceError(null)
     setScheduleError(null)
     setSubmitError(null)
-  }, [])
+  }, [setContainers])
 
   const withLockedIdentity = React.useCallback(
     (snapshot: WorkloadDialogSnapshot): WorkloadDialogSnapshot => {
@@ -590,392 +588,6 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     },
     [applySnapshot, getSnapshot, isBusy, kind, withLockedIdentity, yamlText]
   )
-
-  const updateContainer = React.useCallback(
-    (
-      id: string,
-      field:
-        | "name"
-        | "type"
-        | "image"
-        | "imagePullPolicy"
-        | "command"
-        | "args"
-        | "syncHostTimezone"
-        | "cpuRequest"
-        | "cpuLimit"
-        | "memoryRequestMi"
-        | "memoryLimitMi"
-        | "probes"
-        | "lifecycle"
-        | "securityContext",
-      value:
-        | string
-        | boolean
-        | ContainerProbeMap
-        | ContainerLifecycleMap
-        | ContainerSecurityContextDraft
-    ) => {
-      setContainers((current) =>
-        current.map((item) =>
-          item.id === id
-            ? (() => {
-                if (field === "image") {
-                  const nextImage = typeof value === "string" ? value : ""
-                  const currentName = item.name.trim()
-                  const siblingNames = new Set(
-                    current
-                      .filter((container) => container.id !== item.id)
-                      .map((container) => toDnsLabelFragment(container.name))
-                      .filter(Boolean)
-                  )
-                  const nextAutoBaseName = resolveContainerNameFromImage(nextImage)
-                  const nextAutoName = nextAutoBaseName
-                    ? ensureUniqueContainerName(nextAutoBaseName, siblingNames)
-                    : ""
-                  const shouldAutoSyncName =
-                    currentName.length === 0 ||
-                    isAutoContainerNameForImage(currentName, item.image)
-
-                  return {
-                    ...item,
-                    image: nextImage,
-                    ...(shouldAutoSyncName ? { name: nextAutoName } : {}),
-                  }
-                }
-
-                return {
-                  ...item,
-                  [field]:
-                    field === "syncHostTimezone"
-                      ? value === true
-                      : field === "probes"
-                        ? normalizeProbeMap(value as ContainerProbeMap)
-                        : field === "lifecycle"
-                          ? normalizeLifecycleMap(value as ContainerLifecycleMap)
-                        : field === "securityContext"
-                          ? normalizeSecurityContextDraft(value)
-                          : value,
-                }
-              })()
-            : item
-        )
-      )
-      if (editingImageError) setEditingImageError(null)
-      setEditingPortFieldErrors({})
-      if (submitError) setSubmitError(null)
-    },
-    [editingImageError, submitError]
-  )
-
-  const addContainerPort = React.useCallback(
-    (id: string) => {
-      setContainers((current) =>
-        current.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                ports: [...item.ports, createContainerPortDraft(item.ports.length)],
-              }
-            : item
-        )
-      )
-      setEditingPortFieldErrors({})
-      if (submitError) setSubmitError(null)
-    },
-    [submitError]
-  )
-
-  const updateContainerPort = React.useCallback(
-    (
-      containerId: string,
-      portId: string,
-      field: "protocol" | "name" | "containerPort",
-      value: string
-    ) => {
-      setContainers((current) =>
-        current.map((item) => {
-          if (item.id !== containerId) return item
-
-          return {
-            ...item,
-            ports: item.ports.map((port) => {
-              if (port.id !== portId) return port
-
-              if (field === "protocol") {
-                const nextProtocol = value.toUpperCase()
-                if (!CONTAINER_PORT_PROTOCOL_SET.has(nextProtocol)) return port
-                const normalizedProtocol = nextProtocol as ContainerPortProtocol
-
-                const replacedName = replaceProtocolPrefixInName(port.name, normalizedProtocol)
-                return {
-                  ...port,
-                  protocol: normalizedProtocol,
-                  name: replacedName ?? port.name,
-                }
-              }
-
-              if (field === "containerPort") {
-                const autoNameBefore = buildAutoPortName(port.protocol, port.containerPort)
-                const autoNameAfter = buildAutoPortName(port.protocol, value)
-                const currentName = port.name.trim()
-                const hasAutoPatternName = isAutoPortNameForProtocol(currentName, port.protocol)
-                const shouldAutoRename =
-                  currentName.length === 0 ||
-                  hasAutoPatternName ||
-                  (Boolean(autoNameBefore) && currentName === autoNameBefore)
-                return {
-                  ...port,
-                  containerPort: value,
-                  ...(shouldAutoRename && autoNameAfter ? { name: autoNameAfter } : {}),
-                }
-              }
-
-              return {
-                ...port,
-                name: value,
-              }
-            }),
-          }
-        })
-      )
-      setEditingPortFieldErrors({})
-      if (submitError) setSubmitError(null)
-    },
-    [submitError]
-  )
-
-  const removeContainerPort = React.useCallback(
-    (containerId: string, portId: string) => {
-      setContainers((current) =>
-        current.map((item) =>
-          item.id === containerId
-            ? {
-                ...item,
-                ports: item.ports.filter((port) => port.id !== portId),
-              }
-            : item
-        )
-      )
-      setEditingPortFieldErrors({})
-      if (submitError) setSubmitError(null)
-    },
-    [submitError]
-  )
-
-  const addContainerEnv = React.useCallback(
-    (
-      containerId: string,
-      defaults?: {
-        source?: ContainerEnvVarSource
-        name?: string
-        value?: string
-        sourceResource?: string
-        sourceKey?: string
-      }
-    ) => {
-      setContainers((current) => {
-        const nextContainers = current.map((item) => {
-          if (item.id !== containerId) return item
-          return {
-            ...item,
-            env: [...item.env, createContainerEnvDraft(defaults)],
-          }
-        })
-        const target = nextContainers.find((item) => item.id === containerId)
-        setEditingEnvDuplicateIds(target ? resolveDuplicateContainerEnvNameIds(target.env) : [])
-        return nextContainers
-      })
-      if (submitError) setSubmitError(null)
-    },
-    [submitError]
-  )
-
-  const updateContainerEnv = React.useCallback(
-    (
-      containerId: string,
-      envId: string,
-      field: "source" | "name" | "value" | "sourceResource" | "sourceKey",
-      value: string
-    ) => {
-      setContainers((current) => {
-        const nextContainers = current.map((item) => {
-          if (item.id !== containerId) return item
-          return {
-            ...item,
-            env: item.env.map((entry) =>
-              entry.id === envId
-                ? {
-                    ...entry,
-                    [field]: value,
-                  }
-                : entry
-            ),
-          }
-        })
-        const target = nextContainers.find((item) => item.id === containerId)
-        setEditingEnvDuplicateIds(target ? resolveDuplicateContainerEnvNameIds(target.env) : [])
-        return nextContainers
-      })
-      if (submitError) setSubmitError(null)
-    },
-    [submitError]
-  )
-
-  const removeContainerEnv = React.useCallback(
-    (containerId: string, envId: string) => {
-      setContainers((current) => {
-        const nextContainers = current.map((item) => {
-          if (item.id !== containerId) return item
-          return {
-            ...item,
-            env: item.env.filter((entry) => entry.id !== envId),
-          }
-        })
-        const target = nextContainers.find((item) => item.id === containerId)
-        setEditingEnvDuplicateIds(target ? resolveDuplicateContainerEnvNameIds(target.env) : [])
-        return nextContainers
-      })
-      if (submitError) setSubmitError(null)
-    },
-    [submitError]
-  )
-
-  const clearContainerEnv = React.useCallback(
-    (containerId: string) => {
-      setContainers((current) =>
-        current.map((item) =>
-          item.id === containerId
-            ? {
-                ...item,
-                env: [],
-              }
-            : item
-        )
-      )
-      setEditingEnvDuplicateIds([])
-      if (submitError) setSubmitError(null)
-    },
-    [submitError]
-  )
-
-  const beginEditContainer = React.useCallback(
-    (id: string) => {
-      setContainers((current) => {
-        const nextContainers = current.map((item) =>
-          item.id === id && item.ports.length === 0
-            ? {
-                ...item,
-                ports: [createContainerPortDraft(0)],
-              }
-            : item
-        )
-        const target = nextContainers.find((item) => item.id === id)
-        setEditingEnvDuplicateIds(target ? resolveDuplicateContainerEnvNameIds(target.env) : [])
-        return nextContainers
-      })
-      setEditingContainerId(id)
-      setContainerDialogOpen(true)
-      if (editingImageError) setEditingImageError(null)
-      setEditingPortFieldErrors({})
-      if (submitError) setSubmitError(null)
-    },
-    [editingImageError, submitError]
-  )
-
-  const addContainer = React.useCallback(() => {
-    const next = createContainerDraft()
-    setContainers((current) => [...current, next])
-    setEditingContainerId(next.id)
-    setContainerDialogOpen(true)
-    if (editingImageError) setEditingImageError(null)
-    setEditingPortFieldErrors({})
-    setEditingEnvDuplicateIds([])
-    if (submitError) setSubmitError(null)
-  }, [editingImageError, submitError])
-
-  const removeContainer = React.useCallback(
-    (id: string) => {
-      setContainers((current) => current.filter((item) => item.id !== id))
-      setEditingContainerId((current) => (current === id ? null : current))
-      setPendingDeleteContainerId((current) => (current === id ? null : current))
-      if (editingImageError) setEditingImageError(null)
-      setEditingPortFieldErrors({})
-      setEditingEnvDuplicateIds([])
-      if (submitError) setSubmitError(null)
-    },
-    [editingImageError, submitError]
-  )
-
-  const returnToPodList = React.useCallback(() => {
-    if (!editingContainer) {
-      setContainerDialogOpen(false)
-      setEditingContainerId(null)
-      return
-    }
-
-    // Required checks follow visual order: image -> ports (row by row) -> env duplicate names.
-    const nextImageError = editingContainer.image.trim() ? null : "请输入镜像地址"
-    const nextPortFieldErrors = nextImageError ? {} : validateContainerPorts(editingContainer.ports)
-    const nextEnvDuplicateIds =
-      nextImageError || Object.keys(nextPortFieldErrors).length > 0
-        ? []
-        : resolveDuplicateContainerEnvNameIds(editingContainer.env)
-
-    setEditingImageError(nextImageError)
-    setEditingPortFieldErrors(nextPortFieldErrors)
-    setEditingEnvDuplicateIds(nextEnvDuplicateIds)
-
-    const firstPortErrorFieldId = resolveFirstContainerPortErrorFieldId(
-      editingContainer.id,
-      editingContainer.ports,
-      nextPortFieldErrors
-    )
-    const firstInvalidFieldId = resolveFirstInvalidFieldId([
-      { invalid: Boolean(nextImageError), fieldId: `${editingContainer.id}-image` },
-      { invalid: Boolean(firstPortErrorFieldId), fieldId: firstPortErrorFieldId },
-      {
-        invalid: nextEnvDuplicateIds.length > 0,
-        fieldId:
-          nextEnvDuplicateIds.length > 0
-            ? `${editingContainer.id}-env-${nextEnvDuplicateIds[0]}-name`
-            : null,
-      },
-    ])
-    if (firstInvalidFieldId) {
-      scrollAndFocusFieldById(firstInvalidFieldId)
-      return
-    }
-
-    setEditingImageError(null)
-    setEditingPortFieldErrors({})
-    setEditingEnvDuplicateIds([])
-    setContainerDialogOpen(false)
-    setEditingContainerId(null)
-  }, [editingContainer])
-
-  const cancelEditContainer = React.useCallback(() => {
-    if (editingContainerId) {
-      setContainers((current) =>
-        current.filter(
-          (item) =>
-            item.id !== editingContainerId ||
-            item.image.trim().length > 0 ||
-            item.name.trim().length > 0 ||
-            item.cpuRequest.trim().length > 0 ||
-            item.cpuLimit.trim().length > 0 ||
-            item.memoryRequestMi.trim().length > 0 ||
-            item.memoryLimitMi.trim().length > 0 ||
-            item.ports.some((port) => port.containerPort.trim().length > 0)
-        )
-      )
-    }
-    setEditingImageError(null)
-    setEditingPortFieldErrors({})
-    setEditingEnvDuplicateIds([])
-    setContainerDialogOpen(false)
-    setEditingContainerId(null)
-  }, [editingContainerId])
 
   const runBasicValidation = React.useCallback(async (source?: Pick<WorkloadDialogSnapshot, "name" | "namespace">) => {
     const nextName = (lockedIdentity?.name ?? source?.name ?? name).trim().toLowerCase()

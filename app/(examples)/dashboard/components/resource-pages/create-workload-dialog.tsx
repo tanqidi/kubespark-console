@@ -13,7 +13,6 @@ import {
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 import {
   Dialog,
   DialogClose,
@@ -45,7 +44,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import {
   Select,
   SelectContent,
@@ -58,6 +57,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useCreateWorkloadDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.controller"
+import { ContainerListPanel } from "@/app/(examples)/dashboard/components/resource-pages/container-list-panel"
 import { StorageVolumeList } from "@/app/(examples)/dashboard/components/resource-pages/storage-volume-list"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
@@ -757,92 +757,15 @@ export function CreateWorkloadDialog({
                     </FieldDescription>
                   </Field>
 
-                  <Field>
-                    <FieldLabel>容器</FieldLabel>
-                    <div className="max-h-[44vh] overflow-y-auto pr-2">
-                      <div className="flex flex-col gap-0 pb-1">
-                        {configuredContainers.length > 0 ? (
-                          <ItemGroup className="gap-3">
-                            {configuredContainers.map((item) => (
-                              <Item key={item.id} variant="outline" size="sm" className="hover:bg-muted">
-                                <ItemContent className="min-w-0">
-                                  <ItemTitle className="min-w-0 truncate">
-                                    {item.name.trim() || "未命名容器"}
-                                  </ItemTitle>
-                                  <ItemDescription className="min-w-0 truncate">
-                                    {item.image.trim()}
-                                    {" · "}
-                                    {item.type === "initContainer" ? (
-                                      <span className="font-semibold text-foreground">初始化容器</span>
-                                    ) : (
-                                      "工作容器"
-                                    )}
-                                    {" · "}
-                                    {item.imagePullPolicy}
-                                  </ItemDescription>
-                                </ItemContent>
-                                <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setPendingDeleteContainerId(item.id)}
-                                    disabled={isBusy}
-                                  >
-                                    <IconTrash data-icon="inline-start" />
-                                    删除
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => beginEditContainer(item.id)}
-                                    disabled={isBusy}
-                                  >
-                                    <IconPencil data-icon="inline-start" />
-                                    编辑
-                                  </Button>
-                                </ItemActions>
-                              </Item>
-                            ))}
-                          </ItemGroup>
-                        ) : (
-                          <div
-                            className={cn(
-                              "rounded-lg border border-dashed px-4 py-10 text-center",
-                              submitError === POD_REQUIRED_MESSAGE && "border-destructive"
-                            )}
-                          >
-                            <div className={cn("text-sm font-semibold", submitError === POD_REQUIRED_MESSAGE && "text-destructive")}>
-                              暂无容器配置
-                            </div>
-                            <div
-                              className={cn(
-                                "mt-1 text-sm text-muted-foreground",
-                                submitError === POD_REQUIRED_MESSAGE && "text-destructive"
-                              )}
-                            >
-                              {submitError === POD_REQUIRED_MESSAGE
-                                ? POD_REQUIRED_MESSAGE
-                                : "点击下方“添加容器”录入镜像信息。"}
-                            </div>
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          className="mt-3 flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
-                          onClick={addContainer}
-                          disabled={isBusy}
-                        >
-                          <span className="text-sm font-semibold">添加容器</span>
-                          <span className="mt-1 text-sm text-muted-foreground">
-                            新增一条容器镜像配置。
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                  </Field>
+                  <ContainerListPanel
+                    items={configuredContainers}
+                    isBusy={isBusy}
+                    submitError={submitError}
+                    podRequiredMessage={POD_REQUIRED_MESSAGE}
+                    onAdd={addContainer}
+                    onEdit={beginEditContainer}
+                    onRequestDelete={setPendingDeleteContainerId}
+                  />
                 </FieldGroup>
               </div>
             ) : isStorageStep ? (
