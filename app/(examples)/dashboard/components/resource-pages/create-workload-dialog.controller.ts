@@ -4,6 +4,7 @@ import * as React from "react"
 
 import { checkWorkloadExists } from "@/app/lib/kubespark/workloads"
 import type {
+  ConfigMountInput,
   CreateWorkloadDialogProps,
   CreateStep,
   WorkloadDialogSnapshot,
@@ -1042,7 +1043,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   ])
 
   const handleCreate = React.useCallback(
-    async () => {
+    async (configMounts?: ConfigMountInput[]) => {
       if (isBusy || (!isFinalStep && !yamlMode)) return
 
       setSubmitError(null)
@@ -1101,10 +1102,15 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
             restartPolicy: "Always",
           },
         }
+        const configMountList =
+          Array.isArray(configMounts) && configMounts.length > 0
+            ? configMounts
+            : normalizedSnapshot.pod.configList ?? []
         const manifest = buildWorkloadManifest(
           kind,
           normalizedSnapshot,
-          normalizedSnapshot.pod.storageList ?? []
+          normalizedSnapshot.pod.storageList ?? [],
+          configMountList
         )
         await onSubmit({
           kind,

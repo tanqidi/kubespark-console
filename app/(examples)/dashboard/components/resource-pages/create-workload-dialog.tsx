@@ -61,7 +61,7 @@ import { useCreateWorkloadDialogController } from "@/app/(examples)/dashboard/co
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 export type { WorkloadDialogInitialValues } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
-function resolvePvcNames(items: unknown[]): string[] {
+function resolveResourceNames(items: unknown[]): string[] {
   const names = items
     .map((item) => {
       if (!item || typeof item !== "object") return ""
@@ -75,6 +75,24 @@ function resolvePvcNames(items: unknown[]): string[] {
     .filter((name) => name.length > 0)
 
   return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
+}
+
+type ConfigMountSourceKind = "configMap" | "secret"
+
+type ConfigMountDraft = {
+  sourceKind: ConfigMountSourceKind
+  sourceName: string
+  mounts: Array<{
+    containerName: string
+    mountMode: "none" | "ro"
+    mountPath: string
+  }>
+}
+
+const EMPTY_CONFIG_MOUNT_DRAFT: ConfigMountDraft = {
+  sourceKind: "configMap",
+  sourceName: "",
+  mounts: [],
 }
 
 export function CreateWorkloadDialog({
@@ -172,6 +190,15 @@ export function CreateWorkloadDialog({
   const [persistentVolumeNameLoading, setPersistentVolumeNameLoading] = React.useState(false)
   const [persistentVolumeNameError, setPersistentVolumeNameError] = React.useState<string | null>(null)
   const [storageSaveAttempted, setStorageSaveAttempted] = React.useState(false)
+  const [configMapNameOptions, setConfigMapNameOptions] = React.useState<string[]>([])
+  const [secretNameOptions, setSecretNameOptions] = React.useState<string[]>([])
+  const [configResourceLoading, setConfigResourceLoading] = React.useState(false)
+  const [configResourceError, setConfigResourceError] = React.useState<string | null>(null)
+  const [configMountSaveAttempted, setConfigMountSaveAttempted] = React.useState(false)
+  const [configMountDraft, setConfigMountDraft] = React.useState<ConfigMountDraft>(EMPTY_CONFIG_MOUNT_DRAFT)
+  const [savedConfigMounts, setSavedConfigMounts] = React.useState<ConfigMountDraft[]>([])
+  const [editingConfigMount, setEditingConfigMount] = React.useState(false)
+  const [editingConfigMountIndex, setEditingConfigMountIndex] = React.useState<number | null>(null)
 
   const hasSavedStorageVolume = savedStorageVolumes.length > 0
 
@@ -198,6 +225,11 @@ export function CreateWorkloadDialog({
   const isHostPathVolumeIdEmpty =
     storageVolumeDraft.volumeKind === "hostPath" &&
     storageVolumeDraft.volumeId.trim().length === 0
+  const configSourceNameOptions =
+    configMountDraft.sourceKind === "configMap" ? configMapNameOptions : secretNameOptions
+  const isConfigSourceNameEmpty = configMountDraft.sourceName.trim().length === 0
+  const isEditingConfigMountView = isStorageStep && editingConfigMount
+  const canNavigateStorageView = canNavigateStep && !isEditingConfigMountView
 
   const handleConfirmStorageSave = React.useCallback(() => {
     setStorageSaveAttempted(true)
@@ -233,7 +265,7 @@ export function CreateWorkloadDialog({
     )
       .then(({ items }) => {
         if (cancelled) return
-        setPersistentVolumeNameOptions(resolvePvcNames(items))
+        setPersistentVolumeNameOptions(resolveResourceNames(items))
       })
       .catch((error: unknown) => {
         if (cancelled) return
@@ -266,6 +298,52 @@ export function CreateWorkloadDialog({
   ])
 
   React.useEffect(() => {
+    if (!open) return
+
+    let cancelled = false
+    const targetNamespace = namespace.trim()
+    setConfigResourceLoading(true)
+    setConfigResourceError(null)
+
+    void Promise.all([
+      fetchResourceCollection(
+        "core",
+        "v1",
+        "configmaps",
+        targetNamespace ? { namespace: targetNamespace } : undefined
+      ),
+      fetchResourceCollection(
+        "core",
+        "v1",
+        "secrets",
+        targetNamespace ? { namespace: targetNamespace } : undefined
+      ),
+    ])
+      .then(([configMapsResult, secretsResult]) => {
+        if (cancelled) return
+        setConfigMapNameOptions(resolveResourceNames(configMapsResult.items))
+        setSecretNameOptions(resolveResourceNames(secretsResult.items))
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "加载配置字典/保密字典失败"
+        setConfigResourceError(message)
+        setConfigMapNameOptions([])
+        setSecretNameOptions([])
+      })
+      .finally(() => {
+        if (!cancelled) setConfigResourceLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [namespace, open])
+
+  React.useEffect(() => {
     if (!isEditingStorageView) {
       setStorageSaveAttempted(false)
       return
@@ -287,6 +365,173 @@ export function CreateWorkloadDialog({
     isStorageVolumeNameEmpty,
     storageVolumeDraft.volumeKind,
   ])
+
+  React.useEffect(() => {
+    if (!open) {
+      setConfigMapNameOptions([])
+      setSecretNameOptions([])
+      setConfigResourceLoading(false)
+      setConfigResourceError(null)
+      setConfigMountSaveAttempted(false)
+      setConfigMountDraft(EMPTY_CONFIG_MOUNT_DRAFT)
+      setSavedConfigMounts([])
+      setEditingConfigMount(false)
+      setEditingConfigMountIndex(null)
+    }
+  }, [open])
+
+  React.useEffect(() => {
+    if (!open) return
+    const initialConfigList = Array.isArray(initialValues?.pod?.configList)
+      ? initialValues.pod.configList
+      : []
+    const normalized = initialConfigList
+      .map((item) => ({
+        sourceKind: item.sourceKind === "secret" ? "secret" : "configMap",
+        sourceName: typeof item.sourceName === "string" ? item.sourceName.trim() : "",
+        mounts: Array.isArray(item.mounts)
+          ? item.mounts
+              .map((mount) => ({
+                containerName: typeof mount.containerName === "string" ? mount.containerName.trim() : "",
+                mountMode: mount.mountMode === "ro" ? "ro" : "none",
+                mountPath: typeof mount.mountPath === "string" ? mount.mountPath.trim() : "",
+              }))
+              .filter((mount) => mount.containerName.length > 0)
+          : [],
+      }))
+      .filter((item) => item.sourceName.length > 0)
+    setSavedConfigMounts(normalized)
+  }, [initialValues?.pod?.configList, open])
+
+  const resolveConfigContainerNames = React.useCallback(() => {
+    const names =
+      configuredContainers.length > 0
+        ? configuredContainers.map((item) => item.name.trim())
+        : []
+    return Array.from(new Set(names.filter((item) => item.length > 0)))
+  }, [configuredContainers])
+
+  const startAddConfigMount = React.useCallback(() => {
+    const containerNames = resolveConfigContainerNames()
+    const mounts = containerNames.map((containerName) => ({
+      containerName,
+      mountMode: "none" as const,
+      mountPath: "",
+    }))
+
+    setEditingConfigMountIndex(null)
+    setConfigMountDraft({
+      sourceKind: "configMap",
+      sourceName: "",
+      mounts,
+    })
+    setEditingConfigMount(true)
+  }, [resolveConfigContainerNames])
+
+  const startEditConfigMount = React.useCallback((index: number) => {
+    const selected = savedConfigMounts[index]
+    const containerNames = resolveConfigContainerNames()
+    const previousByName = new Map((selected?.mounts ?? []).map((item) => [item.containerName, item]))
+    const mounts = containerNames.map((containerName) => {
+      const previous = previousByName.get(containerName)
+      return {
+        containerName,
+        mountMode: previous?.mountMode ?? "none",
+        mountPath: previous?.mountPath ?? "",
+      }
+    })
+
+    setEditingConfigMountIndex(index)
+    setConfigMountDraft({
+      sourceKind: selected?.sourceKind === "secret" ? "secret" : "configMap",
+      sourceName: selected?.sourceName ?? "",
+      mounts,
+    })
+    setEditingConfigMount(true)
+  }, [resolveConfigContainerNames, savedConfigMounts])
+
+  const cancelEditConfigMount = React.useCallback(() => {
+    setEditingConfigMount(false)
+    setEditingConfigMountIndex(null)
+    setConfigMountSaveAttempted(false)
+    setConfigMountDraft(EMPTY_CONFIG_MOUNT_DRAFT)
+  }, [])
+
+  const updateConfigMountDraft = React.useCallback(
+    <K extends keyof ConfigMountDraft>(field: K, value: ConfigMountDraft[K]) => {
+      setConfigMountDraft((current) => ({
+        ...current,
+        [field]: value,
+      }))
+    },
+    []
+  )
+
+  const updateConfigMountDraftMount = React.useCallback(
+    (
+      containerName: string,
+      field: "mountMode" | "mountPath",
+      value: "none" | "ro" | string
+    ) => {
+      setConfigMountDraft((current) => ({
+        ...current,
+        mounts: current.mounts.map((item) =>
+          item.containerName === containerName
+            ? {
+                ...item,
+                [field]: value,
+              }
+            : item
+        ),
+      }))
+    },
+    []
+  )
+
+  const confirmEditConfigMount = React.useCallback(() => {
+    setConfigMountSaveAttempted(true)
+    const sourceName = configMountDraft.sourceName.trim()
+    if (!sourceName) return
+    setSavedConfigMounts((current) => {
+      if (
+        editingConfigMountIndex !== null &&
+        editingConfigMountIndex >= 0 &&
+        editingConfigMountIndex < current.length
+      ) {
+        return current.map((item, index) =>
+          index === editingConfigMountIndex
+            ? {
+                ...configMountDraft,
+                sourceName,
+              }
+            : item
+        )
+      }
+      return [
+        ...current,
+        {
+          ...configMountDraft,
+          sourceName,
+        },
+      ]
+    })
+    setEditingConfigMount(false)
+    setEditingConfigMountIndex(null)
+    setConfigMountSaveAttempted(false)
+    setConfigMountDraft(EMPTY_CONFIG_MOUNT_DRAFT)
+  }, [configMountDraft, editingConfigMountIndex])
+
+  const removeConfigMount = React.useCallback((index: number) => {
+    setSavedConfigMounts((current) => current.filter((_, i) => i !== index))
+    if (editingConfigMountIndex === index) {
+      setEditingConfigMount(false)
+      setEditingConfigMountIndex(null)
+      setConfigMountSaveAttempted(false)
+      setConfigMountDraft(EMPTY_CONFIG_MOUNT_DRAFT)
+    } else if (editingConfigMountIndex !== null && editingConfigMountIndex > index) {
+      setEditingConfigMountIndex(editingConfigMountIndex - 1)
+    }
+  }, [editingConfigMountIndex])
   return (
     <Dialog
       open={open}
@@ -328,9 +573,9 @@ export function CreateWorkloadDialog({
                 status: activeStep === "basic" ? "当前" : "已设置",
                 active: activeStep === "basic",
                 icon: <IconSettings2 className="size-4" />,
-                disabled: !canNavigateStep,
+                disabled: !canNavigateStorageView,
                 onClick: () => {
-                  if (!canNavigateStep) return
+                  if (!canNavigateStorageView) return
                   setActiveStep("basic")
                   setSubmitError(null)
                 },
@@ -341,9 +586,9 @@ export function CreateWorkloadDialog({
                 status: activeStep === "pod" ? "当前" : currentStepIndex > 1 ? "已设置" : "未设置",
                 active: activeStep === "pod",
                 icon: <IconBraces className="size-4" />,
-                disabled: !canNavigateStep,
+                disabled: !canNavigateStorageView,
                 onClick: () => {
-                  if (!canNavigateStep || currentStepIndex < 1) return
+                  if (!canNavigateStorageView || currentStepIndex < 1) return
                   setActiveStep("pod")
                   setSubmitError(null)
                 },
@@ -354,9 +599,9 @@ export function CreateWorkloadDialog({
                 status: activeStep === "storage" ? "当前" : currentStepIndex > 2 ? "已设置" : "未设置",
                 active: activeStep === "storage",
                 icon: <IconDatabase className="size-4" />,
-                disabled: !canNavigateStep,
+                disabled: !canNavigateStorageView,
                 onClick: () => {
-                  if (!canNavigateStep || currentStepIndex < 2) return
+                  if (!canNavigateStorageView || currentStepIndex < 2) return
                   if (activeStep === "pod") {
                     const passed = runPodValidation()
                     if (!passed) return
@@ -371,9 +616,9 @@ export function CreateWorkloadDialog({
                 status: activeStep === "advanced" ? "当前" : "未设置",
                 active: activeStep === "advanced",
                 icon: <IconStack2 className="size-4" />,
-                disabled: !canNavigateStep,
+                disabled: !canNavigateStorageView,
                 onClick: () => {
-                  if (!canNavigateStep || currentStepIndex < 2) return
+                  if (!canNavigateStorageView || currentStepIndex < 2) return
                   setActiveStep("advanced")
                   setSubmitError(null)
                 },
@@ -821,6 +1066,131 @@ export function CreateWorkloadDialog({
                       </div>
                     </div>
                   </FieldGroup>
+                ) : isEditingConfigMountView ? (
+                  <FieldGroup className="flex flex-col gap-6">
+                    <Field>
+                      <FieldLabel>挂载来源类型</FieldLabel>
+                      <Tabs
+                        value={configMountDraft.sourceKind}
+                        onValueChange={(value) => {
+                          if (value === "configMap" || value === "secret") {
+                            updateConfigMountDraft("sourceKind", value)
+                            updateConfigMountDraft("sourceName", "")
+                          }
+                        }}
+                      >
+                        <TabsList className="grid w-full max-w-xl grid-cols-2">
+                          <TabsTrigger value="configMap">配置字典</TabsTrigger>
+                          <TabsTrigger value="secret">保密字典</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="create-job-config-mount-name">
+                        {configMountDraft.sourceKind === "configMap" ? "选择配置字典" : "选择保密字典"}
+                      </FieldLabel>
+                      <Select
+                        value={configMountDraft.sourceName}
+                        onValueChange={(value) => {
+                          updateConfigMountDraft("sourceName", value)
+                          if (configMountSaveAttempted) setConfigMountSaveAttempted(false)
+                        }}
+                        disabled={configResourceLoading || configSourceNameOptions.length === 0}
+                      >
+                        <SelectTrigger
+                          id="create-job-config-mount-name"
+                          aria-invalid={configMountSaveAttempted && isConfigSourceNameEmpty}
+                        >
+                          <SelectValue
+                            placeholder={
+                              configResourceLoading
+                                ? "资源加载中..."
+                                : configMountDraft.sourceKind === "configMap"
+                                  ? "请选择配置字典"
+                                  : "请选择保密字典"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {configSourceNameOptions.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      {configResourceError ? (
+                        <FieldDescription className="text-destructive">{configResourceError}</FieldDescription>
+                      ) : configMountSaveAttempted && isConfigSourceNameEmpty ? (
+                        <FieldDescription className="text-destructive">
+                          请选择资源，或点击取消返回。
+                        </FieldDescription>
+                      ) : configSourceNameOptions.length === 0 && !configResourceLoading ? (
+                        <FieldDescription>
+                          当前命名空间暂无可选{configMountDraft.sourceKind === "configMap" ? "配置字典" : "保密字典"}。
+                        </FieldDescription>
+                      ) : (
+                        <FieldDescription>
+                          将{configMountDraft.sourceKind === "configMap" ? "配置字典" : "保密字典"}挂载到容器。
+                        </FieldDescription>
+                      )}
+                    </Field>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="grid grid-cols-3 gap-4">
+                        <FieldLabel>容器</FieldLabel>
+                        <FieldLabel>挂载模式</FieldLabel>
+                        <FieldLabel>挂载路径</FieldLabel>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        {configMountDraft.mounts.map((item, index) => (
+                          <div key={item.containerName} className="grid grid-cols-3 gap-4">
+                            <Input
+                              id={`create-job-config-container-${index}`}
+                              value={item.containerName}
+                              disabled
+                              autoComplete="off"
+                            />
+                            <Select
+                              value={item.mountMode}
+                              onValueChange={(value) => {
+                                if (value === "none" || value === "ro") {
+                                  updateConfigMountDraftMount(item.containerName, "mountMode", value)
+                                }
+                              }}
+                            >
+                              <SelectTrigger
+                                id={`create-job-config-mode-${index}`}
+                                aria-label="挂载模式"
+                                className="w-full"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  <SelectItem value="none">不挂载</SelectItem>
+                                  <SelectItem value="ro">只读</SelectItem>
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              id={`create-job-config-path-${index}`}
+                              value={item.mountPath}
+                              onChange={(event) =>
+                                updateConfigMountDraftMount(item.containerName, "mountPath", event.target.value)
+                              }
+                              placeholder="例如：/etc/config"
+                              autoComplete="off"
+                              disabled={item.mountMode === "none"}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </FieldGroup>
                 ) : (
                   <FieldGroup className="flex flex-col gap-6">
                     <Field>
@@ -912,16 +1282,61 @@ export function CreateWorkloadDialog({
                     <Field>
                       <FieldLabel>挂载配置字典或保密字典</FieldLabel>
                       <div className="flex flex-col gap-3">
-                        <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                          <div className="text-sm font-semibold">暂无配置挂载</div>
-                          <div className="mt-1 text-sm text-muted-foreground">
-                            可挂载配置字典或保密字典内容到容器。
+                        {savedConfigMounts.length > 0 ? (
+                          savedConfigMounts.map((item, index) => (
+                            <Item
+                              key={`${item.sourceKind}-${item.sourceName}-${index}`}
+                              variant="outline"
+                              size="sm"
+                              className="cursor-pointer hover:bg-muted"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => startEditConfigMount(index)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault()
+                                  startEditConfigMount(index)
+                                }
+                              }}
+                            >
+                              <ItemContent className="min-w-0">
+                                <ItemTitle className="min-w-0 truncate">{item.sourceName}</ItemTitle>
+                                <ItemDescription className="min-w-0 truncate">
+                                  {(item.sourceKind === "configMap" ? "配置字典" : "保密字典") +
+                                    " · " +
+                                    `${item.mounts.filter((mount) => mount.mountMode !== "none" && mount.mountPath.trim().length > 0).length} 个容器已配置`}
+                                </ItemDescription>
+                              </ItemContent>
+                              <ItemActions className="gap-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    removeConfigMount(index)
+                                  }}
+                                  disabled={isBusy}
+                                >
+                                  <IconTrash data-icon="inline-start" />
+                                  删除
+                                </Button>
+                              </ItemActions>
+                            </Item>
+                          ))
+                        ) : (
+                          <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                            <div className="text-sm font-semibold">暂无配置挂载</div>
+                            <div className="mt-1 text-sm text-muted-foreground">
+                              可挂载配置字典或保密字典内容到容器。
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         <button
                           type="button"
                           className="flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
+                          onClick={startAddConfigMount}
                           disabled={isBusy}
                         >
                           <span className="text-sm font-semibold">添加配置挂载</span>
@@ -956,7 +1371,7 @@ export function CreateWorkloadDialog({
                     取消
                   </Button>
                 </DialogClose>
-                <Button type="button" onClick={() => void handleCreate()} disabled={isBusy}>
+                <Button type="button" onClick={() => void handleCreate(undefined)} disabled={isBusy}>
                   {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                 </Button>
               </div>
@@ -971,6 +1386,21 @@ export function CreateWorkloadDialog({
                   type="button"
                   onClick={handleConfirmStorageSave}
                   disabled={isBusy || hasDuplicateStorageSelection}
+                >
+                  确认保存
+                </Button>
+              </div>
+            </DialogFooter>
+          ) : isEditingConfigMountView ? (
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+              <div className="flex w-full items-center justify-between gap-3">
+                <Button type="button" variant="outline" onClick={cancelEditConfigMount} disabled={isBusy}>
+                  取消
+                </Button>
+                <Button
+                  type="button"
+                  onClick={confirmEditConfigMount}
+                  disabled={isBusy || isConfigSourceNameEmpty}
                 >
                   确认保存
                 </Button>
@@ -995,7 +1425,7 @@ export function CreateWorkloadDialog({
                 <Button type="button" variant="outline" onClick={goPrev} disabled={isBusy}>
                   上一步
                 </Button>
-                <Button type="button" onClick={() => void handleCreate()} disabled={isBusy}>
+                <Button type="button" onClick={() => void handleCreate(savedConfigMounts)} disabled={isBusy}>
                   {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                 </Button>
               </div>
@@ -1003,10 +1433,10 @@ export function CreateWorkloadDialog({
           ) : (
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
-                <Button type="button" variant="outline" onClick={goPrev} disabled={!canNavigateStep}>
+                <Button type="button" variant="outline" onClick={goPrev} disabled={!canNavigateStorageView}>
                   上一步
                 </Button>
-                <Button type="button" onClick={() => void goNext()} disabled={!canNavigateStep}>
+                <Button type="button" onClick={() => void goNext()} disabled={!canNavigateStorageView}>
                   下一步
                 </Button>
               </div>
