@@ -52,16 +52,6 @@ export function ContainerListPanel({
                   <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
                     <Button
                       type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onRequestDelete(item.id)}
-                      disabled={isBusy}
-                    >
-                      <IconTrash data-icon="inline-start" />
-                      删除
-                    </Button>
-                    <Button
-                      type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => onEdit(item.id)}
@@ -69,6 +59,16 @@ export function ContainerListPanel({
                     >
                       <IconPencil data-icon="inline-start" />
                       编辑
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onRequestDelete(item.id)}
+                      disabled={isBusy}
+                    >
+                      <IconTrash data-icon="inline-start" />
+                      删除
                     </Button>
                   </ItemActions>
                 </Item>
