@@ -451,6 +451,7 @@ export function VolumesPageClient() {
           columns={pvcColumns}
           toolbarStart={volumeTabs}
           toolbarEnd={volumeFilters}
+          onCreate={() => {}}
           onDeleteSelectedRows={handleDeleteSelectedPvcRows}
         />
       ) : (
@@ -459,6 +460,7 @@ export function VolumesPageClient() {
           columns={pvColumns}
           toolbarStart={volumeTabs}
           toolbarEnd={volumeFilters}
+          onCreate={() => {}}
           onDeleteSelectedRows={handleDeleteSelectedPvRows}
         />
       )}

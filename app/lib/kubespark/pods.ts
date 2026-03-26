@@ -1,15 +1,23 @@
 import {
   buildResourceCollectionEndpoint,
+  fetchJsonDeduped,
   deleteResource,
   fetchResourceByName,
   fetchResourceCollection,
 } from "./common"
 import { buildResourceDocument } from "./resource-document"
 import {
+  buildMetadata,
+  checkNamespacedResourceExists,
+  type BaseCreateInput,
+  type ExistenceCheckInput,
+} from "./create-utils"
+import {
   formatAge,
   resolveDescriptionFromAnnotations,
   resolveUpdatedAt,
 } from "./utils"
+import { applyStorageToPodSpec, type PodStorageItemInput } from "./pod-storage"
 
 export type PodStatusKey = "running" | "pending" | "failed" | "succeeded" | "unknown"
 
@@ -58,6 +66,21 @@ export type PodYamlResult = {
   text: string
 }
 
+export type CreatePodInput = BaseCreateInput & {
+  container: {
+    name?: string
+    image: string
+    imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+    port?: {
+      protocol?: "TCP" | "UDP" | "SCTP"
+      name?: string
+      containerPort: string
+    }
+  }
+  restartPolicy?: "Never" | "OnFailure"
+  storageList?: PodStorageItemInput[]
+}
+
 function phaseToStatusKey(phase?: string): PodStatusKey {
   switch (phase) {
     case "Running":
@@ -76,6 +99,114 @@ function phaseToStatusKey(phase?: string): PodStatusKey {
 function phaseToStatusLabel(phase?: string): string {
   if (!phase) return "Unknown"
   return phase
+}
+
+function toDnsLabelFragment(value: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]/g, "-")
+    .replace(/\.+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+  return normalized.slice(0, 63)
+}
+
+function resolveContainerName(name: string | undefined, image: string): string {
+  const fromName = toDnsLabelFragment(name ?? "")
+  if (fromName) return fromName
+
+  const raw = image.trim()
+  const withoutDigest = raw.includes("@") ? raw.split("@")[0] ?? raw : raw
+  const lastSegment = withoutDigest.split("/").filter(Boolean).pop() ?? withoutDigest
+  const tagIndex = lastSegment.lastIndexOf(":")
+  const withoutTag = tagIndex > 0 ? lastSegment.slice(0, tagIndex) : lastSegment
+  const fromImage = toDnsLabelFragment(withoutTag)
+  return fromImage || "container-1"
+}
+
+function pickContainerPortNumber(value: unknown): number | undefined {
+  const text = typeof value === "string" ? value.trim() : ""
+  if (!/^\d+$/.test(text)) return undefined
+  const parsed = Number(text)
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 65535) return undefined
+  return parsed
+}
+
+function pickPortProtocol(value: unknown): "TCP" | "UDP" | "SCTP" | undefined {
+  const normalized = typeof value === "string" ? value.trim().toUpperCase() : ""
+  if (normalized === "TCP" || normalized === "UDP" || normalized === "SCTP") return normalized
+  return undefined
+}
+
+export async function checkPodExists(input: ExistenceCheckInput): Promise<boolean> {
+  return checkNamespacedResourceExists({
+    group: "core",
+    version: "v1",
+    resource: "pods",
+    input,
+  })
+}
+
+export async function createPod(input: CreatePodInput): Promise<void> {
+  const metadata = buildMetadata(input)
+  const image = input.container.image.trim()
+  if (!image) throw new Error("请输入镜像地址")
+
+  const containerName = resolveContainerName(input.container.name, image)
+  const parsedPort = pickContainerPortNumber(input.container.port?.containerPort)
+  const protocol = pickPortProtocol(input.container.port?.protocol)
+  const portName = typeof input.container.port?.name === "string" ? input.container.port.name.trim() : ""
+  const ports =
+    typeof parsedPort === "number"
+      ? [
+          {
+            containerPort: parsedPort,
+            ...(portName ? { name: portName } : {}),
+            ...(protocol ? { protocol } : {}),
+          },
+        ]
+      : []
+
+  const containerSpec: Record<string, unknown> = {
+    name: containerName,
+    image,
+    ...(input.container.imagePullPolicy ? { imagePullPolicy: input.container.imagePullPolicy } : {}),
+    ...(ports.length > 0 ? { ports } : {}),
+  }
+
+  const containerRefs = [
+    {
+      rawName: containerName,
+      resolvedName: containerName,
+      spec: containerSpec,
+    },
+  ]
+  const volumes: Array<Record<string, unknown>> = []
+  applyStorageToPodSpec(input.storageList, containerRefs, volumes)
+
+  const requestBody = {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata,
+    spec: {
+      restartPolicy: input.restartPolicy === "OnFailure" ? "OnFailure" : "Never",
+      containers: [containerSpec],
+      ...(volumes.length > 0 ? { volumes } : {}),
+    },
+  }
+
+  const url = buildResourceCollectionEndpoint("core", "v1", "pods", {
+    namespace: metadata.namespace,
+  })
+
+  await fetchJsonDeduped<unknown>(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  })
 }
 
 export function podPayloadToEditorText(payload: unknown): string {

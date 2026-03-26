@@ -4,6 +4,7 @@ import * as React from "react"
 import { IconEye, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { CreatePodDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-pod-dialog"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -11,10 +12,12 @@ import {
 } from "@/app/(examples)/dashboard/components/table/columns-factory"
 import {
   deletePod,
+  createPod,
   fetchNamespacedPodYaml,
   fetchPodResourceRows,
   type PodResourceRow,
 } from "@/app/lib/kubespark/pods"
+import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
@@ -25,6 +28,8 @@ type PodRow = PodResourceRow
 
 export function PodsPageClient() {
   const [rows, setRows] = React.useState<PodRow[]>([])
+  const [createNamespaceOptions, setCreateNamespaceOptions] = React.useState<Array<{ id: string; name: string }>>([])
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [namespaceQuery, setNamespaceQuery] = React.useState("")
@@ -155,9 +160,17 @@ export function PodsPageClient() {
         setError(null)
       }
       try {
-        const mapped = await fetchPodResourceRows()
+        const [mapped, namespacesResult] = await Promise.all([
+          fetchPodResourceRows(),
+          fetchNamespaces().catch(() => []),
+        ])
         if (cancelled) return
         setRows(mapped)
+        setCreateNamespaceOptions(
+          namespacesResult
+            .map((item) => ({ id: item.name, name: item.name }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        )
         setError(null)
       } catch (e: unknown) {
         if (cancelled) return
@@ -232,6 +245,25 @@ export function PodsPageClient() {
 
   return (
     <>
+      <CreatePodDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        namespaceOptions={createNamespaceOptions}
+        onSubmit={async (payload) => {
+          await createPod(payload)
+          const [mapped, namespacesResult] = await Promise.all([
+            fetchPodResourceRows(),
+            fetchNamespaces().catch(() => []),
+          ])
+          setRows(mapped)
+          setCreateNamespaceOptions(
+            namespacesResult
+              .map((item) => ({ id: item.name, name: item.name }))
+              .sort((a, b) => a.name.localeCompare(b.name))
+          )
+          setError(null)
+        }}
+      />
       <MonacoViewerDialog
         title="查看YAML"
         open={yamlOpen}
@@ -259,6 +291,7 @@ export function PodsPageClient() {
         data={filteredRows}
         columns={columns}
         toolbarEnd={podFilters}
+        onCreate={() => setCreateDialogOpen(true)}
         onDeleteSelectedRows={handleDeleteSelectedRows}
       />
     </>

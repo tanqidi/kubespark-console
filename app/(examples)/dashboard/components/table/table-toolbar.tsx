@@ -103,16 +103,18 @@ export function TableToolbar<TData>({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="transition-none"
-            onClick={onCreate}
-            type="button"
-          >
-            <IconPlus />
-            <span className="hidden lg:inline">创建</span>
-          </Button>
+          {onCreate ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="transition-none"
+              onClick={onCreate}
+              type="button"
+            >
+              <IconPlus />
+              <span className="hidden lg:inline">创建</span>
+            </Button>
+          ) : null}
         </div>
       </div>
 
