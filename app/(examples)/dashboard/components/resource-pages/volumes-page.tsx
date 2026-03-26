@@ -29,10 +29,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type PersistentVolumeRow = PersistentVolumeResourceRow
 type PersistentVolumeClaimRow = PersistentVolumeClaimResourceRow
-type DeleteTarget =
-  | { kind: "pv"; row: PersistentVolumeRow }
-  | { kind: "pvc"; row: PersistentVolumeClaimRow }
-  | null
 
 const persistentVolumeColumns: ColumnConfig<PersistentVolumeRow>[] = [
   {
@@ -94,7 +90,8 @@ export function VolumesPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [pendingDeleteTarget, setPendingDeleteTarget] = React.useState<DeleteTarget>(null)
+  const [pendingDeletePvcRow, setPendingDeletePvcRow] = React.useState<PersistentVolumeClaimRow | null>(null)
+  const [pendingDeletePvRow, setPendingDeletePvRow] = React.useState<PersistentVolumeRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
   const handleViewPvcYaml = React.useCallback((row: PersistentVolumeClaimRow) => {
@@ -158,51 +155,62 @@ export function VolumesPageClient() {
   }, [])
 
   const requestDeletePvc = React.useCallback((row: PersistentVolumeClaimRow) => {
-    setPendingDeleteTarget({ kind: "pvc", row })
+    setPendingDeletePvcRow(row)
   }, [])
 
   const requestDeletePv = React.useCallback((row: PersistentVolumeRow) => {
-    setPendingDeleteTarget({ kind: "pv", row })
+    setPendingDeletePvRow(row)
   }, [])
 
-  const handleConfirmDelete = React.useCallback(() => {
-    if (!pendingDeleteTarget || deleting) return
+  const handleConfirmDeletePvc = React.useCallback(() => {
+    if (!pendingDeletePvcRow || deleting) return
     setDeleting(true)
-
-    const deletePromise =
-      pendingDeleteTarget.kind === "pvc"
-        ? deletePersistentVolumeClaim(
-            pendingDeleteTarget.row.namespace,
-            pendingDeleteTarget.row.name
-          )
-        : deletePersistentVolume(pendingDeleteTarget.row.name)
-
-    void deletePromise
+    void deletePersistentVolumeClaim(
+      pendingDeletePvcRow.namespace,
+      pendingDeletePvcRow.name
+    )
       .then(() => {
-        setPendingDeleteTarget(null)
+        setPendingDeletePvcRow(null)
       })
       .catch((e: unknown) => {
         const message = e instanceof Error ? e.message : "删除失败"
         setError(message)
         console.error("[Volumes] delete request failed", {
-          target:
-            pendingDeleteTarget.kind === "pvc"
-              ? {
-                  kind: "pvc",
-                  name: pendingDeleteTarget.row.name,
-                  namespace: pendingDeleteTarget.row.namespace,
-                }
-              : {
-                  kind: "pv",
-                  name: pendingDeleteTarget.row.name,
-                },
+          target: {
+            kind: "pvc",
+            name: pendingDeletePvcRow.name,
+            namespace: pendingDeletePvcRow.namespace,
+          },
           error: e,
         })
       })
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeleteTarget])
+  }, [deleting, pendingDeletePvcRow])
+
+  const handleConfirmDeletePv = React.useCallback(() => {
+    if (!pendingDeletePvRow || deleting) return
+    setDeleting(true)
+    void deletePersistentVolume(pendingDeletePvRow.name)
+      .then(() => {
+        setPendingDeletePvRow(null)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "删除失败"
+        setError(message)
+        console.error("[Volumes] delete request failed", {
+          target: {
+            kind: "pv",
+            name: pendingDeletePvRow.name,
+          },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setDeleting(false)
+      })
+  }, [deleting, pendingDeletePvRow])
 
   const handleDeleteSelectedPvcRows = React.useCallback(
     (selectedRows: PersistentVolumeClaimRow[]) => {
@@ -416,14 +424,6 @@ export function VolumesPageClient() {
     </>
   )
 
-  const deleteDialogTitle =
-    pendingDeleteTarget?.kind === "pv" ? "删除持久卷" : "删除持久卷声明"
-  const deleteDialogDescription = pendingDeleteTarget
-    ? pendingDeleteTarget.kind === "pv"
-      ? `确定删除持久卷 ${pendingDeleteTarget.row.name} 吗？`
-      : `确定删除持久卷声明 ${pendingDeleteTarget.row.name} 吗？`
-    : ""
-
   return (
     <>
       <MonacoViewerDialog
@@ -436,14 +436,26 @@ export function VolumesPageClient() {
         error={yamlError}
       />
       <DeleteConfirmDialog
-        open={Boolean(pendingDeleteTarget)}
+        open={Boolean(pendingDeletePvcRow)}
         onOpenChange={(open) => {
-          if (!open && !deleting) setPendingDeleteTarget(null)
+          if (!open && !deleting) setPendingDeletePvcRow(null)
         }}
-        title={deleteDialogTitle}
-        description={deleteDialogDescription}
+        title="删除持久卷声明"
+        description={
+          pendingDeletePvcRow ? `确定删除持久卷声明 ${pendingDeletePvcRow.name} 吗？` : ""
+        }
         deleting={deleting}
-        onConfirm={handleConfirmDelete}
+        onConfirm={handleConfirmDeletePvc}
+      />
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeletePvRow)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDeletePvRow(null)
+        }}
+        title="删除持久卷"
+        description={pendingDeletePvRow ? `确定删除持久卷 ${pendingDeletePvRow.name} 吗？` : ""}
+        deleting={deleting}
+        onConfirm={handleConfirmDeletePv}
       />
       {view === "PVC" ? (
         <DataTable
