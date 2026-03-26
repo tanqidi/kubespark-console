@@ -302,14 +302,7 @@ export type CreateJobDialogProps = {
 
 export type CreateStep = "basic" | "strategy" | "pod" | "storage" | "advanced"
 export const CONTAINER_PORT_PROTOCOL_OPTIONS = [
-  "GRPC",
-  "HTTP",
-  "HTTP2",
-  "HTTPS",
-  "MONGO",
-  "REDIS",
   "TCP",
-  "TLS",
   "UDP",
   "SCTP",
 ] as const
@@ -317,15 +310,7 @@ export const CONTAINER_PORT_PROTOCOL_OPTIONS = [
 export const CONTAINER_PORT_PROTOCOL_SET = new Set<string>(CONTAINER_PORT_PROTOCOL_OPTIONS)
 
 export const AUTO_PROTOCOL_PREFIX_SET = new Set([
-  "grpc",
-  "http",
-  "http2",
-  "https",
-  "mongo",
-  "redis",
   "tcp",
-  "tpc",
-  "tls",
   "udp",
   "sctp",
 ])
@@ -1362,7 +1347,7 @@ export function validateContainerPorts(ports: ContainerPortDraft[]): ContainerPo
 }
 
 export function resolveProtocolNamePrefix(protocol: ContainerPortProtocol): string {
-  return protocol === "TCP" ? "tpc" : protocol.toLowerCase()
+  return protocol.toLowerCase()
 }
 
 export function buildAutoPortName(protocol: ContainerPortProtocol, portText: string): string | null {

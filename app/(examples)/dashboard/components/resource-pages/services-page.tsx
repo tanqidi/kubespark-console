@@ -160,26 +160,12 @@ export function ServicesPageClient() {
                   : ""
             return {
               protocol: [
-                "GRPC",
-                "HTTP",
-                "HTTP2",
-                "HTTPS",
-                "MONGO",
-                "REDIS",
                 "TCP",
-                "TLS",
                 "UDP",
                 "SCTP",
               ].includes(protocol)
                 ? (protocol as
-                    | "GRPC"
-                    | "HTTP"
-                    | "HTTP2"
-                    | "HTTPS"
-                    | "MONGO"
-                    | "REDIS"
                     | "TCP"
-                    | "TLS"
                     | "UDP"
                     | "SCTP")
                 : "TCP",

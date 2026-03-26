@@ -207,15 +207,7 @@ export const CONTAINER_PORT_PROTOCOL_OPTIONS = [
 export const CONTAINER_PORT_PROTOCOL_SET = new Set<string>(CONTAINER_PORT_PROTOCOL_OPTIONS)
 
 export const AUTO_PROTOCOL_PREFIX_SET = new Set([
-  "grpc",
-  "http",
-  "http2",
-  "https",
-  "mongo",
-  "redis",
   "tcp",
-  "tpc",
-  "tls",
   "udp",
   "sctp",
 ])

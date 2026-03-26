@@ -14,14 +14,7 @@ import {
 } from "./create-utils"
 
 export type ServicePortProtocol =
-  | "GRPC"
-  | "HTTP"
-  | "HTTP2"
-  | "HTTPS"
-  | "MONGO"
-  | "REDIS"
   | "TCP"
-  | "TLS"
   | "UDP"
   | "SCTP"
 
@@ -156,4 +149,3 @@ export async function updateService(input: UpdateServiceInput): Promise<void> {
     body: JSON.stringify(requestBody),
   })
 }
-

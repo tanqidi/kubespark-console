@@ -50,14 +50,7 @@ const JOB_RESOURCE_BY_KIND: Record<JobRow["kind"], string> = {
 }
 
 const CONTAINER_PORT_PROTOCOL_SET = new Set([
-  "GRPC",
-  "HTTP",
-  "HTTP2",
-  "HTTPS",
-  "MONGO",
-  "REDIS",
   "TCP",
-  "TLS",
   "UDP",
   "SCTP",
 ])
@@ -94,10 +87,10 @@ function toMemoryMiText(value: unknown): string {
 
 function toPortProtocol(
   value: unknown
-): "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP" {
+): "TCP" | "UDP" | "SCTP" {
   const text = asString(value).trim().toUpperCase()
   return CONTAINER_PORT_PROTOCOL_SET.has(text)
-    ? (text as "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP")
+    ? (text as "TCP" | "UDP" | "SCTP")
     : "TCP"
 }
 
@@ -221,7 +214,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
               containerPort,
             }
           })
-          .filter((port): port is { protocol: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"; name: string; containerPort: string } => Boolean(port))
+          .filter((port): port is { protocol: "TCP" | "UDP" | "SCTP"; name: string; containerPort: string } => Boolean(port))
         const env = (Array.isArray(item.env) ? item.env : [])
           .map((entry) => {
             const envItem = asObject(entry)

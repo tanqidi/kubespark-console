@@ -83,7 +83,7 @@ export type JobPodInput = {
       }
     }>
     ports?: Array<{
-      protocol?: "GRPC" | "HTTP" | "HTTP2" | "HTTPS" | "MONGO" | "REDIS" | "TCP" | "TLS" | "UDP" | "SCTP"
+      protocol?: "TCP" | "UDP" | "SCTP"
       name?: string
       containerPort: string
     }>

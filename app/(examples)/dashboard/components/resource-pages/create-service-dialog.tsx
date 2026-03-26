@@ -87,21 +87,13 @@ type SelectorItem = {
 
 type PortItem = {
   id: string
-  protocol:
-    | "GRPC"
-    | "HTTP"
-    | "HTTP2"
-    | "HTTPS"
-    | "MONGO"
-    | "REDIS"
-    | "TCP"
-    | "TLS"
-    | "UDP"
-    | "SCTP"
+  protocol: "TCP" | "UDP" | "SCTP"
   name: string
   targetPort: string
   servicePort: string
 }
+
+type ServicePortFieldErrors = Record<string, { name?: string; targetPort?: string; servicePort?: string }>
 
 type CreateServiceDialogProps = {
   open: boolean
@@ -172,28 +164,24 @@ function validateName(value: string): string | null {
   return null
 }
 
-let nextSelectorId = 0
-let nextPortId = 0
-
 const PORT_PROTOCOL_OPTIONS = [
-  "GRPC",
-  "HTTP",
-  "HTTP2",
-  "HTTPS",
-  "MONGO",
-  "REDIS",
   "TCP",
-  "TLS",
   "UDP",
   "SCTP",
 ] as const
 
 const PORT_PROTOCOL_SET = new Set<string>(PORT_PROTOCOL_OPTIONS)
 
+function createUniqueId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 function createSelectorItem(): SelectorItem {
-  nextSelectorId += 1
   return {
-    id: `svc-selector-${nextSelectorId}`,
+    id: createUniqueId("svc-selector"),
     key: "",
     value: "",
   }
@@ -202,11 +190,11 @@ function createSelectorItem(): SelectorItem {
 function createPortItem(
   defaults?: Partial<Omit<PortItem, "id">>
 ): PortItem {
-  nextPortId += 1
+  const protocol = defaults?.protocol ?? "TCP"
   return {
-    id: `svc-port-${nextPortId}`,
-    protocol: defaults?.protocol ?? "TCP",
-    name: defaults?.name ?? "",
+    id: createUniqueId("svc-port"),
+    protocol,
+    name: defaults?.name ?? `${resolveProtocolNamePrefix(protocol)}-`,
     targetPort: defaults?.targetPort ?? "",
     servicePort: defaults?.servicePort ?? "",
   }
@@ -239,21 +227,13 @@ function normalizePortInput(value: string): string {
 }
 
 const AUTO_PROTOCOL_PREFIX_SET = new Set([
-  "grpc",
-  "http",
-  "http2",
-  "https",
-  "mongo",
-  "redis",
   "tcp",
-  "tpc",
-  "tls",
   "udp",
   "sctp",
 ])
 
 function resolveProtocolNamePrefix(protocol: PortItem["protocol"]): string {
-  return protocol === "TCP" ? "tpc" : protocol.toLowerCase()
+  return protocol.toLowerCase()
 }
 
 function buildAutoPortName(protocol: PortItem["protocol"], portText: string): string | null {
@@ -274,9 +254,9 @@ function replaceProtocolPrefixInName(
   if (!AUTO_PROTOCOL_PREFIX_SET.has(firstPart)) return null
 
   const tail = parts.slice(1).join("-")
-  if (!tail.trim()) return null
-
-  return `${resolveProtocolNamePrefix(nextProtocol)}-${tail}`
+  return tail.trim()
+    ? `${resolveProtocolNamePrefix(nextProtocol)}-${tail}`
+    : `${resolveProtocolNamePrefix(nextProtocol)}-`
 }
 
 function buildServiceManifest(snapshot: ServiceDialogSnapshot): JsonObject {
@@ -425,6 +405,158 @@ function parseServiceYamlText(yamlText: string): ServiceDialogSnapshot {
   }
 }
 
+function validatePortItems(targetPorts: PortItem[]): {
+  normalizedPorts: Array<{
+    id: string
+    protocol: PortItem["protocol"]
+    name: string
+    targetPort: string
+    servicePort: string
+  }>
+  nextPortError: string | null
+  nextPortFieldErrors: ServicePortFieldErrors
+} {
+  const normalizedPorts = targetPorts.map((item) => ({
+    id: item.id,
+    protocol: item.protocol,
+    name: item.name.trim(),
+    targetPort: item.targetPort.trim(),
+    servicePort: item.servicePort.trim(),
+  }))
+
+  const nextPortFieldErrors: ServicePortFieldErrors = {}
+  let nextPortError: string | null = null
+
+  for (let index = 0; index < normalizedPorts.length; index += 1) {
+    const item = normalizedPorts[index]
+    const fieldError: ServicePortFieldErrors[string] = {}
+
+    const hasName = Boolean(item.name)
+    const hasTargetPort = Boolean(item.targetPort)
+    const hasServicePort = Boolean(item.servicePort)
+
+    if (!hasName) fieldError.name = "请输入名称"
+    if (!hasTargetPort) fieldError.targetPort = "请输入容器端口"
+    if (!hasServicePort) fieldError.servicePort = "请输入服务端口"
+
+    if (hasTargetPort) {
+      if (!/^\d+$/.test(item.targetPort)) {
+        fieldError.targetPort = "容器端口格式无效"
+      } else {
+        const targetPortNumber = Number(item.targetPort)
+        if (targetPortNumber < 0 || targetPortNumber > 65535) {
+          fieldError.targetPort = "容器端口超出范围（0-65535）"
+        }
+      }
+    }
+
+    if (hasServicePort) {
+      if (!/^\d+$/.test(item.servicePort)) {
+        fieldError.servicePort = "服务端口格式无效"
+      } else {
+        const servicePortNumber = Number(item.servicePort)
+        if (servicePortNumber < 0 || servicePortNumber > 65535) {
+          fieldError.servicePort = "服务端口超出范围（0-65535）"
+        }
+      }
+    }
+
+    if (fieldError.name || fieldError.targetPort || fieldError.servicePort) {
+      nextPortFieldErrors[item.id] = fieldError
+      if (!nextPortError) {
+        if (!hasName || !hasTargetPort || !hasServicePort) {
+          nextPortError = `第 ${index + 1} 个端口需完整填写名称、容器端口和服务端口`
+        } else if (fieldError.targetPort) {
+          nextPortError = `第 ${index + 1} 个端口的容器端口校验失败`
+        } else if (fieldError.servicePort) {
+          nextPortError = `第 ${index + 1} 个端口的服务端口校验失败`
+        }
+      }
+    }
+  }
+
+  const nameBuckets = new Map<string, string[]>()
+  const targetPortBuckets = new Map<string, string[]>()
+  const servicePortBuckets = new Map<string, string[]>()
+
+  for (const item of normalizedPorts) {
+    if (item.name) {
+      const key = item.name.toLowerCase()
+      const ids = nameBuckets.get(key) ?? []
+      ids.push(item.id)
+      nameBuckets.set(key, ids)
+    }
+    if (item.targetPort) {
+      const key = `${item.protocol}:${item.targetPort}`
+      const ids = targetPortBuckets.get(key) ?? []
+      ids.push(item.id)
+      targetPortBuckets.set(key, ids)
+    }
+    if (item.servicePort) {
+      const key = `${item.protocol}:${item.servicePort}`
+      const ids = servicePortBuckets.get(key) ?? []
+      ids.push(item.id)
+      servicePortBuckets.set(key, ids)
+    }
+  }
+
+  for (const ids of nameBuckets.values()) {
+    if (ids.length < 2) continue
+    for (const id of ids) {
+      const row = nextPortFieldErrors[id] ?? {}
+      row.name = row.name ?? "端口名称重复"
+      nextPortFieldErrors[id] = row
+    }
+    if (!nextPortError) {
+      nextPortError = "存在重复的端口名称，请调整后重试"
+    }
+  }
+
+  for (const ids of targetPortBuckets.values()) {
+    if (ids.length < 2) continue
+    for (const id of ids) {
+      const row = nextPortFieldErrors[id] ?? {}
+      row.targetPort = row.targetPort ?? "同一协议下容器端口重复"
+      nextPortFieldErrors[id] = row
+    }
+    if (!nextPortError) {
+      nextPortError = "存在重复的容器端口，请调整后重试"
+    }
+  }
+
+  for (const ids of servicePortBuckets.values()) {
+    if (ids.length < 2) continue
+    for (const id of ids) {
+      const row = nextPortFieldErrors[id] ?? {}
+      row.servicePort = row.servicePort ?? "同一协议下服务端口重复"
+      nextPortFieldErrors[id] = row
+    }
+    if (!nextPortError) {
+      nextPortError = "存在重复的服务端口，请调整后重试"
+    }
+  }
+
+  return {
+    normalizedPorts,
+    nextPortError,
+    nextPortFieldErrors,
+  }
+}
+
+function resolveFirstServicePortErrorFieldId(
+  ports: PortItem[],
+  errors: ServicePortFieldErrors
+): string | null {
+  for (const item of ports) {
+    const fieldError = errors[item.id]
+    if (!fieldError) continue
+    if (fieldError.name) return `service-port-${item.id}-name`
+    if (fieldError.targetPort) return `service-port-${item.id}-target-port`
+    if (fieldError.servicePort) return `service-port-${item.id}-service-port`
+  }
+  return null
+}
+
 function createSelectorItemWithDefaults(key: string, value: string): SelectorItem {
   return {
     ...createSelectorItem(),
@@ -454,6 +586,7 @@ export function CreateServiceDialog({
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [selectorError, setSelectorError] = React.useState<string | null>(null)
   const [portError, setPortError] = React.useState<string | null>(null)
+  const [portFieldErrors, setPortFieldErrors] = React.useState<ServicePortFieldErrors>({})
   const [stepError, setStepError] = React.useState<string | null>(null)
   const [checkingNext, setCheckingNext] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
@@ -467,6 +600,7 @@ export function CreateServiceDialog({
   const [pendingDeleteTarget, setPendingDeleteTarget] = React.useState<PendingDeleteTarget>(null)
   const [selectorAddPromptOpen, setSelectorAddPromptOpen] = React.useState(false)
   const [selectorAddPromptShown, setSelectorAddPromptShown] = React.useState(false)
+  const lastFocusedPortErrorFieldRef = React.useRef<string>("")
   const isBusy = checkingNext || creating
 
   const title = isEditMode ? "编辑服务" : "创建服务"
@@ -488,6 +622,7 @@ export function CreateServiceDialog({
       setNamespaceError(null)
       setSelectorError(null)
       setPortError(null)
+      setPortFieldErrors({})
       setStepError(null)
       setCheckingNext(false)
       setCreating(false)
@@ -533,6 +668,7 @@ export function CreateServiceDialog({
     setNamespaceError(null)
     setSelectorError(null)
     setPortError(null)
+    setPortFieldErrors({})
     setStepError(null)
     setYamlMode(false)
     setYamlText("")
@@ -553,6 +689,25 @@ export function CreateServiceDialog({
       setSelectorAddPromptShown(true)
     }
   }, [selectorAddPromptShown, selectorItems.length])
+
+  React.useEffect(() => {
+    if (yamlMode || activeStep !== "service") return
+    const firstErrorFieldId = resolveFirstServicePortErrorFieldId(portItems, portFieldErrors)
+    if (!firstErrorFieldId) {
+      lastFocusedPortErrorFieldRef.current = ""
+      return
+    }
+    if (lastFocusedPortErrorFieldRef.current === firstErrorFieldId) return
+
+    const target = document.getElementById(firstErrorFieldId) as HTMLInputElement | null
+    if (!target) return
+
+    lastFocusedPortErrorFieldRef.current = firstErrorFieldId
+    target.scrollIntoView({ behavior: "smooth", block: "center" })
+    window.setTimeout(() => {
+      target.focus()
+    }, 0)
+  }, [activeStep, portFieldErrors, portItems, yamlMode])
 
   const getSnapshot = React.useCallback(
     (): ServiceDialogSnapshot => ({
@@ -590,6 +745,7 @@ export function CreateServiceDialog({
     setNamespaceError(null)
     setSelectorError(null)
     setPortError(null)
+    setPortFieldErrors({})
     setStepError(null)
   }, [])
 
@@ -697,44 +853,11 @@ export function CreateServiceDialog({
       }
     }
 
-    const normalizedPorts = portItems.map((item) => ({
-      protocol: item.protocol,
-      name: item.name.trim(),
-      targetPort: item.targetPort.trim(),
-      servicePort: item.servicePort.trim(),
-    }))
-
-    let nextPortError: string | null = null
-    if (normalizedPorts.length > 0) {
-      for (let index = 0; index < normalizedPorts.length; index += 1) {
-        const item = normalizedPorts[index]
-        if (!item.name || !item.targetPort || !item.servicePort) {
-          nextPortError = `第 ${index + 1} 个端口需完整填写名称、容器端口和服务端口`
-          break
-        }
-        if (!/^\d+$/.test(item.targetPort)) {
-          nextPortError = `第 ${index + 1} 个端口的容器端口格式无效`
-          break
-        }
-        const targetPortNumber = Number(item.targetPort)
-        if (targetPortNumber < 0 || targetPortNumber > 65535) {
-          nextPortError = `第 ${index + 1} 个端口的容器端口超出范围（0-65535）`
-          break
-        }
-        if (!/^\d+$/.test(item.servicePort)) {
-          nextPortError = `第 ${index + 1} 个端口的服务端口格式无效`
-          break
-        }
-        const servicePortNumber = Number(item.servicePort)
-        if (servicePortNumber < 0 || servicePortNumber > 65535) {
-          nextPortError = `第 ${index + 1} 个端口的服务端口超出范围（0-65535）`
-          break
-        }
-      }
-    }
+    const { nextPortError, nextPortFieldErrors } = validatePortItems(portItems)
 
     setSelectorError(nextSelectorError)
     setPortError(nextPortError)
+    setPortFieldErrors(nextPortFieldErrors)
     setStepError(null)
 
     if (nextSelectorError || nextPortError) return
@@ -780,45 +903,12 @@ export function CreateServiceDialog({
       }
     }
 
-    const normalizedPorts = targetPorts.map((item) => ({
-      protocol: item.protocol,
-      name: item.name.trim(),
-      targetPort: item.targetPort.trim(),
-      servicePort: item.servicePort.trim(),
-    }))
-
-    let nextPortError: string | null = null
-    if (normalizedPorts.length > 0) {
-      for (let index = 0; index < normalizedPorts.length; index += 1) {
-        const item = normalizedPorts[index]
-        if (!item.name || !item.targetPort || !item.servicePort) {
-          nextPortError = `第 ${index + 1} 个端口需完整填写名称、容器端口和服务端口`
-          break
-        }
-        if (!/^\d+$/.test(item.targetPort)) {
-          nextPortError = `第 ${index + 1} 个端口的容器端口格式无效`
-          break
-        }
-        const targetPortNumber = Number(item.targetPort)
-        if (targetPortNumber < 0 || targetPortNumber > 65535) {
-          nextPortError = `第 ${index + 1} 个端口的容器端口超出范围（0-65535）`
-          break
-        }
-        if (!/^\d+$/.test(item.servicePort)) {
-          nextPortError = `第 ${index + 1} 个端口的服务端口格式无效`
-          break
-        }
-        const servicePortNumber = Number(item.servicePort)
-        if (servicePortNumber < 0 || servicePortNumber > 65535) {
-          nextPortError = `第 ${index + 1} 个端口的服务端口超出范围（0-65535）`
-          break
-        }
-      }
-    }
+    const { normalizedPorts, nextPortError, nextPortFieldErrors } = validatePortItems(targetPorts)
 
     return {
       nextSelectorError,
       nextPortError,
+      nextPortFieldErrors,
       filledSelectors,
       normalizedPorts,
     }
@@ -904,7 +994,13 @@ export function CreateServiceDialog({
     const normalizedNamespace = (isEditMode && initialValues ? initialValues.namespace : source.namespace).trim()
     const nextNameError = validateName(normalizedName)
     const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
-    const { nextSelectorError, nextPortError, filledSelectors, normalizedPorts } = validateServiceFields(
+    const {
+      nextSelectorError,
+      nextPortError,
+      nextPortFieldErrors,
+      filledSelectors,
+      normalizedPorts,
+    } = validateServiceFields(
       source.selectorItems,
       source.portItems
     )
@@ -913,6 +1009,7 @@ export function CreateServiceDialog({
     setNamespaceError(nextNamespaceError)
     setSelectorError(nextSelectorError)
     setPortError(nextPortError)
+    setPortFieldErrors(nextPortFieldErrors)
     setStepError(null)
 
     if (nextNameError || nextNamespaceError) {
@@ -1020,6 +1117,32 @@ export function CreateServiceDialog({
         current.map((item) => {
           if (item.id !== id) return item
 
+          if (field === "targetPort") {
+            const nextTargetPort = value
+            const shouldSyncServicePort =
+              !item.servicePort.trim() || item.servicePort.trim() === item.targetPort.trim()
+            const nextServicePort = shouldSyncServicePort ? value : item.servicePort
+            const namePrefix = item.name.trim().split("-")[0]?.toLowerCase() ?? ""
+            const isAutoManagedName =
+              !item.name.trim() || AUTO_PROTOCOL_PREFIX_SET.has(namePrefix)
+            const fallbackPort = nextTargetPort.trim() || nextServicePort.trim()
+            const nextAutoName = fallbackPort
+              ? buildAutoPortName(item.protocol, fallbackPort) ?? `${resolveProtocolNamePrefix(item.protocol)}-`
+              : `${resolveProtocolNamePrefix(item.protocol)}-`
+
+            const next: PortItem = {
+              ...item,
+              targetPort: value,
+              servicePort: nextServicePort,
+            }
+
+            if (isAutoManagedName) {
+              next.name = nextAutoName
+            }
+
+            return next
+          }
+
           if (field !== "protocol") {
             return { ...item, [field]: value }
           }
@@ -1047,6 +1170,10 @@ export function CreateServiceDialog({
                 name: autoName,
               }
             }
+            return {
+              ...next,
+              name: `${resolveProtocolNamePrefix(nextProtocol)}-`,
+            }
           }
 
           return next
@@ -1054,6 +1181,23 @@ export function CreateServiceDialog({
       )
       setServiceCompleted(false)
       if (portError) setPortError(null)
+      setPortFieldErrors((current) => {
+        if (!current[id] || field === "protocol") return current
+        const rowError = { ...current[id] }
+        delete rowError[field]
+        if (field === "targetPort") {
+          delete rowError.servicePort
+        }
+        if (Object.keys(rowError).length === 0) {
+          const next = { ...current }
+          delete next[id]
+          return next
+        }
+        return {
+          ...current,
+          [id]: rowError,
+        }
+      })
       if (stepError) setStepError(null)
     },
     [portError, stepError]
@@ -1063,6 +1207,7 @@ export function CreateServiceDialog({
     setPortItems((current) => [...current, createPortItem()])
     setServiceCompleted(false)
     if (portError) setPortError(null)
+    setPortFieldErrors({})
     if (stepError) setStepError(null)
   }, [portError, stepError])
 
@@ -1071,6 +1216,12 @@ export function CreateServiceDialog({
       setPortItems((current) => current.filter((item) => item.id !== id))
       setServiceCompleted(false)
       if (portError) setPortError(null)
+      setPortFieldErrors((current) => {
+        if (!current[id]) return current
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
       if (stepError) setStepError(null)
     },
     [portError, stepError]
@@ -1394,12 +1545,12 @@ export function CreateServiceDialog({
                     )}
                   </Field>
 
-                  <Field data-invalid={Boolean(portError)}>
+                  <Field>
                     <FieldLabel>端口</FieldLabel>
                     <div className="mt-3 flex flex-col gap-3">
                       {portItems.length > 0 ? (
                         portItems.map((item) => (
-                            <div key={item.id} className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+                            <div key={item.id} className="grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
                               <Select
                                   value={item.protocol}
                                   onValueChange={(value) =>
@@ -1412,67 +1563,85 @@ export function CreateServiceDialog({
                                 </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
-                                  <SelectItem value="GRPC">GRPC</SelectItem>
-                                  <SelectItem value="HTTP">HTTP</SelectItem>
-                                  <SelectItem value="HTTP2">HTTP2</SelectItem>
-                                  <SelectItem value="HTTPS">HTTPS</SelectItem>
-                                  <SelectItem value="MONGO">MONGO</SelectItem>
-                                  <SelectItem value="REDIS">REDIS</SelectItem>
                                   <SelectItem value="TCP">TCP</SelectItem>
-                                  <SelectItem value="TLS">TLS</SelectItem>
                                   <SelectItem value="UDP">UDP</SelectItem>
                                   <SelectItem value="SCTP">SCTP</SelectItem>
                                 </SelectGroup>
                               </SelectContent>
                               </Select>
-                              <InputGroup>
-                                <InputGroupAddon>
-                                  <InputGroupText>名称</InputGroupText>
-                                </InputGroupAddon>
-                                <InputGroupInput
-                                  value={item.name}
-                                  onChange={(event) => updatePortItem(item.id, "name", event.target.value)}
-                                  disabled={isBusy}
-                                />
-                              </InputGroup>
-                              <InputGroup>
-                                <InputGroupAddon>
-                                  <InputGroupText>容器端口</InputGroupText>
-                                </InputGroupAddon>
-                                <InputGroupInput
-                                  value={item.targetPort}
-                                  onChange={(event) =>
-                                    updatePortItem(
-                                      item.id,
-                                      "targetPort",
-                                      normalizePortInput(event.target.value)
-                                    )
-                                  }
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  maxLength={5}
-                                  disabled={isBusy}
-                                />
-                              </InputGroup>
-                              <InputGroup>
-                                <InputGroupAddon>
-                                  <InputGroupText>服务端口</InputGroupText>
-                                </InputGroupAddon>
-                                <InputGroupInput
-                                  value={item.servicePort}
-                                  onChange={(event) =>
-                                    updatePortItem(
-                                      item.id,
-                                      "servicePort",
-                                      normalizePortInput(event.target.value)
-                                    )
-                                  }
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  maxLength={5}
-                                  disabled={isBusy}
-                                />
-                              </InputGroup>
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <InputGroup>
+                                  <InputGroupAddon>
+                                    <InputGroupText>名称</InputGroupText>
+                                  </InputGroupAddon>
+                                  <InputGroupInput
+                                    id={`service-port-${item.id}-name`}
+                                    value={item.name}
+                                    onChange={(event) => updatePortItem(item.id, "name", event.target.value)}
+                                    aria-invalid={Boolean(portFieldErrors[item.id]?.name)}
+                                    disabled={isBusy}
+                                  />
+                                </InputGroup>
+                                {portFieldErrors[item.id]?.name ? (
+                                  <p className="text-xs text-destructive">{portFieldErrors[item.id]?.name}</p>
+                                ) : null}
+                              </div>
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <InputGroup>
+                                  <InputGroupAddon>
+                                    <InputGroupText>容器端口</InputGroupText>
+                                  </InputGroupAddon>
+                                  <InputGroupInput
+                                    id={`service-port-${item.id}-target-port`}
+                                    value={item.targetPort}
+                                    onChange={(event) =>
+                                      updatePortItem(
+                                        item.id,
+                                        "targetPort",
+                                        normalizePortInput(event.target.value)
+                                      )
+                                    }
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={5}
+                                    aria-invalid={Boolean(portFieldErrors[item.id]?.targetPort)}
+                                    disabled={isBusy}
+                                  />
+                                </InputGroup>
+                                {portFieldErrors[item.id]?.targetPort ? (
+                                  <p className="text-xs text-destructive">
+                                    {portFieldErrors[item.id]?.targetPort}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <InputGroup>
+                                  <InputGroupAddon>
+                                    <InputGroupText>服务端口</InputGroupText>
+                                  </InputGroupAddon>
+                                  <InputGroupInput
+                                    id={`service-port-${item.id}-service-port`}
+                                    value={item.servicePort}
+                                    onChange={(event) =>
+                                      updatePortItem(
+                                        item.id,
+                                        "servicePort",
+                                        normalizePortInput(event.target.value)
+                                      )
+                                    }
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={5}
+                                    aria-invalid={Boolean(portFieldErrors[item.id]?.servicePort)}
+                                    disabled={isBusy}
+                                  />
+                                </InputGroup>
+                                {portFieldErrors[item.id]?.servicePort ? (
+                                  <p className="text-xs text-destructive">
+                                    {portFieldErrors[item.id]?.servicePort}
+                                  </p>
+                                ) : null}
+                              </div>
                               <Button
                                   type="button"
                                   variant="ghost"
@@ -1496,11 +1665,7 @@ export function CreateServiceDialog({
                         </Button>
                       </div>
                     </div>
-                    {portError ? (
-                        <FieldError>{portError}</FieldError>
-                    ) : (
-                        <FieldDescription>设置服务端口映射。</FieldDescription>
-                    )}
+                    <FieldDescription>设置服务端口映射。</FieldDescription>
                   </Field>
               </div>
             </div>
@@ -1672,8 +1837,8 @@ export function CreateServiceDialog({
 
             const nextPorts = workload.ports.map((port) =>
               createPortItem({
-                protocol: port.protocol,
-                name: `${resolveProtocolNamePrefix(port.protocol)}-${port.port}`,
+                protocol: resolveProtocolFromYaml(port.protocol),
+                name: `${resolveProtocolNamePrefix(resolveProtocolFromYaml(port.protocol))}-${port.port}`,
                 targetPort: String(port.port),
                 servicePort: String(port.port),
               })
@@ -1684,6 +1849,7 @@ export function CreateServiceDialog({
             setServiceCompleted(false)
             setSelectorError(null)
             setPortError(null)
+            setPortFieldErrors({})
             setStepError(null)
             if (nextSelectors.length > 0) {
               setSelectorAddPromptShown(true)
