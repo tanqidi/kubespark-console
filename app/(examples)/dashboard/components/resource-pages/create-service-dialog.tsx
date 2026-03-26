@@ -1538,15 +1538,12 @@ export function CreateServiceDialog({
                         </Button>
                       </div>
                     </div>
-                    {selectorError ? (
-                        <FieldError>{selectorError}</FieldError>
-                    ) : (
-                        <FieldDescription>服务将根据此处标签路由到匹配的 Pod。</FieldDescription>
-                    )}
+                    {selectorError ? <FieldError>{selectorError}</FieldError> : null}
                   </Field>
 
                   <Field>
                     <FieldLabel>端口</FieldLabel>
+                    <FieldDescription>配置服务端口与容器端口映射，支持 TCP、UDP、SCTP 协议。</FieldDescription>
                     <div className="mt-3 flex flex-col gap-3">
                       {portItems.length > 0 ? (
                         portItems.map((item) => (
@@ -1665,7 +1662,6 @@ export function CreateServiceDialog({
                         </Button>
                       </div>
                     </div>
-                    <FieldDescription>设置服务端口映射。</FieldDescription>
                   </Field>
               </div>
             </div>
