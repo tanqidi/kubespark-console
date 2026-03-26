@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import * as React from "react"
-import { IconEye, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { CreatePodDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-pod-dialog"
@@ -15,6 +15,7 @@ import {
   createPod,
   fetchNamespacedPodYaml,
   fetchPodResourceRows,
+  updatePod,
   type PodResourceRow,
 } from "@/app/lib/kubespark/pods"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
@@ -30,6 +31,8 @@ export function PodsPageClient() {
   const [rows, setRows] = React.useState<PodRow[]>([])
   const [createNamespaceOptions, setCreateNamespaceOptions] = React.useState<Array<{ id: string; name: string }>>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false)
+  const [editInitialYamlText, setEditInitialYamlText] = React.useState<string | null>(null)
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [namespaceQuery, setNamespaceQuery] = React.useState("")
@@ -70,6 +73,18 @@ export function PodsPageClient() {
 
   const requestDelete = React.useCallback((row: PodRow) => {
     setPendingDeleteRow(row)
+  }, [])
+
+  const handleEdit = React.useCallback((row: PodRow) => {
+    void fetchNamespacedPodYaml(row.namespace, row.name)
+      .then(({ text }) => {
+        setEditInitialYamlText(text)
+        setEditDialogOpen(true)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载容器组详情失败"
+        setError(message)
+      })
   }, [])
 
   const handleConfirmDelete = React.useCallback(() => {
@@ -136,6 +151,17 @@ export function PodsPageClient() {
           {
             label: (
               <>
+                <IconPencil className="size-4" />
+                {"编辑"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleEdit(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconTrash className="size-4" />
                 {"\u5220\u9664"}
               </>
@@ -148,8 +174,22 @@ export function PodsPageClient() {
           },
         ],
       }),
-    [handleViewYaml, requestDelete]
+    [handleEdit, handleViewYaml, requestDelete]
   )
+
+  const refreshRows = React.useCallback(async () => {
+    const [mapped, namespacesResult] = await Promise.all([
+      fetchPodResourceRows(),
+      fetchNamespaces().catch(() => []),
+    ])
+    setRows(mapped)
+    setCreateNamespaceOptions(
+      namespacesResult
+        .map((item) => ({ id: item.name, name: item.name }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    )
+    setError(null)
+  }, [])
 
   React.useEffect(() => {
     let cancelled = false
@@ -194,7 +234,7 @@ export function PodsPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [])
+  }, [refreshRows])
 
   const namespaceOptions = React.useMemo(
     () =>
@@ -251,17 +291,21 @@ export function PodsPageClient() {
         namespaceOptions={createNamespaceOptions}
         onSubmit={async (payload) => {
           await createPod(payload)
-          const [mapped, namespacesResult] = await Promise.all([
-            fetchPodResourceRows(),
-            fetchNamespaces().catch(() => []),
-          ])
-          setRows(mapped)
-          setCreateNamespaceOptions(
-            namespacesResult
-              .map((item) => ({ id: item.name, name: item.name }))
-              .sort((a, b) => a.name.localeCompare(b.name))
-          )
-          setError(null)
+          await refreshRows()
+        }}
+      />
+      <CreatePodDialog
+        mode="edit"
+        open={editDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setEditDialogOpen(nextOpen)
+          if (!nextOpen) setEditInitialYamlText(null)
+        }}
+        initialYamlText={editInitialYamlText}
+        namespaceOptions={createNamespaceOptions}
+        onSubmit={async (payload) => {
+          await updatePod(payload)
+          await refreshRows()
         }}
       />
       <MonacoViewerDialog

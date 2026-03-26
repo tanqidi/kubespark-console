@@ -1,5 +1,6 @@
 import {
   buildResourceCollectionEndpoint,
+  buildResourceItemEndpoint,
   fetchJsonDeduped,
   deleteResource,
   fetchResourceByName,
@@ -7,6 +8,8 @@ import {
 } from "./common"
 import { buildResourceDocument } from "./resource-document"
 import {
+  asObject,
+  buildDescriptionPatch,
   buildMetadata,
   checkNamespacedResourceExists,
   type BaseCreateInput,
@@ -67,7 +70,7 @@ export type PodYamlResult = {
 }
 
 export type CreatePodInput = BaseCreateInput & {
-  container: {
+  container?: {
     name?: string
     image: string
     imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
@@ -78,6 +81,23 @@ export type CreatePodInput = BaseCreateInput & {
     }
   }
   restartPolicy?: "Never" | "OnFailure"
+  podSpec?: Record<string, unknown>
+  storageList?: PodStorageItemInput[]
+}
+
+export type UpdatePodInput = BaseCreateInput & {
+  container?: {
+    name?: string
+    image: string
+    imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
+    port?: {
+      protocol?: "TCP" | "UDP" | "SCTP"
+      name?: string
+      containerPort: string
+    }
+  }
+  restartPolicy?: "Never" | "OnFailure"
+  podSpec?: Record<string, unknown>
   storageList?: PodStorageItemInput[]
 }
 
@@ -150,50 +170,66 @@ export async function checkPodExists(input: ExistenceCheckInput): Promise<boolea
 
 export async function createPod(input: CreatePodInput): Promise<void> {
   const metadata = buildMetadata(input)
-  const image = input.container.image.trim()
-  if (!image) throw new Error("请输入镜像地址")
+  let spec: Record<string, unknown> | null = null
 
-  const containerName = resolveContainerName(input.container.name, image)
-  const parsedPort = pickContainerPortNumber(input.container.port?.containerPort)
-  const protocol = pickPortProtocol(input.container.port?.protocol)
-  const portName = typeof input.container.port?.name === "string" ? input.container.port.name.trim() : ""
-  const ports =
-    typeof parsedPort === "number"
-      ? [
-          {
-            containerPort: parsedPort,
-            ...(portName ? { name: portName } : {}),
-            ...(protocol ? { protocol } : {}),
-          },
-        ]
-      : []
+  if (input.podSpec && typeof input.podSpec === "object" && !Array.isArray(input.podSpec)) {
+    const parsed = asObject(input.podSpec)
+    spec = {
+      ...parsed,
+      restartPolicy:
+        parsed.restartPolicy === "OnFailure" || parsed.restartPolicy === "Never"
+          ? parsed.restartPolicy
+          : "Never",
+    }
+  } else if (input.container) {
+    const image = input.container.image.trim()
+    if (!image) throw new Error("请输入镜像地址")
 
-  const containerSpec: Record<string, unknown> = {
-    name: containerName,
-    image,
-    ...(input.container.imagePullPolicy ? { imagePullPolicy: input.container.imagePullPolicy } : {}),
-    ...(ports.length > 0 ? { ports } : {}),
+    const containerName = resolveContainerName(input.container.name, image)
+    const parsedPort = pickContainerPortNumber(input.container.port?.containerPort)
+    const protocol = pickPortProtocol(input.container.port?.protocol)
+    const portName = typeof input.container.port?.name === "string" ? input.container.port.name.trim() : ""
+    const ports =
+      typeof parsedPort === "number"
+        ? [
+            {
+              containerPort: parsedPort,
+              ...(portName ? { name: portName } : {}),
+              ...(protocol ? { protocol } : {}),
+            },
+          ]
+        : []
+
+    const containerSpec: Record<string, unknown> = {
+      name: containerName,
+      image,
+      ...(input.container.imagePullPolicy ? { imagePullPolicy: input.container.imagePullPolicy } : {}),
+      ...(ports.length > 0 ? { ports } : {}),
+    }
+
+    const containerRefs = [
+      {
+        rawName: containerName,
+        resolvedName: containerName,
+        spec: containerSpec,
+      },
+    ]
+    const volumes: Array<Record<string, unknown>> = []
+    applyStorageToPodSpec(input.storageList, containerRefs, volumes)
+    spec = {
+      restartPolicy: input.restartPolicy === "OnFailure" ? "OnFailure" : "Never",
+      containers: [containerSpec],
+      ...(volumes.length > 0 ? { volumes } : {}),
+    }
+  } else {
+    throw new Error("缺少容器配置")
   }
-
-  const containerRefs = [
-    {
-      rawName: containerName,
-      resolvedName: containerName,
-      spec: containerSpec,
-    },
-  ]
-  const volumes: Array<Record<string, unknown>> = []
-  applyStorageToPodSpec(input.storageList, containerRefs, volumes)
 
   const requestBody = {
     apiVersion: "v1",
     kind: "Pod",
     metadata,
-    spec: {
-      restartPolicy: input.restartPolicy === "OnFailure" ? "OnFailure" : "Never",
-      containers: [containerSpec],
-      ...(volumes.length > 0 ? { volumes } : {}),
-    },
+    spec,
   }
 
   const url = buildResourceCollectionEndpoint("core", "v1", "pods", {
@@ -202,6 +238,103 @@ export async function createPod(input: CreatePodInput): Promise<void> {
 
   await fetchJsonDeduped<unknown>(url, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  })
+}
+
+export async function updatePod(input: UpdatePodInput): Promise<void> {
+  const metadata = buildMetadata(input)
+  const { payload } = await fetchResourceByName<unknown>("core", "v1", "pods", metadata.name, {
+    namespace: metadata.namespace,
+  })
+  const existing = asObject(payload)
+  const existingMetadata = asObject(existing.metadata)
+  const existingAnnotations = asObject(existingMetadata.annotations)
+  const mergedAnnotations = {
+    ...existingAnnotations,
+    ...buildDescriptionPatch(input.description).annotations,
+  }
+  if (mergedAnnotations.description === null) {
+    delete mergedAnnotations.description
+  }
+
+  let spec: Record<string, unknown> | null = null
+  if (input.podSpec && typeof input.podSpec === "object" && !Array.isArray(input.podSpec)) {
+    const parsed = asObject(input.podSpec)
+    spec = {
+      ...parsed,
+      restartPolicy:
+        parsed.restartPolicy === "OnFailure" || parsed.restartPolicy === "Never"
+          ? parsed.restartPolicy
+          : "Never",
+    }
+  } else if (input.container) {
+    const image = input.container.image.trim()
+    if (!image) throw new Error("请输入镜像地址")
+    const containerName = resolveContainerName(input.container.name, image)
+    const parsedPort = pickContainerPortNumber(input.container.port?.containerPort)
+    const protocol = pickPortProtocol(input.container.port?.protocol)
+    const portName = typeof input.container.port?.name === "string" ? input.container.port.name.trim() : ""
+    const ports =
+      typeof parsedPort === "number"
+        ? [
+            {
+              containerPort: parsedPort,
+              ...(portName ? { name: portName } : {}),
+              ...(protocol ? { protocol } : {}),
+            },
+          ]
+        : []
+
+    const containerSpec: Record<string, unknown> = {
+      name: containerName,
+      image,
+      ...(input.container.imagePullPolicy ? { imagePullPolicy: input.container.imagePullPolicy } : {}),
+      ...(ports.length > 0 ? { ports } : {}),
+    }
+
+    const containerRefs = [
+      {
+        rawName: containerName,
+        resolvedName: containerName,
+        spec: containerSpec,
+      },
+    ]
+    const volumes: Array<Record<string, unknown>> = []
+    applyStorageToPodSpec(input.storageList, containerRefs, volumes)
+    spec = {
+      restartPolicy: input.restartPolicy === "OnFailure" ? "OnFailure" : "Never",
+      containers: [containerSpec],
+      ...(volumes.length > 0 ? { volumes } : {}),
+    }
+  } else {
+    throw new Error("缺少容器配置")
+  }
+
+  const requestBody = {
+    apiVersion: "v1",
+    kind: "Pod",
+    metadata: {
+      name: metadata.name,
+      namespace: metadata.namespace,
+      resourceVersion:
+        typeof existingMetadata.resourceVersion === "string"
+          ? existingMetadata.resourceVersion
+          : undefined,
+      ...(Object.keys(mergedAnnotations).length > 0 ? { annotations: mergedAnnotations } : {}),
+      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
+        ? { labels: existingMetadata.labels }
+        : {}),
+    },
+    spec,
+  }
+
+  const url = buildResourceItemEndpoint("core", "v1", "pods", metadata.name, metadata.namespace)
+  await fetchJsonDeduped<unknown>(url, {
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },

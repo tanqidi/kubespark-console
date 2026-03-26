@@ -1277,8 +1277,8 @@ export function createContainerDraft(): ContainerDraft {
 export function createContainerPortDraft(index: number): ContainerPortDraft {
   return {
     id: crypto.randomUUID(),
-    protocol: "HTTP",
-    name: `http-${index}`,
+    protocol: "TCP",
+    name: `tcp-${index}`,
     containerPort: "",
   }
 }
