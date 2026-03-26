@@ -293,7 +293,7 @@ function buildServiceManifest(snapshot: ServiceDialogSnapshot): JsonObject {
         ...(Number.isFinite(parsedTargetPort) && targetPort ? { targetPort: parsedTargetPort } : {}),
       }
     })
-    .filter((item): item is Record<string, unknown> => item !== null)
+    .filter((item): item is NonNullable<typeof item> => item !== null)
 
   const spec: JsonObject = {
     type:
