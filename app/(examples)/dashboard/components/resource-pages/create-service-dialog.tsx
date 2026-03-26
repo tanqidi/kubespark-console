@@ -133,11 +133,6 @@ type ServiceDialogSnapshot = {
   enableSessionAffinity: boolean
 }
 
-type PendingDeleteTarget =
-  | { kind: "selector"; id: string }
-  | { kind: "port"; id: string }
-  | null
-
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
 })
@@ -597,7 +592,8 @@ export function CreateServiceDialog({
   const [yamlMode, setYamlMode] = React.useState(false)
   const [yamlText, setYamlText] = React.useState("")
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [pendingDeleteTarget, setPendingDeleteTarget] = React.useState<PendingDeleteTarget>(null)
+  const [pendingDeleteSelectorId, setPendingDeleteSelectorId] = React.useState<string | null>(null)
+  const [pendingDeletePortId, setPendingDeletePortId] = React.useState<string | null>(null)
   const [selectorAddPromptOpen, setSelectorAddPromptOpen] = React.useState(false)
   const [selectorAddPromptShown, setSelectorAddPromptShown] = React.useState(false)
   const lastFocusedPortErrorFieldRef = React.useRef<string>("")
@@ -633,7 +629,8 @@ export function CreateServiceDialog({
       setYamlMode(false)
       setYamlText("")
       setYamlError(null)
-      setPendingDeleteTarget(null)
+      setPendingDeleteSelectorId(null)
+      setPendingDeletePortId(null)
       setSelectorAddPromptOpen(false)
       setSelectorAddPromptShown(false)
     }
@@ -1236,7 +1233,7 @@ export function CreateServiceDialog({
         removeSelectorItem(id)
         return
       }
-      setPendingDeleteTarget({ kind: "selector", id })
+      setPendingDeleteSelectorId(id)
     },
     [removeSelectorItem, selectorItems]
   )
@@ -1253,20 +1250,22 @@ export function CreateServiceDialog({
         removePortItem(id)
         return
       }
-      setPendingDeleteTarget({ kind: "port", id })
+      setPendingDeletePortId(id)
     },
     [portItems, removePortItem]
   )
 
-  const handleConfirmDeleteItem = React.useCallback(() => {
-    if (!pendingDeleteTarget) return
-    if (pendingDeleteTarget.kind === "selector") {
-      removeSelectorItem(pendingDeleteTarget.id)
-    } else {
-      removePortItem(pendingDeleteTarget.id)
-    }
-    setPendingDeleteTarget(null)
-  }, [pendingDeleteTarget, removePortItem, removeSelectorItem])
+  const handleConfirmDeleteSelectorItem = React.useCallback(() => {
+    if (!pendingDeleteSelectorId) return
+    removeSelectorItem(pendingDeleteSelectorId)
+    setPendingDeleteSelectorId(null)
+  }, [pendingDeleteSelectorId, removeSelectorItem])
+
+  const handleConfirmDeletePortItem = React.useCallback(() => {
+    if (!pendingDeletePortId) return
+    removePortItem(pendingDeletePortId)
+    setPendingDeletePortId(null)
+  }, [pendingDeletePortId, removePortItem])
 
   return (
     <Dialog
@@ -1801,20 +1800,29 @@ export function CreateServiceDialog({
         </div>
 
         <DeleteConfirmDialog
-          open={Boolean(pendingDeleteTarget)}
+          open={Boolean(pendingDeleteSelectorId)}
           onOpenChange={(nextOpen) => {
             if (!nextOpen && !isBusy) {
-              setPendingDeleteTarget(null)
+              setPendingDeleteSelectorId(null)
             }
           }}
-          title={pendingDeleteTarget?.kind === "selector" ? "删除工作负载选择器" : "删除端口项"}
-          description={
-            pendingDeleteTarget?.kind === "selector"
-              ? "确定删除该工作负载选择器吗？"
-              : "确定删除该端口项吗？"
-          }
+          title="删除工作负载选择器"
+          description="确定删除该工作负载选择器吗？"
           deleting={isBusy}
-          onConfirm={handleConfirmDeleteItem}
+          onConfirm={handleConfirmDeleteSelectorItem}
+        />
+
+        <DeleteConfirmDialog
+          open={Boolean(pendingDeletePortId)}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen && !isBusy) {
+              setPendingDeletePortId(null)
+            }
+          }}
+          title="删除端口项"
+          description="确定删除该端口项吗？"
+          deleting={isBusy}
+          onConfirm={handleConfirmDeletePortItem}
         />
 
         <WorkloadPickerDialog
