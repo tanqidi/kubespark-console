@@ -35,7 +35,9 @@ export function StepHeaderNav({ items, highlightByActiveOnly = false }: StepHead
           const statusTone = item.active || isDone ? "bg-emerald-500" : "bg-muted-foreground/35"
           const statusTextTone = item.active || isDone ? "text-foreground" : "text-muted-foreground"
           const shapeClass =
-            index === 0
+            items.length === 1
+              ? "rounded-lg"
+              : index === 0
               ? "rounded-l-lg rounded-r-none"
               : index === items.length - 1
                 ? "rounded-r-lg rounded-l-none border-l-0"

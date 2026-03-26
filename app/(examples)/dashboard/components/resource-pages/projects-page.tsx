@@ -1,10 +1,14 @@
 ﻿"use client"
 
 import * as React from "react"
-import { IconEye, IconTrash } from "@tabler/icons-react"
+import type { EditorProps } from "@monaco-editor/react"
+import { IconEye, IconPencil, IconSettings2, IconTrash } from "@tabler/icons-react"
+import dynamic from "next/dynamic"
+import { parse, stringify } from "yaml"
 
 import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
 // import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -17,6 +21,7 @@ import {
   fetchNamespaceYaml,
   fetchNamespaces,
   type NamespaceRow,
+  updateNamespace,
 } from "@/app/lib/kubespark/projects"
 import {
   Dialog,
@@ -35,10 +40,25 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+})
+
+const MONACO_OPTIONS: EditorProps["options"] = {
+  automaticLayout: true,
+  fontSize: 13,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  stickyScroll: { enabled: false },
+  tabSize: 2,
+  wordWrap: "on",
+}
 
 const projectColumns: ColumnConfig<NamespaceRow>[] = [
   {
@@ -94,6 +114,57 @@ function validateProjectName(name: string): string | null {
   return null
 }
 
+function buildProjectYamlText(params: { name: string; description: string }): string {
+  return stringify(
+    {
+      apiVersion: "v1",
+      kind: "Namespace",
+      metadata: {
+        ...(params.name.trim() ? { name: params.name.trim() } : {}),
+        ...(params.description.trim()
+          ? { annotations: { description: params.description.trim() } }
+          : {}),
+      },
+    },
+    {
+      indent: 2,
+      lineWidth: 0,
+      sortMapEntries: false,
+    }
+  )
+}
+
+function parseProjectYamlText(yamlText: string): { name: string; description: string } {
+  const normalized = yamlText.trim()
+  if (!normalized) throw new Error("请输入 YAML 内容")
+
+  const parsed = parse(normalized)
+  const root =
+    typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null
+  if (!root) throw new Error("YAML 内容格式无效")
+
+  const kind = typeof root.kind === "string" ? root.kind.trim() : ""
+  if (kind && kind !== "Namespace") throw new Error("YAML 资源类型必须是 Namespace")
+
+  const metadata =
+    typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
+      ? (root.metadata as Record<string, unknown>)
+      : {}
+  const annotations =
+    typeof metadata.annotations === "object" &&
+    metadata.annotations !== null &&
+    !Array.isArray(metadata.annotations)
+      ? (metadata.annotations as Record<string, unknown>)
+      : {}
+
+  return {
+    name: typeof metadata.name === "string" ? metadata.name : "",
+    description: typeof annotations.description === "string" ? annotations.description : "",
+  }
+}
+
 export function ProjectsPageClient() {
   const [rows, setRows] = React.useState<NamespaceRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -104,13 +175,22 @@ export function ProjectsPageClient() {
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<NamespaceRow | null>(null)
+  const [editingRow, setEditingRow] = React.useState<NamespaceRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [createName, setCreateName] = React.useState("")
   const [createDescription, setCreateDescription] = React.useState("")
   const [createNameInvalid, setCreateNameInvalid] = React.useState(false)
   const [createNameError, setCreateNameError] = React.useState<string | null>(null)
+  const [createYamlMode, setCreateYamlMode] = React.useState(false)
+  const [createYamlText, setCreateYamlText] = React.useState("")
+  const [createYamlError, setCreateYamlError] = React.useState<string | null>(null)
   const [creating, setCreating] = React.useState(false)
+  const isEditMode = Boolean(editingRow)
+  const dialogTitle = isEditMode ? "编辑项目" : "创建项目"
+  const dialogDescription = isEditMode
+    ? "编辑项目描述信息。"
+    : "创建项目以对资源进行分组并控制不同用户的权限。"
 
   const handleViewYaml = React.useCallback((row: NamespaceRow) => {
     setYamlOpen(true)
@@ -141,6 +221,18 @@ export function ProjectsPageClient() {
 
   const requestDelete = React.useCallback((row: NamespaceRow) => {
     setPendingDeleteRow(row)
+  }, [])
+
+  const requestEdit = React.useCallback((row: NamespaceRow) => {
+    setEditingRow(row)
+    setCreateName(row.name)
+    setCreateDescription(row.description ?? "")
+    setCreateNameInvalid(false)
+    setCreateNameError(null)
+    setCreateYamlMode(false)
+    setCreateYamlText("")
+    setCreateYamlError(null)
+    setCreateDialogOpen(true)
   }, [])
 
   const handleConfirmDelete = React.useCallback(() => {
@@ -178,24 +270,49 @@ export function ProjectsPageClient() {
       event.preventDefault()
       if (creating) return
 
-      const nextName = createName.trim()
-      const nextDescription = createDescription.trim()
+      let nextName = (editingRow?.name ?? createName).trim()
+      let nextDescription = createDescription.trim()
+
+      if (createYamlMode) {
+        try {
+          const parsed = parseProjectYamlText(createYamlText)
+          nextName = isEditMode ? (editingRow?.name ?? "").trim() : parsed.name.trim()
+          nextDescription = parsed.description.trim()
+          if (!isEditMode) setCreateName(nextName)
+          setCreateDescription(nextDescription)
+          setCreateYamlError(null)
+        } catch (error) {
+          setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+          return
+        }
+      }
+
       const validationMessage = validateProjectName(nextName)
       if (validationMessage) {
         setCreateNameInvalid(true)
         setCreateNameError(validationMessage)
+        if (createYamlMode) setCreateYamlError(validationMessage)
         return
       }
 
       setCreateNameInvalid(false)
       setCreateNameError(null)
+      setCreateYamlError(null)
       setCreating(true)
 
-      void createNamespace({ name: nextName, description: nextDescription })
+      const request = isEditMode
+        ? updateNamespace({ name: nextName, description: nextDescription })
+        : createNamespace({ name: nextName, description: nextDescription })
+
+      void request
         .then(async () => {
           setCreateDialogOpen(false)
+          setEditingRow(null)
           setCreateName("")
           setCreateDescription("")
+          setCreateYamlMode(false)
+          setCreateYamlText("")
+          setCreateYamlError(null)
           const items = await fetchNamespaces()
           setRows(items)
           setError(null)
@@ -205,12 +322,15 @@ export function ProjectsPageClient() {
           const isNameError = isNameRelatedCreateError(e)
           setCreateNameInvalid(isNameError)
           setCreateNameError(isNameError ? message : null)
+          if (createYamlMode) {
+            setCreateYamlError(message)
+          }
         })
         .finally(() => {
           setCreating(false)
         })
     },
-    [createDescription, createName, creating]
+    [createDescription, createName, createYamlMode, createYamlText, creating, editingRow, isEditMode]
   )
 
   const columns = React.useMemo(
@@ -232,6 +352,17 @@ export function ProjectsPageClient() {
           {
             label: (
               <>
+                <IconPencil className="size-4" />
+                {"编辑"}
+              </>
+            ),
+            onSelect: (row) => {
+              requestEdit(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconTrash className="size-4" />
                 {"删除"}
               </>
@@ -244,7 +375,7 @@ export function ProjectsPageClient() {
           },
         ],
       }),
-    [handleViewYaml, requestDelete]
+    [handleViewYaml, requestDelete, requestEdit]
   )
 
   React.useEffect(() => {
@@ -319,76 +450,166 @@ export function ProjectsPageClient() {
           if (!open && creating) return
           setCreateDialogOpen(open)
           if (!open) {
+            setEditingRow(null)
             setCreateNameInvalid(false)
             setCreateNameError(null)
+            setCreateYamlMode(false)
+            setCreateYamlText("")
+            setCreateYamlError(null)
           }
         }}
       >
         <DialogContent
-          className="sm:max-w-xl"
+          className="flex max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
           onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
-          <form onSubmit={handleCreateSubmit}>
-            <DialogHeader>
-              <DialogTitle>创建项目</DialogTitle>
-              <DialogDescription>
-                创建项目以对资源进行分组并控制不同用户的权限。
-              </DialogDescription>
+          <form onSubmit={handleCreateSubmit} className="flex min-h-0 flex-1 flex-col">
+            <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <DialogTitle>{dialogTitle}</DialogTitle>
+                  <DialogDescription>{dialogDescription}</DialogDescription>
+                </div>
+                <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                  <span className="text-sm font-medium">编辑 YAML</span>
+                  <Switch
+                    checked={createYamlMode}
+                    onCheckedChange={(checked) => {
+                      if (creating) return
+                      if (checked) {
+                        setCreateYamlText(
+                          buildProjectYamlText({
+                            name: editingRow?.name ?? createName,
+                            description: createDescription,
+                          })
+                        )
+                        setCreateYamlError(null)
+                        setCreateYamlMode(true)
+                        return
+                      }
+
+                      try {
+                        const parsed = parseProjectYamlText(createYamlText)
+                        if (!isEditMode) {
+                          setCreateName(parsed.name)
+                        }
+                        setCreateDescription(parsed.description)
+                        setCreateYamlError(null)
+                        setCreateYamlMode(false)
+                      } catch (error) {
+                        setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+                      }
+                    }}
+                    disabled={creating}
+                    aria-label="编辑 YAML"
+                  />
+                </div>
+              </div>
             </DialogHeader>
 
-            <FieldGroup className="mt-4">
-              <Field data-invalid={createNameInvalid}>
-                <FieldLabel htmlFor="project-create-name">名称</FieldLabel>
-                <Input
-                  id="project-create-name"
-                  name="name"
-                  value={createName}
-                  onChange={(event) => {
-                    setCreateName(event.target.value)
-                    if (createNameInvalid) setCreateNameInvalid(false)
-                    if (createNameError) setCreateNameError(null)
-                  }}
-                  placeholder="请输入项目名称"
-                  autoComplete="off"
-                  aria-invalid={createNameInvalid}
-                  disabled={creating}
-                />
-                {createNameError ? (
-                  <FieldError>{createNameError}</FieldError>
-                ) : (
-                  <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
-                )}
-              </Field>
+            {!createYamlMode ? (
+              <StepHeaderNav
+                items={[
+                  {
+                    id: "basic",
+                    title: "基本信息",
+                    status: "当前",
+                    active: true,
+                    icon: <IconSettings2 className="size-4" />,
+                    disabled: creating,
+                    onClick: () => {},
+                  },
+                ]}
+              />
+            ) : null}
 
-              <Field>
-                <FieldLabel htmlFor="project-create-description">
-                  说明
-                </FieldLabel>
-                <Textarea
-                  id="project-create-description"
-                  name="description"
-                  value={createDescription}
-                  onChange={(event) => setCreateDescription(event.target.value)}
-                  placeholder="请输入项目描述（选填）"
-                  maxLength={256}
-                  className="min-h-20"
-                  disabled={creating}
-                />
-                <FieldDescription>
-                  描述可包含任意字符，最长 256 个字符。
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {createYamlMode ? (
+                <div className="border-b p-6">
+                  <div className="flex h-full min-h-[56vh] flex-col">
+                    <div className="overflow-hidden rounded-lg border">
+                      <MonacoEditor
+                        language="yaml"
+                        theme="vs-dark"
+                        value={createYamlText}
+                        onChange={(value) => {
+                          setCreateYamlText(value ?? "")
+                          if (createYamlError) setCreateYamlError(null)
+                          if (createNameInvalid) setCreateNameInvalid(false)
+                          if (createNameError) setCreateNameError(null)
+                        }}
+                        options={MONACO_OPTIONS}
+                        height="56vh"
+                      />
+                    </div>
+                    {createYamlError ? <FieldError className="mt-3">{createYamlError}</FieldError> : null}
+                  </div>
+                </div>
+              ) : (
+                <div className="border-b p-6">
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">基本信息</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      填写项目名称与描述信息。
+                    </p>
+                  </div>
+                  <FieldGroup className="flex flex-col gap-4">
+                    <Field data-invalid={createNameInvalid}>
+                      <FieldLabel htmlFor="project-create-name">名称</FieldLabel>
+                      <Input
+                        id="project-create-name"
+                        name="name"
+                        value={editingRow?.name ?? createName}
+                        onChange={(event) => {
+                          if (isEditMode) return
+                          setCreateName(event.target.value)
+                          if (createNameInvalid) setCreateNameInvalid(false)
+                          if (createNameError) setCreateNameError(null)
+                        }}
+                        placeholder="请输入项目名称"
+                        autoComplete="off"
+                        aria-invalid={createNameInvalid}
+                        disabled={creating || isEditMode}
+                      />
+                      {createNameError ? (
+                        <FieldError>{createNameError}</FieldError>
+                      ) : (
+                        <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
+                      )}
+                    </Field>
 
-            <DialogFooter className="mt-4">
+                    <Field>
+                      <FieldLabel htmlFor="project-create-description">
+                        描述
+                      </FieldLabel>
+                      <Textarea
+                        id="project-create-description"
+                        name="description"
+                        value={createDescription}
+                        onChange={(event) => setCreateDescription(event.target.value)}
+                        placeholder="请输入描述（选填）"
+                        maxLength={256}
+                        className="min-h-28"
+                        disabled={creating}
+                      />
+                      <FieldDescription>
+                        描述将写入资源注解 `description`，最长 256 个字符。
+                      </FieldDescription>
+                    </Field>
+                  </FieldGroup>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="border-t bg-background px-6 py-5">
               <DialogClose asChild>
                 <Button type="button" variant="outline" disabled={creating}>
                   取消
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={creating}>
-                {creating ? "创建中..." : "创建"}
+                {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
               </Button>
             </DialogFooter>
           </form>
@@ -421,7 +642,17 @@ export function ProjectsPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
-        onCreate={() => setCreateDialogOpen(true)}
+        onCreate={() => {
+          setEditingRow(null)
+          setCreateName("")
+          setCreateDescription("")
+          setCreateNameInvalid(false)
+          setCreateNameError(null)
+          setCreateYamlMode(false)
+          setCreateYamlText("")
+          setCreateYamlError(null)
+          setCreateDialogOpen(true)
+        }}
         toolbarEnd={projectFilters}
         onDeleteSelectedRows={handleDeleteSelectedRows}
       />

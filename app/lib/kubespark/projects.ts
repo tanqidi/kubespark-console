@@ -1,8 +1,10 @@
 import {
   buildResourceCollectionEndpoint,
+  buildResourceItemEndpoint,
   deleteResource,
   fetchJsonDeduped,
   fetchResourceCollection,
+  fetchResourceByName,
 } from "./common"
 import { buildResourceDocument } from "./resource-document"
 import { formatAge, resolveUpdatedAt } from "./utils"
@@ -40,6 +42,11 @@ export type NamespaceYamlResult = {
 }
 
 export type CreateNamespaceInput = {
+  name: string
+  description?: string
+}
+
+export type UpdateNamespaceInput = {
   name: string
   description?: string
 }
@@ -101,6 +108,62 @@ export async function createNamespace(input: CreateNamespaceInput): Promise<void
   const url = buildResourceCollectionEndpoint("core", "v1", "namespaces")
   await fetchJsonDeduped<unknown>(url, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  })
+}
+
+export async function updateNamespace(input: UpdateNamespaceInput): Promise<void> {
+  const name = normalizeKubernetesNamespaceName(input.name)
+  const description = input.description?.trim() ?? ""
+
+  const { payload } = await fetchResourceByName<unknown>("core", "v1", "namespaces", name)
+  const existing =
+    typeof payload === "object" && payload !== null && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : {}
+  const existingMetadata =
+    typeof existing.metadata === "object" && existing.metadata !== null && !Array.isArray(existing.metadata)
+      ? (existing.metadata as Record<string, unknown>)
+      : {}
+  const existingAnnotations =
+    typeof existingMetadata.annotations === "object" &&
+    existingMetadata.annotations !== null &&
+    !Array.isArray(existingMetadata.annotations)
+      ? (existingMetadata.annotations as Record<string, unknown>)
+      : {}
+
+  const mergedAnnotations: Record<string, unknown> = {
+    ...existingAnnotations,
+  }
+  if (description) {
+    mergedAnnotations.description = description
+  } else {
+    delete mergedAnnotations.description
+  }
+
+  const requestBody = {
+    apiVersion: "v1",
+    kind: "Namespace",
+    metadata: {
+      name,
+      resourceVersion:
+        typeof existingMetadata.resourceVersion === "string"
+          ? existingMetadata.resourceVersion
+          : undefined,
+      ...(Object.keys(mergedAnnotations).length > 0 ? { annotations: mergedAnnotations } : {}),
+      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
+        ? { labels: existingMetadata.labels }
+        : {}),
+    },
+  }
+
+  const url = buildResourceItemEndpoint("core", "v1", "namespaces", name)
+
+  await fetchJsonDeduped<unknown>(url, {
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
     },
