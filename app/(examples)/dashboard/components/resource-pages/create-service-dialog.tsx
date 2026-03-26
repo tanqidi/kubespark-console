@@ -48,6 +48,12 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group"
+import {
   Item,
   ItemContent,
   ItemDescription,
@@ -1419,42 +1425,54 @@ export function CreateServiceDialog({
                                 </SelectGroup>
                               </SelectContent>
                               </Select>
-                              <Input
+                              <InputGroup>
+                                <InputGroupAddon>
+                                  <InputGroupText>名称</InputGroupText>
+                                </InputGroupAddon>
+                                <InputGroupInput
                                   value={item.name}
                                   onChange={(event) => updatePortItem(item.id, "name", event.target.value)}
-                                  placeholder="名称"
                                   disabled={isBusy}
-                              />
-                              <Input
+                                />
+                              </InputGroup>
+                              <InputGroup>
+                                <InputGroupAddon>
+                                  <InputGroupText>容器端口</InputGroupText>
+                                </InputGroupAddon>
+                                <InputGroupInput
                                   value={item.targetPort}
                                   onChange={(event) =>
-                                      updatePortItem(
-                                        item.id,
-                                        "targetPort",
-                                        normalizePortInput(event.target.value)
-                                      )
+                                    updatePortItem(
+                                      item.id,
+                                      "targetPort",
+                                      normalizePortInput(event.target.value)
+                                    )
                                   }
                                   inputMode="numeric"
                                   pattern="[0-9]*"
                                   maxLength={5}
-                                  placeholder="容器端口"
                                   disabled={isBusy}
-                              />
-                              <Input
+                                />
+                              </InputGroup>
+                              <InputGroup>
+                                <InputGroupAddon>
+                                  <InputGroupText>服务端口</InputGroupText>
+                                </InputGroupAddon>
+                                <InputGroupInput
                                   value={item.servicePort}
                                   onChange={(event) =>
-                                      updatePortItem(
-                                        item.id,
-                                        "servicePort",
-                                        normalizePortInput(event.target.value)
-                                      )
+                                    updatePortItem(
+                                      item.id,
+                                      "servicePort",
+                                      normalizePortInput(event.target.value)
+                                    )
                                   }
                                   inputMode="numeric"
                                   pattern="[0-9]*"
                                   maxLength={5}
-                                  placeholder="服务端口"
                                   disabled={isBusy}
-                              />
+                                />
+                              </InputGroup>
                               <Button
                                   type="button"
                                   variant="ghost"

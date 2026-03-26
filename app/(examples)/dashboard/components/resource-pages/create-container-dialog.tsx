@@ -1,6 +1,6 @@
 "use client"
 
-import { IconFileText, IconKey, IconX } from "@tabler/icons-react"
+import { IconFileText, IconKey, IconTrash, IconX } from "@tabler/icons-react"
 import { type ContainerPortFieldErrors } from "@/app/lib/kubespark/form-validation"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -446,63 +446,74 @@ export function CreateContainerDialog({
                       const fieldError = portFieldErrors[item.id]
                       return (
                         <div key={item.id} className="grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-                          <Select
-                            value={item.protocol}
-                            onValueChange={(value) => onUpdatePort(item.id, "protocol", value)}
-                            disabled={isBusy}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="协议" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                <SelectItem value="TCP">TCP</SelectItem>
-                                <SelectItem value="UDP">UDP</SelectItem>
-                                <SelectItem value="SCTP">SCTP</SelectItem>
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                          <div className="flex flex-col gap-1">
-                            <Input
-                              id={`${container.id}-port-${item.id}-name`}
-                              value={item.name}
-                              onChange={(event) => onUpdatePort(item.id, "name", event.target.value)}
-                              placeholder="名称"
-                              aria-invalid={Boolean(fieldError?.name)}
+                          <Field>
+                            <Select
+                              value={item.protocol}
+                              onValueChange={(value) => onUpdatePort(item.id, "protocol", value)}
                               disabled={isBusy}
-                            />
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="协议" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  <SelectItem value="TCP">TCP</SelectItem>
+                                  <SelectItem value="UDP">UDP</SelectItem>
+                                  <SelectItem value="SCTP">SCTP</SelectItem>
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                          <Field>
+                            <InputGroup>
+                              <InputGroupAddon>
+                                <InputGroupText>名称</InputGroupText>
+                              </InputGroupAddon>
+                              <InputGroupInput
+                                id={`${container.id}-port-${item.id}-name`}
+                                value={item.name}
+                                onChange={(event) => onUpdatePort(item.id, "name", event.target.value)}
+                                aria-invalid={Boolean(fieldError?.name)}
+                                disabled={isBusy}
+                              />
+                            </InputGroup>
                             {fieldError?.name ? (
                               <p className="text-xs text-destructive">{fieldError.name}</p>
                             ) : null}
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Input
-                              id={`${container.id}-port-${item.id}-container-port`}
-                              value={item.containerPort}
-                              onChange={(event) =>
-                                onUpdatePort(
-                                  item.id,
-                                  "containerPort",
-                                  normalizePortInput(event.target.value)
-                                )
-                              }
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              maxLength={5}
-                              placeholder="容器端口"
-                              aria-invalid={Boolean(fieldError?.containerPort)}
-                              disabled={isBusy}
-                            />
+                          </Field>
+                          <Field>
+                            <InputGroup>
+                              <InputGroupAddon>
+                                <InputGroupText>容器端口</InputGroupText>
+                              </InputGroupAddon>
+                              <InputGroupInput
+                                id={`${container.id}-port-${item.id}-container-port`}
+                                value={item.containerPort}
+                                onChange={(event) =>
+                                  onUpdatePort(
+                                    item.id,
+                                    "containerPort",
+                                    normalizePortInput(event.target.value)
+                                  )
+                                }
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={5}
+                                aria-invalid={Boolean(fieldError?.containerPort)}
+                                disabled={isBusy}
+                              />
+                            </InputGroup>
                             {fieldError?.containerPort ? (
                               <p className="text-xs text-destructive">{fieldError.containerPort}</p>
                             ) : null}
-                          </div>
+                          </Field>
                           <Button
                             type="button"
                             variant="ghost"
                             onClick={() => onRemovePort(item.id)}
                             disabled={isBusy}
                           >
+                            <IconTrash data-icon="inline-start" />
                             删除
                           </Button>
                         </div>
