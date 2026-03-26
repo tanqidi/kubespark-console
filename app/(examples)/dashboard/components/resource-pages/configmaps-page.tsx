@@ -51,7 +51,6 @@ const configMapColumns: ColumnConfig<ConfigMapRow>[] = [
   },
   { key: "namespace", label: "命名空间" },
   { key: "dataItems", label: "数据项", align: "right" },
-  { key: "size", label: "大小", align: "right" },
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]
