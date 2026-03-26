@@ -388,8 +388,8 @@ export function CreateWorkloadDialog({
     const initialConfigList = Array.isArray(initialValues?.pod?.configList)
       ? initialValues.pod.configList
       : []
-    const normalized = initialConfigList
-      .map((item) => ({
+    const normalized: ConfigMountDraft[] = initialConfigList
+      .map((item): ConfigMountDraft => ({
         sourceKind: item.sourceKind === "secret" ? "secret" : "configMap",
         sourceName: typeof item.sourceName === "string" ? item.sourceName.trim() : "",
         mounts: Array.isArray(item.mounts)
@@ -739,23 +739,23 @@ export function CreateWorkloadDialog({
                 </div>
 
                 <FieldGroup className="flex flex-col gap-6">
-                  <Field>
-                    <FieldLabel htmlFor="create-workload-replicas">容器组副本数</FieldLabel>
-                    <Input
-                      id="create-workload-replicas"
-                      value={backoffLimit}
-                      onChange={(event) => setBackoffLimit(normalizeIntegerInput(event.target.value))}
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder={kind === "DaemonSet" ? "DaemonSet 不适用" : "例如：3"}
-                      disabled={isBusy || kind === "DaemonSet"}
-                    />
-                    <FieldDescription>
-                      {kind === "DaemonSet"
-                        ? "DaemonSet 不需要副本数，按节点自动调度。"
-                        : "用于控制工作负载期望副本数量。"}
-                    </FieldDescription>
-                  </Field>
+                  {kind !== "DaemonSet" ? (
+                    <Field>
+                      <FieldLabel htmlFor="create-workload-replicas">容器组副本数</FieldLabel>
+                      <Input
+                        id="create-workload-replicas"
+                        value={backoffLimit}
+                        onChange={(event) => setBackoffLimit(normalizeIntegerInput(event.target.value))}
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="例如：3"
+                        disabled={isBusy}
+                      />
+                      <FieldDescription>
+                        用于控制工作负载期望副本数量。
+                      </FieldDescription>
+                    </Field>
+                  ) : null}
 
                   <ContainerListPanel
                     items={configuredContainers}

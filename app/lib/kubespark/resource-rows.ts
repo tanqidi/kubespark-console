@@ -266,12 +266,17 @@ export type StorageClassResourceRow = {
   id: string
   name: string
   description: string
+  isDefault: string
   provisioner: string
   reclaimPolicy: string
   volumeBindingMode: string
   allowExpansion: string
   age: string
   updatedAt: string
+}
+
+function formatIsDefaultStorageClass(value: unknown): string {
+  return typeof value === "string" && value.trim().toLowerCase() === "true" ? "Yes" : "-"
 }
 
 function formatAllowExpansion(value: unknown): string {
@@ -284,11 +289,13 @@ export async function fetchStorageClassRows(limit = 300): Promise<StorageClassRe
   return items.slice(0, limit).map((item, index) => {
     const resource = asObject(item)
     const metadata = asObject(resource.metadata)
+    const annotations = asObject(metadata.annotations)
     const name = asString(metadata.name, "storageclass")
     return {
       id: asString(metadata.uid, `${name}-${index}`),
       name: asString(metadata.name),
       description: readDescription(resource),
+      isDefault: formatIsDefaultStorageClass(annotations["storageclass.kubernetes.io/is-default-class"]),
       provisioner: asString(resource.provisioner),
       reclaimPolicy: asString(resource.reclaimPolicy),
       volumeBindingMode: asString(resource.volumeBindingMode),
