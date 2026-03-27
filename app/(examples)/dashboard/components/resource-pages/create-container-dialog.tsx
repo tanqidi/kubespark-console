@@ -275,6 +275,23 @@ export function CreateContainerDialog({
                   </Field>
 
                   <Field>
+                    <FieldLabel htmlFor={`${container.id}-name`}>容器名称</FieldLabel>
+                    <Input
+                      id={`${container.id}-name`}
+                      value={container.name}
+                      onChange={(event) => onChange("name", event.target.value)}
+                      placeholder="例如：worker"
+                      autoComplete="off"
+                      disabled={isBusy}
+                    />
+                    <FieldDescription>
+                      留空时会基于镜像地址自动生成。
+                    </FieldDescription>
+                  </Field>
+                </div>
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <Field>
                     <FieldLabel htmlFor={`${container.id}-pull-policy`}>镜像拉取策略</FieldLabel>
                     <Select
                       value={container.imagePullPolicy}
@@ -298,23 +315,6 @@ export function CreateContainerDialog({
                     </Select>
                     <FieldDescription>
                       {resolveImagePullPolicyDescription(container.imagePullPolicy)}
-                    </FieldDescription>
-                  </Field>
-                </div>
-
-                <div className="grid gap-5 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor={`${container.id}-name`}>容器名称</FieldLabel>
-                    <Input
-                      id={`${container.id}-name`}
-                      value={container.name}
-                      onChange={(event) => onChange("name", event.target.value)}
-                      placeholder="例如：worker"
-                      autoComplete="off"
-                      disabled={isBusy}
-                    />
-                    <FieldDescription>
-                      留空时会基于镜像地址自动生成。
                     </FieldDescription>
                   </Field>
 
