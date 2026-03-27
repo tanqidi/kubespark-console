@@ -1138,29 +1138,37 @@ export function CreateContainerDialog({
                                       </SelectContent>
                                     </Select>
                                     <div className="flex min-w-0 flex-col gap-1">
-                                      <Input
-                                        id={`${container.id}-env-${item.id}-name`}
-                                        value={item.name}
-                                        onChange={(event) => onUpdateEnv(item.id, "name", event.target.value)}
-                                        placeholder="键"
-                                        autoComplete="off"
-                                        className="min-w-0"
-                                        aria-invalid={envDuplicateIdSet.has(item.id)}
-                                        disabled={isBusy}
-                                      />
+                                      <InputGroup>
+                                        <InputGroupAddon>
+                                          <InputGroupText>键</InputGroupText>
+                                        </InputGroupAddon>
+                                        <InputGroupInput
+                                          id={`${container.id}-env-${item.id}-name`}
+                                          value={item.name}
+                                          onChange={(event) => onUpdateEnv(item.id, "name", event.target.value)}
+                                          autoComplete="off"
+                                          className="min-w-0"
+                                          aria-invalid={envDuplicateIdSet.has(item.id)}
+                                          disabled={isBusy}
+                                        />
+                                      </InputGroup>
                                       {envDuplicateIdSet.has(item.id) ? (
                                         <p className="text-xs text-destructive">环境变量名称重复</p>
                                       ) : null}
                                     </div>
                                     {item.source === "custom" ? (
-                                      <Input
-                                        value={item.value}
-                                        onChange={(event) => onUpdateEnv(item.id, "value", event.target.value)}
-                                        placeholder="值"
-                                        autoComplete="off"
-                                        className="min-w-0"
-                                        disabled={isBusy}
-                                      />
+                                      <InputGroup>
+                                        <InputGroupAddon>
+                                          <InputGroupText>值</InputGroupText>
+                                        </InputGroupAddon>
+                                        <InputGroupInput
+                                          value={item.value}
+                                          onChange={(event) => onUpdateEnv(item.id, "value", event.target.value)}
+                                          autoComplete="off"
+                                          className="min-w-0"
+                                          disabled={isBusy}
+                                        />
+                                      </InputGroup>
                                     ) : (
                                       <>
                                         <Select
