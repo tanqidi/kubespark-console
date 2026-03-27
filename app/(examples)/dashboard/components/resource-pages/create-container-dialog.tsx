@@ -676,7 +676,7 @@ export function CreateContainerDialog({
                                           className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] p-4"
                                           align="start"
                                           side="bottom"
-                                          sideOffset={8}
+                                          sideOffset={-44}
                                         >
                                           <div className="space-y-4">
                                           <Tabs
@@ -987,7 +987,7 @@ export function CreateContainerDialog({
                                           className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] p-4"
                                           align="start"
                                           side="bottom"
-                                          sideOffset={8}
+                                          sideOffset={-44}
                                         >
                                           <div className="space-y-4">
                                             <Tabs
