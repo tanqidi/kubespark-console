@@ -68,6 +68,7 @@ export type WorkloadDialogInitialValues = {
   }
   pod?: {
     restartPolicy?: "Always"
+    terminationGracePeriodSeconds?: string
     serviceAccountName?: string
     configList?: Array<{
       sourceKind?: "configMap" | "secret"
@@ -234,6 +235,7 @@ export type WorkloadDialogSnapshot = {
   }
   pod: {
     restartPolicy: "Always"
+    terminationGracePeriodSeconds: string
     serviceAccountName: string
     containers: ContainerDraft[]
     configList?: ConfigMountInput[]
@@ -774,6 +776,7 @@ export function createContainerDraftFromInitial(
 
 export function buildPodSpecFromContainers(
   restartPolicy: "Always",
+  terminationGracePeriodSeconds: string,
   serviceAccountName: string,
   containers: ContainerDraft[],
   storage?: JobStorageInput | JobStorageInput[],
@@ -995,6 +998,9 @@ export function buildPodSpecFromContainers(
 
   return {
     restartPolicy,
+    ...(toOptionalIntegerString(terminationGracePeriodSeconds)
+      ? { terminationGracePeriodSeconds: Number.parseInt(terminationGracePeriodSeconds, 10) }
+      : {}),
     ...(serviceAccountName.trim() ? { serviceAccountName: serviceAccountName.trim() } : {}),
     ...(workload.length > 0 ? { containers: workload } : {}),
     ...(init.length > 0 ? { initContainers: init } : {}),
@@ -1025,6 +1031,7 @@ export function buildWorkloadManifest(
   }
   const podSpec = buildPodSpecFromContainers(
     "Always",
+    snapshot.pod.terminationGracePeriodSeconds,
     snapshot.pod.serviceAccountName,
     snapshot.pod.containers,
     storage,
@@ -1282,6 +1289,8 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
     },
     pod: {
       restartPolicy: "Always",
+      terminationGracePeriodSeconds:
+        toOptionalIntegerString(podSpec.terminationGracePeriodSeconds) || "30",
       serviceAccountName: asString(podSpec.serviceAccountName).trim() || "default",
       containers: containers.length > 0 ? containers : [],
       ...(parsedConfigList.length > 0 ? { configList: parsedConfigList } : {}),
@@ -1453,7 +1462,7 @@ export function resolveSubmitErrorMessage(error: unknown, kind: WorkloadCreateKi
 export function resolveStepDescription(step: CreateStep): string {
   switch (step) {
     case "advanced":
-      return "高级设置功能即将开放。"
+      return "配置容器组运行策略与服务账号等高级参数。"
     default:
       return ""
   }

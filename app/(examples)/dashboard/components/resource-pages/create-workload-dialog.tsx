@@ -151,7 +151,6 @@ export function CreateWorkloadDialog({
     removeContainerEnv,
     removeContainerPort,
     removeStorageVolume,
-    restartPolicy,
     returnToPodList,
     runPodValidation,
     savedStorageVolumes,
@@ -164,7 +163,7 @@ export function CreateWorkloadDialog({
     setNamespace,
     setNamespaceError,
     setPendingDeleteContainerId,
-    setRestartPolicy,
+    setTerminationGracePeriodSeconds,
     setServiceAccountName,
     startAddStorageVolume,
     startEditStorageVolume,
@@ -178,6 +177,7 @@ export function CreateWorkloadDialog({
     updateContainer,
     updateContainerEnv,
     updateContainerPort,
+    terminationGracePeriodSeconds,
     serviceAccountName,
     yamlError,
     yamlMode,
@@ -1216,23 +1216,23 @@ export function CreateWorkloadDialog({
                 </div>
                 <FieldGroup className="grid gap-6 md:grid-cols-2">
                   <Field>
-                    <FieldLabel htmlFor="create-workload-restart-policy">重启策略</FieldLabel>
-                    <Select
-                      value={restartPolicy}
-                      onValueChange={(value) => {
-                        if (value === "Always") setRestartPolicy("Always")
-                      }}
+                    <FieldLabel htmlFor="create-workload-termination-grace-period-seconds">
+                      优雅终止宽限时间（秒）
+                    </FieldLabel>
+                    <Input
+                      id="create-workload-termination-grace-period-seconds"
+                      value={terminationGracePeriodSeconds}
+                      onChange={(event) =>
+                        setTerminationGracePeriodSeconds(normalizeIntegerInput(event.target.value))
+                      }
+                      placeholder="30"
+                      inputMode="numeric"
+                      autoComplete="off"
                       disabled={isBusy}
-                    >
-                      <SelectTrigger id="create-workload-restart-policy">
-                        <SelectValue placeholder="请选择重启策略" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="Always">Always</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    />
+                    <FieldDescription>
+                      Pod 终止时等待容器优雅退出的时长，默认 30 秒。
+                    </FieldDescription>
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="create-workload-service-account">服务账号</FieldLabel>

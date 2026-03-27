@@ -24,6 +24,7 @@ import {
   isAutoContainerNameForImage,
   isAutoPortNameForProtocol,
   normalizeLifecycleMap,
+  normalizeIntegerInput,
   normalizeProbeMap,
   normalizeSecurityContextDraft,
   parseWorkloadYamlText,
@@ -80,6 +81,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const [parallelism, setParallelism] = React.useState("")
   const [activeDeadlineSeconds, setActiveDeadlineSeconds] = React.useState("")
   const [restartPolicy, setRestartPolicy] = React.useState<"Always">("Always")
+  const [terminationGracePeriodSeconds, setTerminationGracePeriodSeconds] = React.useState("30")
   const [serviceAccountName, setServiceAccountName] = React.useState("default")
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
@@ -170,6 +172,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       setParallelism("")
       setActiveDeadlineSeconds("")
       setRestartPolicy("Always")
+      setTerminationGracePeriodSeconds("30")
       setServiceAccountName("default")
       setContainers([])
       resetEditorUiState()
@@ -202,6 +205,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setParallelism(initialValues.strategy?.parallelism ?? "")
     setActiveDeadlineSeconds(initialValues.strategy?.activeDeadlineSeconds ?? "")
     setRestartPolicy("Always")
+    setTerminationGracePeriodSeconds(initialValues.pod?.terminationGracePeriodSeconds?.trim() || "30")
     setServiceAccountName(initialValues.pod?.serviceAccountName?.trim() || "default")
     setContainers(
       Array.isArray(initialValues.pod?.containers)
@@ -474,6 +478,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         },
         pod: {
           restartPolicy,
+          terminationGracePeriodSeconds,
           serviceAccountName,
           containers,
           ...(normalizedStorageList.length > 0
@@ -497,6 +502,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       schedule,
       parallelism,
       restartPolicy,
+      terminationGracePeriodSeconds,
       serviceAccountName,
       savedStorageVolumes,
       storageVolumeDraft,
@@ -513,6 +519,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setParallelism(snapshot.strategy.parallelism)
     setActiveDeadlineSeconds(snapshot.strategy.activeDeadlineSeconds)
     setRestartPolicy(snapshot.pod.restartPolicy)
+    setTerminationGracePeriodSeconds(snapshot.pod.terminationGracePeriodSeconds?.trim() || "30")
     setServiceAccountName(snapshot.pod.serviceAccountName?.trim() || "default")
     setContainers(snapshot.pod.containers)
     const nextStorageVolumes = Array.isArray(snapshot.pod.storageList)
@@ -725,6 +732,8 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
           pod: {
             ...source.pod,
             restartPolicy: "Always",
+            terminationGracePeriodSeconds:
+              normalizeIntegerInput(source.pod.terminationGracePeriodSeconds) || "30",
             serviceAccountName: source.pod.serviceAccountName.trim() || "default",
           },
         }
@@ -819,6 +828,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     removeContainerPort,
     removeStorageVolume,
     restartPolicy,
+    terminationGracePeriodSeconds,
     serviceAccountName,
     returnToPodList,
     runPodValidation,
@@ -838,6 +848,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setParallelism,
     setPendingDeleteContainerId,
     setRestartPolicy,
+    setTerminationGracePeriodSeconds,
     setServiceAccountName,
     setSchedule,
     setScheduleError,
