@@ -1309,6 +1309,7 @@ export function CreateContainerDialog({
                                       onClick={() => onRemoveEnv(item.id)}
                                       disabled={isBusy}
                                     >
+                                      <IconTrash data-icon="inline-start" />
                                       删除
                                     </Button>
                                   </div>

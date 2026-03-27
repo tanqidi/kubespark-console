@@ -1286,16 +1286,22 @@ export function CreateWorkloadDialog({
                                 </InputGroupAddon>
                                 <InputGroupInput
                                   id="create-workload-rolling-update-max-unavailable"
-                                  value={rollingUpdateMaxUnavailable}
+                                  value={rollingUpdateMaxUnavailable.replace(/%/g, "")}
                                   onChange={(event) =>
                                     setRollingUpdateMaxUnavailable(
-                                      normalizeIntOrPercentInput(event.target.value)
+                                      (() => {
+                                        const normalized = normalizeIntOrPercentInput(event.target.value).replace(/%/g, "")
+                                        return normalized ? `${normalized}%` : ""
+                                      })()
                                     )
                                   }
-                                  placeholder="25%"
+                                  placeholder="25"
                                   autoComplete="off"
                                   disabled={isBusy}
                                 />
+                                <InputGroupAddon align="inline-end">
+                                  <InputGroupText>%</InputGroupText>
+                                </InputGroupAddon>
                               </InputGroup>
                               <InputGroup>
                                 <InputGroupAddon>
@@ -1303,16 +1309,22 @@ export function CreateWorkloadDialog({
                                 </InputGroupAddon>
                                 <InputGroupInput
                                   id="create-workload-rolling-update-max-surge"
-                                  value={rollingUpdateMaxSurge}
+                                  value={rollingUpdateMaxSurge.replace(/%/g, "")}
                                   onChange={(event) =>
                                     setRollingUpdateMaxSurge(
-                                      normalizeIntOrPercentInput(event.target.value)
+                                      (() => {
+                                        const normalized = normalizeIntOrPercentInput(event.target.value).replace(/%/g, "")
+                                        return normalized ? `${normalized}%` : ""
+                                      })()
                                     )
                                   }
-                                  placeholder="25%"
+                                  placeholder="25"
                                   autoComplete="off"
                                   disabled={isBusy}
                                 />
+                                <InputGroupAddon align="inline-end">
+                                  <InputGroupText>%</InputGroupText>
+                                </InputGroupAddon>
                               </InputGroup>
                             </div>
                           ) : null}
