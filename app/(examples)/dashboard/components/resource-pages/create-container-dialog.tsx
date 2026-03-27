@@ -673,7 +673,7 @@ export function CreateContainerDialog({
                                           </div>
                                         </PopoverTrigger>
                                         <PopoverContent
-                                          className="w-[min(86vw,760px)] p-4"
+                                          className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] p-4"
                                           align="start"
                                           side="bottom"
                                           sideOffset={8}
@@ -984,7 +984,7 @@ export function CreateContainerDialog({
                                           </div>
                                         </PopoverTrigger>
                                         <PopoverContent
-                                          className="w-[min(86vw,760px)] p-4"
+                                          className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] p-4"
                                           align="start"
                                           side="bottom"
                                           sideOffset={8}
