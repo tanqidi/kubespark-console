@@ -86,6 +86,81 @@ type CreateContainerDialogControllerProps = {
   ) => void
 }
 
+type DraftRequiredFieldErrors = {
+  command?: string
+  httpPort?: string
+  tcpPort?: string
+}
+
+function createDefaultProbeDraftFieldErrors(): Record<ProbeSectionKey, DraftRequiredFieldErrors> {
+  return {
+    liveness: {},
+    readiness: {},
+    startup: {},
+  }
+}
+
+function createDefaultLifecycleDraftFieldErrors(): Record<LifecycleSectionKey, DraftRequiredFieldErrors> {
+  return {
+    postStart: {},
+    preStop: {},
+  }
+}
+
+function resolveDraftRequiredFieldErrors(
+  draft: Pick<ContainerProbeDraft, "mode" | "command" | "httpPort" | "tcpPort">
+): DraftRequiredFieldErrors {
+  const isValidPort = (raw: string) => {
+    const parsed = Number(raw)
+    return Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535
+  }
+  if (draft.mode === "command") {
+    return draft.command.trim() ? {} : { command: "请输入命令" }
+  }
+  if (draft.mode === "http") {
+    if (!draft.httpPort.trim()) return {}
+    return isValidPort(draft.httpPort.trim()) ? {} : { httpPort: "端口范围需在 1-65535" }
+  }
+  if (draft.mode === "tcp") {
+    if (!draft.tcpPort.trim()) return {}
+    return isValidPort(draft.tcpPort.trim()) ? {} : { tcpPort: "TCP 端口范围需在 1-65535" }
+  }
+  return {}
+}
+
+function normalizeProbeDraftForConfirm(draft: ContainerProbeDraft): ContainerProbeDraft {
+  const normalizedPath = draft.httpPath.trim() ? draft.httpPath.trim() : "/"
+  const normalizedHttpPort = draft.httpPort.trim() ? draft.httpPort.trim() : "80"
+  const normalizedTcpPort = draft.tcpPort.trim() ? draft.tcpPort.trim() : "80"
+  return {
+    ...draft,
+    httpPath: normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`,
+    httpPort: normalizedHttpPort,
+    tcpPort: normalizedTcpPort,
+    initialDelaySeconds: draft.initialDelaySeconds.trim() ? draft.initialDelaySeconds.trim() : "0",
+    timeoutSeconds: draft.timeoutSeconds.trim() ? draft.timeoutSeconds.trim() : "1",
+    periodSeconds: draft.periodSeconds.trim() ? draft.periodSeconds.trim() : "10",
+    successThreshold: draft.successThreshold.trim() ? draft.successThreshold.trim() : "1",
+    failureThreshold: draft.failureThreshold.trim() ? draft.failureThreshold.trim() : "3",
+    command: draft.command.trim(),
+  }
+}
+
+function normalizeLifecycleDraftForConfirm(
+  draft: ContainerLifecycleActionDraft
+): ContainerLifecycleActionDraft {
+  const normalizedPath = draft.httpPath.trim() ? draft.httpPath.trim() : "/"
+  const normalizedHttpPort = draft.httpPort.trim() ? draft.httpPort.trim() : "80"
+  const normalizedTcpPort = draft.tcpPort.trim() ? draft.tcpPort.trim() : "80"
+  return {
+    ...draft,
+    httpPath: normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`,
+    httpPort: normalizedHttpPort,
+    tcpPort: normalizedTcpPort,
+    command: draft.command.trim(),
+  }
+}
+
 export function useCreateContainerDialogController(props: CreateContainerDialogControllerProps) {
   const {
     open,
@@ -103,12 +178,18 @@ export function useCreateContainerDialogController(props: CreateContainerDialogC
   const [probeState, setProbeState] = React.useState<Record<ProbeSectionKey, ProbeSectionState>>(
     createDefaultProbeState
   )
+  const [probeDraftFieldErrors, setProbeDraftFieldErrors] = React.useState<
+    Record<ProbeSectionKey, DraftRequiredFieldErrors>
+  >(createDefaultProbeDraftFieldErrors)
   const [probePopoverOpen, setProbePopoverOpen] = React.useState<Record<ProbeSectionKey, boolean>>(
     createDefaultProbePopoverOpenState
   )
   const [lifecycleState, setLifecycleState] = React.useState<Record<LifecycleSectionKey, LifecycleSectionState>>(
     createDefaultLifecycleState
   )
+  const [lifecycleDraftFieldErrors, setLifecycleDraftFieldErrors] = React.useState<
+    Record<LifecycleSectionKey, DraftRequiredFieldErrors>
+  >(createDefaultLifecycleDraftFieldErrors)
   const [lifecyclePopoverOpen, setLifecyclePopoverOpen] = React.useState<
     Record<LifecycleSectionKey, boolean>
   >(createDefaultLifecyclePopoverOpenState)
@@ -172,6 +253,10 @@ export function useCreateContainerDialogController(props: CreateContainerDialogC
 
   const updateProbeDraft = React.useCallback(
     (section: ProbeSectionKey, field: ProbeDraftField, value: string | ProbeMode | "HTTP" | "HTTPS") => {
+      setProbeDraftFieldErrors((current) => ({
+        ...current,
+        [section]: {},
+      }))
       setProbeState((current) => ({
         ...current,
         [section]: {
@@ -200,6 +285,10 @@ export function useCreateContainerDialogController(props: CreateContainerDialogC
   )
 
   const cancelProbeEdit = React.useCallback((section: ProbeSectionKey) => {
+    setProbeDraftFieldErrors((current) => ({
+      ...current,
+      [section]: {},
+    }))
     setProbeState((current) => ({
       ...current,
       [section]: {
@@ -214,42 +303,56 @@ export function useCreateContainerDialogController(props: CreateContainerDialogC
   }, [])
 
   const confirmProbeEdit = React.useCallback((section: ProbeSectionKey) => {
-    setProbeState((current) => {
-      const next = {
+    const normalizedDraft = normalizeProbeDraftForConfirm(probeState[section].draft)
+    const validationErrors = resolveDraftRequiredFieldErrors(normalizedDraft)
+    if (Object.keys(validationErrors).length > 0) {
+      setProbeDraftFieldErrors((current) => ({
         ...current,
-        [section]: {
-          ...current[section],
-          enabled: true,
-        },
-      }
-      onChange("probes", buildProbeMapFromState(next))
-      return next
-    })
+        [section]: validationErrors,
+      }))
+      return
+    }
+    setProbeDraftFieldErrors((current) => ({
+      ...current,
+      [section]: {},
+    }))
+    const next = {
+      ...probeState,
+      [section]: {
+        ...probeState[section],
+        enabled: true,
+        draft: normalizedDraft,
+      },
+    }
+    setProbeState(next)
+    onChange("probes", buildProbeMapFromState(next))
     setProbePopoverOpen((current) => ({
       ...current,
       [section]: false,
     }))
-  }, [onChange])
+  }, [onChange, probeState])
 
   const clearProbeEdit = React.useCallback((section: ProbeSectionKey) => {
+    setProbeDraftFieldErrors((current) => ({
+      ...current,
+      [section]: {},
+    }))
     const nextDraft = createDefaultProbeDraft()
     probeDraftSnapshotRef.current[section] = { ...nextDraft }
-    setProbeState((current) => {
-      const next = {
-        ...current,
-        [section]: {
-          enabled: false,
-          draft: nextDraft,
-        },
-      }
-      onChange("probes", buildProbeMapFromState(next))
-      return next
-    })
+    const next = {
+      ...probeState,
+      [section]: {
+        enabled: false,
+        draft: nextDraft,
+      },
+    }
+    setProbeState(next)
+    onChange("probes", buildProbeMapFromState(next))
     setProbePopoverOpen((current) => ({
       ...current,
       [section]: false,
     }))
-  }, [onChange])
+  }, [onChange, probeState])
 
   const updateLifecycleDraft = React.useCallback(
     (
@@ -257,6 +360,10 @@ export function useCreateContainerDialogController(props: CreateContainerDialogC
       field: LifecycleDraftField,
       value: string | ProbeMode | "HTTP" | "HTTPS"
     ) => {
+      setLifecycleDraftFieldErrors((current) => ({
+        ...current,
+        [section]: {},
+      }))
       setLifecycleState((current) => ({
         ...current,
         [section]: {
@@ -285,6 +392,10 @@ export function useCreateContainerDialogController(props: CreateContainerDialogC
   )
 
   const cancelLifecycleEdit = React.useCallback((section: LifecycleSectionKey) => {
+    setLifecycleDraftFieldErrors((current) => ({
+      ...current,
+      [section]: {},
+    }))
     setLifecycleState((current) => ({
       ...current,
       [section]: {
@@ -299,42 +410,56 @@ export function useCreateContainerDialogController(props: CreateContainerDialogC
   }, [])
 
   const confirmLifecycleEdit = React.useCallback((section: LifecycleSectionKey) => {
-    setLifecycleState((current) => {
-      const next = {
+    const normalizedDraft = normalizeLifecycleDraftForConfirm(lifecycleState[section].draft)
+    const validationErrors = resolveDraftRequiredFieldErrors(normalizedDraft)
+    if (Object.keys(validationErrors).length > 0) {
+      setLifecycleDraftFieldErrors((current) => ({
         ...current,
-        [section]: {
-          ...current[section],
-          enabled: true,
-        },
-      }
-      onChange("lifecycle", buildLifecycleMapFromState(next))
-      return next
-    })
+        [section]: validationErrors,
+      }))
+      return
+    }
+    setLifecycleDraftFieldErrors((current) => ({
+      ...current,
+      [section]: {},
+    }))
+    const next = {
+      ...lifecycleState,
+      [section]: {
+        ...lifecycleState[section],
+        enabled: true,
+        draft: normalizedDraft,
+      },
+    }
+    setLifecycleState(next)
+    onChange("lifecycle", buildLifecycleMapFromState(next))
     setLifecyclePopoverOpen((current) => ({
       ...current,
       [section]: false,
     }))
-  }, [onChange])
+  }, [onChange, lifecycleState])
 
   const clearLifecycleEdit = React.useCallback((section: LifecycleSectionKey) => {
+    setLifecycleDraftFieldErrors((current) => ({
+      ...current,
+      [section]: {},
+    }))
     const nextDraft = createDefaultLifecycleActionDraft()
     lifecycleDraftSnapshotRef.current[section] = { ...nextDraft }
-    setLifecycleState((current) => {
-      const next = {
-        ...current,
-        [section]: {
-          enabled: false,
-          draft: nextDraft,
-        },
-      }
-      onChange("lifecycle", buildLifecycleMapFromState(next))
-      return next
-    })
+    const next = {
+      ...lifecycleState,
+      [section]: {
+        enabled: false,
+        draft: nextDraft,
+      },
+    }
+    setLifecycleState(next)
+    onChange("lifecycle", buildLifecycleMapFromState(next))
     setLifecyclePopoverOpen((current) => ({
       ...current,
       [section]: false,
     }))
-  }, [onChange])
+  }, [onChange, lifecycleState])
 
   const firstErrorFieldId = React.useMemo(() => {
     if (!container) return null
@@ -369,8 +494,10 @@ export function useCreateContainerDialogController(props: CreateContainerDialogC
       syncHostTimezone: syncHostTimezoneEnabled,
     }))
     setProbeState(createProbeStateFromContainer(container?.probes))
+    setProbeDraftFieldErrors(createDefaultProbeDraftFieldErrors())
     setProbePopoverOpen(createDefaultProbePopoverOpenState())
     setLifecycleState(createLifecycleStateFromContainer(container?.lifecycle))
+    setLifecycleDraftFieldErrors(createDefaultLifecycleDraftFieldErrors())
     setLifecyclePopoverOpen(createDefaultLifecyclePopoverOpenState())
   }, [
     containerId,
@@ -498,8 +625,10 @@ export function useCreateContainerDialogController(props: CreateContainerDialogC
     extensionState,
     handleLifecyclePopoverOpenChange,
     handleProbePopoverOpenChange,
+    lifecycleDraftFieldErrors,
     lifecyclePopoverOpen,
     lifecycleState,
+    probeDraftFieldErrors,
     probePopoverOpen,
     probeState,
     secretKeyRefOptions,

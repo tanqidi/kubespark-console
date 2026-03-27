@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { IconFileText, IconKey, IconTrash, IconX } from "@tabler/icons-react"
 import { type ContainerPortFieldErrors } from "@/app/lib/kubespark/form-validation"
 import { Button } from "@/components/ui/button"
@@ -192,8 +193,10 @@ export function CreateContainerDialog({
     extensionState,
     handleLifecyclePopoverOpenChange,
     handleProbePopoverOpenChange,
+    lifecycleDraftFieldErrors,
     lifecyclePopoverOpen,
     lifecycleState,
+    probeDraftFieldErrors,
     probePopoverOpen,
     probeState,
     secretKeyRefOptions,
@@ -220,6 +223,14 @@ export function CreateContainerDialog({
     onAddEnv,
     onChange,
   })
+
+  const resourceEnabledFromData = Boolean(
+    container?.cpuRequest ||
+      container?.cpuLimit ||
+      container?.memoryRequestMi ||
+      container?.memoryLimitMi
+  )
+  const [resourceEnabled, setResourceEnabled] = useState(resourceEnabledFromData)
 
   if (!container) return null
 
@@ -346,96 +357,6 @@ export function CreateContainerDialog({
 
             <div className="rounded-md border bg-card">
               <div className="border-b bg-muted/80 px-4 py-3">
-                <div className="text-sm font-semibold">资源设置</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  设置容器的资源上限与资源预留，调度时会优先参考这些值。
-                </div>
-              </div>
-              <div className="grid gap-5 p-4 md:grid-cols-2">
-                                  <div className="flex flex-col gap-3">
-                  <Field>
-                    <FieldLabel htmlFor={`${container.id}-cpu-request`}>CPU 预留</FieldLabel>
-                    <InputGroup>
-                      <InputGroupInput
-                        id={`${container.id}-cpu-request`}
-                        value={container.cpuRequest}
-                        onChange={(event) => onChange("cpuRequest", normalizeCpuInput(event.target.value))}
-                        inputMode="decimal"
-                        autoComplete="off"
-                        placeholder="无预留"
-                        disabled={isBusy}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>Core</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor={`${container.id}-cpu-limit`}>CPU 限制</FieldLabel>
-                    <InputGroup>
-                      <InputGroupInput
-                        id={`${container.id}-cpu-limit`}
-                        value={container.cpuLimit}
-                        onChange={(event) => onChange("cpuLimit", normalizeCpuInput(event.target.value))}
-                        inputMode="decimal"
-                        autoComplete="off"
-                        placeholder="无上限"
-                        disabled={isBusy}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>Core</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                  </Field>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  <Field>
-                    <FieldLabel htmlFor={`${container.id}-memory-request`}>内存预留</FieldLabel>
-                    <InputGroup>
-                      <InputGroupInput
-                        id={`${container.id}-memory-request`}
-                        value={container.memoryRequestMi}
-                        onChange={(event) =>
-                          onChange("memoryRequestMi", normalizeMemoryInput(event.target.value))
-                        }
-                        inputMode="numeric"
-                        autoComplete="off"
-                        placeholder="无预留"
-                        disabled={isBusy}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>Mi</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor={`${container.id}-memory-limit`}>内存上限</FieldLabel>
-                    <InputGroup>
-                      <InputGroupInput
-                        id={`${container.id}-memory-limit`}
-                        value={container.memoryLimitMi}
-                        onChange={(event) =>
-                          onChange("memoryLimitMi", normalizeMemoryInput(event.target.value))
-                        }
-                        inputMode="numeric"
-                        autoComplete="off"
-                        placeholder="无上限"
-                        disabled={isBusy}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>Mi</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                  </Field>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-md border bg-card">
-              <div className="border-b bg-muted/80 px-4 py-3">
                 <div className="text-sm font-semibold">端口设置</div>
                 <div className="mt-1 text-sm text-muted-foreground">设置用于访问容器的端口。</div>
               </div>
@@ -530,6 +451,97 @@ export function CreateContainerDialog({
               </div>
             </div>
 
+            <AdvancedToggleCard
+              checked={resourceEnabled}
+              disabled={isBusy}
+              ariaLabel="资源设置"
+              title="资源设置"
+              description="设置容器的资源上限与资源预留。"
+              onCheckedChange={(nextValue) => {
+                setResourceEnabled(nextValue)
+                if (!nextValue) {
+                  onChange("cpuRequest", "")
+                  onChange("cpuLimit", "")
+                  onChange("memoryRequestMi", "")
+                  onChange("memoryLimitMi", "")
+                }
+              }}
+            >
+              <div className="grid gap-3 md:grid-cols-2">
+                <InputGroup>
+                  <InputGroupAddon>
+                    <InputGroupText>CPU 预留</InputGroupText>
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    id={`${container.id}-cpu-request`}
+                    value={container.cpuRequest}
+                    onChange={(event) => onChange("cpuRequest", normalizeCpuInput(event.target.value))}
+                    inputMode="decimal"
+                    autoComplete="off"
+                    disabled={isBusy}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupText>Core</InputGroupText>
+                  </InputGroupAddon>
+                </InputGroup>
+
+                <InputGroup>
+                  <InputGroupAddon>
+                    <InputGroupText>CPU 限制</InputGroupText>
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    id={`${container.id}-cpu-limit`}
+                    value={container.cpuLimit}
+                    onChange={(event) => onChange("cpuLimit", normalizeCpuInput(event.target.value))}
+                    inputMode="decimal"
+                    autoComplete="off"
+                    disabled={isBusy}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupText>Core</InputGroupText>
+                  </InputGroupAddon>
+                </InputGroup>
+
+                <InputGroup>
+                  <InputGroupAddon>
+                    <InputGroupText>内存预留</InputGroupText>
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    id={`${container.id}-memory-request`}
+                    value={container.memoryRequestMi}
+                    onChange={(event) =>
+                      onChange("memoryRequestMi", normalizeMemoryInput(event.target.value))
+                    }
+                    inputMode="numeric"
+                    autoComplete="off"
+                    disabled={isBusy}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupText>Mi</InputGroupText>
+                  </InputGroupAddon>
+                </InputGroup>
+
+                <InputGroup>
+                  <InputGroupAddon>
+                    <InputGroupText>内存上限</InputGroupText>
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    id={`${container.id}-memory-limit`}
+                    value={container.memoryLimitMi}
+                    onChange={(event) =>
+                      onChange("memoryLimitMi", normalizeMemoryInput(event.target.value))
+                    }
+                    inputMode="numeric"
+                    autoComplete="off"
+                    disabled={isBusy}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupText>Mi</InputGroupText>
+                  </InputGroupAddon>
+                </InputGroup>
+              </div>
+            </AdvancedToggleCard>
+
             <div className="space-y-3">
               {CONTAINER_EXTENSION_OPTIONS.map((option) => {
                     const checked =
@@ -615,6 +627,7 @@ export function CreateContainerDialog({
                             <div className="flex flex-col gap-6">
                               {HEALTH_CHECK_SECTIONS.map((section) => {
                                 const sectionState = probeState[section.key]
+                                const draftFieldError = probeDraftFieldErrors[section.key]
                                 const draft = sectionState.draft
                                 const isOpen = probePopoverOpen[section.key]
                                 return (
@@ -717,64 +730,82 @@ export function CreateContainerDialog({
                                                   disabled={isBusy}
                                                 />
                                               </InputGroup>
+                                              <div className="flex flex-col gap-1">
+                                                <InputGroup>
+                                                  <InputGroupAddon>
+                                                    <InputGroupText>端口</InputGroupText>
+                                                  </InputGroupAddon>
+                                                  <InputGroupInput
+                                                    value={draft.httpPort}
+                                                    onChange={(event) =>
+                                                      updateProbeDraft(
+                                                        section.key,
+                                                        "httpPort",
+                                                        normalizePortInput(event.target.value)
+                                                      )
+                                                    }
+                                                    inputMode="numeric"
+                                                    maxLength={5}
+                                                    autoComplete="off"
+                                                    aria-invalid={Boolean(draftFieldError?.httpPort)}
+                                                    disabled={isBusy}
+                                                  />
+                                                </InputGroup>
+                                                {draftFieldError?.httpPort ? (
+                                                  <p className="text-xs text-destructive">{draftFieldError.httpPort}</p>
+                                                ) : null}
+                                              </div>
+                                            </div>
+                                          ) : null}
+
+                                          {draft.mode === "command" ? (
+                                            <div className="flex flex-col gap-1">
                                               <InputGroup>
                                                 <InputGroupAddon>
-                                                  <InputGroupText>端口</InputGroupText>
+                                                  <InputGroupText>命令</InputGroupText>
                                                 </InputGroupAddon>
                                                 <InputGroupInput
-                                                  value={draft.httpPort}
+                                                  value={draft.command}
+                                                  onChange={(event) =>
+                                                    updateProbeDraft(section.key, "command", event.target.value)
+                                                  }
+                                                  autoComplete="off"
+                                                  aria-invalid={Boolean(draftFieldError?.command)}
+                                                  disabled={isBusy}
+                                                />
+                                              </InputGroup>
+                                              {draftFieldError?.command ? (
+                                                <p className="text-xs text-destructive">{draftFieldError.command}</p>
+                                              ) : null}
+                                            </div>
+                                          ) : null}
+
+                                          {draft.mode === "tcp" ? (
+                                            <div className="flex flex-col gap-1">
+                                              <InputGroup>
+                                                <InputGroupAddon>
+                                                  <InputGroupText>TCP 端口</InputGroupText>
+                                                </InputGroupAddon>
+                                                <InputGroupInput
+                                                  value={draft.tcpPort}
                                                   onChange={(event) =>
                                                     updateProbeDraft(
                                                       section.key,
-                                                      "httpPort",
+                                                      "tcpPort",
                                                       normalizePortInput(event.target.value)
                                                     )
                                                   }
                                                   inputMode="numeric"
                                                   maxLength={5}
                                                   autoComplete="off"
+                                                  aria-invalid={Boolean(draftFieldError?.tcpPort)}
                                                   disabled={isBusy}
                                                 />
                                               </InputGroup>
+                                              {draftFieldError?.tcpPort ? (
+                                                <p className="text-xs text-destructive">{draftFieldError.tcpPort}</p>
+                                              ) : null}
                                             </div>
-                                          ) : null}
-
-                                          {draft.mode === "command" ? (
-                                            <InputGroup>
-                                              <InputGroupAddon>
-                                                <InputGroupText>命令</InputGroupText>
-                                              </InputGroupAddon>
-                                              <InputGroupInput
-                                                value={draft.command}
-                                                onChange={(event) =>
-                                                  updateProbeDraft(section.key, "command", event.target.value)
-                                                }
-                                                autoComplete="off"
-                                                disabled={isBusy}
-                                              />
-                                            </InputGroup>
-                                          ) : null}
-
-                                          {draft.mode === "tcp" ? (
-                                            <InputGroup>
-                                              <InputGroupAddon>
-                                                <InputGroupText>TCP 端口</InputGroupText>
-                                              </InputGroupAddon>
-                                              <InputGroupInput
-                                                value={draft.tcpPort}
-                                                onChange={(event) =>
-                                                  updateProbeDraft(
-                                                    section.key,
-                                                    "tcpPort",
-                                                    normalizePortInput(event.target.value)
-                                                  )
-                                                }
-                                                inputMode="numeric"
-                                                maxLength={5}
-                                                autoComplete="off"
-                                                disabled={isBusy}
-                                              />
-                                            </InputGroup>
                                           ) : null}
 
                                           <div className="grid gap-3 md:grid-cols-3">
@@ -905,6 +936,7 @@ export function CreateContainerDialog({
                             <div className="flex flex-col gap-6">
                               {LIFECYCLE_SECTIONS.map((section) => {
                                 const sectionState = lifecycleState[section.key]
+                                const draftFieldError = lifecycleDraftFieldErrors[section.key]
                                 const draft = sectionState.draft
                                 const isOpen = lifecyclePopoverOpen[section.key]
                                 return (
@@ -1009,21 +1041,27 @@ export function CreateContainerDialog({
                                                     autoComplete="off"
                                                     disabled={isBusy}
                                                   />
-                                                  <Input
-                                                    value={draft.httpPort}
-                                                    onChange={(event) =>
-                                                      updateLifecycleDraft(
-                                                        section.key,
-                                                        "httpPort",
-                                                        normalizePortInput(event.target.value)
-                                                      )
-                                                    }
-                                                    placeholder="80"
-                                                    inputMode="numeric"
-                                                    maxLength={5}
-                                                    autoComplete="off"
-                                                    disabled={isBusy}
-                                                  />
+                                                  <div className="flex flex-col gap-1">
+                                                    <Input
+                                                      value={draft.httpPort}
+                                                      onChange={(event) =>
+                                                        updateLifecycleDraft(
+                                                          section.key,
+                                                          "httpPort",
+                                                          normalizePortInput(event.target.value)
+                                                        )
+                                                      }
+                                                      placeholder="80"
+                                                      inputMode="numeric"
+                                                      maxLength={5}
+                                                      autoComplete="off"
+                                                      aria-invalid={Boolean(draftFieldError?.httpPort)}
+                                                      disabled={isBusy}
+                                                    />
+                                                    {draftFieldError?.httpPort ? (
+                                                      <p className="text-xs text-destructive">{draftFieldError.httpPort}</p>
+                                                    ) : null}
+                                                  </div>
                                                 </div>
                                               </div>
                                             ) : null}
@@ -1041,8 +1079,12 @@ export function CreateContainerDialog({
                                                     )
                                                   }
                                                   placeholder='/bin/sh -c "echo ready"'
+                                                  aria-invalid={Boolean(draftFieldError?.command)}
                                                   disabled={isBusy}
                                                 />
+                                                {draftFieldError?.command ? (
+                                                  <p className="text-xs text-destructive">{draftFieldError.command}</p>
+                                                ) : null}
                                               </div>
                                             ) : null}
 
@@ -1062,8 +1104,12 @@ export function CreateContainerDialog({
                                                   inputMode="numeric"
                                                   maxLength={5}
                                                   autoComplete="off"
+                                                  aria-invalid={Boolean(draftFieldError?.tcpPort)}
                                                   disabled={isBusy}
                                                 />
+                                                {draftFieldError?.tcpPort ? (
+                                                  <p className="text-xs text-destructive">{draftFieldError.tcpPort}</p>
+                                                ) : null}
                                               </div>
                                             ) : null}
 
