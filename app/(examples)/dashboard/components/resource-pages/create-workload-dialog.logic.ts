@@ -68,6 +68,7 @@ export type WorkloadDialogInitialValues = {
   }
   pod?: {
     restartPolicy?: "Always"
+    serviceAccountName?: string
     configList?: Array<{
       sourceKind?: "configMap" | "secret"
       sourceName?: string
@@ -233,6 +234,7 @@ export type WorkloadDialogSnapshot = {
   }
   pod: {
     restartPolicy: "Always"
+    serviceAccountName: string
     containers: ContainerDraft[]
     configList?: ConfigMountInput[]
     storageList?: JobStorageInput[]
@@ -772,6 +774,7 @@ export function createContainerDraftFromInitial(
 
 export function buildPodSpecFromContainers(
   restartPolicy: "Always",
+  serviceAccountName: string,
   containers: ContainerDraft[],
   storage?: JobStorageInput | JobStorageInput[],
   configMounts?: ConfigMountInput[]
@@ -992,6 +995,7 @@ export function buildPodSpecFromContainers(
 
   return {
     restartPolicy,
+    ...(serviceAccountName.trim() ? { serviceAccountName: serviceAccountName.trim() } : {}),
     ...(workload.length > 0 ? { containers: workload } : {}),
     ...(init.length > 0 ? { initContainers: init } : {}),
     ...(volumes.length > 0 ? { volumes } : {}),
@@ -1019,7 +1023,13 @@ export function buildWorkloadManifest(
       ? { annotations: { description: snapshot.description.trim() } }
       : {}),
   }
-  const podSpec = buildPodSpecFromContainers("Always", snapshot.pod.containers, storage, configMounts)
+  const podSpec = buildPodSpecFromContainers(
+    "Always",
+    snapshot.pod.serviceAccountName,
+    snapshot.pod.containers,
+    storage,
+    configMounts
+  )
   const template = {
     metadata: {
       labels: {
@@ -1272,6 +1282,7 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
     },
     pod: {
       restartPolicy: "Always",
+      serviceAccountName: asString(podSpec.serviceAccountName).trim() || "default",
       containers: containers.length > 0 ? containers : [],
       ...(parsedConfigList.length > 0 ? { configList: parsedConfigList } : {}),
       ...(parsedStorageList.length > 0 ? { storageList: parsedStorageList } : {}),

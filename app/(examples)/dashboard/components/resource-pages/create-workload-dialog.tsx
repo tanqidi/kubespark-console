@@ -151,6 +151,7 @@ export function CreateWorkloadDialog({
     removeContainerEnv,
     removeContainerPort,
     removeStorageVolume,
+    restartPolicy,
     returnToPodList,
     runPodValidation,
     savedStorageVolumes,
@@ -163,6 +164,8 @@ export function CreateWorkloadDialog({
     setNamespace,
     setNamespaceError,
     setPendingDeleteContainerId,
+    setRestartPolicy,
+    setServiceAccountName,
     startAddStorageVolume,
     startEditStorageVolume,
     storageVolumeDraft,
@@ -175,6 +178,7 @@ export function CreateWorkloadDialog({
     updateContainer,
     updateContainerEnv,
     updateContainerPort,
+    serviceAccountName,
     yamlError,
     yamlMode,
     yamlText,
@@ -1206,10 +1210,42 @@ export function CreateWorkloadDialog({
               </div>
             ) : (
               <div>
-                <div className="mb-3">
+                <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">高级设置</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
                 </div>
+                <FieldGroup className="grid gap-6 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="create-workload-restart-policy">重启策略</FieldLabel>
+                    <Select
+                      value={restartPolicy}
+                      onValueChange={(value) => {
+                        if (value === "Always") setRestartPolicy("Always")
+                      }}
+                      disabled={isBusy}
+                    >
+                      <SelectTrigger id="create-workload-restart-policy">
+                        <SelectValue placeholder="请选择重启策略" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="Always">Always</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="create-workload-service-account">服务账号</FieldLabel>
+                    <Input
+                      id="create-workload-service-account"
+                      value={serviceAccountName}
+                      onChange={(event) => setServiceAccountName(event.target.value)}
+                      placeholder="default"
+                      autoComplete="off"
+                      disabled={isBusy}
+                    />
+                  </Field>
+                </FieldGroup>
               </div>
             )}
 

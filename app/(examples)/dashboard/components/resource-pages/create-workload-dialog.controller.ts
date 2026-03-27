@@ -80,6 +80,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const [parallelism, setParallelism] = React.useState("")
   const [activeDeadlineSeconds, setActiveDeadlineSeconds] = React.useState("")
   const [restartPolicy, setRestartPolicy] = React.useState<"Always">("Always")
+  const [serviceAccountName, setServiceAccountName] = React.useState("default")
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [scheduleError, setScheduleError] = React.useState<string | null>(null)
@@ -169,6 +170,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       setParallelism("")
       setActiveDeadlineSeconds("")
       setRestartPolicy("Always")
+      setServiceAccountName("default")
       setContainers([])
       resetEditorUiState()
       setNameError(null)
@@ -200,6 +202,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setParallelism(initialValues.strategy?.parallelism ?? "")
     setActiveDeadlineSeconds(initialValues.strategy?.activeDeadlineSeconds ?? "")
     setRestartPolicy("Always")
+    setServiceAccountName(initialValues.pod?.serviceAccountName?.trim() || "default")
     setContainers(
       Array.isArray(initialValues.pod?.containers)
         ? initialValues.pod.containers.map((item, index) => createContainerDraftFromInitial(item, index))
@@ -471,6 +474,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         },
         pod: {
           restartPolicy,
+          serviceAccountName,
           containers,
           ...(normalizedStorageList.length > 0
             ? {
@@ -493,6 +497,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       schedule,
       parallelism,
       restartPolicy,
+      serviceAccountName,
       savedStorageVolumes,
       storageVolumeDraft,
     ]
@@ -508,6 +513,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setParallelism(snapshot.strategy.parallelism)
     setActiveDeadlineSeconds(snapshot.strategy.activeDeadlineSeconds)
     setRestartPolicy(snapshot.pod.restartPolicy)
+    setServiceAccountName(snapshot.pod.serviceAccountName?.trim() || "default")
     setContainers(snapshot.pod.containers)
     const nextStorageVolumes = Array.isArray(snapshot.pod.storageList)
       ? snapshot.pod.storageList
@@ -719,6 +725,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
           pod: {
             ...source.pod,
             restartPolicy: "Always",
+            serviceAccountName: source.pod.serviceAccountName.trim() || "default",
           },
         }
         const configMountList =
@@ -812,6 +819,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     removeContainerPort,
     removeStorageVolume,
     restartPolicy,
+    serviceAccountName,
     returnToPodList,
     runPodValidation,
     savedStorageVolumes,
@@ -830,6 +838,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setParallelism,
     setPendingDeleteContainerId,
     setRestartPolicy,
+    setServiceAccountName,
     setSchedule,
     setScheduleError,
     startAddStorageVolume,
