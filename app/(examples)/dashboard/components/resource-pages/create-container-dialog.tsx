@@ -28,7 +28,7 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group"
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
+import { AdvancedToggleCard } from "@/app/(examples)/dashboard/components/resource-pages/advanced-toggle-card"
 import {
   Select,
   SelectContent,
@@ -538,7 +538,7 @@ export function CreateContainerDialog({
                 </div>
               </div>
               <div className="p-4">
-                <ItemGroup className="gap-3">
+                <div className="space-y-3">
                   {CONTAINER_EXTENSION_OPTIONS.map((option) => {
                     const checked =
                       option.key === "syncHostTimezone"
@@ -546,50 +546,46 @@ export function CreateContainerDialog({
                         : extensionState[option.key]
                     const isStartupCommand = option.key === "startupCommand"
                     return (
-                      <Item key={option.key} variant="outline" className="items-start">
-                        <Checkbox
-                          id={`${container.id}-option-${option.key}`}
-                          checked={checked}
-                          onCheckedChange={(nextChecked) => {
-                            const nextValue = nextChecked === true
-                            setExtensionState((current) => ({
-                              ...current,
-                              [option.key]: nextValue,
-                            }))
-                            if (option.key === "syncHostTimezone") {
-                              onChange("syncHostTimezone", nextValue)
-                            } else if (option.key === "securityContext" && !nextValue) {
-                              onChange("securityContext", createDefaultSecurityContextDraft())
-                            } else if (option.key === "healthCheck" && !nextValue) {
-                              setProbeState(createDefaultProbeState())
-                              setProbePopoverOpen(createDefaultProbePopoverOpenState())
-                              onChange("probes", {})
-                            } else if (option.key === "lifecycle" && !nextValue) {
-                              setLifecycleState(createDefaultLifecycleState())
-                              setLifecyclePopoverOpen(createDefaultLifecyclePopoverOpenState())
-                              onChange("lifecycle", {})
-                            } else if (option.key === "startupCommand" && !nextValue) {
-                              onChange("command", "")
-                              onChange("args", "")
-                            } else if (option.key === "env" && nextValue && container.env.length === 0) {
-                              onAddEnv({
-                                name: "TZ",
-                                value: "Asia/Shanghai",
-                              })
-                            } else if (option.key === "env" && !nextValue) {
-                              onClearEnv()
-                            }
-                          }}
-                          disabled={isBusy}
-                          className="mt-1"
-                        />
-                        <ItemContent>
-                          <ItemTitle>{option.title}</ItemTitle>
-                          <ItemDescription>{option.description}</ItemDescription>
-                        </ItemContent>
+                      <AdvancedToggleCard
+                        key={option.key}
+                        checked={checked}
+                        disabled={isBusy}
+                        ariaLabel={option.title}
+                        title={option.title}
+                        description={option.description}
+                        onCheckedChange={(nextValue) => {
+                          setExtensionState((current) => ({
+                            ...current,
+                            [option.key]: nextValue,
+                          }))
+                          if (option.key === "syncHostTimezone") {
+                            onChange("syncHostTimezone", nextValue)
+                          } else if (option.key === "securityContext" && !nextValue) {
+                            onChange("securityContext", createDefaultSecurityContextDraft())
+                          } else if (option.key === "healthCheck" && !nextValue) {
+                            setProbeState(createDefaultProbeState())
+                            setProbePopoverOpen(createDefaultProbePopoverOpenState())
+                            onChange("probes", {})
+                          } else if (option.key === "lifecycle" && !nextValue) {
+                            setLifecycleState(createDefaultLifecycleState())
+                            setLifecyclePopoverOpen(createDefaultLifecyclePopoverOpenState())
+                            onChange("lifecycle", {})
+                          } else if (option.key === "startupCommand" && !nextValue) {
+                            onChange("command", "")
+                            onChange("args", "")
+                          } else if (option.key === "env" && nextValue && container.env.length === 0) {
+                            onAddEnv({
+                              name: "TZ",
+                              value: "Asia/Shanghai",
+                            })
+                          } else if (option.key === "env" && !nextValue) {
+                            onClearEnv()
+                          }
+                        }}
+                      >
 
                         {isStartupCommand && checked ? (
-                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                          <div className="basis-full">
                             <FieldGroup className="flex flex-col gap-4">
                               <Field>
                                 <FieldLabel htmlFor={`${container.id}-startup-command`}>命令</FieldLabel>
@@ -623,7 +619,7 @@ export function CreateContainerDialog({
                         ) : null}
 
                         {option.key === "healthCheck" && checked ? (
-                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                          <div className="basis-full">
                             <div className="flex flex-col gap-6">
                               {HEALTH_CHECK_SECTIONS.map((section) => {
                                 const sectionState = probeState[section.key]
@@ -895,7 +891,7 @@ export function CreateContainerDialog({
                         ) : null}
 
                         {option.key === "lifecycle" && checked ? (
-                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                          <div className="basis-full">
                             <div className="flex flex-col gap-6">
                               {LIFECYCLE_SECTIONS.map((section) => {
                                 const sectionState = lifecycleState[section.key]
@@ -1091,7 +1087,7 @@ export function CreateContainerDialog({
                         ) : null}
 
                         {option.key === "env" && checked ? (
-                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                          <div className="basis-full">
                             <FieldGroup className="flex flex-col gap-3">
                               {container.env.length > 0 ? (
                                 container.env.map((item) => (
@@ -1418,7 +1414,7 @@ export function CreateContainerDialog({
                         ) : null}
 
                         {option.key === "securityContext" && checked ? (
-                          <div className="basis-full rounded-md bg-muted/60 p-4">
+                          <div className="basis-full">
                             <div className="space-y-4">
                               <div className="space-y-3">
                                 <p className="text-sm text-foreground">访问控制</p>
@@ -1538,10 +1534,10 @@ export function CreateContainerDialog({
                             </div>
                           </div>
                         ) : null}
-                      </Item>
+                      </AdvancedToggleCard>
                     )
                   })}
-                </ItemGroup>
+                </div>
               </div>
             </div>
           </FieldGroup>
@@ -1561,3 +1557,4 @@ export function CreateContainerDialog({
     </Dialog>
   )
 }
+
