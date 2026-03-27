@@ -44,7 +44,14 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -146,6 +153,10 @@ export function CreateWorkloadDialog({
     nameError,
     namespace,
     namespaceError,
+    rollingUpdateEnabled,
+    rollingUpdateMaxSurge,
+    rollingUpdateMaxUnavailable,
+    rollingUpdateType,
     pendingDeleteContainer,
     removeContainer,
     removeContainerEnv,
@@ -163,6 +174,10 @@ export function CreateWorkloadDialog({
     setNamespace,
     setNamespaceError,
     setPendingDeleteContainerId,
+    setRollingUpdateEnabled,
+    setRollingUpdateMaxSurge,
+    setRollingUpdateMaxUnavailable,
+    setRollingUpdateType,
     setTerminationGracePeriodSeconds,
     setServiceAccountName,
     startAddStorageVolume,
@@ -206,6 +221,15 @@ export function CreateWorkloadDialog({
   const [editingConfigMountIndex, setEditingConfigMountIndex] = React.useState<number | null>(null)
   const [pendingDeleteStorageIndex, setPendingDeleteStorageIndex] = React.useState<number | null>(null)
   const [pendingDeleteConfigMountIndex, setPendingDeleteConfigMountIndex] = React.useState<number | null>(null)
+  const normalizeIntOrPercentInput = React.useCallback((value: string) => {
+    const compact = value.replace(/\s+/g, "")
+    if (!compact) return ""
+    if (/^\d+%?$/.test(compact)) return compact
+    const stripped = compact.replace(/[^0-9%]/g, "")
+    const percentIndex = stripped.indexOf("%")
+    if (percentIndex === -1) return stripped
+    return `${stripped.slice(0, percentIndex).replace(/%/g, "")}%`
+  }, [])
 
   const volumeNameOptions = persistentVolumeNameOptions
   const currentStorageVolumeId = (
@@ -1215,6 +1239,94 @@ export function CreateWorkloadDialog({
                   <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
                 </div>
                 <FieldGroup className="grid gap-6 md:grid-cols-2">
+                  {kind === "Deployment" ? (
+                    <Field className="md:col-span-2">
+                      <div className="rounded-lg border bg-muted/20 p-4">
+                        <div className="flex items-start gap-3">
+                          <Checkbox
+                            checked={rollingUpdateEnabled}
+                            onCheckedChange={(checked) => {
+                              if (isBusy) return
+                              setRollingUpdateEnabled(checked === true)
+                            }}
+                            aria-label="滚动更新策略"
+                            disabled={isBusy}
+                          />
+                          <div>
+                            <div className="text-sm">滚动更新策略</div>
+                            <div className="mt-1 text-sm text-muted-foreground">
+                              开启后可设置滚动更新策略，包括更新类型、最大不可用比例和最大激增比例。
+                            </div>
+                          </div>
+                        </div>
+                      {rollingUpdateEnabled ? (
+                        <div className="mt-4 rounded-lg bg-muted/60 p-4">
+                          <FieldGroup className="grid gap-4">
+                            <Field>
+                              <Select
+                                value={rollingUpdateType}
+                                onValueChange={(value) => {
+                                  if (value === "RollingUpdate" || value === "Recreate") {
+                                    setRollingUpdateType(value)
+                                  }
+                                }}
+                                disabled={isBusy}
+                              >
+                                <SelectTrigger id="create-workload-rolling-update-type">
+                                  <SelectValue placeholder="请选择类型" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectGroup>
+                                    <SelectItem value="RollingUpdate">RollingUpdate</SelectItem>
+                                    <SelectItem value="Recreate">Recreate</SelectItem>
+                                  </SelectGroup>
+                                </SelectContent>
+                              </Select>
+                            </Field>
+                            {rollingUpdateType === "RollingUpdate" ? (
+                              <div className="grid gap-4 md:grid-cols-2">
+                              <InputGroup>
+                                <InputGroupAddon>
+                                  <InputGroupText>maxUnavailable</InputGroupText>
+                                </InputGroupAddon>
+                                <InputGroupInput
+                                  id="create-workload-rolling-update-max-unavailable"
+                                  value={rollingUpdateMaxUnavailable}
+                                  onChange={(event) =>
+                                    setRollingUpdateMaxUnavailable(
+                                      normalizeIntOrPercentInput(event.target.value)
+                                    )
+                                  }
+                                  placeholder="25%"
+                                  autoComplete="off"
+                                  disabled={isBusy}
+                                />
+                              </InputGroup>
+                              <InputGroup>
+                                <InputGroupAddon>
+                                  <InputGroupText>maxSurge</InputGroupText>
+                                </InputGroupAddon>
+                                <InputGroupInput
+                                  id="create-workload-rolling-update-max-surge"
+                                  value={rollingUpdateMaxSurge}
+                                  onChange={(event) =>
+                                    setRollingUpdateMaxSurge(
+                                      normalizeIntOrPercentInput(event.target.value)
+                                    )
+                                  }
+                                  placeholder="25%"
+                                  autoComplete="off"
+                                  disabled={isBusy}
+                                />
+                              </InputGroup>
+                              </div>
+                            ) : null}
+                          </FieldGroup>
+                        </div>
+                      ) : null}
+                      </div>
+                    </Field>
+                  ) : null}
                   <Field>
                     <FieldLabel htmlFor="create-workload-termination-grace-period-seconds">
                       优雅终止宽限时间（秒）

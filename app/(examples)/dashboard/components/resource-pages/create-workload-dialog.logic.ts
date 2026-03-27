@@ -65,6 +65,10 @@ export type WorkloadDialogInitialValues = {
     completions?: string
     parallelism?: string
     activeDeadlineSeconds?: string
+    rollingUpdateEnabled?: boolean
+    rollingUpdateType?: "RollingUpdate" | "Recreate"
+    rollingUpdateMaxUnavailable?: string
+    rollingUpdateMaxSurge?: string
   }
   pod?: {
     restartPolicy?: "Always"
@@ -232,6 +236,10 @@ export type WorkloadDialogSnapshot = {
     completions: string
     parallelism: string
     activeDeadlineSeconds: string
+    rollingUpdateEnabled: boolean
+    rollingUpdateType: "RollingUpdate" | "Recreate"
+    rollingUpdateMaxUnavailable: string
+    rollingUpdateMaxSurge: string
   }
   pod: {
     restartPolicy: "Always"
@@ -1021,6 +1029,10 @@ export function buildWorkloadManifest(
   const minReadySeconds = toOptionalIntegerString(snapshot.strategy.completions)
   const revisionHistoryLimit = toOptionalIntegerString(snapshot.strategy.parallelism)
   const progressDeadlineSeconds = toOptionalIntegerString(snapshot.strategy.activeDeadlineSeconds)
+  const rollingUpdateEnabled = snapshot.strategy.rollingUpdateEnabled
+  const rollingUpdateType = snapshot.strategy.rollingUpdateType
+  const rollingUpdateMaxUnavailable = snapshot.strategy.rollingUpdateMaxUnavailable.trim()
+  const rollingUpdateMaxSurge = snapshot.strategy.rollingUpdateMaxSurge.trim()
 
   const metadata: JsonObject = {
     name: metadataName,
@@ -1063,6 +1075,25 @@ export function buildWorkloadManifest(
     }
     if (progressDeadlineSeconds) {
       spec.progressDeadlineSeconds = Number.parseInt(progressDeadlineSeconds, 10)
+    }
+    if (rollingUpdateEnabled) {
+      const toIntOrText = (value: string): number | string =>
+        /^\d+$/.test(value) ? Number.parseInt(value, 10) : value
+      if (rollingUpdateType === "Recreate") {
+        spec.strategy = {
+          type: "Recreate",
+        }
+      } else {
+        spec.strategy = {
+          type: "RollingUpdate",
+          rollingUpdate: {
+            ...(rollingUpdateMaxUnavailable
+              ? { maxUnavailable: toIntOrText(rollingUpdateMaxUnavailable) }
+              : {}),
+            ...(rollingUpdateMaxSurge ? { maxSurge: toIntOrText(rollingUpdateMaxSurge) } : {}),
+          },
+        }
+      }
     }
   }
   if (kind === "StatefulSet") {
@@ -1286,6 +1317,23 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
       parallelism: toOptionalIntegerString(spec.revisionHistoryLimit),
       activeDeadlineSeconds:
         kind === "Deployment" ? toOptionalIntegerString(spec.progressDeadlineSeconds) : "",
+      rollingUpdateEnabled:
+        kind === "Deployment" &&
+        Object.keys(asObject(asObject(spec.strategy).rollingUpdate)).length > 0,
+      rollingUpdateType:
+        kind === "Deployment" && asString(asObject(spec.strategy).type).trim() === "Recreate"
+          ? "Recreate"
+          : "RollingUpdate",
+      rollingUpdateMaxUnavailable:
+        kind === "Deployment"
+          ? asString(asObject(asObject(spec.strategy).rollingUpdate).maxUnavailable) ||
+            toOptionalIntegerString(asObject(asObject(spec.strategy).rollingUpdate).maxUnavailable)
+          : "",
+      rollingUpdateMaxSurge:
+        kind === "Deployment"
+          ? asString(asObject(asObject(spec.strategy).rollingUpdate).maxSurge) ||
+            toOptionalIntegerString(asObject(asObject(spec.strategy).rollingUpdate).maxSurge)
+          : "",
     },
     pod: {
       restartPolicy: "Always",
@@ -1462,7 +1510,7 @@ export function resolveSubmitErrorMessage(error: unknown, kind: WorkloadCreateKi
 export function resolveStepDescription(step: CreateStep): string {
   switch (step) {
     case "advanced":
-      return "配置容器组运行策略与服务账号等高级参数。"
+      return "配置服务账号、优雅终止时间等高级参数。"
     default:
       return ""
   }

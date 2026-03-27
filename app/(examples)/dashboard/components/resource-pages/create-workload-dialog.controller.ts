@@ -80,6 +80,11 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const [completions, setCompletions] = React.useState("")
   const [parallelism, setParallelism] = React.useState("")
   const [activeDeadlineSeconds, setActiveDeadlineSeconds] = React.useState("")
+  const [rollingUpdateEnabled, setRollingUpdateEnabled] = React.useState(false)
+  const [rollingUpdateType, setRollingUpdateType] =
+    React.useState<"RollingUpdate" | "Recreate">("RollingUpdate")
+  const [rollingUpdateMaxUnavailable, setRollingUpdateMaxUnavailable] = React.useState("25%")
+  const [rollingUpdateMaxSurge, setRollingUpdateMaxSurge] = React.useState("25%")
   const [restartPolicy, setRestartPolicy] = React.useState<"Always">("Always")
   const [terminationGracePeriodSeconds, setTerminationGracePeriodSeconds] = React.useState("30")
   const [serviceAccountName, setServiceAccountName] = React.useState("default")
@@ -171,6 +176,10 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       setCompletions("")
       setParallelism("")
       setActiveDeadlineSeconds("")
+      setRollingUpdateEnabled(false)
+      setRollingUpdateType("RollingUpdate")
+      setRollingUpdateMaxUnavailable("25%")
+      setRollingUpdateMaxSurge("25%")
       setRestartPolicy("Always")
       setTerminationGracePeriodSeconds("30")
       setServiceAccountName("default")
@@ -204,6 +213,12 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setCompletions(initialValues.strategy?.completions ?? "")
     setParallelism(initialValues.strategy?.parallelism ?? "")
     setActiveDeadlineSeconds(initialValues.strategy?.activeDeadlineSeconds ?? "")
+    setRollingUpdateEnabled(initialValues.strategy?.rollingUpdateEnabled === true)
+    setRollingUpdateType(
+      initialValues.strategy?.rollingUpdateType === "Recreate" ? "Recreate" : "RollingUpdate"
+    )
+    setRollingUpdateMaxUnavailable(initialValues.strategy?.rollingUpdateMaxUnavailable?.trim() || "25%")
+    setRollingUpdateMaxSurge(initialValues.strategy?.rollingUpdateMaxSurge?.trim() || "25%")
     setRestartPolicy("Always")
     setTerminationGracePeriodSeconds(initialValues.pod?.terminationGracePeriodSeconds?.trim() || "30")
     setServiceAccountName(initialValues.pod?.serviceAccountName?.trim() || "default")
@@ -475,6 +490,10 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
           completions,
           parallelism,
           activeDeadlineSeconds,
+          rollingUpdateEnabled,
+          rollingUpdateType,
+          rollingUpdateMaxUnavailable,
+          rollingUpdateMaxSurge,
         },
         pod: {
           restartPolicy,
@@ -501,6 +520,10 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       namespace,
       schedule,
       parallelism,
+      rollingUpdateEnabled,
+      rollingUpdateType,
+      rollingUpdateMaxUnavailable,
+      rollingUpdateMaxSurge,
       restartPolicy,
       terminationGracePeriodSeconds,
       serviceAccountName,
@@ -518,6 +541,12 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setCompletions(snapshot.strategy.completions)
     setParallelism(snapshot.strategy.parallelism)
     setActiveDeadlineSeconds(snapshot.strategy.activeDeadlineSeconds)
+    setRollingUpdateEnabled(snapshot.strategy.rollingUpdateEnabled === true)
+    setRollingUpdateType(
+      snapshot.strategy.rollingUpdateType === "Recreate" ? "Recreate" : "RollingUpdate"
+    )
+    setRollingUpdateMaxUnavailable(snapshot.strategy.rollingUpdateMaxUnavailable?.trim() || "25%")
+    setRollingUpdateMaxSurge(snapshot.strategy.rollingUpdateMaxSurge?.trim() || "25%")
     setRestartPolicy(snapshot.pod.restartPolicy)
     setTerminationGracePeriodSeconds(snapshot.pod.terminationGracePeriodSeconds?.trim() || "30")
     setServiceAccountName(snapshot.pod.serviceAccountName?.trim() || "default")
@@ -822,6 +851,10 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     namespace,
     namespaceError,
     parallelism,
+    rollingUpdateEnabled,
+    rollingUpdateType,
+    rollingUpdateMaxUnavailable,
+    rollingUpdateMaxSurge,
     pendingDeleteContainer,
     removeContainer,
     removeContainerEnv,
@@ -846,6 +879,10 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setNamespace,
     setNamespaceError,
     setParallelism,
+    setRollingUpdateEnabled,
+    setRollingUpdateType,
+    setRollingUpdateMaxUnavailable,
+    setRollingUpdateMaxSurge,
     setPendingDeleteContainerId,
     setRestartPolicy,
     setTerminationGracePeriodSeconds,
