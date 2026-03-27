@@ -530,16 +530,8 @@ export function CreateContainerDialog({
               </div>
             </div>
 
-            <div className="rounded-md border bg-card">
-              <div className="border-b bg-muted/80 px-4 py-3">
-                <div className="text-sm font-semibold">扩展配置</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  通过开关启用容器扩展能力，具体参数配置后续逐步开放。
-                </div>
-              </div>
-              <div className="p-4">
-                <div className="space-y-3">
-                  {CONTAINER_EXTENSION_OPTIONS.map((option) => {
+            <div className="space-y-3">
+              {CONTAINER_EXTENSION_OPTIONS.map((option) => {
                     const checked =
                       option.key === "syncHostTimezone"
                         ? container.syncHostTimezone
@@ -1536,9 +1528,7 @@ export function CreateContainerDialog({
                         ) : null}
                       </AdvancedToggleCard>
                     )
-                  })}
-                </div>
-              </div>
+              })}
             </div>
           </FieldGroup>
         </div>
