@@ -682,40 +682,46 @@ export function CreateContainerDialog({
                                           </Tabs>
 
                                           {draft.mode === "http" ? (
-                                            <div className="space-y-3">
-                                              <div className="text-sm">路径</div>
-                                              <div className="grid gap-3 md:grid-cols-3">
-                                                <div className="w-full">
-                                                  <Select
-                                                    value={draft.httpScheme}
-                                                    onValueChange={(value) => {
-                                                      if (value === "HTTP" || value === "HTTPS") {
-                                                        updateProbeDraft(section.key, "httpScheme", value)
-                                                      }
-                                                    }}
-                                                    disabled={isBusy}
-                                                  >
-                                                    <SelectTrigger className="w-full">
-                                                      <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectGroup>
-                                                        <SelectItem value="HTTP">HTTP</SelectItem>
-                                                        <SelectItem value="HTTPS">HTTPS</SelectItem>
-                                                      </SelectGroup>
-                                                    </SelectContent>
-                                                  </Select>
-                                                </div>
-                                                <Input
+                                            <div className="grid gap-3 md:grid-cols-3">
+                                              <div className="w-full">
+                                                <Select
+                                                  value={draft.httpScheme}
+                                                  onValueChange={(value) => {
+                                                    if (value === "HTTP" || value === "HTTPS") {
+                                                      updateProbeDraft(section.key, "httpScheme", value)
+                                                    }
+                                                  }}
+                                                  disabled={isBusy}
+                                                >
+                                                  <SelectTrigger className="w-full">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectGroup>
+                                                      <SelectItem value="HTTP">HTTP</SelectItem>
+                                                      <SelectItem value="HTTPS">HTTPS</SelectItem>
+                                                    </SelectGroup>
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+                                              <InputGroup>
+                                                <InputGroupAddon>
+                                                  <InputGroupText>路径</InputGroupText>
+                                                </InputGroupAddon>
+                                                <InputGroupInput
                                                   value={draft.httpPath}
                                                   onChange={(event) =>
                                                     updateProbeDraft(section.key, "httpPath", event.target.value)
                                                   }
-                                                  placeholder="/"
                                                   autoComplete="off"
                                                   disabled={isBusy}
                                                 />
-                                                <Input
+                                              </InputGroup>
+                                              <InputGroup>
+                                                <InputGroupAddon>
+                                                  <InputGroupText>端口</InputGroupText>
+                                                </InputGroupAddon>
+                                                <InputGroupInput
                                                   value={draft.httpPort}
                                                   onChange={(event) =>
                                                     updateProbeDraft(
@@ -724,34 +730,37 @@ export function CreateContainerDialog({
                                                       normalizePortInput(event.target.value)
                                                     )
                                                   }
-                                                  placeholder="80"
                                                   inputMode="numeric"
                                                   maxLength={5}
                                                   autoComplete="off"
                                                   disabled={isBusy}
                                                 />
-                                              </div>
+                                              </InputGroup>
                                             </div>
                                           ) : null}
 
                                           {draft.mode === "command" ? (
-                                            <div className="space-y-3">
-                                              <div className="text-sm">命令</div>
-                                              <Input
+                                            <InputGroup>
+                                              <InputGroupAddon>
+                                                <InputGroupText>命令</InputGroupText>
+                                              </InputGroupAddon>
+                                              <InputGroupInput
                                                 value={draft.command}
                                                 onChange={(event) =>
                                                   updateProbeDraft(section.key, "command", event.target.value)
                                                 }
-                                                placeholder='/bin/sh -c "echo ok"'
+                                                autoComplete="off"
                                                 disabled={isBusy}
                                               />
-                                            </div>
+                                            </InputGroup>
                                           ) : null}
 
                                           {draft.mode === "tcp" ? (
-                                            <div className="space-y-3">
-                                              <div className="text-sm">TCP 端口</div>
-                                              <Input
+                                            <InputGroup>
+                                              <InputGroupAddon>
+                                                <InputGroupText>TCP 端口</InputGroupText>
+                                              </InputGroupAddon>
+                                              <InputGroupInput
                                                 value={draft.tcpPort}
                                                 onChange={(event) =>
                                                   updateProbeDraft(
@@ -760,19 +769,20 @@ export function CreateContainerDialog({
                                                     normalizePortInput(event.target.value)
                                                   )
                                                 }
-                                                placeholder="80"
                                                 inputMode="numeric"
                                                 maxLength={5}
                                                 autoComplete="off"
                                                 disabled={isBusy}
                                               />
-                                            </div>
+                                            </InputGroup>
                                           ) : null}
 
                                           <div className="grid gap-3 md:grid-cols-3">
-                                            <Field>
-                                              <FieldLabel>初始延迟（s）</FieldLabel>
-                                              <Input
+                                            <InputGroup>
+                                              <InputGroupAddon>
+                                                <InputGroupText>初始延迟（s）</InputGroupText>
+                                              </InputGroupAddon>
+                                              <InputGroupInput
                                                 value={draft.initialDelaySeconds}
                                                 onChange={(event) =>
                                                   updateProbeDraft(
@@ -785,10 +795,12 @@ export function CreateContainerDialog({
                                                 autoComplete="off"
                                                 disabled={isBusy}
                                               />
-                                            </Field>
-                                            <Field>
-                                              <FieldLabel>超时时间（s）</FieldLabel>
-                                              <Input
+                                            </InputGroup>
+                                            <InputGroup>
+                                              <InputGroupAddon>
+                                                <InputGroupText>超时时间（s）</InputGroupText>
+                                              </InputGroupAddon>
+                                              <InputGroupInput
                                                 value={draft.timeoutSeconds}
                                                 onChange={(event) =>
                                                   updateProbeDraft(
@@ -801,10 +813,12 @@ export function CreateContainerDialog({
                                                 autoComplete="off"
                                                 disabled={isBusy}
                                               />
-                                            </Field>
-                                            <Field>
-                                              <FieldLabel>检查间隔（s）</FieldLabel>
-                                              <Input
+                                            </InputGroup>
+                                            <InputGroup>
+                                              <InputGroupAddon>
+                                                <InputGroupText>检查间隔（s）</InputGroupText>
+                                              </InputGroupAddon>
+                                              <InputGroupInput
                                                 value={draft.periodSeconds}
                                                 onChange={(event) =>
                                                   updateProbeDraft(
@@ -817,10 +831,12 @@ export function CreateContainerDialog({
                                                 autoComplete="off"
                                                 disabled={isBusy}
                                               />
-                                            </Field>
-                                            <Field>
-                                              <FieldLabel>成功阈值</FieldLabel>
-                                              <Input
+                                            </InputGroup>
+                                            <InputGroup>
+                                              <InputGroupAddon>
+                                                <InputGroupText>成功阈值</InputGroupText>
+                                              </InputGroupAddon>
+                                              <InputGroupInput
                                                 value={draft.successThreshold}
                                                 onChange={(event) =>
                                                   updateProbeDraft(
@@ -833,10 +849,12 @@ export function CreateContainerDialog({
                                                 autoComplete="off"
                                                 disabled={isBusy}
                                               />
-                                            </Field>
-                                            <Field>
-                                              <FieldLabel>失败阈值</FieldLabel>
-                                              <Input
+                                            </InputGroup>
+                                            <InputGroup>
+                                              <InputGroupAddon>
+                                                <InputGroupText>失败阈值</InputGroupText>
+                                              </InputGroupAddon>
+                                              <InputGroupInput
                                                 value={draft.failureThreshold}
                                                 onChange={(event) =>
                                                   updateProbeDraft(
@@ -849,7 +867,7 @@ export function CreateContainerDialog({
                                                 autoComplete="off"
                                                 disabled={isBusy}
                                               />
-                                            </Field>
+                                            </InputGroup>
                                             <div aria-hidden className="hidden md:block" />
                                           </div>
 
