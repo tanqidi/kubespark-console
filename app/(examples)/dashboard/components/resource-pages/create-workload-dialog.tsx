@@ -51,7 +51,6 @@ import {
   InputGroupText,
 } from "@/components/ui/input-group"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -66,6 +65,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useCreateWorkloadDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.controller"
 import { ContainerListPanel } from "@/app/(examples)/dashboard/components/resource-pages/container-list-panel"
 import { StorageVolumeList } from "@/app/(examples)/dashboard/components/resource-pages/storage-volume-list"
+import { AdvancedToggleCard } from "@/app/(examples)/dashboard/components/resource-pages/advanced-toggle-card"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 export type { WorkloadDialogInitialValues } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
@@ -157,6 +157,8 @@ export function CreateWorkloadDialog({
     rollingUpdateMaxSurge,
     rollingUpdateMaxUnavailable,
     rollingUpdateType,
+    schedulingPolicyEnabled,
+    schedulingPolicy,
     pendingDeleteContainer,
     removeContainer,
     removeContainerEnv,
@@ -178,6 +180,8 @@ export function CreateWorkloadDialog({
     setRollingUpdateMaxSurge,
     setRollingUpdateMaxUnavailable,
     setRollingUpdateType,
+    setSchedulingPolicyEnabled,
+    setSchedulingPolicy,
     setTerminationGracePeriodSeconds,
     setServiceAccountName,
     startAddStorageVolume,
@@ -1241,50 +1245,41 @@ export function CreateWorkloadDialog({
                 <FieldGroup className="grid gap-6 md:grid-cols-2">
                   {kind === "Deployment" ? (
                     <Field className="md:col-span-2">
-                      <div className="rounded-lg border bg-muted/20 p-4">
-                        <div className="flex items-start gap-3">
-                          <Checkbox
-                            checked={rollingUpdateEnabled}
-                            onCheckedChange={(checked) => {
-                              if (isBusy) return
-                              setRollingUpdateEnabled(checked === true)
-                            }}
-                            aria-label="滚动更新策略"
-                            disabled={isBusy}
-                          />
-                          <div>
-                            <div className="text-sm">滚动更新策略</div>
-                            <div className="mt-1 text-sm text-muted-foreground">
-                              开启后可设置滚动更新策略，包括更新类型、最大不可用比例和最大激增比例。
-                            </div>
-                          </div>
-                        </div>
-                      {rollingUpdateEnabled ? (
-                        <div className="mt-4 rounded-lg bg-muted/60 p-4">
-                          <FieldGroup className="grid gap-4">
-                            <Field>
-                              <Select
-                                value={rollingUpdateType}
-                                onValueChange={(value) => {
-                                  if (value === "RollingUpdate" || value === "Recreate") {
-                                    setRollingUpdateType(value)
-                                  }
-                                }}
-                                disabled={isBusy}
-                              >
-                                <SelectTrigger id="create-workload-rolling-update-type">
-                                  <SelectValue placeholder="请选择类型" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectGroup>
-                                    <SelectItem value="RollingUpdate">RollingUpdate</SelectItem>
-                                    <SelectItem value="Recreate">Recreate</SelectItem>
-                                  </SelectGroup>
-                                </SelectContent>
-                              </Select>
-                            </Field>
-                            {rollingUpdateType === "RollingUpdate" ? (
-                              <div className="grid gap-4 md:grid-cols-2">
+                      <AdvancedToggleCard
+                        checked={rollingUpdateEnabled}
+                        disabled={isBusy}
+                        ariaLabel="滚动更新策略"
+                        title="滚动更新策略"
+                        description="开启后可设置滚动更新策略，包括更新类型、最大不可用比例和最大激增比例。"
+                        onCheckedChange={(checked) => {
+                          if (isBusy) return
+                          setRollingUpdateEnabled(checked)
+                        }}
+                      >
+                        <FieldGroup className="grid gap-4">
+                          <Field>
+                            <Select
+                              value={rollingUpdateType}
+                              onValueChange={(value) => {
+                                if (value === "RollingUpdate" || value === "Recreate") {
+                                  setRollingUpdateType(value)
+                                }
+                              }}
+                              disabled={isBusy}
+                            >
+                              <SelectTrigger id="create-workload-rolling-update-type">
+                                <SelectValue placeholder="请选择类型" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  <SelectItem value="RollingUpdate">RollingUpdate</SelectItem>
+                                  <SelectItem value="Recreate">Recreate</SelectItem>
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                          {rollingUpdateType === "RollingUpdate" ? (
+                            <div className="grid gap-4 md:grid-cols-2">
                               <InputGroup>
                                 <InputGroupAddon>
                                   <InputGroupText>maxUnavailable</InputGroupText>
@@ -1319,14 +1314,59 @@ export function CreateWorkloadDialog({
                                   disabled={isBusy}
                                 />
                               </InputGroup>
-                              </div>
-                            ) : null}
-                          </FieldGroup>
-                        </div>
-                      ) : null}
-                      </div>
+                            </div>
+                          ) : null}
+                        </FieldGroup>
+                      </AdvancedToggleCard>
                     </Field>
                   ) : null}
+                  <Field className="md:col-span-2">
+                    <AdvancedToggleCard
+                      checked={schedulingPolicyEnabled}
+                      disabled={isBusy}
+                      ariaLabel="调度策略"
+                      title="调度策略"
+                      description="选择容器组在节点上的调度方式。"
+                      onCheckedChange={(checked) => {
+                        if (isBusy) return
+                        setSchedulingPolicyEnabled(checked)
+                      }}
+                    >
+                      <div>
+                        <Select
+                          value={schedulingPolicy}
+                          onValueChange={(value) => {
+                            if (
+                              value === "default" ||
+                              value === "spread" ||
+                              value === "concentrated"
+                            ) {
+                              setSchedulingPolicy(value)
+                            }
+                          }}
+                          disabled={isBusy}
+                        >
+                          <SelectTrigger id="create-workload-scheduling-policy" className="w-full">
+                            <SelectValue placeholder="请选择调度策略" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="default">默认规则</SelectItem>
+                              <SelectItem value="spread">分散调度</SelectItem>
+                              <SelectItem value="concentrated">集中调度</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <div className="mt-3 text-sm text-muted-foreground">
+                          {schedulingPolicy === "spread"
+                            ? "尽可能将容器组副本调度到不同的节点上。"
+                            : schedulingPolicy === "concentrated"
+                              ? "尽可能将容器组副本调度到同一节点上。"
+                              : "按照默认的规则将容器组副本调度到节点。"}
+                        </div>
+                      </div>
+                    </AdvancedToggleCard>
+                  </Field>
                   <Field>
                     <FieldLabel htmlFor="create-workload-termination-grace-period-seconds">
                       优雅终止宽限时间（秒）

@@ -74,6 +74,8 @@ export type WorkloadDialogInitialValues = {
     restartPolicy?: "Always"
     terminationGracePeriodSeconds?: string
     serviceAccountName?: string
+    schedulingPolicyEnabled?: boolean
+    schedulingPolicy?: SchedulingPolicy
     configList?: Array<{
       sourceKind?: "configMap" | "secret"
       sourceName?: string
@@ -204,6 +206,7 @@ export type CreateWorkloadDialogProps = {
 }
 
 export type CreateStep = "basic" | "pod" | "storage" | "advanced"
+export type SchedulingPolicy = "default" | "spread" | "concentrated"
 export const CONTAINER_PORT_PROTOCOL_OPTIONS = [
   "TCP",
   "UDP",
@@ -245,6 +248,8 @@ export type WorkloadDialogSnapshot = {
     restartPolicy: "Always"
     terminationGracePeriodSeconds: string
     serviceAccountName: string
+    schedulingPolicyEnabled: boolean
+    schedulingPolicy: SchedulingPolicy
     containers: ContainerDraft[]
     configList?: ConfigMountInput[]
     storageList?: JobStorageInput[]
@@ -786,6 +791,9 @@ export function buildPodSpecFromContainers(
   restartPolicy: "Always",
   terminationGracePeriodSeconds: string,
   serviceAccountName: string,
+  schedulingPolicyEnabled: boolean,
+  schedulingPolicy: SchedulingPolicy,
+  appName: string,
   containers: ContainerDraft[],
   storage?: JobStorageInput | JobStorageInput[],
   configMounts?: ConfigMountInput[]
@@ -1004,12 +1012,54 @@ export function buildPodSpecFromContainers(
     })
   })
 
+  const schedulerName = "default-scheduler"
+  const schedulingAffinity =
+    schedulingPolicy === "spread"
+      ? {
+          podAntiAffinity: {
+            preferredDuringSchedulingIgnoredDuringExecution: [
+              {
+                weight: 100,
+                podAffinityTerm: {
+                  labelSelector: {
+                    matchLabels: {
+                      app: appName,
+                    },
+                  },
+                  topologyKey: "kubernetes.io/hostname",
+                },
+              },
+            ],
+          },
+        }
+      : schedulingPolicy === "concentrated"
+        ? {
+            podAffinity: {
+              preferredDuringSchedulingIgnoredDuringExecution: [
+                {
+                  weight: 100,
+                  podAffinityTerm: {
+                    labelSelector: {
+                      matchLabels: {
+                        app: appName,
+                      },
+                    },
+                    topologyKey: "kubernetes.io/hostname",
+                  },
+                },
+              ],
+            },
+          }
+        : {}
+
   return {
     restartPolicy,
     ...(toOptionalIntegerString(terminationGracePeriodSeconds)
       ? { terminationGracePeriodSeconds: Number.parseInt(terminationGracePeriodSeconds, 10) }
       : {}),
     ...(serviceAccountName.trim() ? { serviceAccountName: serviceAccountName.trim() } : {}),
+    ...(schedulingPolicyEnabled ? { schedulerName } : {}),
+    ...(schedulingPolicyEnabled ? { affinity: schedulingAffinity } : {}),
     ...(workload.length > 0 ? { containers: workload } : {}),
     ...(init.length > 0 ? { initContainers: init } : {}),
     ...(volumes.length > 0 ? { volumes } : {}),
@@ -1045,6 +1095,9 @@ export function buildWorkloadManifest(
     "Always",
     snapshot.pod.terminationGracePeriodSeconds,
     snapshot.pod.serviceAccountName,
+    snapshot.pod.schedulingPolicyEnabled,
+    snapshot.pod.schedulingPolicy,
+    appName,
     snapshot.pod.containers,
     storage,
     configMounts
@@ -1053,6 +1106,7 @@ export function buildWorkloadManifest(
     metadata: {
       labels: {
         "app.kubernetes.io/name": appName,
+        app: appName,
       },
     },
     spec: podSpec,
@@ -1137,6 +1191,26 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
   const spec = asObject(root.spec)
   const template = asObject(spec.template)
   const podSpec = asObject(template.spec)
+  const affinity = asObject(podSpec.affinity)
+  const podAntiAffinity = asObject(affinity.podAntiAffinity)
+  const podAffinity = asObject(affinity.podAffinity)
+  const antiPreferredTerms = Array.isArray(podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution)
+    ? podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution
+    : []
+  const preferredTerms = Array.isArray(podAffinity.preferredDuringSchedulingIgnoredDuringExecution)
+    ? podAffinity.preferredDuringSchedulingIgnoredDuringExecution
+    : []
+  const antiTopologyKey = asString(asObject(asObject(antiPreferredTerms[0]).podAffinityTerm).topologyKey).trim()
+  const topologyKey = asString(asObject(asObject(preferredTerms[0]).podAffinityTerm).topologyKey).trim()
+  const schedulingPolicy: SchedulingPolicy =
+    antiTopologyKey === "kubernetes.io/hostname"
+      ? "spread"
+      : topologyKey === "kubernetes.io/hostname"
+        ? "concentrated"
+        : "default"
+  const schedulingPolicyEnabled =
+    Object.prototype.hasOwnProperty.call(podSpec, "schedulerName") ||
+    Object.prototype.hasOwnProperty.call(podSpec, "affinity")
 
   const hostTimeVolumeNames = new Set(
     (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
@@ -1340,6 +1414,8 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
       terminationGracePeriodSeconds:
         toOptionalIntegerString(podSpec.terminationGracePeriodSeconds) || "30",
       serviceAccountName: asString(podSpec.serviceAccountName).trim() || "default",
+      schedulingPolicyEnabled,
+      schedulingPolicy,
       containers: containers.length > 0 ? containers : [],
       ...(parsedConfigList.length > 0 ? { configList: parsedConfigList } : {}),
       ...(parsedStorageList.length > 0 ? { storageList: parsedStorageList } : {}),
