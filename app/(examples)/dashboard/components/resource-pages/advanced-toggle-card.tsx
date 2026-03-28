@@ -42,7 +42,7 @@ export function AdvancedToggleCard({
           <div className="mt-1 text-sm text-muted-foreground">{description}</div>
         </div>
       </div>
-      {checked && hasBodyContent ? <div className="mt-4 rounded-lg bg-muted/60 p-4">{children}</div> : null}
+      {checked && hasBodyContent ? <div className="mt-4 rounded-lg bg-muted/60 p-4 border border-dashed">{children}</div> : null}
     </div>
   )
 }

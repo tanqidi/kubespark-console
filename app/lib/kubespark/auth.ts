@@ -22,7 +22,7 @@ export type LoginResponse = {
  * 通过代理调用后端登录接口
  */
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
-  const url = `${API_PROXY_BASE}/kapis/auth.kubespark.io/v1/login`;
+  const url = `${API_PROXY_BASE}/kapis/auth/v1/login`;
   
   const response = await fetch(url, {
     method: "POST",

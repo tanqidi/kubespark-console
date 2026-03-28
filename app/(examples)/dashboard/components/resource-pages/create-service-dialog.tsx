@@ -237,6 +237,16 @@ function buildAutoPortName(protocol: PortItem["protocol"], portText: string): st
   return `${resolveProtocolNamePrefix(protocol)}-${normalized}`
 }
 
+function isAutoPortNameForProtocol(name: string, protocol: PortItem["protocol"]): boolean {
+  const trimmed = name.trim().toLowerCase()
+  if (!trimmed) return false
+  const prefix = resolveProtocolNamePrefix(protocol)
+  if (trimmed === `${prefix}-`) return true
+  if (!trimmed.startsWith(`${prefix}-`)) return false
+  const suffix = trimmed.slice(prefix.length + 1)
+  return /^\d+$/.test(suffix)
+}
+
 function replaceProtocolPrefixInName(
   name: string,
   nextProtocol: PortItem["protocol"]
@@ -1119,13 +1129,16 @@ export function CreateServiceDialog({
             const shouldSyncServicePort =
               !item.servicePort.trim() || item.servicePort.trim() === item.targetPort.trim()
             const nextServicePort = shouldSyncServicePort ? value : item.servicePort
-            const namePrefix = item.name.trim().split("-")[0]?.toLowerCase() ?? ""
-            const isAutoManagedName =
-              !item.name.trim() || AUTO_PROTOCOL_PREFIX_SET.has(namePrefix)
-            const fallbackPort = nextTargetPort.trim() || nextServicePort.trim()
-            const nextAutoName = fallbackPort
-              ? buildAutoPortName(item.protocol, fallbackPort) ?? `${resolveProtocolNamePrefix(item.protocol)}-`
-              : `${resolveProtocolNamePrefix(item.protocol)}-`
+            const fallbackPortBefore = item.targetPort.trim() || item.servicePort.trim()
+            const fallbackPortAfter = nextTargetPort.trim() || nextServicePort.trim()
+            const autoNameBefore = buildAutoPortName(item.protocol, fallbackPortBefore)
+            const autoNameAfter = buildAutoPortName(item.protocol, fallbackPortAfter)
+            const currentName = item.name.trim()
+            const hasAutoPatternName = isAutoPortNameForProtocol(currentName, item.protocol)
+            const shouldAutoRename =
+              currentName.length === 0 ||
+              hasAutoPatternName ||
+              (Boolean(autoNameBefore) && currentName === autoNameBefore)
 
             const next: PortItem = {
               ...item,
@@ -1133,8 +1146,8 @@ export function CreateServiceDialog({
               servicePort: nextServicePort,
             }
 
-            if (isAutoManagedName) {
-              next.name = nextAutoName
+            if (shouldAutoRename) {
+              next.name = autoNameAfter ?? `${resolveProtocolNamePrefix(item.protocol)}-`
             }
 
             return next
@@ -1483,11 +1496,17 @@ export function CreateServiceDialog({
                   </Field>
 
                   <Field data-invalid={Boolean(selectorError)}>
-                    <div className="flex items-center justify-between gap-3">
-                      <FieldLabel>工作负载选择器</FieldLabel>
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-1">
+                        <FieldLabel>工作负载选择器</FieldLabel>
+                        <FieldDescription className="mt-0">
+                          通过标签筛选关联工作负载，建议优先使用“指定工作负载”自动回填标签。
+                        </FieldDescription>
+                      </div>
                       <Button
                           type="button"
                           variant="outline"
+                          className="shrink-0"
                           onClick={() => setWorkloadPickerOpen(true)}
                           disabled={isBusy || !namespace.trim()}
                       >
@@ -1541,8 +1560,13 @@ export function CreateServiceDialog({
                   </Field>
 
                   <Field>
-                    <FieldLabel>端口</FieldLabel>
-                    <FieldDescription>配置服务端口与容器端口映射，支持 TCP、UDP、SCTP 协议。</FieldDescription>
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-1">
+                        <FieldLabel>端口</FieldLabel>
+                        <FieldDescription className="mt-0">配置服务端口与容器端口映射，支持 TCP、UDP、SCTP 协议。</FieldDescription>
+                      </div>
+                      <div className="hidden h-9 shrink-0 md:block" aria-hidden />
+                    </div>
                     <div className="mt-3 flex flex-col gap-3">
                       {portItems.length > 0 ? (
                         portItems.map((item) => (

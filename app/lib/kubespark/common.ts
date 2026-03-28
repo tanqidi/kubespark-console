@@ -1,5 +1,5 @@
 export const API_PROXY_BASE = process.env.NEXT_PUBLIC_API_PROXY_BASE || "/api/kubespark";
-const RESOURCE_ENDPOINT_BASE = `${API_PROXY_BASE}/kapis/resources.kubespark.io/v1alpha1/resources`;
+const RESOURCE_ENDPOINT_BASE = `${API_PROXY_BASE}/kapis/v1alpha1/resources`;
 
 const inFlightGet = new Map<string, Promise<unknown>>();
 
