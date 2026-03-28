@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { resolveFirstInvalidFieldId, scrollAndFocusFieldById } from "@/app/lib/kubespark/form-validation"
 import { checkJobExists } from "@/app/lib/kubespark/jobs"
 import type {
   CreateJobDialogProps,

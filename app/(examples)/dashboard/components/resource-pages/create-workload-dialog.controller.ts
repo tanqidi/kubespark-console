@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { resolveFirstInvalidFieldId, scrollAndFocusFieldById } from "@/app/lib/kubespark/form-validation"
 import { checkWorkloadExists } from "@/app/lib/kubespark/workloads"
 import type {
   ConfigMountInput,

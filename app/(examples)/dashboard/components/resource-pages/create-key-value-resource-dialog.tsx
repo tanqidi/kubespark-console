@@ -1028,7 +1028,7 @@ export function CreateKeyValueResourceDialog({
                       <div className="flex flex-col gap-1">
                         <h3 className="text-[15px] font-semibold">数据</h3>
                         <p className="text-sm text-muted-foreground">
-                          管理资源中的键值对数据，可随时新增、编辑或取消本次修改。
+                          管理资源中的键值对数据，可随时新增或编辑。
                         </p>
                       </div>
                     </div>
