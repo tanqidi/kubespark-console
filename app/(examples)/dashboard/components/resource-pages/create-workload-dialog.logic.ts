@@ -1013,6 +1013,8 @@ export function buildPodSpecFromContainers(
   })
 
   const schedulerName = "default-scheduler"
+  const shouldApplySchedulingPolicy =
+    schedulingPolicyEnabled && (schedulingPolicy === "spread" || schedulingPolicy === "concentrated")
   const schedulingAffinity =
     schedulingPolicy === "spread"
       ? {
@@ -1058,8 +1060,8 @@ export function buildPodSpecFromContainers(
       ? { terminationGracePeriodSeconds: Number.parseInt(terminationGracePeriodSeconds, 10) }
       : {}),
     ...(serviceAccountName.trim() ? { serviceAccountName: serviceAccountName.trim() } : {}),
-    ...(schedulingPolicyEnabled ? { schedulerName } : {}),
-    ...(schedulingPolicyEnabled ? { affinity: schedulingAffinity } : {}),
+    ...(shouldApplySchedulingPolicy ? { schedulerName } : {}),
+    ...(shouldApplySchedulingPolicy ? { affinity: schedulingAffinity } : {}),
     ...(workload.length > 0 ? { containers: workload } : {}),
     ...(init.length > 0 ? { initContainers: init } : {}),
     ...(volumes.length > 0 ? { volumes } : {}),
@@ -1202,6 +1204,9 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
     : []
   const antiTopologyKey = asString(asObject(asObject(antiPreferredTerms[0]).podAffinityTerm).topologyKey).trim()
   const topologyKey = asString(asObject(asObject(preferredTerms[0]).podAffinityTerm).topologyKey).trim()
+  const schedulerName = asString(podSpec.schedulerName).trim()
+  const hasAnyAffinityConfig = Object.keys(affinity).length > 0
+  const hasEffectivePolicyRules = antiPreferredTerms.length > 0 || preferredTerms.length > 0
   const schedulingPolicy: SchedulingPolicy =
     antiTopologyKey === "kubernetes.io/hostname"
       ? "spread"
@@ -1209,8 +1214,9 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
         ? "concentrated"
         : "default"
   const schedulingPolicyEnabled =
-    Object.prototype.hasOwnProperty.call(podSpec, "schedulerName") ||
-    Object.prototype.hasOwnProperty.call(podSpec, "affinity")
+    schedulingPolicy !== "default" ||
+    (schedulerName.length > 0 && schedulerName !== "default-scheduler") ||
+    (hasAnyAffinityConfig && hasEffectivePolicyRules)
 
   const hostTimeVolumeNames = new Set(
     (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
@@ -1380,6 +1386,23 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
       }
     })
 
+  const strategyObj = asObject(spec.strategy)
+  const strategyType = asString(strategyObj.type).trim()
+  const rollingUpdateObj = asObject(strategyObj.rollingUpdate)
+  const rollingUpdateMaxUnavailable =
+    asString(rollingUpdateObj.maxUnavailable) ||
+    toOptionalIntegerString(rollingUpdateObj.maxUnavailable)
+  const rollingUpdateMaxSurge =
+    asString(rollingUpdateObj.maxSurge) || toOptionalIntegerString(rollingUpdateObj.maxSurge)
+  const normalizeRollingValue = (value: string) => value.replace(/\s+/g, "").toLowerCase()
+  const isDefaultRollingUpdateValues =
+    normalizeRollingValue(rollingUpdateMaxUnavailable) === "25%" &&
+    normalizeRollingValue(rollingUpdateMaxSurge) === "25%"
+  const hasRollingUpdateConfig = Object.keys(rollingUpdateObj).length > 0
+  const rollingUpdateEnabled =
+    kind === "Deployment" &&
+    (strategyType === "Recreate" || (hasRollingUpdateConfig && !isDefaultRollingUpdateValues))
+
   return {
     name: asString(metadata.name),
     namespace: asString(metadata.namespace),
@@ -1391,23 +1414,10 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
       parallelism: toOptionalIntegerString(spec.revisionHistoryLimit),
       activeDeadlineSeconds:
         kind === "Deployment" ? toOptionalIntegerString(spec.progressDeadlineSeconds) : "",
-      rollingUpdateEnabled:
-        kind === "Deployment" &&
-        Object.keys(asObject(asObject(spec.strategy).rollingUpdate)).length > 0,
-      rollingUpdateType:
-        kind === "Deployment" && asString(asObject(spec.strategy).type).trim() === "Recreate"
-          ? "Recreate"
-          : "RollingUpdate",
-      rollingUpdateMaxUnavailable:
-        kind === "Deployment"
-          ? asString(asObject(asObject(spec.strategy).rollingUpdate).maxUnavailable) ||
-            toOptionalIntegerString(asObject(asObject(spec.strategy).rollingUpdate).maxUnavailable)
-          : "",
-      rollingUpdateMaxSurge:
-        kind === "Deployment"
-          ? asString(asObject(asObject(spec.strategy).rollingUpdate).maxSurge) ||
-            toOptionalIntegerString(asObject(asObject(spec.strategy).rollingUpdate).maxSurge)
-          : "",
+      rollingUpdateEnabled,
+      rollingUpdateType: kind === "Deployment" && strategyType === "Recreate" ? "Recreate" : "RollingUpdate",
+      rollingUpdateMaxUnavailable: kind === "Deployment" ? rollingUpdateMaxUnavailable : "",
+      rollingUpdateMaxSurge: kind === "Deployment" ? rollingUpdateMaxSurge : "",
     },
     pod: {
       restartPolicy: "Always",
