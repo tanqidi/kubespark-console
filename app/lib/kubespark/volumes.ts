@@ -1,4 +1,5 @@
 import { buildResourceCollectionEndpoint, fetchJsonDeduped } from "./common"
+import { checkNamespacedResourceExists, type ExistenceCheckInput } from "./create-utils"
 
 type AccessMode = "ReadWriteOnce" | "ReadOnlyMany" | "ReadWriteMany" | "ReadWriteOncePod"
 type VolumeMode = "Filesystem" | "Block"
@@ -12,6 +13,17 @@ export type CreatePersistentVolumeClaimInput = {
   storageClassName?: string
   volumeMode?: VolumeMode
   volumeName?: string
+}
+
+export async function checkPersistentVolumeClaimExists(
+  input: ExistenceCheckInput
+): Promise<boolean> {
+  return checkNamespacedResourceExists({
+    group: "core",
+    version: "v1",
+    resource: "persistentvolumeclaims",
+    input,
+  })
 }
 
 function normalizeResourceName(name: string): string {

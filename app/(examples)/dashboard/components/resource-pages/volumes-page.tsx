@@ -27,7 +27,10 @@ import {
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
-import { createPersistentVolumeClaim } from "@/app/lib/kubespark/volumes"
+import {
+  checkPersistentVolumeClaimExists,
+  createPersistentVolumeClaim,
+} from "@/app/lib/kubespark/volumes"
 import {
   Dialog,
   DialogClose,
@@ -306,6 +309,7 @@ export function VolumesPageClient() {
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [createStep, setCreateStep] = React.useState<VolumeCreateStep>("basic")
   const [creating, setCreating] = React.useState(false)
+  const [checkingCreateNext, setCheckingCreateNext] = React.useState(false)
   const [createYamlMode, setCreateYamlMode] = React.useState(false)
   const [createYamlText, setCreateYamlText] = React.useState("")
   const [createYamlError, setCreateYamlError] = React.useState<string | null>(null)
@@ -470,6 +474,7 @@ export function VolumesPageClient() {
   const resetCreateForm = React.useCallback(() => {
     setCreateStep("basic")
     setCreateYamlMode(false)
+    setCheckingCreateNext(false)
     setCreateYamlText("")
     setCreateYamlError(null)
     setCreateName("")
@@ -594,19 +599,42 @@ export function VolumesPageClient() {
     return true
   }, [createStorageClassName, createStorageRequest, storageClassOptions.length])
 
-  const handleCreateNext = React.useCallback(() => {
-    if (creating) return
+  const handleCreateNext = React.useCallback(async () => {
+    if (creating || checkingCreateNext) return
     setCreateSubmitError(null)
     if (createStep === "basic") {
       if (!validateBasicStep()) return
-      setCreateStep("storage")
+      setCheckingCreateNext(true)
+      try {
+        const exists = await checkPersistentVolumeClaimExists({
+          name: createName.trim().toLowerCase(),
+          namespace: createNamespace.trim(),
+        })
+        if (exists) {
+          setCreateNameError("卷声明名称已存在，请更换后重试")
+          return
+        }
+        setCreateStep("storage")
+      } catch (error) {
+        setCreateSubmitError(error instanceof Error ? error.message : "卷声明名称校验失败，请稍后重试")
+      } finally {
+        setCheckingCreateNext(false)
+      }
       return
     }
     if (createStep === "storage") {
       if (!validateStorageStep()) return
       setCreateStep("advanced")
     }
-  }, [createStep, creating, validateBasicStep, validateStorageStep])
+  }, [
+    checkingCreateNext,
+    createName,
+    createNamespace,
+    createStep,
+    creating,
+    validateBasicStep,
+    validateStorageStep,
+  ])
 
   const handleCreateSubmit = React.useCallback(async () => {
     if (creating) return
@@ -1216,7 +1244,7 @@ export function VolumesPageClient() {
               <div className="flex w-full items-center justify-between gap-3">
                 {createYamlMode || createStep === "basic" ? (
                   <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={creating}>
+                    <Button type="button" variant="outline" disabled={creating || checkingCreateNext}>
                       取消
                     </Button>
                   </DialogClose>
@@ -1225,19 +1253,23 @@ export function VolumesPageClient() {
                     type="button"
                     variant="outline"
                     onClick={() => setCreateStep(createStep === "advanced" ? "storage" : "basic")}
-                    disabled={creating}
+                    disabled={creating || checkingCreateNext}
                   >
                     上一步
                   </Button>
                 )}
 
                 {createYamlMode || createStep === "advanced" ? (
-                  <Button type="button" onClick={() => void handleCreateSubmit()} disabled={creating}>
+                  <Button
+                    type="button"
+                    onClick={() => void handleCreateSubmit()}
+                    disabled={creating || checkingCreateNext}
+                  >
                     {creating ? "创建中..." : "创建"}
                   </Button>
                 ) : (
-                  <Button type="button" onClick={handleCreateNext} disabled={creating}>
-                    下一步
+                  <Button type="button" onClick={() => void handleCreateNext()} disabled={creating || checkingCreateNext}>
+                    {checkingCreateNext && createStep === "basic" ? "校验中..." : "下一步"}
                   </Button>
                 )}
               </div>
