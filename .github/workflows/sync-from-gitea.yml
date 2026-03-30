@@ -1,0 +1,38 @@
+name: Sync from Gitea to GitHub
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # 每 6 小时执行一次
+  workflow_dispatch:        # 允许手动触发测试
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitHub repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "tanqidi"
+          git config user.email "1729746565@qq.com"
+
+      - name: Add Gitea as remote and sync
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_URL: ${{ secrets.GITEA_URL }}
+        run: |
+          # 添加 Gitea remote（使用 token 认证）
+          git remote add gitea "https://${GITEA_TOKEN}@${GITEA_URL#https://}" || true
+          
+          # 从 Gitea 拉取最新内容并清理过期分支引用
+          git fetch gitea --prune --tags
+          
+          # 关键修改：使用 --mirror 强制完整镜像（会自动删除 GitHub 上多余的分支）
+          git push --force --mirror origin
+          
+          # 额外推送 tags（保险起见）
+          git push --force --tags origin
