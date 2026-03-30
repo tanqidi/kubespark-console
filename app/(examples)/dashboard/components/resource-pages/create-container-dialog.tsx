@@ -249,7 +249,7 @@ export function CreateContainerDialog({
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
         overlayClassName="!bg-transparent !backdrop-blur-none"
-        className="flex max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+        className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
       >
         <DialogHeader className="shrink-0 border-b bg-muted/15 px-6 py-5 pr-20">
           <DialogTitle>录入容器</DialogTitle>

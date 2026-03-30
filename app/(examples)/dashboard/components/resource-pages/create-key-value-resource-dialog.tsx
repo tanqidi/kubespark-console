@@ -816,7 +816,7 @@ export function CreateKeyValueResourceDialog({
       }}
     >
       <DialogContent
-        className="flex max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+        className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
@@ -878,10 +878,10 @@ export function CreateKeyValueResourceDialog({
             />
           ) : null}
 
-          <div className="min-h-0 flex-1 px-6 py-6">
+          <div className={yamlMode ? "min-h-0 flex-1 px-6 py-6" : "min-h-0 flex-1 overflow-y-auto px-6 py-6"}>
             {yamlMode ? (
               <div className="flex h-full min-h-0 flex-col">
-                <div className="h-[58vh] min-h-[420px] overflow-hidden rounded-lg border">
+                <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border">
                   <MonacoEditor
                     language="yaml"
                     theme="vs-dark"

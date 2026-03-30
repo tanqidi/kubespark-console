@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
@@ -460,7 +460,7 @@ export function ProjectsPageClient() {
         }}
       >
         <DialogContent
-          className="flex max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+          className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
           onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
@@ -524,11 +524,10 @@ export function ProjectsPageClient() {
               />
             ) : null}
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className={createYamlMode ? "min-h-0 flex-1 p-6" : "min-h-0 flex-1 overflow-y-auto"}>
               {createYamlMode ? (
-                <div className="border-b p-6">
-                  <div className="flex h-full min-h-[56vh] flex-col">
-                    <div className="overflow-hidden rounded-lg border">
+                <div className="flex h-full min-h-0 flex-col">
+                    <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border">
                       <MonacoEditor
                         language="yaml"
                         theme="vs-dark"
@@ -540,12 +539,11 @@ export function ProjectsPageClient() {
                           if (createNameError) setCreateNameError(null)
                         }}
                         options={MONACO_OPTIONS}
-                        height="56vh"
+                        height="100%"
                       />
                     </div>
                     {createYamlError ? <FieldError className="mt-3">{createYamlError}</FieldError> : null}
                   </div>
-                </div>
               ) : (
                 <div className="border-b p-6">
                   <div className="mb-4">
