@@ -16,7 +16,7 @@
 
 - 代理前缀：`/api/kubespark`
 - 资源基础路径：
-  `/api/kubespark/kapis/resources.kubespark.io/v1alpha1/resources/{group}/{version}/{resource}`
+  `/api/kubespark/kapis/v1alpha1/resources/{group}/{version}/{resource}`
 
 上游地址由服务端环境变量控制：
 

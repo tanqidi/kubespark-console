@@ -72,7 +72,7 @@ app/
 
 ### 4.1 URL 与查询
 
-- 列表路径：`/kapis/resources.kubespark.io/v1alpha1/resources/{group}/{version}/{resource}`
+- 列表路径：`/kapis/v1alpha1/resources/{group}/{version}/{resource}`
 - 支持 query：`namespace/fieldSelector/labelSelector`
 
 ### 4.2 查询封装

@@ -43,7 +43,7 @@ UI 层 (app/(examples)/dashboard/components)
   └─ app/api/kubespark/[[...path]]/route.ts (GET/POST/PUT/DELETE)
 
 上游层
-  └─ /kapis/resources.kubespark.io/v1alpha1/resources/{group}/{version}/{resource}
+  └─ /kapis/v1alpha1/resources/{group}/{version}/{resource}
 ```
 
 ## 3. 核心请求链路
