@@ -3,7 +3,7 @@
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
-import { IconAdjustments, IconEye, IconPencil, IconRoute2, IconSettings2, IconTrash } from "@tabler/icons-react"
+import { IconAdjustments, IconEye, IconPencil, IconPlus, IconRoute2, IconSettings2, IconTrash } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import { parse, stringify } from "yaml"
 
@@ -652,46 +652,74 @@ export function RoutesPageClient() {
     setCreateRuleViewMode("list")
   }, [])
 
-  const saveRuleDraft = React.useCallback(() => {
+  const saveRuleDraft = React.useCallback((options?: { stayInEdit?: boolean }) => {
     setCreateSubmitError(null)
-    if (!validateRuleStep()) return false
-    const nextRule = normalizeRuleItem({
-      host: createHost,
-      path: createPath,
-      serviceName: createServiceName,
-      servicePort: createServicePort,
-      protocol: createProtocol,
-      tlsSecretName: createProtocol === "HTTPS" ? createTlsSecretName : "",
-    })
-    setCreateRules((current) => {
-      if (editingRuleIndex === null) return [...current, nextRule]
-      return current.map((rule, index) => (index === editingRuleIndex ? nextRule : rule))
-    })
-    setRuleSaveAttempted(false)
-    setCreateRuleViewMode("list")
-    setEditingRuleIndex(null)
-    setCreateHost("")
-    setCreatePath("/")
-    setCreateServiceName("")
-    setCreateServicePort("")
-    setCreateProtocol("HTTP")
-    setCreateTlsSecretName("")
-    setCreateHostError(null)
+    const hostError = validateHost(createHost)
+    const tlsSecretError =
+      createProtocol === "HTTPS" && !createTlsSecretName.trim()
+        ? "请选择 HTTPS 保密字典"
+        : null
+    setCreateHostError(hostError)
+    setCreateTlsSecretError(tlsSecretError)
     setCreatePathError(null)
     setCreateServiceError(null)
     setCreateServicePortError(null)
-    setCreateTlsSecretError(null)
+    if (hostError || tlsSecretError) return false
+    if (createRules.length === 0) {
+      setRuleSaveAttempted(true)
+      setCreateSubmitError(ROUTE_RULE_REQUIRED_MESSAGE)
+      return false
+    }
+
+    for (let index = 0; index < createRules.length; index += 1) {
+      const rule = createRules[index]
+      const pathError = validatePath(rule.path)
+      if (pathError) {
+        setCreateSubmitError(`第 ${index + 1} 条路径配置无效：${pathError}`)
+        return false
+      }
+      if (!rule.serviceName.trim()) {
+        setCreateSubmitError(`第 ${index + 1} 条路径配置无效：请选择服务`)
+        return false
+      }
+      const portError = validateServicePortText(rule.servicePort)
+      if (portError) {
+        setCreateSubmitError(`第 ${index + 1} 条路径配置无效：${portError}`)
+        return false
+      }
+    }
+
+    setCreateRules((current) =>
+      current.map((rule) =>
+        normalizeRuleItem({
+          ...rule,
+          host: createHost,
+          protocol: createProtocol,
+          tlsSecretName: createProtocol === "HTTPS" ? createTlsSecretName : "",
+        })
+      )
+    )
+    setRuleSaveAttempted(false)
+    setCreateRuleViewMode(options?.stayInEdit ? "edit" : "list")
+    setEditingRuleIndex(null)
     return true
-  }, [
-    createHost,
-    createPath,
-    createProtocol,
-    createServiceName,
-    createServicePort,
-    createTlsSecretName,
-    editingRuleIndex,
-    validateRuleStep,
-  ])
+  }, [createHost, createProtocol, createRules, createTlsSecretName])
+
+  const addPathRule = React.useCallback(() => {
+    setCreateRules((current) => [
+      ...current,
+      normalizeRuleItem({
+        host: createHost,
+        path: "/",
+        serviceName: "",
+        servicePort: "",
+        protocol: createProtocol,
+        tlsSecretName: createProtocol === "HTTPS" ? createTlsSecretName : "",
+      }),
+    ])
+    setRuleSaveAttempted(false)
+    setCreateSubmitError(null)
+  }, [createHost, createProtocol, createTlsSecretName])
 
   const handleCreateNext = React.useCallback(async () => {
     if (creating || checkingCreateNext) return
@@ -967,6 +995,16 @@ export function RoutesPageClient() {
     setEditingRuleIndex(index)
     setCreateRuleViewMode("edit")
   }, [createRules])
+
+  const removeRuleItem = React.useCallback((targetIndex: number) => {
+    setCreateRules((current) => current.filter((_, index) => index !== targetIndex))
+    if (editingRuleIndex !== null && editingRuleIndex === targetIndex) {
+      setEditingRuleIndex(null)
+      setCreateRuleViewMode("list")
+    } else if (editingRuleIndex !== null && editingRuleIndex > targetIndex) {
+      setEditingRuleIndex(editingRuleIndex - 1)
+    }
+  }, [editingRuleIndex])
 
   const requestDeleteRuleItem = React.useCallback((index: number) => {
     setPendingDeleteRuleIndex(index)
@@ -1549,92 +1587,120 @@ export function RoutesPageClient() {
 
                         <Field className="md:col-span-2">
                           <FieldLabel>路径</FieldLabel>
-                          <div className="grid items-start gap-3 md:grid-cols-3">
-                              <div className="flex min-w-0 flex-col gap-1">
-                                <InputGroup>
-                                  <InputGroupAddon>
-                                    <InputGroupText>路径</InputGroupText>
-                                  </InputGroupAddon>
-                                  <InputGroupInput
-                                    id="route-create-path"
-                                    value={createPath}
-                                    onChange={(event) => {
-                                      setCreatePath(event.target.value)
-                                      if (createPathError) setCreatePathError(null)
-                                    }}
-                                    placeholder="/"
-                                    autoComplete="off"
-                                    aria-invalid={Boolean(createPathError)}
-                                    disabled={creating}
-                                  />
-                                </InputGroup>
-                                {createPathError ? <p className="text-xs text-destructive">{createPathError}</p> : null}
-                              </div>
-
-                              <div className="flex min-w-0 flex-col gap-1">
-                                <FilterCombobox
-                                  options={serviceOptions.map((option) => ({ id: option.name, name: option.name }))}
-                                  value={createServiceName}
-                                  onValueChange={(value) => {
-                                    setCreateServiceName(value)
-                                    const next = serviceOptions.find((item) => item.name === value)
-                                    if (next?.ports.length === 1) {
-                                      setCreateServicePort(String(next.ports[0]))
-                                    } else {
-                                      setCreateServicePort("")
-                                    }
-                                    if (createServiceError) setCreateServiceError(null)
-                                    if (createServicePortError) setCreateServicePortError(null)
-                                  }}
-                                  placeholder="服务"
-                                  emptyText="当前项目暂无可选服务"
-                                  className="w-full"
-                                  disabled={creating}
-                                  contentContainer={createDialogPopupLayerRef}
-                                />
-                                {createServiceError ? <p className="text-xs text-destructive">{createServiceError}</p> : null}
-                              </div>
-
-                              <div className="flex min-w-0 flex-col gap-1">
-                                <Combobox
-                                  items={selectedServicePorts.map((port) => `${port}`)}
-                                  value={createServicePort.trim() ? createServicePort : null}
-                                  inputValue={createServicePort}
-                                  onInputValueChange={(value) => {
-                                    setCreateServicePort(normalizeServicePortInput(value ?? ""))
-                                    if (createServicePortError) setCreateServicePortError(null)
-                                  }}
-                                  onValueChange={(item) => {
-                                    setCreateServicePort(normalizeServicePortInput(item ?? ""))
-                                    if (createServicePortError) setCreateServicePortError(null)
-                                  }}
-                                  disabled={creating}
+                          {createRules.length > 0 ? (
+                            <div className="mt-3 flex flex-col gap-2">
+                              {createRules.map((rule, index) => (
+                                <div
+                                  key={`${rule.host}-${rule.path}-${rule.serviceName}-${rule.servicePort}-${index}-inline`}
+                                  className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
                                 >
-                                  <ComboboxInput
-                                    placeholder="端口"
+                                  <InputGroup>
+                                    <InputGroupAddon>
+                                      <InputGroupText>路径</InputGroupText>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                      value={rule.path}
+                                      onChange={(event) => {
+                                        const nextPath = event.target.value
+                                        setCreateRules((current) =>
+                                          current.map((item, itemIndex) =>
+                                            itemIndex === index ? { ...item, path: nextPath } : item
+                                          )
+                                        )
+                                      }}
+                                      placeholder="/"
+                                      autoComplete="off"
+                                      disabled={creating}
+                                    />
+                                  </InputGroup>
+                                  <FilterCombobox
+                                    options={serviceOptions.map((option) => ({ id: option.name, name: option.name }))}
+                                    value={rule.serviceName}
+                                    onValueChange={(value) => {
+                                      const next = serviceOptions.find((item) => item.name === value)
+                                      const nextPort =
+                                        next?.ports.length === 1 ? String(next.ports[0]) : ""
+                                      setCreateRules((current) =>
+                                        current.map((item, itemIndex) =>
+                                          itemIndex === index
+                                            ? { ...item, serviceName: value, servicePort: nextPort }
+                                            : item
+                                        )
+                                      )
+                                    }}
+                                    placeholder="服务"
+                                    emptyText="当前项目暂无可选服务"
                                     className="w-full"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    maxLength={5}
                                     disabled={creating}
-                                    aria-invalid={Boolean(createServicePortError)}
+                                    contentContainer={createDialogPopupLayerRef}
                                   />
-                                  <ComboboxContent
-                                    container={createDialogPopupLayerRef}
-                                    className="pointer-events-auto"
+                                  <Combobox
+                                    items={
+                                      (serviceOptions.find((item) => item.name === rule.serviceName)?.ports ?? []).map(
+                                        (port) => `${port}`
+                                      )
+                                    }
+                                    value={rule.servicePort.trim() ? rule.servicePort : null}
+                                    inputValue={rule.servicePort}
+                                    onInputValueChange={(value) => {
+                                      const nextPort = normalizeServicePortInput(value ?? "")
+                                      setCreateRules((current) =>
+                                        current.map((item, itemIndex) =>
+                                          itemIndex === index ? { ...item, servicePort: nextPort } : item
+                                        )
+                                      )
+                                    }}
+                                    onValueChange={(item) => {
+                                      const nextPort = normalizeServicePortInput(item ?? "")
+                                      setCreateRules((current) =>
+                                        current.map((value, itemIndex) =>
+                                          itemIndex === index ? { ...value, servicePort: nextPort } : value
+                                        )
+                                      )
+                                    }}
+                                    disabled={creating}
                                   >
-                                    <ComboboxEmpty>未找到端口，可直接输入</ComboboxEmpty>
-                                    <ComboboxList>
-                                      {(item) => (
-                                        <ComboboxItem key={item} value={item}>
-                                          {item}
-                                        </ComboboxItem>
-                                      )}
-                                    </ComboboxList>
-                                  </ComboboxContent>
-                                </Combobox>
-                                {createServicePortError ? <p className="text-xs text-destructive">{createServicePortError}</p> : null}
-                              </div>
+                                    <ComboboxInput
+                                      placeholder="端口"
+                                      className="w-full"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      maxLength={5}
+                                      disabled={creating}
+                                    />
+                                    <ComboboxContent
+                                      container={createDialogPopupLayerRef}
+                                      className="pointer-events-auto"
+                                    >
+                                      <ComboboxEmpty>未找到端口，可直接输入</ComboboxEmpty>
+                                      <ComboboxList>
+                                        {(item) => (
+                                          <ComboboxItem key={item} value={item}>
+                                            {item}
+                                          </ComboboxItem>
+                                        )}
+                                      </ComboboxList>
+                                    </ComboboxContent>
+                                  </Combobox>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => removeRuleItem(index)}
+                                    disabled={creating}
+                                  >
+                                    <IconTrash data-icon="inline-start" />
+                                    删除
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          <div className="mt-3 flex justify-end">
+                            <Button type="button" variant="outline" onClick={addPathRule} disabled={creating}>
+                              <IconPlus data-icon="inline-start" />
+                              添加
+                            </Button>
                           </div>
                         </Field>
                       </FieldGroup>
