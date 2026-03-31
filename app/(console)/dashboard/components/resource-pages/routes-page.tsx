@@ -436,6 +436,7 @@ export function RoutesPageClient() {
   const [createServicePortError, setCreateServicePortError] = React.useState<string | null>(null)
   const [createTlsSecretError, setCreateTlsSecretError] = React.useState<string | null>(null)
   const [createSubmitError, setCreateSubmitError] = React.useState<string | null>(null)
+  const [ruleRowErrorMap, setRuleRowErrorMap] = React.useState<Record<number, string>>({})
   const [ruleSaveAttempted, setRuleSaveAttempted] = React.useState(false)
   const createServicePortRef = React.useRef("")
   const isEditMode = Boolean(editingRouteRef)
@@ -462,6 +463,24 @@ export function RoutesPageClient() {
       return acc
     }, [])
   }, [activeHostSourceKey, createRules])
+  const duplicatePathRuleIndexSet = React.useMemo(() => {
+    const indexSet = new Set<number>()
+    const pathFirstIndex = new Map<string, number>()
+    currentHostPathRuleIndexes.forEach((index) => {
+      const rule = createRules[index]
+      if (!rule) return
+      const key = rule.path.trim()
+      if (!key) return
+      const first = pathFirstIndex.get(key)
+      if (first === undefined) {
+        pathFirstIndex.set(key, index)
+        return
+      }
+      indexSet.add(first)
+      indexSet.add(index)
+    })
+    return indexSet
+  }, [createRules, currentHostPathRuleIndexes])
   const routeRuleHostGroups = React.useMemo(() => {
     const groups = new Map<
       string,
@@ -521,6 +540,7 @@ export function RoutesPageClient() {
     setCreateServicePortError(null)
     setCreateTlsSecretError(null)
     setCreateSubmitError(null)
+    setRuleRowErrorMap({})
     setRuleSaveAttempted(false)
   }, [])
 
@@ -699,6 +719,7 @@ export function RoutesPageClient() {
     setCreateServiceError(null)
     setCreateServicePortError(null)
     setCreateTlsSecretError(null)
+    setRuleRowErrorMap({})
     setEditingRuleIndex(null)
     setCreateRuleViewMode("edit")
   }, [])
@@ -706,11 +727,13 @@ export function RoutesPageClient() {
   const cancelEditRule = React.useCallback(() => {
     setCreateSubmitError(null)
     setEditingRuleIndex(null)
+    setRuleRowErrorMap({})
     setCreateRuleViewMode("list")
   }, [])
 
   const saveRuleDraft = React.useCallback((options?: { stayInEdit?: boolean }) => {
     setCreateSubmitError(null)
+    setRuleRowErrorMap({})
     const hostError = validateHost(createHost)
     const tlsSecretError =
       createProtocol === "HTTPS" && !createTlsSecretName.trim()
@@ -728,28 +751,45 @@ export function RoutesPageClient() {
     }, [])
     if (targetIndexes.length === 0) {
       setRuleSaveAttempted(true)
-      setCreateSubmitError(ROUTE_RULE_REQUIRED_MESSAGE)
       return false
     }
 
+    const rowErrors: Record<number, string> = {}
     for (let i = 0; i < targetIndexes.length; i += 1) {
       const index = targetIndexes[i] ?? 0
       const rule = createRules[index]
       if (!rule) continue
       const pathError = validatePath(rule.path)
       if (pathError) {
-        setCreateSubmitError(`第 ${i + 1} 条路径配置无效：${pathError}`)
-        return false
+        rowErrors[index] = pathError
+        continue
       }
       if (!rule.serviceName.trim()) {
-        setCreateSubmitError(`第 ${i + 1} 条路径配置无效：请选择服务`)
-        return false
+        rowErrors[index] = "请选择服务"
+        continue
       }
       const portError = validateServicePortText(rule.servicePort)
       if (portError) {
-        setCreateSubmitError(`第 ${i + 1} 条路径配置无效：${portError}`)
-        return false
+        rowErrors[index] = portError
       }
+    }
+    const hostPathSet = new Map<string, number>()
+    for (let i = 0; i < targetIndexes.length; i += 1) {
+      const index = targetIndexes[i] ?? 0
+      const rule = createRules[index]
+      if (!rule) continue
+      const pathKey = rule.path.trim()
+      const firstIndex = hostPathSet.get(pathKey)
+      if (firstIndex !== undefined) {
+        rowErrors[firstIndex] = "路径重复"
+        rowErrors[index] = "路径重复"
+      } else {
+        hostPathSet.set(pathKey, index)
+      }
+    }
+    if (Object.keys(rowErrors).length > 0) {
+      setRuleRowErrorMap(rowErrors)
+      return false
     }
 
     setCreateRules((current) =>
@@ -765,6 +805,7 @@ export function RoutesPageClient() {
       )
     )
     setRuleSaveAttempted(false)
+    setRuleRowErrorMap({})
     setCreateRuleViewMode(options?.stayInEdit ? "edit" : "list")
     setEditingRuleIndex(null)
     return true
@@ -784,6 +825,7 @@ export function RoutesPageClient() {
     ])
     setRuleSaveAttempted(false)
     setCreateSubmitError(null)
+    setRuleRowErrorMap({})
   }, [createHost, createProtocol, createTlsSecretName])
 
   const handleCreateNext = React.useCallback(async () => {
@@ -896,16 +938,6 @@ export function RoutesPageClient() {
     const namespaceError = draft.namespace.trim() ? null : "请选择项目"
     const normalizedRules = draft.rules.map((rule) => normalizeRuleItem(rule))
     const hostError = normalizedRules.length === 0 ? ROUTE_RULE_REQUIRED_MESSAGE : null
-    const duplicateHost = (() => {
-      const seen = new Set<string>()
-      for (const rule of normalizedRules) {
-        const host = rule.host.trim().toLowerCase()
-        if (!host) continue
-        if (seen.has(host)) return rule.host
-        seen.add(host)
-      }
-      return ""
-    })()
     const hasInvalidRule = normalizedRules.some((rule) => {
       if (validateHost(rule.host)) return true
       if (validatePath(rule.path)) return true
@@ -914,11 +946,21 @@ export function RoutesPageClient() {
       if (rule.protocol === "HTTPS" && !rule.tlsSecretName) return true
       return false
     })
+    const duplicatePathHost = (() => {
+      const hostPathSet = new Set<string>()
+      for (const rule of normalizedRules) {
+        const hostKey = normalizeHostKey(rule.host)
+        const pathKey = rule.path.trim()
+        if (!hostKey || !pathKey) continue
+        const combined = `${hostKey}::${pathKey}`
+        if (hostPathSet.has(combined)) return rule.host
+        hostPathSet.add(combined)
+      }
+      return ""
+    })()
     const pathError = hostError
       ? null
-      : duplicateHost
-        ? `域名 ${duplicateHost} 重复，请更换后重试`
-        : hasInvalidRule
+      : hasInvalidRule
           ? "存在未完整填写的路由规则"
           : null
     const serviceError = null
@@ -941,6 +983,28 @@ export function RoutesPageClient() {
         else setCreateStep("rule")
       } else {
         setCreateYamlError(firstError)
+      }
+      return
+    }
+    if (duplicatePathHost) {
+      const hostKey = normalizeHostKey(duplicatePathHost)
+      const targetIndex = normalizedRules.findIndex(
+        (rule) => normalizeHostKey(rule.host) === hostKey
+      )
+      if (!createYamlMode) {
+        setCreateStep("rule")
+        setCreateRuleViewMode("edit")
+      }
+      if (targetIndex >= 0) {
+        const target = normalizedRules[targetIndex]
+        if (target) {
+          setCreateHost(target.host)
+          setCreateProtocol(target.protocol)
+          setCreateTlsSecretName(target.tlsSecretName)
+          setEditingRuleIndex(
+            createRules.findIndex((rule) => normalizeHostKey(rule.host) === hostKey)
+          )
+        }
       }
       return
     }
@@ -1065,6 +1129,16 @@ export function RoutesPageClient() {
 
   const removeRuleItem = React.useCallback((targetIndex: number) => {
     setCreateRules((current) => current.filter((_, index) => index !== targetIndex))
+    setRuleRowErrorMap((current) => {
+      const next: Record<number, string> = {}
+      Object.entries(current).forEach(([key, message]) => {
+        const index = Number(key)
+        if (!Number.isInteger(index)) return
+        if (index < targetIndex) next[index] = message
+        if (index > targetIndex) next[index - 1] = message
+      })
+      return next
+    })
     if (editingRuleIndex !== null && editingRuleIndex === targetIndex) {
       setEditingRuleIndex(null)
       setCreateRuleViewMode("list")
@@ -1657,30 +1731,49 @@ export function RoutesPageClient() {
                               {currentHostPathRuleIndexes.map((ruleIndex) => {
                                 const rule = createRules[ruleIndex]
                                 if (!rule) return null
+                                const rowErrorMessage = duplicatePathRuleIndexSet.has(ruleIndex)
+                                  ? "路径重复"
+                                  : (ruleRowErrorMap[ruleIndex] ?? null)
                                 return (
                                 <div
                                   key={`route-path-row-${ruleIndex}`}
                                   className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
                                 >
-                                  <InputGroup>
-                                    <InputGroupAddon>
-                                      <InputGroupText>路径</InputGroupText>
-                                    </InputGroupAddon>
-                                    <InputGroupInput
-                                      value={rule.path}
-                                      onChange={(event) => {
-                                        const nextPath = event.target.value
-                                        setCreateRules((current) =>
-                                          current.map((item, itemIndex) =>
-                                            itemIndex === ruleIndex ? { ...item, path: nextPath } : item
+                                  <div className="flex flex-col gap-1">
+                                    <InputGroup>
+                                      <InputGroupAddon>
+                                        <InputGroupText>路径</InputGroupText>
+                                      </InputGroupAddon>
+                                      <InputGroupInput
+                                        value={rule.path}
+                                        onChange={(event) => {
+                                          const nextPath = event.target.value
+                                          setCreateRules((current) =>
+                                            current.map((item, itemIndex) =>
+                                              itemIndex === ruleIndex ? { ...item, path: nextPath } : item
+                                            )
                                           )
-                                        )
-                                      }}
-                                      placeholder="/"
-                                      autoComplete="off"
-                                      disabled={creating}
-                                    />
-                                  </InputGroup>
+                                          if (ruleRowErrorMap[ruleIndex]) {
+                                            setRuleRowErrorMap((current) => {
+                                              const next = { ...current }
+                                              delete next[ruleIndex]
+                                              return next
+                                            })
+                                          }
+                                        }}
+                                        placeholder="/"
+                                        autoComplete="off"
+                                        aria-invalid={
+                                          duplicatePathRuleIndexSet.has(ruleIndex) ||
+                                          Boolean(ruleRowErrorMap[ruleIndex])
+                                        }
+                                        disabled={creating}
+                                      />
+                                    </InputGroup>
+                                    {rowErrorMessage ? (
+                                      <FieldError>{rowErrorMessage}</FieldError>
+                                    ) : null}
+                                  </div>
                                   <FilterCombobox
                                     options={serviceOptions.map((option) => ({ id: option.name, name: option.name }))}
                                     value={rule.serviceName}
@@ -1695,6 +1788,13 @@ export function RoutesPageClient() {
                                             : item
                                         )
                                       )
+                                      if (ruleRowErrorMap[ruleIndex]) {
+                                        setRuleRowErrorMap((current) => {
+                                          const nextMap = { ...current }
+                                          delete nextMap[ruleIndex]
+                                          return nextMap
+                                        })
+                                      }
                                     }}
                                     placeholder="服务"
                                     emptyText="当前项目暂无可选服务"
@@ -1717,6 +1817,13 @@ export function RoutesPageClient() {
                                           itemIndex === ruleIndex ? { ...item, servicePort: nextPort } : item
                                         )
                                       )
+                                      if (ruleRowErrorMap[ruleIndex]) {
+                                        setRuleRowErrorMap((current) => {
+                                          const nextMap = { ...current }
+                                          delete nextMap[ruleIndex]
+                                          return nextMap
+                                        })
+                                      }
                                     }}
                                     onValueChange={(item) => {
                                       const nextPort = normalizeServicePortInput(item ?? "")
@@ -1725,6 +1832,13 @@ export function RoutesPageClient() {
                                           itemIndex === ruleIndex ? { ...value, servicePort: nextPort } : value
                                         )
                                       )
+                                      if (ruleRowErrorMap[ruleIndex]) {
+                                        setRuleRowErrorMap((current) => {
+                                          const nextMap = { ...current }
+                                          delete nextMap[ruleIndex]
+                                          return nextMap
+                                        })
+                                      }
                                     }}
                                     disabled={creating}
                                   >
