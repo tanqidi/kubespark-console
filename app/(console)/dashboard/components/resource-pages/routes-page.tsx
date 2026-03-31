@@ -192,6 +192,10 @@ function normalizeRuleItem(item: RouteRuleItem): RouteRuleItem {
   }
 }
 
+function normalizeHostKey(host: string): string {
+  return host.trim().toLowerCase()
+}
+
 function buildRouteYamlText(params: {
   name: string
   namespace: string
@@ -201,11 +205,28 @@ function buildRouteYamlText(params: {
 }): string {
   const normalizedRules = params.rules.map(normalizeRuleItem).filter((rule) => rule.host && rule.path && rule.serviceName && rule.servicePort)
   const tlsMap = new Map<string, Set<string>>()
+  const pathsByHost = new Map<
+    string,
+    Array<{
+      path: string
+      serviceName: string
+      servicePort: string
+    }>
+  >()
   normalizedRules.forEach((rule) => {
     if (rule.protocol !== "HTTPS" || !rule.tlsSecretName) return
     const hosts = tlsMap.get(rule.tlsSecretName) ?? new Set<string>()
     hosts.add(rule.host)
     tlsMap.set(rule.tlsSecretName, hosts)
+  })
+  normalizedRules.forEach((rule) => {
+    const paths = pathsByHost.get(rule.host) ?? []
+    paths.push({
+      path: rule.path,
+      serviceName: rule.serviceName,
+      servicePort: rule.servicePort,
+    })
+    pathsByHost.set(rule.host, paths)
   })
   return stringify(
     {
@@ -236,21 +257,19 @@ function buildRouteYamlText(params: {
               })),
             }
           : {}),
-        rules: normalizedRules.map((rule) => ({
-          host: rule.host,
+        rules: Array.from(pathsByHost.entries()).map(([host, paths]) => ({
+          host,
           http: {
-            paths: [
-              {
-                path: rule.path,
-                pathType: DEFAULT_PATH_TYPE,
-                backend: {
-                  service: {
-                    name: rule.serviceName,
-                    port: { number: Number(rule.servicePort) },
-                  },
+            paths: paths.map((pathRule) => ({
+              path: pathRule.path,
+              pathType: DEFAULT_PATH_TYPE,
+              backend: {
+                service: {
+                  name: pathRule.serviceName,
+                  port: { number: Number(pathRule.servicePort) },
                 },
               },
-            ],
+            })),
           },
         })),
       },
@@ -433,6 +452,14 @@ export function RoutesPageClient() {
     () => createRules.length > 0,
     [createRules]
   )
+  const currentHostKey = React.useMemo(() => normalizeHostKey(createHost), [createHost])
+  const currentHostPathRuleIndexes = React.useMemo(() => {
+    if (!currentHostKey) return []
+    return createRules.reduce<number[]>((acc, rule, index) => {
+      if (normalizeHostKey(rule.host) === currentHostKey) acc.push(index)
+      return acc
+    }, [])
+  }, [createRules, currentHostKey])
   const canNavigateCreateSteps = !creating && !(createStep === "rule" && createRuleViewMode === "edit")
 
   const resetCreateForm = React.useCallback(() => {
@@ -665,45 +692,53 @@ export function RoutesPageClient() {
     setCreateServiceError(null)
     setCreateServicePortError(null)
     if (hostError || tlsSecretError) return false
-    if (createRules.length === 0) {
+    const targetIndexes = createRules.reduce<number[]>((acc, rule, index) => {
+      if (normalizeHostKey(rule.host) === currentHostKey) acc.push(index)
+      return acc
+    }, [])
+    if (targetIndexes.length === 0) {
       setRuleSaveAttempted(true)
       setCreateSubmitError(ROUTE_RULE_REQUIRED_MESSAGE)
       return false
     }
 
-    for (let index = 0; index < createRules.length; index += 1) {
+    for (let i = 0; i < targetIndexes.length; i += 1) {
+      const index = targetIndexes[i] ?? 0
       const rule = createRules[index]
+      if (!rule) continue
       const pathError = validatePath(rule.path)
       if (pathError) {
-        setCreateSubmitError(`第 ${index + 1} 条路径配置无效：${pathError}`)
+        setCreateSubmitError(`第 ${i + 1} 条路径配置无效：${pathError}`)
         return false
       }
       if (!rule.serviceName.trim()) {
-        setCreateSubmitError(`第 ${index + 1} 条路径配置无效：请选择服务`)
+        setCreateSubmitError(`第 ${i + 1} 条路径配置无效：请选择服务`)
         return false
       }
       const portError = validateServicePortText(rule.servicePort)
       if (portError) {
-        setCreateSubmitError(`第 ${index + 1} 条路径配置无效：${portError}`)
+        setCreateSubmitError(`第 ${i + 1} 条路径配置无效：${portError}`)
         return false
       }
     }
 
     setCreateRules((current) =>
-      current.map((rule) =>
-        normalizeRuleItem({
-          ...rule,
-          host: createHost,
-          protocol: createProtocol,
-          tlsSecretName: createProtocol === "HTTPS" ? createTlsSecretName : "",
-        })
+      current.map((rule, index) =>
+        targetIndexes.includes(index)
+          ? normalizeRuleItem({
+              ...rule,
+              host: createHost,
+              protocol: createProtocol,
+              tlsSecretName: createProtocol === "HTTPS" ? createTlsSecretName : "",
+            })
+          : rule
       )
     )
     setRuleSaveAttempted(false)
     setCreateRuleViewMode(options?.stayInEdit ? "edit" : "list")
     setEditingRuleIndex(null)
     return true
-  }, [createHost, createProtocol, createRules, createTlsSecretName])
+  }, [createHost, createProtocol, createRules, createTlsSecretName, currentHostKey])
 
   const addPathRule = React.useCallback(() => {
     setCreateRules((current) => [
@@ -1587,11 +1622,14 @@ export function RoutesPageClient() {
 
                         <Field className="md:col-span-2">
                           <FieldLabel>路径</FieldLabel>
-                          {createRules.length > 0 ? (
+                          {currentHostPathRuleIndexes.length > 0 ? (
                             <div className="mt-3 flex flex-col gap-2">
-                              {createRules.map((rule, index) => (
+                              {currentHostPathRuleIndexes.map((ruleIndex) => {
+                                const rule = createRules[ruleIndex]
+                                if (!rule) return null
+                                return (
                                 <div
-                                  key={`${rule.host}-${rule.path}-${rule.serviceName}-${rule.servicePort}-${index}-inline`}
+                                  key={`route-path-row-${ruleIndex}`}
                                   className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
                                 >
                                   <InputGroup>
@@ -1604,7 +1642,7 @@ export function RoutesPageClient() {
                                         const nextPath = event.target.value
                                         setCreateRules((current) =>
                                           current.map((item, itemIndex) =>
-                                            itemIndex === index ? { ...item, path: nextPath } : item
+                                            itemIndex === ruleIndex ? { ...item, path: nextPath } : item
                                           )
                                         )
                                       }}
@@ -1622,7 +1660,7 @@ export function RoutesPageClient() {
                                         next?.ports.length === 1 ? String(next.ports[0]) : ""
                                       setCreateRules((current) =>
                                         current.map((item, itemIndex) =>
-                                          itemIndex === index
+                                          itemIndex === ruleIndex
                                             ? { ...item, serviceName: value, servicePort: nextPort }
                                             : item
                                         )
@@ -1646,7 +1684,7 @@ export function RoutesPageClient() {
                                       const nextPort = normalizeServicePortInput(value ?? "")
                                       setCreateRules((current) =>
                                         current.map((item, itemIndex) =>
-                                          itemIndex === index ? { ...item, servicePort: nextPort } : item
+                                          itemIndex === ruleIndex ? { ...item, servicePort: nextPort } : item
                                         )
                                       )
                                     }}
@@ -1654,7 +1692,7 @@ export function RoutesPageClient() {
                                       const nextPort = normalizeServicePortInput(item ?? "")
                                       setCreateRules((current) =>
                                         current.map((value, itemIndex) =>
-                                          itemIndex === index ? { ...value, servicePort: nextPort } : value
+                                          itemIndex === ruleIndex ? { ...value, servicePort: nextPort } : value
                                         )
                                       )
                                     }}
@@ -1686,14 +1724,14 @@ export function RoutesPageClient() {
                                     type="button"
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => removeRuleItem(index)}
+                                    onClick={() => removeRuleItem(ruleIndex)}
                                     disabled={creating}
                                   >
                                     <IconTrash data-icon="inline-start" />
                                     删除
                                   </Button>
                                 </div>
-                              ))}
+                              )})}
                             </div>
                           ) : null}
                           <div className="mt-3 flex justify-end">

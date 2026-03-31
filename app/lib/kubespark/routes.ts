@@ -152,12 +152,31 @@ function buildIngressSpec(input: CreateIngressInput) {
   })
 
   const tlsMap = new Map<string, Set<string>>()
+  const pathsByHost = new Map<
+    string,
+    Array<{
+      path: string
+      pathType: IngressPathType
+      serviceName: string
+      servicePort: number
+    }>
+  >()
   normalizedRules.forEach((rule) => {
     if (rule.protocol !== "HTTPS") return
     const secret = rule.tlsSecretName
     const hosts = tlsMap.get(secret) ?? new Set<string>()
     hosts.add(rule.host)
     tlsMap.set(secret, hosts)
+  })
+  normalizedRules.forEach((rule) => {
+    const paths = pathsByHost.get(rule.host) ?? []
+    paths.push({
+      path: rule.path,
+      pathType: rule.pathType,
+      serviceName: rule.serviceName,
+      servicePort: rule.servicePort,
+    })
+    pathsByHost.set(rule.host, paths)
   })
 
   return {
@@ -169,23 +188,21 @@ function buildIngressSpec(input: CreateIngressInput) {
           })),
         }
       : {}),
-    rules: normalizedRules.map((rule) => ({
-      host: rule.host,
+    rules: Array.from(pathsByHost.entries()).map(([host, paths]) => ({
+      host,
       http: {
-        paths: [
-          {
-            path: rule.path,
-            pathType: rule.pathType,
-            backend: {
-              service: {
-                name: rule.serviceName,
-                port: {
-                  number: rule.servicePort,
-                },
+        paths: paths.map((pathRule) => ({
+          path: pathRule.path,
+          pathType: pathRule.pathType,
+          backend: {
+            service: {
+              name: pathRule.serviceName,
+              port: {
+                number: pathRule.servicePort,
               },
             },
           },
-        ],
+        })),
       },
     })),
   }
