@@ -47,8 +47,8 @@ function normalizeServiceName(serviceName: string): string {
 }
 
 function normalizeServicePort(servicePort: number): number {
-  if (!Number.isInteger(servicePort) || servicePort <= 0) {
-    throw new Error("服务端口必须是大于 0 的整数")
+  if (!Number.isInteger(servicePort) || servicePort < 1 || servicePort > 65535) {
+    throw new Error("服务端口必须是 1-65535 的整数")
   }
   return servicePort
 }

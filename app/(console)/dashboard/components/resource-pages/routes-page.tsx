@@ -148,6 +148,25 @@ function validatePath(path: string): string | null {
   return null
 }
 
+function validateServicePortText(portText: string): string | null {
+  const value = portText.trim()
+  if (!value || !/^\d+$/.test(value)) return "服务端口必须是 1-65535 的整数"
+  const port = Number(value)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return "服务端口必须是 1-65535 的整数"
+  }
+  return null
+}
+
+function normalizeServicePortInput(rawValue: string): string {
+  const digits = rawValue.replace(/[^0-9]/g, "").slice(0, 5)
+  if (!digits) return ""
+  const port = Number(digits)
+  if (!Number.isFinite(port)) return ""
+  if (port > 65535) return "65535"
+  return digits
+}
+
 function buildRouteYamlText(params: {
   name: string
   namespace: string
@@ -283,7 +302,7 @@ function parseRouteYamlText(yamlText: string): {
     host: typeof firstRule.host === "string" ? firstRule.host : "",
     path: typeof firstPath.path === "string" ? firstPath.path : "",
     serviceName: typeof service.name === "string" ? service.name : "",
-    servicePort: servicePort && servicePort > 0 ? String(servicePort) : "",
+    servicePort: servicePort && servicePort > 0 ? normalizeServicePortInput(String(servicePort)) : "",
     pathType,
     protocol,
     tlsSecretName,
@@ -351,6 +370,11 @@ export function RoutesPageClient() {
   const [createTlsSecretError, setCreateTlsSecretError] = React.useState<string | null>(null)
   const [createSubmitError, setCreateSubmitError] = React.useState<string | null>(null)
   const [ruleSaveAttempted, setRuleSaveAttempted] = React.useState(false)
+  const createServicePortRef = React.useRef("")
+
+  React.useEffect(() => {
+    createServicePortRef.current = createServicePort
+  }, [createServicePort])
 
   const selectedServicePorts = React.useMemo(() => {
     const selected = serviceOptions.find((item) => item.name === createServiceName)
@@ -459,11 +483,11 @@ export function RoutesPageClient() {
         const currentServiceExists = mapped.some((item) => item.name === createServiceName)
         if (!currentServiceExists) {
           setCreateServiceName("")
-          setCreateServicePort("")
         } else {
           const selected = mapped.find((item) => item.name === createServiceName)
-          const currentPort = Number(createServicePort.trim())
-          if (!selected?.ports.includes(currentPort)) {
+          if (selected?.ports.length === 1) {
+            setCreateServicePort(String(selected.ports[0]))
+          } else if (!createServicePortRef.current.trim()) {
             setCreateServicePort("")
           }
         }
@@ -499,7 +523,7 @@ export function RoutesPageClient() {
     return () => {
       cancelled = true
     }
-  }, [createDialogOpen, createNamespace, createProtocol, createServiceName, createServicePort, createTlsSecretName])
+  }, [createDialogOpen, createNamespace, createProtocol, createServiceName, createTlsSecretName])
 
   React.useEffect(() => {
     if (createProtocol === "HTTP") {
@@ -547,11 +571,7 @@ export function RoutesPageClient() {
     const hostError = validateHost(createHost)
     const pathError = validatePath(createPath)
     const serviceError = createServiceName.trim() ? null : "请选择服务"
-    const parsedPort = Number(createServicePort.trim())
-    const servicePortError =
-      createServicePort.trim() && Number.isInteger(parsedPort) && parsedPort > 0
-        ? null
-        : "服务端口必须是大于 0 的整数"
+    const servicePortError = validateServicePortText(createServicePort)
     const tlsSecretError =
       createProtocol === "HTTPS" && !createTlsSecretName.trim()
         ? "请选择 HTTPS 保密字典"
@@ -675,11 +695,7 @@ export function RoutesPageClient() {
     const hostError = validateHost(draft.host)
     const pathError = validatePath(draft.path)
     const serviceError = draft.serviceName.trim() ? null : "请选择服务"
-    const parsedPort = Number(draft.servicePort.trim())
-    const servicePortError =
-      draft.servicePort.trim() && Number.isInteger(parsedPort) && parsedPort > 0
-        ? null
-        : "服务端口必须是大于 0 的整数"
+    const servicePortError = validateServicePortText(draft.servicePort)
     const tlsSecretError =
       draft.protocol === "HTTPS" && !draft.tlsSecretName.trim()
         ? "请选择 HTTPS 保密字典"
@@ -1272,7 +1288,12 @@ export function RoutesPageClient() {
                                   value={createServiceName}
                                   onValueChange={(value) => {
                                     setCreateServiceName(value)
-                                    setCreateServicePort("")
+                                    const next = serviceOptions.find((item) => item.name === value)
+                                    if (next?.ports.length === 1) {
+                                      setCreateServicePort(String(next.ports[0]))
+                                    } else {
+                                      setCreateServicePort("")
+                                    }
                                     if (createServiceError) setCreateServiceError(null)
                                     if (createServicePortError) setCreateServicePortError(null)
                                   }}
@@ -1291,11 +1312,11 @@ export function RoutesPageClient() {
                                   value={createServicePort.trim() ? createServicePort : null}
                                   inputValue={createServicePort}
                                   onInputValueChange={(value) => {
-                                    setCreateServicePort((value ?? "").replace(/[^0-9]/g, ""))
+                                    setCreateServicePort(normalizeServicePortInput(value ?? ""))
                                     if (createServicePortError) setCreateServicePortError(null)
                                   }}
                                   onValueChange={(item) => {
-                                    setCreateServicePort((item ?? "").replace(/[^0-9]/g, ""))
+                                    setCreateServicePort(normalizeServicePortInput(item ?? ""))
                                     if (createServicePortError) setCreateServicePortError(null)
                                   }}
                                   disabled={creating}
@@ -1303,6 +1324,9 @@ export function RoutesPageClient() {
                                   <ComboboxInput
                                     placeholder="端口"
                                     className="w-full"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={5}
                                     disabled={creating}
                                     aria-invalid={Boolean(createServicePortError)}
                                   />
