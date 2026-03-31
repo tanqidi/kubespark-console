@@ -301,6 +301,8 @@ export function CreateJobDialog({
   React.useEffect(() => {
     if (!open) setPendingDeleteStorageIndex(null)
   }, [open])
+  const namespaceDisplayName =
+    namespaceOptions.find((option) => option.id === namespace)?.name ?? namespace
   return (
     <Dialog
       open={open}
@@ -465,29 +467,32 @@ export function CreateJobDialog({
 
                   <Field data-invalid={Boolean(namespaceError)}>
                     <FieldLabel htmlFor="create-job-namespace">项目</FieldLabel>
-                    <Select
-                      value={namespace}
-                      onValueChange={(value) => {
-                        if (isEditMode) return
-                        setNamespace(value)
-                        if (namespaceError) setNamespaceError(null)
-                        if (submitError) setSubmitError(null)
-                      }}
-                      disabled={isBusy || isEditMode}
-                    >
-                      <SelectTrigger id="create-job-namespace" aria-invalid={Boolean(namespaceError)}>
-                        <SelectValue placeholder="请选择项目" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {namespaceOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    {isEditMode ? (
+                      <Input id="create-job-namespace" value={namespaceDisplayName} disabled />
+                    ) : (
+                      <Select
+                        value={namespace}
+                        onValueChange={(value) => {
+                          setNamespace(value)
+                          if (namespaceError) setNamespaceError(null)
+                          if (submitError) setSubmitError(null)
+                        }}
+                        disabled={isBusy}
+                      >
+                        <SelectTrigger id="create-job-namespace" aria-invalid={Boolean(namespaceError)}>
+                          <SelectValue placeholder="请选择项目" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {namespaceOptions.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                                {option.name}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
                     {namespaceError ? (
                       <FieldError>{namespaceError}</FieldError>
                     ) : (
