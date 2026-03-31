@@ -432,6 +432,14 @@ function validatePortItems(targetPorts: PortItem[]): {
   const nextPortFieldErrors: ServicePortFieldErrors = {}
   let nextPortError: string | null = null
 
+  if (normalizedPorts.length === 0) {
+    return {
+      normalizedPorts,
+      nextPortError: "请至少添加一个服务端口",
+      nextPortFieldErrors,
+    }
+  }
+
   for (let index = 0; index < normalizedPorts.length; index += 1) {
     const item = normalizedPorts[index]
     const fieldError: ServicePortFieldErrors[string] = {}
@@ -1495,7 +1503,7 @@ export function CreateServiceDialog({
                     </FieldDescription>
                   </Field>
 
-                  <Field data-invalid={Boolean(selectorError)}>
+                  <Field>
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-1">
                         <FieldLabel>工作负载选择器</FieldLabel>
@@ -1545,7 +1553,13 @@ export function CreateServiceDialog({
                               </div>
                           ))
                       ) : (
-                          <div className="rounded-lg border border-dashed px-4 py-4 text-sm text-muted-foreground">
+                          <div
+                            className={`rounded-lg border border-dashed px-4 py-4 text-sm ${
+                              selectorError
+                                ? "border-destructive text-destructive"
+                                : "text-muted-foreground"
+                            }`}
+                          >
                             暂未指定工作负载，点击“指定工作负载”自动回填标签选择器。
                           </div>
                       )}
@@ -1556,7 +1570,6 @@ export function CreateServiceDialog({
                         </Button>
                       </div>
                     </div>
-                    {selectorError ? <FieldError>{selectorError}</FieldError> : null}
                   </Field>
 
                   <Field>
@@ -1674,8 +1687,14 @@ export function CreateServiceDialog({
                             </div>
                         ))
                       ) : (
-                        <div className="rounded-lg border border-dashed px-4 py-4 text-sm text-muted-foreground">
-                          当前未配置端口。若保持为空，将不校验端口项；添加端口后每行需完整填写三项。
+                        <div
+                          className={`rounded-lg border border-dashed px-4 py-4 text-sm ${
+                            portError
+                              ? "border-destructive text-destructive"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          请先添加端口配置，添加端口后每行需完整填写三项。
                         </div>
                       )}
                       <div className="flex justify-end">
