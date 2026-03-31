@@ -54,7 +54,7 @@
 | 任务（Job） | ✅ | ✅ | ✅ | ✅ | ✅ | 创建/编辑共用同一套弹窗链路 |
 | 定时任务（CronJob） | ✅ | ✅ | ✅ | ✅ | ✅ | 复用 Job 页面与创建编辑流程 |
 | 容器组（Pod） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 以运维查看/删除为主 |
-| 应用路由（Ingress） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 当前无创建/编辑弹窗 |
+| 应用路由（Ingress） | ✅ | ✅ | ✅ | ✅ | ✅ | 已支持路由规则多条录入、YAML 互转、编辑回显 |
 | 存储卷（PV/PVC） | ✅ | ✅ | ⏳ | ✅ | ✅ | 已支持 PV/PVC 创建（表单 + YAML） |
 | 存储类（StorageClass） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 当前无创建/编辑弹窗 |
 | 节点（Node） | ✅ | N/A | N/A | N/A | ⏳ | 当前以列表信息为主 |
@@ -65,8 +65,7 @@
 ### 高优先级
 
 - Job 创建剩余步骤补全（当前部分步骤为占位文案）。
-- Ingress、PV/PVC、StorageClass 的创建/编辑能力。
-- Ingress、StorageClass 的创建/编辑能力。
+- StorageClass 的创建/编辑能力。
 
 ### 中优先级
 
@@ -92,4 +91,18 @@
 - Dialog 内使用 `Combobox`（尤其 `ComboboxChips` 多选）时，`ComboboxContent` 必须显式指定 `container` 为弹窗内部容器 `ref`。
 - 推荐写法：`<ComboboxContent anchor={anchor} container={dialogContainerRef}>`。
 - 原因：默认 portal 到 `body` 时，可能被 Dialog 的焦点/外部交互层拦截，表现为“列表可见但 hover/选中失效”。
+
+## 8. 本轮更新（2026-03-31）
+
+- 路由（Ingress）创建/编辑链路完成：
+  - 新增编辑入口与更新提交（`PUT`）能力。
+  - 路由规则列表按 `host` 聚合展示，支持同一域名多路径汇总。
+  - 录入页路径条目改为统一行交互（可增删、可编辑）。
+- 路由规则校验优化：
+  - 同一 `host` 下 `path` 重复实时标红，并在行下显示“路径重复”。
+  - 行内错误提示统一，不再依赖底部大段错误信息。
+- 路由 YAML / 提交结构修正：
+  - 同一 `host` 的多条路径会合并到单个 `rules[].http.paths`，避免重复 `host` 规则块。
+- Deployment 高级设置默认值调整：
+  - 创建模式下“调度策略”默认未勾选（仅显式开启时才生效）。
 
