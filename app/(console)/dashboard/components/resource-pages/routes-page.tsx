@@ -1204,7 +1204,7 @@ export function RoutesPageClient() {
               <div className="flex w-full items-center justify-between gap-3">
                 {createStep === "rule" && !createYamlMode && createRuleViewMode === "edit" ? (
                   <Button type="button" variant="outline" onClick={cancelEditRule} disabled={creating}>
-                    取消编辑
+                    取消
                   </Button>
                 ) : createYamlMode || createStep === "basic" ? (
                   <DialogClose asChild><Button type="button" variant="outline" disabled={creating || checkingCreateNext}>取消</Button></DialogClose>
@@ -1213,8 +1213,13 @@ export function RoutesPageClient() {
                 )}
 
                 {createStep === "rule" && !createYamlMode && createRuleViewMode === "edit" ? (
-                  <Button type="button" onClick={() => void saveRuleDraft()} disabled={creating}>
-                    保存规则
+                  <Button
+                    type="button"
+                    onClick={() => void saveRuleDraft()}
+                    disabled={creating}
+                    className="bg-black text-white hover:bg-black/90"
+                  >
+                    确认保存
                   </Button>
                 ) : createYamlMode || createStep === "advanced" ? (
                   <Button type="button" onClick={() => void handleCreateSubmit()} disabled={creating || checkingCreateNext}>{creating ? "创建中..." : "创建"}</Button>
