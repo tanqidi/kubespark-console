@@ -59,6 +59,7 @@ import { Button } from "@/components/ui/button"
 
 type RouteRow = RouteResourceRow
 type RouteCreateStep = "basic" | "rule" | "advanced"
+type RouteRuleViewMode = "list" | "edit"
 type NamespaceOption = { id: string; name: string }
 type ServiceOption = { name: string; ports: number[] }
 type PathType = IngressPathType
@@ -279,6 +280,7 @@ export function RoutesPageClient() {
 
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [createStep, setCreateStep] = React.useState<RouteCreateStep>("basic")
+  const [createRuleViewMode, setCreateRuleViewMode] = React.useState<RouteRuleViewMode>("list")
   const [creating, setCreating] = React.useState(false)
   const [checkingCreateNext, setCheckingCreateNext] = React.useState(false)
   const [createYamlMode, setCreateYamlMode] = React.useState(false)
@@ -310,9 +312,21 @@ export function RoutesPageClient() {
     const selected = serviceOptions.find((item) => item.name === createServiceName)
     return selected?.ports ?? []
   }, [createServiceName, serviceOptions])
+  const hasConfiguredRule = React.useMemo(
+    () =>
+      Boolean(
+        createHost.trim() &&
+          createPath.trim() &&
+          createServiceName.trim() &&
+          createServicePort.trim()
+      ),
+    [createHost, createPath, createServiceName, createServicePort]
+  )
+  const canNavigateCreateSteps = !creating && !(createStep === "rule" && createRuleViewMode === "edit")
 
   const resetCreateForm = React.useCallback(() => {
     setCreateStep("basic")
+    setCreateRuleViewMode("list")
     setCreateYamlMode(false)
     setCreateYamlText("")
     setCreateYamlError(null)
@@ -459,6 +473,23 @@ export function RoutesPageClient() {
     return !hostError && !pathError && !serviceError && !servicePortError
   }, [createHost, createPath, createServiceName, createServicePort])
 
+  const beginEditRule = React.useCallback(() => {
+    setCreateSubmitError(null)
+    setCreateRuleViewMode("edit")
+  }, [])
+
+  const cancelEditRule = React.useCallback(() => {
+    setCreateSubmitError(null)
+    setCreateRuleViewMode("list")
+  }, [])
+
+  const saveRuleDraft = React.useCallback(() => {
+    setCreateSubmitError(null)
+    if (!validateRuleStep()) return false
+    setCreateRuleViewMode("list")
+    return true
+  }, [validateRuleStep])
+
   const handleCreateNext = React.useCallback(async () => {
     if (creating || checkingCreateNext) return
     setCreateSubmitError(null)
@@ -483,17 +514,26 @@ export function RoutesPageClient() {
       return
     }
     if (createStep === "rule") {
-      if (!validateRuleStep()) return
+      if (createRuleViewMode === "edit") {
+        const saved = saveRuleDraft()
+        if (!saved) return
+      }
+      if (!hasConfiguredRule) {
+        setCreateSubmitError("请先添加一条路由规则，再继续创建资源。")
+        return
+      }
       setCreateStep("advanced")
     }
   }, [
+    createRuleViewMode,
     checkingCreateNext,
     createName,
     createNamespace,
     createStep,
     creating,
+    hasConfiguredRule,
+    saveRuleDraft,
     validateBasicStep,
-    validateRuleStep,
   ])
 
   const handleCreateSubmit = React.useCallback(async () => {
@@ -524,6 +564,7 @@ export function RoutesPageClient() {
         setCreateServicePort(draft.servicePort)
         setCreatePathType(draft.pathType)
         setCreateIngressClassName(draft.ingressClassName)
+        setCreateRuleViewMode("list")
         setCreateYamlError(null)
       } catch (parseError) {
         setCreateYamlError(parseError instanceof Error ? parseError.message : "YAML 解析失败")
@@ -839,6 +880,7 @@ export function RoutesPageClient() {
                         setCreateServicePort(parsed.servicePort)
                         setCreatePathType(parsed.pathType)
                         setCreateIngressClassName(parsed.ingressClassName)
+                        setCreateRuleViewMode("list")
                         setCreateYamlError(null)
                         setCreateYamlMode(false)
                       } catch (parseError: unknown) {
@@ -866,7 +908,7 @@ export function RoutesPageClient() {
                           : "未设置",
                     active: createStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
-                    disabled: creating,
+                    disabled: !canNavigateCreateSteps,
                     onClick: () => setCreateStep("basic"),
                   },
                   {
@@ -875,12 +917,12 @@ export function RoutesPageClient() {
                     status:
                       createStep === "rule"
                         ? "当前"
-                        : createHost.trim() && createPath.trim() && createServiceName.trim() && createServicePort.trim()
+                        : hasConfiguredRule
                           ? "已设置"
                           : "未设置",
                     active: createStep === "rule",
                     icon: <IconRoute2 className="size-4" />,
-                    disabled: creating,
+                    disabled: !canNavigateCreateSteps,
                     onClick: () => setCreateStep("rule"),
                   },
                   {
@@ -894,7 +936,7 @@ export function RoutesPageClient() {
                           : "未设置",
                     active: createStep === "advanced",
                     icon: <IconAdjustments className="size-4" />,
-                    disabled: creating,
+                    disabled: !canNavigateCreateSteps,
                     onClick: () => setCreateStep("advanced"),
                   },
                 ]}
@@ -955,46 +997,184 @@ export function RoutesPageClient() {
                 </div>
               ) : createStep === "rule" ? (
                 <div>
-                  <div className="mb-4"><h3 className="text-[15px] font-semibold">路由规则</h3><p className="mt-1 text-sm text-muted-foreground">设置域名、路径与后端服务。</p></div>
-                  <FieldGroup className="grid gap-6 md:grid-cols-2">
-                    <Field data-invalid={Boolean(createHostError)}>
-                      <FieldLabel htmlFor="route-create-host">域名</FieldLabel>
-                      <Input id="route-create-host" value={createHost} onChange={(event) => { setCreateHost(event.target.value); if (createHostError) setCreateHostError(null) }} placeholder="例如：example.com" autoComplete="off" aria-invalid={Boolean(createHostError)} disabled={creating} />
-                      {createHostError ? <FieldError>{createHostError}</FieldError> : null}
-                    </Field>
-                    <Field data-invalid={Boolean(createPathError)}>
-                      <FieldLabel htmlFor="route-create-path">路径</FieldLabel>
-                      <Input id="route-create-path" value={createPath} onChange={(event) => { setCreatePath(event.target.value); if (createPathError) setCreatePathError(null) }} placeholder="/" autoComplete="off" aria-invalid={Boolean(createPathError)} disabled={creating} />
-                      {createPathError ? <FieldError>{createPathError}</FieldError> : null}
-                    </Field>
-                    <Field data-invalid={Boolean(createServiceError)}>
-                      <FieldLabel htmlFor="route-create-service">服务</FieldLabel>
-                      <Select value={createServiceName} onValueChange={(value) => { setCreateServiceName(value); if (createServiceError) setCreateServiceError(null); const next = serviceOptions.find((item) => item.name === value); if (next?.ports[0]) setCreateServicePort(String(next.ports[0])) }} disabled={creating}>
-                        <SelectTrigger id="route-create-service" aria-invalid={Boolean(createServiceError)}><SelectValue placeholder="请选择服务" /></SelectTrigger>
-                        <SelectContent><SelectGroup>{serviceOptions.length > 0 ? serviceOptions.map((option) => (<SelectItem key={option.name} value={option.name}>{option.name}</SelectItem>)) : (<SelectItem value="__none__" disabled>当前项目暂无可选服务</SelectItem>)}</SelectGroup></SelectContent>
-                      </Select>
-                      {createServiceError ? <FieldError>{createServiceError}</FieldError> : null}
-                    </Field>
-                    <Field data-invalid={Boolean(createServicePortError)}>
-                      <FieldLabel htmlFor="route-create-service-port">服务端口</FieldLabel>
-                      {selectedServicePorts.length > 0 ? (
-                        <Select value={createServicePort} onValueChange={(value) => { setCreateServicePort(value); if (createServicePortError) setCreateServicePortError(null) }} disabled={creating}>
-                          <SelectTrigger id="route-create-service-port" aria-invalid={Boolean(createServicePortError)}><SelectValue placeholder="请选择服务端口" /></SelectTrigger>
-                          <SelectContent><SelectGroup>{selectedServicePorts.map((port) => (<SelectItem key={`${port}`} value={`${port}`}>{port}</SelectItem>))}</SelectGroup></SelectContent>
-                        </Select>
-                      ) : (
-                        <Input id="route-create-service-port" value={createServicePort} onChange={(event) => { setCreateServicePort(event.target.value.replace(/[^0-9]/g, "")); if (createServicePortError) setCreateServicePortError(null) }} inputMode="numeric" placeholder="例如：80" autoComplete="off" aria-invalid={Boolean(createServicePortError)} disabled={creating} />
-                      )}
-                      {createServicePortError ? <FieldError>{createServicePortError}</FieldError> : null}
-                    </Field>
-                    <Field className="md:col-span-2">
-                      <FieldLabel htmlFor="route-create-path-type">路径类型</FieldLabel>
-                      <Select value={createPathType} onValueChange={(value) => { if (value === "Prefix" || value === "Exact" || value === "ImplementationSpecific") setCreatePathType(value) }} disabled={creating}>
-                        <SelectTrigger id="route-create-path-type"><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectGroup><SelectItem value="Prefix">Prefix</SelectItem><SelectItem value="Exact">Exact</SelectItem><SelectItem value="ImplementationSpecific">ImplementationSpecific</SelectItem></SelectGroup></SelectContent>
-                      </Select>
-                    </Field>
-                  </FieldGroup>
+                  {createRuleViewMode === "list" ? (
+                    <>
+                      <div className="mb-4">
+                        <h3 className="text-[15px] font-semibold">路由规则</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">先添加一条路由规则，再继续创建资源。</p>
+                      </div>
+
+                      <div className="mt-4 max-h-[50vh] overflow-y-auto pr-2">
+                        <div className="flex flex-col gap-0 pb-4">
+                          {hasConfiguredRule ? (
+                            <div className="rounded-lg border px-4 py-4">
+                              <div className="text-sm font-semibold">{createHost || "-"}</div>
+                              <div className="mt-1 text-sm text-muted-foreground">
+                                {`${createPath || "-"} -> ${createServiceName || "-"}:${createServicePort || "-"} (${createPathType})`}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                              <div className="text-sm font-semibold">暂无路由规则</div>
+                              <div className="mt-1 text-sm text-muted-foreground">
+                                先添加一条路由规则，再继续创建资源。
+                              </div>
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            className="mt-3 flex w-full flex-col items-start rounded-lg border border-dashed px-4 py-4 text-left transition hover:border-foreground/30 hover:bg-accent/20"
+                            onClick={beginEditRule}
+                            disabled={creating}
+                          >
+                            <span className="text-sm font-semibold">{hasConfiguredRule ? "编辑路由规则" : "添加路由规则"}</span>
+                            <span className="mt-1 text-sm text-muted-foreground">
+                              {hasConfiguredRule ? "更新域名、路径和后端服务。" : "添加域名、路径和后端服务映射。"}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mb-4">
+                        <h3 className="text-[15px] font-semibold">录入路由规则</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">设置域名、路径与后端服务。</p>
+                      </div>
+                      <FieldGroup className="grid gap-6 md:grid-cols-2">
+                        <Field data-invalid={Boolean(createHostError)}>
+                          <FieldLabel htmlFor="route-create-host">域名</FieldLabel>
+                          <Input
+                            id="route-create-host"
+                            value={createHost}
+                            onChange={(event) => {
+                              setCreateHost(event.target.value)
+                              if (createHostError) setCreateHostError(null)
+                            }}
+                            placeholder="例如：example.com"
+                            autoComplete="off"
+                            aria-invalid={Boolean(createHostError)}
+                            disabled={creating}
+                          />
+                          {createHostError ? <FieldError>{createHostError}</FieldError> : null}
+                        </Field>
+                        <Field data-invalid={Boolean(createPathError)}>
+                          <FieldLabel htmlFor="route-create-path">路径</FieldLabel>
+                          <Input
+                            id="route-create-path"
+                            value={createPath}
+                            onChange={(event) => {
+                              setCreatePath(event.target.value)
+                              if (createPathError) setCreatePathError(null)
+                            }}
+                            placeholder="/"
+                            autoComplete="off"
+                            aria-invalid={Boolean(createPathError)}
+                            disabled={creating}
+                          />
+                          {createPathError ? <FieldError>{createPathError}</FieldError> : null}
+                        </Field>
+                        <Field data-invalid={Boolean(createServiceError)}>
+                          <FieldLabel htmlFor="route-create-service">服务</FieldLabel>
+                          <Select
+                            value={createServiceName}
+                            onValueChange={(value) => {
+                              setCreateServiceName(value)
+                              if (createServiceError) setCreateServiceError(null)
+                              const next = serviceOptions.find((item) => item.name === value)
+                              if (next?.ports[0]) setCreateServicePort(String(next.ports[0]))
+                            }}
+                            disabled={creating}
+                          >
+                            <SelectTrigger id="route-create-service" aria-invalid={Boolean(createServiceError)}>
+                              <SelectValue placeholder="请选择服务" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {serviceOptions.length > 0 ? (
+                                  serviceOptions.map((option) => (
+                                    <SelectItem key={option.name} value={option.name}>
+                                      {option.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="__none__" disabled>
+                                    当前项目暂无可选服务
+                                  </SelectItem>
+                                )}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                          {createServiceError ? <FieldError>{createServiceError}</FieldError> : null}
+                        </Field>
+                        <Field data-invalid={Boolean(createServicePortError)}>
+                          <FieldLabel htmlFor="route-create-service-port">服务端口</FieldLabel>
+                          {selectedServicePorts.length > 0 ? (
+                            <Select
+                              value={createServicePort}
+                              onValueChange={(value) => {
+                                setCreateServicePort(value)
+                                if (createServicePortError) setCreateServicePortError(null)
+                              }}
+                              disabled={creating}
+                            >
+                              <SelectTrigger id="route-create-service-port" aria-invalid={Boolean(createServicePortError)}>
+                                <SelectValue placeholder="请选择服务端口" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {selectedServicePorts.map((port) => (
+                                    <SelectItem key={`${port}`} value={`${port}`}>
+                                      {port}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              id="route-create-service-port"
+                              value={createServicePort}
+                              onChange={(event) => {
+                                setCreateServicePort(event.target.value.replace(/[^0-9]/g, ""))
+                                if (createServicePortError) setCreateServicePortError(null)
+                              }}
+                              inputMode="numeric"
+                              placeholder="例如：80"
+                              autoComplete="off"
+                              aria-invalid={Boolean(createServicePortError)}
+                              disabled={creating}
+                            />
+                          )}
+                          {createServicePortError ? <FieldError>{createServicePortError}</FieldError> : null}
+                        </Field>
+                        <Field className="md:col-span-2">
+                          <FieldLabel htmlFor="route-create-path-type">路径类型</FieldLabel>
+                          <Select
+                            value={createPathType}
+                            onValueChange={(value) => {
+                              if (value === "Prefix" || value === "Exact" || value === "ImplementationSpecific") {
+                                setCreatePathType(value)
+                              }
+                            }}
+                            disabled={creating}
+                          >
+                            <SelectTrigger id="route-create-path-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectItem value="Prefix">Prefix</SelectItem>
+                                <SelectItem value="Exact">Exact</SelectItem>
+                                <SelectItem value="ImplementationSpecific">ImplementationSpecific</SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      </FieldGroup>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -1014,13 +1194,21 @@ export function RoutesPageClient() {
 
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
-                {createYamlMode || createStep === "basic" ? (
+                {createStep === "rule" && !createYamlMode && createRuleViewMode === "edit" ? (
+                  <Button type="button" variant="outline" onClick={cancelEditRule} disabled={creating}>
+                    取消编辑
+                  </Button>
+                ) : createYamlMode || createStep === "basic" ? (
                   <DialogClose asChild><Button type="button" variant="outline" disabled={creating || checkingCreateNext}>取消</Button></DialogClose>
                 ) : (
                   <Button type="button" variant="outline" onClick={() => setCreateStep(createStep === "advanced" ? "rule" : "basic")} disabled={creating || checkingCreateNext}>上一步</Button>
                 )}
 
-                {createYamlMode || createStep === "advanced" ? (
+                {createStep === "rule" && !createYamlMode && createRuleViewMode === "edit" ? (
+                  <Button type="button" onClick={() => void saveRuleDraft()} disabled={creating}>
+                    保存规则
+                  </Button>
+                ) : createYamlMode || createStep === "advanced" ? (
                   <Button type="button" onClick={() => void handleCreateSubmit()} disabled={creating || checkingCreateNext}>{creating ? "创建中..." : "创建"}</Button>
                 ) : (
                   <Button type="button" onClick={() => void handleCreateNext()} disabled={creating || checkingCreateNext}>{checkingCreateNext && createStep === "basic" ? "校验中..." : "下一步"}</Button>
