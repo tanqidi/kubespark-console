@@ -1250,7 +1250,7 @@ export function CreateWorkloadDialog({
                         disabled={isBusy}
                         ariaLabel="滚动更新策略"
                         title="滚动更新策略"
-                        description="可配置更新类型、最大不可用和最大激增；仅出现默认值（25%/25%）时视为未开启（即使不配置，Kubernetes 也会自动补齐该默认值）。"
+                        description="可配置更新类型、最大不可用和最大激增。"
                         onCheckedChange={(checked) => {
                           if (isBusy) return
                           setRollingUpdateEnabled(checked)
@@ -1338,7 +1338,7 @@ export function CreateWorkloadDialog({
                       disabled={isBusy}
                       ariaLabel="调度策略"
                       title="调度策略"
-                      description="选择容器组在节点上的调度方式。默认规则视为未开启；即使不配置，Kubernetes 也会按默认方式调度。"
+                      description="选择容器组在节点上的调度方式。"
                       onCheckedChange={(checked) => {
                         if (isBusy) return
                         setSchedulingPolicyEnabled(checked)

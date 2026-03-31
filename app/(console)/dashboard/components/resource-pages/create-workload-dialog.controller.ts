@@ -90,7 +90,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const [restartPolicy, setRestartPolicy] = React.useState<"Always">("Always")
   const [terminationGracePeriodSeconds, setTerminationGracePeriodSeconds] = React.useState("30")
   const [serviceAccountName, setServiceAccountName] = React.useState("default")
-  const [schedulingPolicyEnabled, setSchedulingPolicyEnabled] = React.useState(true)
+  const [schedulingPolicyEnabled, setSchedulingPolicyEnabled] = React.useState(false)
   const [schedulingPolicy, setSchedulingPolicy] = React.useState<SchedulingPolicy>("default")
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
@@ -187,7 +187,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       setRestartPolicy("Always")
       setTerminationGracePeriodSeconds("30")
       setServiceAccountName("default")
-      setSchedulingPolicyEnabled(true)
+      setSchedulingPolicyEnabled(false)
       setSchedulingPolicy("default")
       setContainers([])
       resetEditorUiState()
@@ -228,7 +228,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setRestartPolicy("Always")
     setTerminationGracePeriodSeconds(initialValues.pod?.terminationGracePeriodSeconds?.trim() || "30")
     setServiceAccountName(initialValues.pod?.serviceAccountName?.trim() || "default")
-    setSchedulingPolicyEnabled(initialValues.pod?.schedulingPolicyEnabled !== false)
+    setSchedulingPolicyEnabled(initialValues.pod?.schedulingPolicyEnabled === true)
     setSchedulingPolicy(initialValues.pod?.schedulingPolicy ?? "default")
     setContainers(
       Array.isArray(initialValues.pod?.containers)
@@ -562,7 +562,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setRestartPolicy(snapshot.pod.restartPolicy)
     setTerminationGracePeriodSeconds(snapshot.pod.terminationGracePeriodSeconds?.trim() || "30")
     setServiceAccountName(snapshot.pod.serviceAccountName?.trim() || "default")
-    setSchedulingPolicyEnabled(snapshot.pod.schedulingPolicyEnabled !== false)
+    setSchedulingPolicyEnabled(snapshot.pod.schedulingPolicyEnabled === true)
     setSchedulingPolicy(snapshot.pod.schedulingPolicy ?? "default")
     setContainers(snapshot.pod.containers)
     const nextStorageVolumes = Array.isArray(snapshot.pod.storageList)
@@ -778,7 +778,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
             terminationGracePeriodSeconds:
               normalizeIntegerInput(source.pod.terminationGracePeriodSeconds) || "30",
             serviceAccountName: source.pod.serviceAccountName.trim() || "default",
-            schedulingPolicyEnabled: source.pod.schedulingPolicyEnabled !== false,
+            schedulingPolicyEnabled: source.pod.schedulingPolicyEnabled === true,
             schedulingPolicy:
               source.pod.schedulingPolicy === "spread" ||
               source.pod.schedulingPolicy === "concentrated"

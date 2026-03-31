@@ -1159,8 +1159,7 @@ export function CreateContainerDialog({
                                     className={cn(
                                       item.source === "custom"
                                         ? "grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
-                                        : "grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]",
-                                      envDuplicateIdSet.has(item.id) && "rounded-md border border-destructive/80 bg-destructive/5 p-2"
+                                        : "grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
                                     )}
                                   >
                                     <Select
