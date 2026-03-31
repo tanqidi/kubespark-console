@@ -543,6 +543,7 @@ export type PersistentVolumeResourceRow = {
   reclaimPolicy: string
   status: string
   node: string
+  age: string
   updatedAt: string
 }
 
@@ -556,6 +557,7 @@ export type PersistentVolumeClaimResourceRow = {
   accessMode: string
   status: string
   boundPV: string
+  age: string
   updatedAt: string
 }
 
@@ -598,6 +600,7 @@ function mapPersistentVolumes(items: unknown[], limit: number): PersistentVolume
       reclaimPolicy: asString(spec.persistentVolumeReclaimPolicy),
       status: asString(status.phase),
       node,
+      age: formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined),
       updatedAt: resolveUpdatedAt(resource),
     }
   })
@@ -632,6 +635,7 @@ function mapPersistentVolumeClaims(
       accessMode,
       status: asString(status.phase),
       boundPV: asString(spec.volumeName),
+      age: formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined),
       updatedAt: resolveUpdatedAt(resource),
     }
   })

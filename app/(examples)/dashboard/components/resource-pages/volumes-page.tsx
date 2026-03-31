@@ -120,7 +120,7 @@ const persistentVolumeColumns: ColumnConfig<PersistentVolumeRow>[] = [
   { key: "reclaimPolicy", label: "回收策略" },
   { key: "status", label: "状态", render: "status" },
   { key: "node", label: "节点" },
-  { key: "updatedAt", label: "更新时间" },
+  { key: "age", label: "运行时间" },
 ]
 
 const persistentVolumeClaimColumns: ColumnConfig<PersistentVolumeClaimRow>[] = [
@@ -136,7 +136,7 @@ const persistentVolumeClaimColumns: ColumnConfig<PersistentVolumeClaimRow>[] = [
   { key: "accessMode", label: "访问模式" },
   { key: "status", label: "状态", render: "status" },
   { key: "boundPV", label: "绑定 PV" },
-  { key: "updatedAt", label: "更新时间" },
+  { key: "age", label: "运行时间" },
 ]
 
 const NAME_RULE_MESSAGE =
@@ -1736,6 +1736,7 @@ export function VolumesPageClient() {
       >
         <DialogContent
           className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+          onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
           <div ref={createPvDialogContainerRef} className="flex min-h-0 flex-1 flex-col">
@@ -2072,7 +2073,9 @@ export function VolumesPageClient() {
                                 {(values as string[]).map((value) => (
                                   <ComboboxChip key={value}>{value}</ComboboxChip>
                                 ))}
-                                <ComboboxChipsInput placeholder="请选择节点" />
+                                <ComboboxChipsInput
+                                  placeholder={(values as string[]).length > 0 ? "" : "请选择节点"}
+                                />
                               </>
                             )}
                           </ComboboxValue>
