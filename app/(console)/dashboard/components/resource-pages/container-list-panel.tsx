@@ -95,9 +95,7 @@ export function ContainerListPanel({
                   submitError === podRequiredMessage && "text-destructive"
                 )}
               >
-                {submitError === podRequiredMessage
-                  ? podRequiredMessage
-                  : "点击下方“添加容器”录入镜像信息。"}
+                {"点击下方“添加容器”录入镜像信息。"}
               </div>
             </div>
           )}

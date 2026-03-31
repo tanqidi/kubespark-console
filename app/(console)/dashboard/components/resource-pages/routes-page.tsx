@@ -94,6 +94,7 @@ const routeColumns: ColumnConfig<RouteRow>[] = [
 
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字和连字符（-），必须以小写字母或数字开头和结尾，最长 253 个字符。"
+const ROUTE_RULE_REQUIRED_MESSAGE = "先添加一条路由规则，再继续创建资源。"
 
 function asObject(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -307,6 +308,7 @@ export function RoutesPageClient() {
   const [createServiceError, setCreateServiceError] = React.useState<string | null>(null)
   const [createServicePortError, setCreateServicePortError] = React.useState<string | null>(null)
   const [createSubmitError, setCreateSubmitError] = React.useState<string | null>(null)
+  const [ruleSaveAttempted, setRuleSaveAttempted] = React.useState(false)
 
   const selectedServicePorts = React.useMemo(() => {
     const selected = serviceOptions.find((item) => item.name === createServiceName)
@@ -347,6 +349,7 @@ export function RoutesPageClient() {
     setCreateServiceError(null)
     setCreateServicePortError(null)
     setCreateSubmitError(null)
+    setRuleSaveAttempted(false)
   }, [])
 
   React.useEffect(() => {
@@ -475,6 +478,7 @@ export function RoutesPageClient() {
 
   const beginEditRule = React.useCallback(() => {
     setCreateSubmitError(null)
+    setRuleSaveAttempted(false)
     setCreateRuleViewMode("edit")
   }, [])
 
@@ -486,6 +490,7 @@ export function RoutesPageClient() {
   const saveRuleDraft = React.useCallback(() => {
     setCreateSubmitError(null)
     if (!validateRuleStep()) return false
+    setRuleSaveAttempted(false)
     setCreateRuleViewMode("list")
     return true
   }, [validateRuleStep])
@@ -505,6 +510,7 @@ export function RoutesPageClient() {
           setCreateNameError("路由名称已存在，请更换后重试")
           return
         }
+        setRuleSaveAttempted(false)
         setCreateStep("rule")
       } catch (checkError) {
         setCreateSubmitError(checkError instanceof Error ? checkError.message : "路由名称校验失败，请稍后重试")
@@ -519,7 +525,7 @@ export function RoutesPageClient() {
         if (!saved) return
       }
       if (!hasConfiguredRule) {
-        setCreateSubmitError("请先添加一条路由规则，再继续创建资源。")
+        setRuleSaveAttempted(true)
         return
       }
       setCreateStep("advanced")
@@ -539,6 +545,7 @@ export function RoutesPageClient() {
   const handleCreateSubmit = React.useCallback(async () => {
     if (creating) return
     setCreateSubmitError(null)
+    setRuleSaveAttempted(false)
 
     let draft = {
       name: createName,
@@ -1001,7 +1008,6 @@ export function RoutesPageClient() {
                     <>
                       <div className="mb-4">
                         <h3 className="text-[15px] font-semibold">路由规则</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">先添加一条路由规则，再继续创建资源。</p>
                       </div>
 
                       <div className="mt-4 max-h-[50vh] overflow-y-auto pr-2">
@@ -1015,9 +1021,11 @@ export function RoutesPageClient() {
                             </div>
                           ) : (
                             <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                              <div className="text-sm font-semibold">暂无路由规则</div>
-                              <div className="mt-1 text-sm text-muted-foreground">
-                                先添加一条路由规则，再继续创建资源。
+                              <div className={ruleSaveAttempted ? "text-sm font-semibold text-destructive" : "text-sm font-semibold"}>
+                                暂无路由规则
+                              </div>
+                              <div className={ruleSaveAttempted ? "mt-1 text-sm text-destructive" : "mt-1 text-sm text-muted-foreground"}>
+                                {ROUTE_RULE_REQUIRED_MESSAGE}
                               </div>
                             </div>
                           )}

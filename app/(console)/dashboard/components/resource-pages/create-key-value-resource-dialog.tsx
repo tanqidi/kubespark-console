@@ -140,6 +140,7 @@ const SECRET_TYPE_OPTIONS = [
 
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
+const DATA_ITEM_REQUIRED_MESSAGE = "请至少添加一个数据项"
 
 function validateName(value: string): string | null {
   if (!value) return "请输入名称"
@@ -690,7 +691,7 @@ export function CreateKeyValueResourceDialog({
       const seen = new Set<string>()
 
       if (cleanedItems.length === 0) {
-        resolvedItemsError = "请至少添加一个数据项"
+        resolvedItemsError = DATA_ITEM_REQUIRED_MESSAGE
       }
 
       cleanedItems.forEach((item, index) => {
@@ -1074,9 +1075,13 @@ export function CreateKeyValueResourceDialog({
                             ))}
                           </ItemGroup>
                         ) : (
-                          <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                            <div className="text-sm font-semibold">暂无数据项</div>
-                            <div className="mt-1 text-sm text-muted-foreground">
+                          <div
+                            className={`rounded-lg border border-dashed px-4 py-10 text-center ${itemsError === DATA_ITEM_REQUIRED_MESSAGE ? "border-destructive" : ""}`}
+                          >
+                            <div className={`text-sm font-semibold ${itemsError === DATA_ITEM_REQUIRED_MESSAGE ? "text-destructive" : ""}`}>暂无数据项</div>
+                            <div
+                              className={`mt-1 text-sm ${itemsError === DATA_ITEM_REQUIRED_MESSAGE ? "text-destructive" : "text-muted-foreground"}`}
+                            >
                               先添加一组键值对，再继续创建资源。
                             </div>
                           </div>
@@ -1094,7 +1099,9 @@ export function CreateKeyValueResourceDialog({
                           </span>
                         </button>
 
-                        {itemsError ? <FieldError className="mt-4">{itemsError}</FieldError> : null}
+                        {itemsError && itemsError !== DATA_ITEM_REQUIRED_MESSAGE ? (
+                          <FieldError className="mt-4">{itemsError}</FieldError>
+                        ) : null}
                         {submitError ? <FieldError className="mt-4">{submitError}</FieldError> : null}
                       </div>
                     </div>
