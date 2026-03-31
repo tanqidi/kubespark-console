@@ -36,6 +36,14 @@ import {
 } from "@/components/ui/dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
+import {
   Field,
   FieldDescription,
   FieldError,
@@ -43,6 +51,12 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import {
   Select,
@@ -63,6 +77,8 @@ type RouteRuleViewMode = "list" | "edit"
 type NamespaceOption = { id: string; name: string }
 type ServiceOption = { name: string; ports: number[] }
 type PathType = IngressPathType
+type RouteProtocol = "HTTP" | "HTTPS"
+const DEFAULT_PATH_TYPE: PathType = "ImplementationSpecific"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -141,6 +157,8 @@ function buildRouteYamlText(params: {
   serviceName: string
   servicePort: string
   pathType: PathType
+  protocol: RouteProtocol
+  tlsSecretName: string
   ingressClassName: string
 }): string {
   const servicePort = Number(params.servicePort.trim())
@@ -164,6 +182,16 @@ function buildRouteYamlText(params: {
       spec: {
         ...(params.ingressClassName.trim()
           ? { ingressClassName: params.ingressClassName.trim() }
+          : {}),
+        ...(params.protocol === "HTTPS" && params.tlsSecretName.trim()
+          ? {
+              tls: [
+                {
+                  hosts: [params.host.trim()],
+                  secretName: params.tlsSecretName.trim(),
+                },
+              ],
+            }
           : {}),
         rules: [
           {
@@ -205,6 +233,8 @@ function parseRouteYamlText(yamlText: string): {
   serviceName: string
   servicePort: string
   pathType: PathType
+  protocol: RouteProtocol
+  tlsSecretName: string
   ingressClassName: string
 } {
   const normalized = yamlText.trim()
@@ -225,6 +255,8 @@ function parseRouteYamlText(yamlText: string): {
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
   const spec = asObject(root.spec)
+  const tlsEntries = Array.isArray(spec.tls) ? spec.tls : []
+  const firstTls = asObject(tlsEntries[0])
   const rules = Array.isArray(spec.rules) ? spec.rules : []
   const firstRule = asObject(rules[0])
   const http = asObject(firstRule.http)
@@ -239,7 +271,10 @@ function parseRouteYamlText(yamlText: string): {
   const pathType: PathType =
     pathTypeRaw === "Exact" || pathTypeRaw === "ImplementationSpecific" || pathTypeRaw === "Prefix"
       ? pathTypeRaw
-      : "Prefix"
+      : "ImplementationSpecific"
+
+  const tlsSecretName = typeof firstTls.secretName === "string" ? firstTls.secretName : ""
+  const protocol: RouteProtocol = tlsEntries.length > 0 ? "HTTPS" : "HTTP"
 
   return {
     name: typeof metadata.name === "string" ? metadata.name : "",
@@ -250,6 +285,8 @@ function parseRouteYamlText(yamlText: string): {
     serviceName: typeof service.name === "string" ? service.name : "",
     servicePort: servicePort && servicePort > 0 ? String(servicePort) : "",
     pathType,
+    protocol,
+    tlsSecretName,
     ingressClassName: typeof spec.ingressClassName === "string" ? spec.ingressClassName : "",
   }
 }
@@ -267,6 +304,8 @@ function resolveErrorMessage(error: unknown): string {
   return "API request failed"
 }
 export function RoutesPageClient() {
+  const createDialogContainerRef = React.useRef<HTMLDivElement | null>(null)
+  const createDialogPopupLayerRef = React.useRef<HTMLDivElement | null>(null)
   const [rows, setRows] = React.useState<RouteRow[]>([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -290,6 +329,7 @@ export function RoutesPageClient() {
 
   const [namespaceOptions, setNamespaceOptions] = React.useState<NamespaceOption[]>([])
   const [serviceOptions, setServiceOptions] = React.useState<ServiceOption[]>([])
+  const [secretOptions, setSecretOptions] = React.useState<string[]>([])
 
   const [createName, setCreateName] = React.useState("")
   const [createNamespace, setCreateNamespace] = React.useState("")
@@ -298,7 +338,8 @@ export function RoutesPageClient() {
   const [createPath, setCreatePath] = React.useState("/")
   const [createServiceName, setCreateServiceName] = React.useState("")
   const [createServicePort, setCreateServicePort] = React.useState("")
-  const [createPathType, setCreatePathType] = React.useState<PathType>("Prefix")
+  const [createProtocol, setCreateProtocol] = React.useState<RouteProtocol>("HTTP")
+  const [createTlsSecretName, setCreateTlsSecretName] = React.useState("")
   const [createIngressClassName, setCreateIngressClassName] = React.useState("")
 
   const [createNameError, setCreateNameError] = React.useState<string | null>(null)
@@ -307,6 +348,7 @@ export function RoutesPageClient() {
   const [createPathError, setCreatePathError] = React.useState<string | null>(null)
   const [createServiceError, setCreateServiceError] = React.useState<string | null>(null)
   const [createServicePortError, setCreateServicePortError] = React.useState<string | null>(null)
+  const [createTlsSecretError, setCreateTlsSecretError] = React.useState<string | null>(null)
   const [createSubmitError, setCreateSubmitError] = React.useState<string | null>(null)
   const [ruleSaveAttempted, setRuleSaveAttempted] = React.useState(false)
 
@@ -320,9 +362,10 @@ export function RoutesPageClient() {
         createHost.trim() &&
           createPath.trim() &&
           createServiceName.trim() &&
-          createServicePort.trim()
+          createServicePort.trim() &&
+          (createProtocol === "HTTP" || createTlsSecretName.trim())
       ),
-    [createHost, createPath, createServiceName, createServicePort]
+    [createHost, createPath, createProtocol, createServiceName, createServicePort, createTlsSecretName]
   )
   const canNavigateCreateSteps = !creating && !(createStep === "rule" && createRuleViewMode === "edit")
 
@@ -340,7 +383,8 @@ export function RoutesPageClient() {
     setCreatePath("/")
     setCreateServiceName("")
     setCreateServicePort("")
-    setCreatePathType("Prefix")
+    setCreateProtocol("HTTP")
+    setCreateTlsSecretName("")
     setCreateIngressClassName("")
     setCreateNameError(null)
     setCreateNamespaceError(null)
@@ -348,6 +392,7 @@ export function RoutesPageClient() {
     setCreatePathError(null)
     setCreateServiceError(null)
     setCreateServicePortError(null)
+    setCreateTlsSecretError(null)
     setCreateSubmitError(null)
     setRuleSaveAttempted(false)
   }, [])
@@ -383,8 +428,10 @@ export function RoutesPageClient() {
     const namespace = createNamespace.trim()
     if (!namespace) {
       setServiceOptions([])
+      setSecretOptions([])
       setCreateServiceName("")
       setCreateServicePort("")
+      setCreateTlsSecretName("")
       return
     }
 
@@ -409,12 +456,16 @@ export function RoutesPageClient() {
           .sort((a, b) => a.name.localeCompare(b.name))
         setServiceOptions(mapped)
 
-        const preferredService = mapped.find((item) => item.name === createServiceName) ?? mapped[0]
-        const nextServiceName = preferredService?.name ?? ""
-        setCreateServiceName(nextServiceName)
-        const preferredPort = preferredService?.ports[0]
-        if (!createServicePort.trim() || !preferredService?.ports.includes(Number(createServicePort.trim()))) {
-          setCreateServicePort(preferredPort ? String(preferredPort) : "")
+        const currentServiceExists = mapped.some((item) => item.name === createServiceName)
+        if (!currentServiceExists) {
+          setCreateServiceName("")
+          setCreateServicePort("")
+        } else {
+          const selected = mapped.find((item) => item.name === createServiceName)
+          const currentPort = Number(createServicePort.trim())
+          if (!selected?.ports.includes(currentPort)) {
+            setCreateServicePort("")
+          }
         }
       })
       .catch((loadError) => {
@@ -423,10 +474,39 @@ export function RoutesPageClient() {
         setServiceOptions([])
       })
 
+    void fetchResourceCollection("core", "v1", "secrets", { namespace })
+      .then((result) => {
+        if (cancelled) return
+        const names = (
+          result.items as Array<{
+            metadata?: { name?: string }
+          }>
+        )
+          .map((item) => item.metadata?.name?.trim() ?? "")
+          .filter((name) => name.length > 0)
+          .sort((a, b) => a.localeCompare(b))
+        setSecretOptions(names)
+        if (createProtocol === "HTTPS" && !names.includes(createTlsSecretName)) {
+          setCreateTlsSecretName("")
+        }
+      })
+      .catch((loadError) => {
+        if (cancelled) return
+        console.error("[Routes] load secret options failed", loadError)
+        setSecretOptions([])
+      })
+
     return () => {
       cancelled = true
     }
-  }, [createDialogOpen, createNamespace, createServiceName, createServicePort])
+  }, [createDialogOpen, createNamespace, createProtocol, createServiceName, createServicePort, createTlsSecretName])
+
+  React.useEffect(() => {
+    if (createProtocol === "HTTP") {
+      if (createTlsSecretName) setCreateTlsSecretName("")
+      if (createTlsSecretError) setCreateTlsSecretError(null)
+    }
+  }, [createProtocol, createTlsSecretError, createTlsSecretName])
 
   const buildCreateYaml = React.useCallback(() => {
     return buildRouteYamlText({
@@ -437,7 +517,9 @@ export function RoutesPageClient() {
       path: createPath,
       serviceName: createServiceName,
       servicePort: createServicePort,
-      pathType: createPathType,
+      pathType: DEFAULT_PATH_TYPE,
+      protocol: createProtocol,
+      tlsSecretName: createTlsSecretName,
       ingressClassName: createIngressClassName,
     })
   }, [
@@ -447,9 +529,10 @@ export function RoutesPageClient() {
     createName,
     createNamespace,
     createPath,
-    createPathType,
+    createProtocol,
     createServiceName,
     createServicePort,
+    createTlsSecretName,
   ])
 
   const validateBasicStep = React.useCallback(() => {
@@ -469,12 +552,17 @@ export function RoutesPageClient() {
       createServicePort.trim() && Number.isInteger(parsedPort) && parsedPort > 0
         ? null
         : "服务端口必须是大于 0 的整数"
+    const tlsSecretError =
+      createProtocol === "HTTPS" && !createTlsSecretName.trim()
+        ? "请选择 HTTPS 保密字典"
+        : null
     setCreateHostError(hostError)
     setCreatePathError(pathError)
     setCreateServiceError(serviceError)
     setCreateServicePortError(servicePortError)
-    return !hostError && !pathError && !serviceError && !servicePortError
-  }, [createHost, createPath, createServiceName, createServicePort])
+    setCreateTlsSecretError(tlsSecretError)
+    return !hostError && !pathError && !serviceError && !servicePortError && !tlsSecretError
+  }, [createHost, createPath, createProtocol, createServiceName, createServicePort, createTlsSecretName])
 
   const beginEditRule = React.useCallback(() => {
     setCreateSubmitError(null)
@@ -555,7 +643,9 @@ export function RoutesPageClient() {
       path: createPath,
       serviceName: createServiceName,
       servicePort: createServicePort,
-      pathType: createPathType,
+      pathType: DEFAULT_PATH_TYPE,
+      protocol: createProtocol,
+      tlsSecretName: createTlsSecretName,
       ingressClassName: createIngressClassName,
     }
 
@@ -569,7 +659,8 @@ export function RoutesPageClient() {
         setCreatePath(draft.path || "/")
         setCreateServiceName(draft.serviceName)
         setCreateServicePort(draft.servicePort)
-        setCreatePathType(draft.pathType)
+        setCreateProtocol(draft.protocol)
+        setCreateTlsSecretName(draft.tlsSecretName)
         setCreateIngressClassName(draft.ingressClassName)
         setCreateRuleViewMode("list")
         setCreateYamlError(null)
@@ -589,6 +680,10 @@ export function RoutesPageClient() {
       draft.servicePort.trim() && Number.isInteger(parsedPort) && parsedPort > 0
         ? null
         : "服务端口必须是大于 0 的整数"
+    const tlsSecretError =
+      draft.protocol === "HTTPS" && !draft.tlsSecretName.trim()
+        ? "请选择 HTTPS 保密字典"
+        : null
 
     setCreateNameError(nameError)
     setCreateNamespaceError(namespaceError)
@@ -596,8 +691,10 @@ export function RoutesPageClient() {
     setCreatePathError(pathError)
     setCreateServiceError(serviceError)
     setCreateServicePortError(servicePortError)
+    setCreateTlsSecretError(tlsSecretError)
 
-    const firstError = nameError || namespaceError || hostError || pathError || serviceError || servicePortError
+    const firstError =
+      nameError || namespaceError || hostError || pathError || serviceError || servicePortError || tlsSecretError
     if (firstError) {
       if (!createYamlMode) {
         if (nameError || namespaceError) setCreateStep("basic")
@@ -617,7 +714,9 @@ export function RoutesPageClient() {
         path: draft.path.trim(),
         serviceName: draft.serviceName.trim(),
         servicePort: Number(draft.servicePort.trim()),
-        pathType: draft.pathType,
+        pathType: DEFAULT_PATH_TYPE,
+        protocol: draft.protocol,
+        tlsSecretName: draft.protocol === "HTTPS" ? draft.tlsSecretName.trim() : "",
         ingressClassName: draft.ingressClassName.trim(),
         description: draft.description.trim(),
       })
@@ -643,9 +742,10 @@ export function RoutesPageClient() {
     createName,
     createNamespace,
     createPath,
-    createPathType,
+    createProtocol,
     createServiceName,
     createServicePort,
+    createTlsSecretName,
     createYamlMode,
     createYamlText,
     creating,
@@ -853,10 +953,18 @@ export function RoutesPageClient() {
         }}
       >
         <DialogContent
+          ref={createDialogContainerRef}
           className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
-          onInteractOutside={(event) => event.preventDefault()}
+          onInteractOutside={(event) => {
+            const target = event.target
+            if (target instanceof Element && target.closest("[data-slot='combobox-content']")) {
+              return
+            }
+            event.preventDefault()
+          }}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
+          <div ref={createDialogPopupLayerRef} className="pointer-events-none absolute inset-0 z-50" />
           <div className="flex min-h-0 flex-1 flex-col">
             <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
               <div className="flex items-start justify-between gap-4">
@@ -885,7 +993,8 @@ export function RoutesPageClient() {
                         setCreatePath(parsed.path || "/")
                         setCreateServiceName(parsed.serviceName)
                         setCreateServicePort(parsed.servicePort)
-                        setCreatePathType(parsed.pathType)
+                        setCreateProtocol(parsed.protocol)
+                        setCreateTlsSecretName(parsed.tlsSecretName)
                         setCreateIngressClassName(parsed.ingressClassName)
                         setCreateRuleViewMode("list")
                         setCreateYamlError(null)
@@ -1016,11 +1125,15 @@ export function RoutesPageClient() {
                             <div className="rounded-lg border px-4 py-4">
                               <div className="text-sm font-semibold">{createHost || "-"}</div>
                               <div className="mt-1 text-sm text-muted-foreground">
-                                {`${createPath || "-"} -> ${createServiceName || "-"}:${createServicePort || "-"} (${createPathType})`}
+                                {`${createProtocol} ${createPath || "-"} -> ${createServiceName || "-"}:${createServicePort || "-"}${createProtocol === "HTTPS" && createTlsSecretName ? ` / Secret: ${createTlsSecretName}` : ""}`}
                               </div>
                             </div>
                           ) : (
-                            <div className="rounded-lg border border-dashed px-4 py-10 text-center">
+                            <div
+                              className={`rounded-lg border border-dashed px-4 py-10 text-center ${
+                                ruleSaveAttempted ? "border-destructive" : ""
+                              }`}
+                            >
                               <div className={ruleSaveAttempted ? "text-sm font-semibold text-destructive" : "text-sm font-semibold"}>
                                 暂无路由规则
                               </div>
@@ -1053,132 +1166,163 @@ export function RoutesPageClient() {
                       <FieldGroup className="grid gap-6 md:grid-cols-2">
                         <Field data-invalid={Boolean(createHostError)}>
                           <FieldLabel htmlFor="route-create-host">域名</FieldLabel>
-                          <Input
-                            id="route-create-host"
-                            value={createHost}
-                            onChange={(event) => {
-                              setCreateHost(event.target.value)
-                              if (createHostError) setCreateHostError(null)
-                            }}
-                            placeholder="例如：example.com"
-                            autoComplete="off"
-                            aria-invalid={Boolean(createHostError)}
-                            disabled={creating}
-                          />
-                          {createHostError ? <FieldError>{createHostError}</FieldError> : null}
-                        </Field>
-                        <Field data-invalid={Boolean(createPathError)}>
-                          <FieldLabel htmlFor="route-create-path">路径</FieldLabel>
-                          <Input
-                            id="route-create-path"
-                            value={createPath}
-                            onChange={(event) => {
-                              setCreatePath(event.target.value)
-                              if (createPathError) setCreatePathError(null)
-                            }}
-                            placeholder="/"
-                            autoComplete="off"
-                            aria-invalid={Boolean(createPathError)}
-                            disabled={creating}
-                          />
-                          {createPathError ? <FieldError>{createPathError}</FieldError> : null}
-                        </Field>
-                        <Field data-invalid={Boolean(createServiceError)}>
-                          <FieldLabel htmlFor="route-create-service">服务</FieldLabel>
-                          <Select
-                            value={createServiceName}
-                            onValueChange={(value) => {
-                              setCreateServiceName(value)
-                              if (createServiceError) setCreateServiceError(null)
-                              const next = serviceOptions.find((item) => item.name === value)
-                              if (next?.ports[0]) setCreateServicePort(String(next.ports[0]))
-                            }}
-                            disabled={creating}
-                          >
-                            <SelectTrigger id="route-create-service" aria-invalid={Boolean(createServiceError)}>
-                              <SelectValue placeholder="请选择服务" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectGroup>
-                                {serviceOptions.length > 0 ? (
-                                  serviceOptions.map((option) => (
-                                    <SelectItem key={option.name} value={option.name}>
-                                      {option.name}
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <SelectItem value="__none__" disabled>
-                                    当前项目暂无可选服务
-                                  </SelectItem>
-                                )}
-                              </SelectGroup>
-                            </SelectContent>
-                          </Select>
-                          {createServiceError ? <FieldError>{createServiceError}</FieldError> : null}
-                        </Field>
-                        <Field data-invalid={Boolean(createServicePortError)}>
-                          <FieldLabel htmlFor="route-create-service-port">服务端口</FieldLabel>
-                          {selectedServicePorts.length > 0 ? (
-                            <Select
-                              value={createServicePort}
-                              onValueChange={(value) => {
-                                setCreateServicePort(value)
-                                if (createServicePortError) setCreateServicePortError(null)
-                              }}
-                              disabled={creating}
-                            >
-                              <SelectTrigger id="route-create-service-port" aria-invalid={Boolean(createServicePortError)}>
-                                <SelectValue placeholder="请选择服务端口" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectGroup>
-                                  {selectedServicePorts.map((port) => (
-                                    <SelectItem key={`${port}`} value={`${port}`}>
-                                      {port}
-                                    </SelectItem>
-                                  ))}
-                                </SelectGroup>
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Input
-                              id="route-create-service-port"
-                              value={createServicePort}
+                                <InputGroup>
+                                  <InputGroupAddon>
+                                    <InputGroupText>域名</InputGroupText>
+                                  </InputGroupAddon>
+                                  <InputGroupInput
+                              id="route-create-host"
+                              value={createHost}
                               onChange={(event) => {
-                                setCreateServicePort(event.target.value.replace(/[^0-9]/g, ""))
-                                if (createServicePortError) setCreateServicePortError(null)
+                                setCreateHost(event.target.value)
+                                if (createHostError) setCreateHostError(null)
                               }}
-                              inputMode="numeric"
-                              placeholder="例如：80"
+                              placeholder=""
                               autoComplete="off"
-                              aria-invalid={Boolean(createServicePortError)}
+                              aria-invalid={Boolean(createHostError)}
                               disabled={creating}
                             />
-                          )}
-                          {createServicePortError ? <FieldError>{createServicePortError}</FieldError> : null}
+                          </InputGroup>
+                          {createHostError ? <FieldError>{createHostError}</FieldError> : null}
                         </Field>
-                        <Field className="md:col-span-2">
-                          <FieldLabel htmlFor="route-create-path-type">路径类型</FieldLabel>
+                        <Field>
+                          <FieldLabel htmlFor="route-create-protocol">协议</FieldLabel>
                           <Select
-                            value={createPathType}
+                            value={createProtocol}
                             onValueChange={(value) => {
-                              if (value === "Prefix" || value === "Exact" || value === "ImplementationSpecific") {
-                                setCreatePathType(value)
+                              if (value === "HTTP" || value === "HTTPS") {
+                                setCreateProtocol(value)
                               }
                             }}
                             disabled={creating}
                           >
-                            <SelectTrigger id="route-create-path-type">
+                            <SelectTrigger id="route-create-protocol">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectGroup>
-                                <SelectItem value="Prefix">Prefix</SelectItem>
-                                <SelectItem value="Exact">Exact</SelectItem>
-                                <SelectItem value="ImplementationSpecific">ImplementationSpecific</SelectItem>
+                                <SelectItem value="HTTP">HTTP</SelectItem>
+                                <SelectItem value="HTTPS">HTTPS</SelectItem>
                               </SelectGroup>
                             </SelectContent>
                           </Select>
+                        </Field>
+
+                        {createProtocol === "HTTPS" ? (
+                          <Field className="md:col-span-2" data-invalid={Boolean(createTlsSecretError)}>
+                            <FieldLabel htmlFor="route-create-secret">保密字典</FieldLabel>
+                            <Select
+                              value={createTlsSecretName}
+                              onValueChange={(value) => {
+                                setCreateTlsSecretName(value)
+                                if (createTlsSecretError) setCreateTlsSecretError(null)
+                              }}
+                              disabled={creating}
+                            >
+                              <SelectTrigger id="route-create-secret" aria-invalid={Boolean(createTlsSecretError)}>
+                                <SelectValue placeholder="请选择 Secret" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {secretOptions.length > 0 ? (
+                                    secretOptions.map((option) => (
+                                      <SelectItem key={option} value={option}>
+                                        {option}
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <SelectItem value="__none__" disabled>
+                                      当前项目暂无可选 Secret
+                                    </SelectItem>
+                                  )}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                            {createTlsSecretError ? <FieldError>{createTlsSecretError}</FieldError> : null}
+                          </Field>
+                        ) : null}
+
+                        <Field className="md:col-span-2">
+                          <FieldLabel>路径</FieldLabel>
+                          <div className="grid items-start gap-3 md:grid-cols-3">
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <InputGroup>
+                                  <InputGroupAddon>
+                                    <InputGroupText>路径</InputGroupText>
+                                  </InputGroupAddon>
+                                  <InputGroupInput
+                                    id="route-create-path"
+                                    value={createPath}
+                                    onChange={(event) => {
+                                      setCreatePath(event.target.value)
+                                      if (createPathError) setCreatePathError(null)
+                                    }}
+                                    placeholder="/"
+                                    autoComplete="off"
+                                    aria-invalid={Boolean(createPathError)}
+                                    disabled={creating}
+                                  />
+                                </InputGroup>
+                                {createPathError ? <p className="text-xs text-destructive">{createPathError}</p> : null}
+                              </div>
+
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <FilterCombobox
+                                  options={serviceOptions.map((option) => ({ id: option.name, name: option.name }))}
+                                  value={createServiceName}
+                                  onValueChange={(value) => {
+                                    setCreateServiceName(value)
+                                    setCreateServicePort("")
+                                    if (createServiceError) setCreateServiceError(null)
+                                    if (createServicePortError) setCreateServicePortError(null)
+                                  }}
+                                  placeholder="服务"
+                                  emptyText="当前项目暂无可选服务"
+                                  className="w-full"
+                                  disabled={creating}
+                                  contentContainer={createDialogPopupLayerRef}
+                                />
+                                {createServiceError ? <p className="text-xs text-destructive">{createServiceError}</p> : null}
+                              </div>
+
+                              <div className="flex min-w-0 flex-col gap-1">
+                                <Combobox
+                                  items={selectedServicePorts.map((port) => `${port}`)}
+                                  value={createServicePort.trim() ? createServicePort : null}
+                                  inputValue={createServicePort}
+                                  onInputValueChange={(value) => {
+                                    setCreateServicePort((value ?? "").replace(/[^0-9]/g, ""))
+                                    if (createServicePortError) setCreateServicePortError(null)
+                                  }}
+                                  onValueChange={(item) => {
+                                    setCreateServicePort((item ?? "").replace(/[^0-9]/g, ""))
+                                    if (createServicePortError) setCreateServicePortError(null)
+                                  }}
+                                  disabled={creating}
+                                >
+                                  <ComboboxInput
+                                    placeholder="端口"
+                                    className="w-full"
+                                    disabled={creating}
+                                    aria-invalid={Boolean(createServicePortError)}
+                                  />
+                                  <ComboboxContent
+                                    container={createDialogPopupLayerRef}
+                                    className="pointer-events-auto"
+                                  >
+                                    <ComboboxEmpty>未找到端口，可直接输入</ComboboxEmpty>
+                                    <ComboboxList>
+                                      {(item) => (
+                                        <ComboboxItem key={item} value={item}>
+                                          {item}
+                                        </ComboboxItem>
+                                      )}
+                                    </ComboboxList>
+                                  </ComboboxContent>
+                                </Combobox>
+                                {createServicePortError ? <p className="text-xs text-destructive">{createServicePortError}</p> : null}
+                              </div>
+                          </div>
                         </Field>
                       </FieldGroup>
                     </>

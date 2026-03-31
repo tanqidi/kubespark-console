@@ -24,6 +24,7 @@ interface FilterComboboxProps {
   emptyText?: string
   className?: string
   disabled?: boolean
+  contentContainer?: React.ComponentProps<typeof ComboboxContent>["container"]
 }
 
 export function FilterCombobox({
@@ -34,6 +35,7 @@ export function FilterCombobox({
   emptyText = "No items found.",
   className,
   disabled = false,
+  contentContainer,
 }: FilterComboboxProps) {
   const selectedOption = React.useMemo(
     () => options.find((option) => option.id === value) ?? null,
@@ -50,7 +52,10 @@ export function FilterCombobox({
       disabled={disabled}
     >
       <ComboboxInput placeholder={placeholder} className={className} disabled={disabled} />
-      <ComboboxContent className="duration-0 data-open:animate-none data-closed:animate-none">
+      <ComboboxContent
+        container={contentContainer}
+        className="pointer-events-auto duration-0 data-open:animate-none data-closed:animate-none"
+      >
         <ComboboxEmpty>{emptyText}</ComboboxEmpty>
         <ComboboxList>
           {(item) => (

@@ -15,6 +15,8 @@ export type CreateIngressInput = {
   serviceName: string
   servicePort: number
   pathType?: IngressPathType
+  protocol?: "HTTP" | "HTTPS"
+  tlsSecretName?: string
   ingressClassName?: string
   description?: string
 }
@@ -67,9 +69,15 @@ export async function createIngress(input: CreateIngressInput): Promise<void> {
   const path = normalizePath(input.path)
   const serviceName = normalizeServiceName(input.serviceName)
   const servicePort = normalizeServicePort(input.servicePort)
-  const pathType = input.pathType ?? "Prefix"
+  const pathType = input.pathType ?? "ImplementationSpecific"
+  const protocol = input.protocol ?? "HTTP"
+  const tlsSecretName = input.tlsSecretName?.trim() ?? ""
   const ingressClassName = input.ingressClassName?.trim() ?? ""
   const description = input.description?.trim() ?? ""
+
+  if (protocol === "HTTPS" && !tlsSecretName) {
+    throw new Error("请选择 HTTPS 保密字典")
+  }
 
   const annotations: Record<string, string> = {}
   if (description) annotations.description = description
@@ -84,6 +92,16 @@ export async function createIngress(input: CreateIngressInput): Promise<void> {
     },
     spec: {
       ...(ingressClassName ? { ingressClassName } : {}),
+      ...(protocol === "HTTPS"
+        ? {
+            tls: [
+              {
+                hosts: [host],
+                secretName: tlsSecretName,
+              },
+            ],
+          }
+        : {}),
       rules: [
         {
           host,
