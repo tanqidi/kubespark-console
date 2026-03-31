@@ -614,8 +614,6 @@ export function CreateServiceDialog({
   const [pendingDeletePortId, setPendingDeletePortId] = React.useState<string | null>(null)
   const [selectorAddPromptOpen, setSelectorAddPromptOpen] = React.useState(false)
   const [selectorAddPromptShown, setSelectorAddPromptShown] = React.useState(false)
-  const namespaceDisplayName =
-    namespaceOptions.find((option) => option.id === namespace)?.name ?? namespace
   const lastFocusedPortErrorFieldRef = React.useRef<string>("")
   const isBusy = checkingNext || creating
 
@@ -1418,35 +1416,32 @@ export function CreateServiceDialog({
 
                 <Field data-invalid={Boolean(namespaceError)}>
                   <FieldLabel htmlFor="service-create-namespace">项目</FieldLabel>
-                  {isEditMode ? (
-                    <Input id="service-create-namespace" value={namespaceDisplayName} disabled />
-                  ) : (
-                    <Select
-                      value={namespace}
-                      onValueChange={(value) => {
-                        setNamespace(value)
-                        if (namespaceError) setNamespaceError(null)
-                        if (stepError) setStepError(null)
-                      }}
-                      disabled={isBusy}
+                  <Select
+                    value={namespace}
+                    onValueChange={(value) => {
+                      if (isEditMode) return
+                      setNamespace(value)
+                      if (namespaceError) setNamespaceError(null)
+                      if (stepError) setStepError(null)
+                    }}
+                    disabled={isBusy || isEditMode}
+                  >
+                    <SelectTrigger
+                      id="service-create-namespace"
+                      aria-invalid={Boolean(namespaceError)}
                     >
-                      <SelectTrigger
-                        id="service-create-namespace"
-                        aria-invalid={Boolean(namespaceError)}
-                      >
-                        <SelectValue placeholder="请选择项目" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {namespaceOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  )}
+                      <SelectValue placeholder="请选择项目" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {namespaceOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                   {namespaceError ? (
                     <FieldError>{namespaceError}</FieldError>
                   ) : (
