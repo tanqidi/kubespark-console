@@ -1,6 +1,6 @@
 # KubeSpark React 架构细节
 
-更新时间：2026-03-25
+更新时间：2026-03-31
 
 ## 1. 目录结构（当前）
 
@@ -64,7 +64,7 @@ app/
 | Workload(Deploy/STS/DS) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Pod | ✅ | ⏳ | ⏳ | ✅ | ✅ |
 | Ingress | ✅ | ⏳ | ⏳ | ✅ | ✅ |
-| PV/PVC | ✅ | ⏳ | ⏳ | ✅ | ✅ |
+| PV/PVC | ✅ | ✅ | ⏳ | ✅ | ✅ |
 | StorageClass | ✅ | ⏳ | ⏳ | ✅ | ✅ |
 | Node | ✅ | N/A | N/A | N/A | ⏳ |
 
@@ -156,9 +156,17 @@ app/
 
 ## 12. 当前未覆盖项
 
-- Ingress / PV(PVC) / StorageClass 的创建编辑链路
+- Ingress / StorageClass 的创建编辑链路
 - Node YAML 查看
 - PATCH 透传
+
+## 14. Dialog 内 Combobox 约定
+
+- `components/ui/combobox.tsx` 的 `ComboboxContent` 已支持 `container` 参数，透传给 `ComboboxPrimitive.Portal`。
+- 在弹窗中使用 `Combobox` 时，必须将 popup portal 到弹窗内部容器，示例：
+  - `const dialogContainerRef = React.useRef<HTMLDivElement | null>(null)`
+  - `<div ref={dialogContainerRef}>...<ComboboxContent anchor={anchor} container={dialogContainerRef} />...</div>`
+- 目的：避免 portal 到 `body` 后被 Dialog 模态层影响，出现下拉项 hover/选中不生效的问题。
 
 ## 13. 终端建议（Windows）
 

@@ -544,6 +544,7 @@ export function VolumesPageClient() {
   const [createPvHostPathError, setCreatePvHostPathError] = React.useState<string | null>(null)
   const [createPvSubmitError, setCreatePvSubmitError] = React.useState<string | null>(null)
   const createPvNodeAnchor = useComboboxAnchor()
+  const createPvDialogContainerRef = React.useRef<HTMLDivElement | null>(null)
 
   const handleViewPvcYaml = React.useCallback((row: PersistentVolumeClaimRow) => {
     setYamlOpen(true)
@@ -1735,10 +1736,9 @@ export function VolumesPageClient() {
       >
         <DialogContent
           className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
-          onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div ref={createPvDialogContainerRef} className="flex min-h-0 flex-1 flex-col">
             <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -2077,7 +2077,7 @@ export function VolumesPageClient() {
                             )}
                           </ComboboxValue>
                         </ComboboxChips>
-                        <ComboboxContent anchor={createPvNodeAnchor}>
+                        <ComboboxContent anchor={createPvNodeAnchor} container={createPvDialogContainerRef}>
                           <ComboboxEmpty>未找到节点</ComboboxEmpty>
                           <ComboboxList>
                             {(item) => (

@@ -1,6 +1,6 @@
 # 开发进度（CRUD 首期）
 
-更新时间：2026-03-25
+更新时间：2026-03-31
 
 ## 1. 范围说明
 
@@ -55,7 +55,7 @@
 | 定时任务（CronJob） | ✅ | ✅ | ✅ | ✅ | ✅ | 复用 Job 页面与创建编辑流程 |
 | 容器组（Pod） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 以运维查看/删除为主 |
 | 应用路由（Ingress） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 当前无创建/编辑弹窗 |
-| 存储卷（PV/PVC） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 当前无创建/编辑弹窗 |
+| 存储卷（PV/PVC） | ✅ | ✅ | ⏳ | ✅ | ✅ | 已支持 PV/PVC 创建（表单 + YAML） |
 | 存储类（StorageClass） | ✅ | ⏳ | ⏳ | ✅ | ✅ | 当前无创建/编辑弹窗 |
 | 节点（Node） | ✅ | N/A | N/A | N/A | ⏳ | 当前以列表信息为主 |
 | 工作负载总览 | ✅ | ⏳ | ⏳ | ✅ | ✅ | 汇总页，不直接承载创建 |
@@ -66,6 +66,7 @@
 
 - Job 创建剩余步骤补全（当前部分步骤为占位文案）。
 - Ingress、PV/PVC、StorageClass 的创建/编辑能力。
+- Ingress、StorageClass 的创建/编辑能力。
 
 ### 中优先级
 
@@ -82,7 +83,13 @@
 
 ## 6. 下一阶段建议
 
-1. 先补齐 CRUD 缺口资源（Job 编辑、Ingress/Volume/StorageClass 创建编辑）。  
+1. 先补齐 CRUD 缺口资源（Job 编辑、Ingress/StorageClass 创建编辑）。  
 2. 完成 Job/CronJob 表单剩余步骤，确保“从表单到资源体”闭环稳定。  
 3. 最后再评估是否进入监控模块（作为二期，不影响首期上线）。
+
+## 7. UI 交互约定（新增）
+
+- Dialog 内使用 `Combobox`（尤其 `ComboboxChips` 多选）时，`ComboboxContent` 必须显式指定 `container` 为弹窗内部容器 `ref`。
+- 推荐写法：`<ComboboxContent anchor={anchor} container={dialogContainerRef}>`。
+- 原因：默认 portal 到 `body` 时，可能被 Dialog 的焦点/外部交互层拦截，表现为“列表可见但 hover/选中失效”。
 
