@@ -425,7 +425,7 @@ export function RoutesPageClient() {
   const [createTlsSecretName, setCreateTlsSecretName] = React.useState("")
   const [createRules, setCreateRules] = React.useState<RouteRuleItem[]>([])
   const [editingRuleIndex, setEditingRuleIndex] = React.useState<number | null>(null)
-  const [pendingDeleteRuleIndex, setPendingDeleteRuleIndex] = React.useState<number | null>(null)
+  const [pendingDeleteRuleHostKey, setPendingDeleteRuleHostKey] = React.useState<string | null>(null)
   const [createIngressClassName, setCreateIngressClassName] = React.useState("")
 
   const [createNameError, setCreateNameError] = React.useState<string | null>(null)
@@ -444,22 +444,52 @@ export function RoutesPageClient() {
     createServicePortRef.current = createServicePort
   }, [createServicePort])
 
-  const selectedServicePorts = React.useMemo(() => {
-    const selected = serviceOptions.find((item) => item.name === createServiceName)
-    return selected?.ports ?? []
-  }, [createServiceName, serviceOptions])
   const hasConfiguredRule = React.useMemo(
     () => createRules.length > 0,
     [createRules]
   )
   const currentHostKey = React.useMemo(() => normalizeHostKey(createHost), [createHost])
+  const editingSourceHostKey = React.useMemo(() => {
+    if (editingRuleIndex === null) return null
+    const target = createRules[editingRuleIndex]
+    return target ? normalizeHostKey(target.host) : null
+  }, [createRules, editingRuleIndex])
+  const activeHostSourceKey = editingSourceHostKey ?? currentHostKey
   const currentHostPathRuleIndexes = React.useMemo(() => {
-    if (!currentHostKey) return []
+    if (!activeHostSourceKey) return []
     return createRules.reduce<number[]>((acc, rule, index) => {
-      if (normalizeHostKey(rule.host) === currentHostKey) acc.push(index)
+      if (normalizeHostKey(rule.host) === activeHostSourceKey) acc.push(index)
       return acc
     }, [])
-  }, [createRules, currentHostKey])
+  }, [activeHostSourceKey, createRules])
+  const routeRuleHostGroups = React.useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        host: string
+        protocol: RouteProtocol
+        tlsSecretName: string
+        summaries: string[]
+      }
+    >()
+    createRules.forEach((rule) => {
+      const hostKey = normalizeHostKey(rule.host)
+      if (!hostKey) return
+      const summary = `${rule.path || "-"} -> ${rule.serviceName || "-"}:${rule.servicePort || "-"}`
+      const existing = groups.get(hostKey)
+      if (existing) {
+        existing.summaries.push(summary)
+        return
+      }
+      groups.set(hostKey, {
+        host: rule.host || "-",
+        protocol: rule.protocol,
+        tlsSecretName: rule.tlsSecretName,
+        summaries: [summary],
+      })
+    })
+    return Array.from(groups.entries()).map(([hostKey, group]) => ({ hostKey, ...group }))
+  }, [createRules])
   const canNavigateCreateSteps = !creating && !(createStep === "rule" && createRuleViewMode === "edit")
 
   const resetCreateForm = React.useCallback(() => {
@@ -481,7 +511,7 @@ export function RoutesPageClient() {
     setCreateTlsSecretName("")
     setCreateRules([])
     setEditingRuleIndex(null)
-    setPendingDeleteRuleIndex(null)
+    setPendingDeleteRuleHostKey(null)
     setCreateIngressClassName("")
     setCreateNameError(null)
     setCreateNamespaceError(null)
@@ -693,7 +723,7 @@ export function RoutesPageClient() {
     setCreateServicePortError(null)
     if (hostError || tlsSecretError) return false
     const targetIndexes = createRules.reduce<number[]>((acc, rule, index) => {
-      if (normalizeHostKey(rule.host) === currentHostKey) acc.push(index)
+      if (normalizeHostKey(rule.host) === activeHostSourceKey) acc.push(index)
       return acc
     }, [])
     if (targetIndexes.length === 0) {
@@ -738,7 +768,7 @@ export function RoutesPageClient() {
     setCreateRuleViewMode(options?.stayInEdit ? "edit" : "list")
     setEditingRuleIndex(null)
     return true
-  }, [createHost, createProtocol, createRules, createTlsSecretName, currentHostKey])
+  }, [activeHostSourceKey, createHost, createProtocol, createRules, createTlsSecretName])
 
   const addPathRule = React.useCallback(() => {
     setCreateRules((current) => [
@@ -1013,7 +1043,9 @@ export function RoutesPageClient() {
     setPendingDeleteRow(row)
   }, [])
 
-  const requestEditRuleItem = React.useCallback((index: number) => {
+  const requestEditRuleItem = React.useCallback((hostKey: string) => {
+    const index = createRules.findIndex((rule) => normalizeHostKey(rule.host) === hostKey)
+    if (index < 0) return
     const target = createRules[index]
     if (!target) return
     setCreateHost(target.host)
@@ -1041,21 +1073,19 @@ export function RoutesPageClient() {
     }
   }, [editingRuleIndex])
 
-  const requestDeleteRuleItem = React.useCallback((index: number) => {
-    setPendingDeleteRuleIndex(index)
+  const requestDeleteRuleItem = React.useCallback((hostKey: string) => {
+    setPendingDeleteRuleHostKey(hostKey)
   }, [])
 
   const handleConfirmDeleteRuleItem = React.useCallback(() => {
-    if (pendingDeleteRuleIndex === null) return
-    setCreateRules((current) => current.filter((_, index) => index !== pendingDeleteRuleIndex))
-    if (editingRuleIndex !== null && editingRuleIndex === pendingDeleteRuleIndex) {
-      setEditingRuleIndex(null)
-      setCreateRuleViewMode("list")
-    } else if (editingRuleIndex !== null && editingRuleIndex > pendingDeleteRuleIndex) {
-      setEditingRuleIndex(editingRuleIndex - 1)
-    }
-    setPendingDeleteRuleIndex(null)
-  }, [editingRuleIndex, pendingDeleteRuleIndex])
+    if (!pendingDeleteRuleHostKey) return
+    setCreateRules((current) =>
+      current.filter((rule) => normalizeHostKey(rule.host) !== pendingDeleteRuleHostKey)
+    )
+    setEditingRuleIndex(null)
+    setCreateRuleViewMode("list")
+    setPendingDeleteRuleHostKey(null)
+  }, [pendingDeleteRuleHostKey])
 
   const requestEdit = React.useCallback((row: RouteRow) => {
     if (creating || checkingCreateNext) return
@@ -1468,16 +1498,16 @@ export function RoutesPageClient() {
                         <div className="flex flex-col gap-0 pb-4">
                           {hasConfiguredRule ? (
                             <div className="flex flex-col gap-3">
-                              {createRules.map((rule, index) => (
+                              {routeRuleHostGroups.map((group) => (
                                 <div
-                                  key={`${rule.host}-${rule.path}-${rule.serviceName}-${rule.servicePort}-${index}`}
+                                  key={`rule-host-${group.hostKey}`}
                                   className="group/item rounded-lg border px-4 py-4 hover:bg-muted"
                                 >
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
-                                      <div className="text-sm font-semibold">{rule.host || "-"}</div>
+                                      <div className="text-sm font-semibold">{group.host || "-"}</div>
                                       <div className="mt-1 text-sm text-muted-foreground">
-                                        {`${rule.protocol} ${rule.path || "-"} -> ${rule.serviceName || "-"}:${rule.servicePort || "-"}${rule.protocol === "HTTPS" && rule.tlsSecretName ? ` / Secret: ${rule.tlsSecretName}` : ""}`}
+                                        {`${group.protocol} ${group.summaries.join("；")}${group.protocol === "HTTPS" && group.tlsSecretName ? ` / Secret: ${group.tlsSecretName}` : ""}`}
                                       </div>
                                     </div>
                                     <div className="pointer-events-none flex items-center gap-2 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
@@ -1485,7 +1515,7 @@ export function RoutesPageClient() {
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => requestEditRuleItem(index)}
+                                        onClick={() => requestEditRuleItem(group.hostKey)}
                                         disabled={creating}
                                       >
                                         <IconPencil data-icon="inline-start" />
@@ -1495,7 +1525,7 @@ export function RoutesPageClient() {
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => requestDeleteRuleItem(index)}
+                                        onClick={() => requestDeleteRuleItem(group.hostKey)}
                                         disabled={creating}
                                       >
                                         <IconTrash data-icon="inline-start" />
@@ -1797,9 +1827,9 @@ export function RoutesPageClient() {
 
       <MonacoViewerDialog title="查看YAML" open={yamlOpen} onOpenChange={setYamlOpen} value={yamlContent} language="yaml" loading={yamlLoading} error={yamlError} />
       <DeleteConfirmDialog
-        open={pendingDeleteRuleIndex !== null}
+        open={pendingDeleteRuleHostKey !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingDeleteRuleIndex(null)
+          if (!open) setPendingDeleteRuleHostKey(null)
         }}
         title="删除路由规则"
         description="确定删除该路由规则吗？"
