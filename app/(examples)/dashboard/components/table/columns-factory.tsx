@@ -243,6 +243,7 @@ export function createColumns<TData extends Record<string, unknown>>(
   if (includeActions) {
     defs.push({
       id: "actions",
+      header: "操作",
       cell: ({ row }) =>
         visibleActionItems.length === 0 ? (
           <Button
