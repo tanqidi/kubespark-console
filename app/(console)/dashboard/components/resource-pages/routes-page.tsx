@@ -3,14 +3,14 @@
 import * as React from "react"
 import { IconEye, IconTrash } from "@tabler/icons-react"
 
-import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
-// import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
+import { DataTable } from "@/app/(console)/dashboard/components/data-table"
+// import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
   renderNameDescriptionCell,
   type ColumnConfig,
-} from "@/app/(examples)/dashboard/components/table/columns-factory"
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
+} from "@/app/(console)/dashboard/components/table/columns-factory"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {
   fetchRouteRows,
   type RouteResourceRow,

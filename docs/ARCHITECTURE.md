@@ -15,7 +15,7 @@
 ## 2. 分层架构
 
 ```text
-UI 层 (app/(examples)/dashboard/components)
+UI 层 (app/(console)/dashboard/components)
   ├─ 资源页面：workloads/jobs/pods/services/routes/... 
   ├─ 资源弹窗：create-*-dialog.tsx
   ├─ 共享片段：container-list-panel.tsx / storage-volume-list.tsx
@@ -98,7 +98,7 @@ UI 层 (app/(examples)/dashboard/components)
 
 ## 5. 路由与页面组织
 
-- `app/(examples)/dashboard/[...slug]/page.tsx`：按 slug 分发页面组件
+- `app/(console)/dashboard/[...slug]/page.tsx`：按 slug 分发页面组件
 - `resource-pages/*`：资源页与资源弹窗
 - 当前主页面覆盖：`nodes/projects/workloads/jobs/pods/services/routes/configmaps/secrets/volumes/storageclasses`
 

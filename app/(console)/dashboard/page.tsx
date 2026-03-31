@@ -1,10 +1,10 @@
 "use client"
 
-import { ChartAreaInteractive } from "@/app/(examples)/dashboard/components/chart-area-interactive"
-import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
-import { createColumns } from "@/app/(examples)/dashboard/components/table/columns-factory"
-import { SectionCards } from "@/app/(examples)/dashboard/components/section-cards"
-import data from "@/app/(examples)/dashboard/data.json"
+import { ChartAreaInteractive } from "@/app/(console)/dashboard/components/chart-area-interactive"
+import { DataTable } from "@/app/(console)/dashboard/components/data-table"
+import { createColumns } from "@/app/(console)/dashboard/components/table/columns-factory"
+import { SectionCards } from "@/app/(console)/dashboard/components/section-cards"
+import data from "@/app/(console)/dashboard/data.json"
 
 type Row = (typeof data)[number]
 

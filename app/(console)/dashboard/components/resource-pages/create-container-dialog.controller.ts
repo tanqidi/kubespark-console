@@ -45,7 +45,7 @@ import {
   type ProbeDraftField,
   type ProbeSectionKey,
   type ProbeSectionState,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog.logic"
 
 type CreateContainerDialogControllerProps = {
   open: boolean

@@ -3,9 +3,9 @@
 import * as React from "react"
 import { IconInnerShadowTop } from "@tabler/icons-react"
 
-import { kubesparkSidebarMenu } from "@/app/(examples)/dashboard/components/sidebar-data"
-import { NavMain } from "@/app/(examples)/dashboard/components/nav-main"
-import { NavUser } from "@/app/(examples)/dashboard/components/nav-user"
+import { kubesparkSidebarMenu } from "@/app/(console)/dashboard/components/sidebar-data"
+import { NavMain } from "@/app/(console)/dashboard/components/nav-main"
+import { NavUser } from "@/app/(console)/dashboard/components/nav-user"
 import {
   Sidebar,
   SidebarContent,

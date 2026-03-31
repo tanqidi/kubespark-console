@@ -24,7 +24,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table"
 
-import { TableToolbar } from "@/app/(examples)/dashboard/components/table/table-toolbar"
+import { TableToolbar } from "@/app/(console)/dashboard/components/table/table-toolbar"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {

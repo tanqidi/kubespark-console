@@ -13,8 +13,8 @@ import { parse, stringify } from "yaml"
 
 import { checkConfigMapExists } from "@/app/lib/kubespark/configmaps"
 import { checkSecretExists } from "@/app/lib/kubespark/secrets"
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
-import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,

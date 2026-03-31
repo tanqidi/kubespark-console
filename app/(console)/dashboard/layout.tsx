@@ -1,8 +1,8 @@
 import { cookies } from "next/headers"
 
-import { DashboardShell } from "@/app/(examples)/dashboard/components/dashboard-shell"
+import { DashboardShell } from "@/app/(console)/dashboard/components/dashboard-shell"
 
-import "@/app/(examples)/dashboard/theme.css"
+import "@/app/(console)/dashboard/theme.css"
 
 export default async function DashboardLayout({
   children,

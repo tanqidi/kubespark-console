@@ -9,8 +9,8 @@ import {
   IconStack2,
 } from "@tabler/icons-react"
 
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
-import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,10 +23,10 @@ import {
 } from "@/components/ui/dialog"
 import {
   CreateContainerDialog,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog"
+} from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog"
 import type {
   CreateJobDialogProps,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
 import {
   MonacoEditor,
   MONACO_OPTIONS,
@@ -34,7 +34,7 @@ import {
   POD_REQUIRED_MESSAGE,
   normalizeIntegerInput,
   resolveStepDescription,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
 import {
   Field,
   FieldDescription,
@@ -54,12 +54,12 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { useCreateJobDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.controller"
-import { ContainerListPanel } from "@/app/(examples)/dashboard/components/resource-pages/container-list-panel"
-import { StorageVolumeList } from "@/app/(examples)/dashboard/components/resource-pages/storage-volume-list"
+import { useCreateJobDialogController } from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.controller"
+import { ContainerListPanel } from "@/app/(console)/dashboard/components/resource-pages/container-list-panel"
+import { StorageVolumeList } from "@/app/(console)/dashboard/components/resource-pages/storage-volume-list"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
-export type { JobDialogInitialValues } from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+export type { JobDialogInitialValues } from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
 function resolvePvcNames(items: unknown[]): string[] {
   const names = items
     .map((item) => {

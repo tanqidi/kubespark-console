@@ -37,7 +37,7 @@ app/
 
 ## 2. 路由到页面映射
 
-`app/(examples)/dashboard/[...slug]/page.tsx` 按 `slug[0]` 映射页面：
+`app/(console)/dashboard/[...slug]/page.tsx` 按 `slug[0]` 映射页面：
 
 - `nodes` -> `NodesPageClient`
 - `projects` -> `ProjectsPageClient`

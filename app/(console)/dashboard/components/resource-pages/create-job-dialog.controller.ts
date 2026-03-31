@@ -8,7 +8,7 @@ import type {
   CreateJobDialogProps,
   CreateStep,
   JobDialogSnapshot,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
 import {
   CONTAINER_PORT_PROTOCOL_SET,
   CRON_SCHEDULE_REQUIRED_MESSAGE,
@@ -38,8 +38,8 @@ import {
   toOptionalNonNegativeInt,
   validateContainerPorts,
   validateName,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
-import { useContainerEditor } from "@/app/(examples)/dashboard/components/resource-pages/use-container-editor"
+} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
+import { useContainerEditor } from "@/app/(console)/dashboard/components/resource-pages/use-container-editor"
 
 type StorageVolumeKind = "persistent" | "ephemeral" | "hostPath"
 type StorageMountMode = "none" | "ro" | "rw"

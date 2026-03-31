@@ -2,11 +2,11 @@
 
 import * as React from "react"
 
-import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
-// import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
+import { DataTable } from "@/app/(console)/dashboard/components/data-table"
+// import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
-} from "@/app/(examples)/dashboard/components/table/columns-factory"
+} from "@/app/(console)/dashboard/components/table/columns-factory"
 import { fetchNodeResourceRows, type NodeResourceRow } from "@/app/lib/kubespark/nodes"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"

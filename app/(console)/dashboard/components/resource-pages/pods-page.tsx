@@ -3,13 +3,13 @@
 import * as React from "react"
 import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
 
-import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
-import { CreatePodDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-pod-dialog"
-// import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
+import { DataTable } from "@/app/(console)/dashboard/components/data-table"
+import { CreatePodDialog } from "@/app/(console)/dashboard/components/resource-pages/create-pod-dialog"
+// import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
   renderNameDescriptionCell,
-} from "@/app/(examples)/dashboard/components/table/columns-factory"
+} from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
   deletePod,
   createPod,
@@ -19,7 +19,7 @@ import {
   type PodResourceRow,
 } from "@/app/lib/kubespark/pods"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"

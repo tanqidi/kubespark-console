@@ -7,8 +7,8 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/app/(examples)/dashboard/components/app-sidebar"
-import { SiteHeader } from "@/app/(examples)/dashboard/components/site-header"
+import { AppSidebar } from "@/app/(console)/dashboard/components/app-sidebar"
+import { SiteHeader } from "@/app/(console)/dashboard/components/site-header"
 
 type DashboardShellProps = {
   children: React.ReactNode

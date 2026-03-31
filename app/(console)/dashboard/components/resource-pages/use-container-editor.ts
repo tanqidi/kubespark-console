@@ -8,7 +8,7 @@ import type {
   ContainerPortProtocol,
   ContainerProbeMap,
   ContainerSecurityContextDraft,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog.logic"
 import {
   resolveFirstContainerPortErrorFieldId,
   resolveFirstInvalidFieldId,

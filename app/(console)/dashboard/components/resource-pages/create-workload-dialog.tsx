@@ -10,8 +10,8 @@ import {
   IconTrash,
 } from "@tabler/icons-react"
 
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
-import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -24,10 +24,10 @@ import {
 } from "@/components/ui/dialog"
 import {
   CreateContainerDialog,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog"
+} from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog"
 import type {
   CreateWorkloadDialogProps,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.logic"
 import {
   MonacoEditor,
   MONACO_OPTIONS,
@@ -35,7 +35,7 @@ import {
   POD_REQUIRED_MESSAGE,
   normalizeIntegerInput,
   resolveStepDescription,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.logic"
 import {
   Field,
   FieldDescription,
@@ -62,13 +62,13 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { useCreateWorkloadDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.controller"
-import { ContainerListPanel } from "@/app/(examples)/dashboard/components/resource-pages/container-list-panel"
-import { StorageVolumeList } from "@/app/(examples)/dashboard/components/resource-pages/storage-volume-list"
-import { AdvancedToggleCard } from "@/app/(examples)/dashboard/components/resource-pages/advanced-toggle-card"
+import { useCreateWorkloadDialogController } from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.controller"
+import { ContainerListPanel } from "@/app/(console)/dashboard/components/resource-pages/container-list-panel"
+import { StorageVolumeList } from "@/app/(console)/dashboard/components/resource-pages/storage-volume-list"
+import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
-export type { WorkloadDialogInitialValues } from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
+export type { WorkloadDialogInitialValues } from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.logic"
 function resolveResourceNames(items: unknown[]): string[] {
   const names = items
     .map((item) => {

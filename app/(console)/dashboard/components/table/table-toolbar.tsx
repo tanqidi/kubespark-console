@@ -4,7 +4,7 @@ import * as React from "react"
 import { IconChevronDown, IconLayoutColumns, IconPlus, IconTrash } from "@tabler/icons-react"
 import { type Column, type Table } from "@tanstack/react-table"
 
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {

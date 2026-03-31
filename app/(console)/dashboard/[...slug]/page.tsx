@@ -12,12 +12,12 @@ import {
   StorageClassesPageClient,
   VolumesPageClient,
   WorkloadsPageClient,
-} from "@/app/(examples)/dashboard/components/resource-pages"
-import { ResourceDetailPage } from "@/app/(examples)/dashboard/components/resource-pages/resource-detail-page"
+} from "@/app/(console)/dashboard/components/resource-pages"
+import { ResourceDetailPage } from "@/app/(console)/dashboard/components/resource-pages/resource-detail-page"
 import {
   WorkloadDetailTemplate,
   type WorkloadDetailKind,
-} from "@/app/(examples)/dashboard/components/resource-pages/workload-detail-templates"
+} from "@/app/(console)/dashboard/components/resource-pages/workload-detail-templates"
 
 const sectionRenderers = {
   nodes: NodesPageClient,

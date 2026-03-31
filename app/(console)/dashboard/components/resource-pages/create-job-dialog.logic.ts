@@ -14,13 +14,13 @@ import type {
   ContainerProbeMap,
   ContainerSecurityContextDraft,
   ContainerType,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog.logic"
 import type { ContainerPortFieldErrors } from "@/app/lib/kubespark/form-validation"
 import { parse, stringify } from "yaml"
 import {
   applyStorageToVolumesAndMounts,
   parseStorageListFromPodSpec,
-} from "@/app/(examples)/dashboard/components/resource-pages/pod-storage-utils"
+} from "@/app/(console)/dashboard/components/resource-pages/pod-storage-utils"
 export type NamespaceOption = {
   id: string
   name: string

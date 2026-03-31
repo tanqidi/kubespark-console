@@ -13,11 +13,11 @@ import {
 import { parse, stringify } from "yaml"
 
 import { checkServiceExists, createService, updateService } from "@/app/lib/kubespark/services"
-import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {
   WorkloadPickerDialog,
-} from "@/app/(examples)/dashboard/components/resource-pages/workload-picker-dialog"
+} from "@/app/(console)/dashboard/components/resource-pages/workload-picker-dialog"
 import {
   AlertDialog,
   AlertDialogAction,

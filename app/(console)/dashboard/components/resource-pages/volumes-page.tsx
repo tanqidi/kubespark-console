@@ -6,15 +6,15 @@ import { IconAdjustments, IconDatabase, IconEye, IconSettings2, IconTrash } from
 import dynamic from "next/dynamic"
 import { parse, stringify } from "yaml"
 
-import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
-import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
-// import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
+import { DataTable } from "@/app/(console)/dashboard/components/data-table"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
+// import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
   renderNameDescriptionCell,
   type ColumnConfig,
-} from "@/app/(examples)/dashboard/components/table/columns-factory"
+} from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
   fetchVolumeRows,
   type PersistentVolumeClaimResourceRow,

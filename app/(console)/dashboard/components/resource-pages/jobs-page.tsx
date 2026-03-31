@@ -3,20 +3,20 @@
 import * as React from "react"
 import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
 
-import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import {
   CreateJobDialog,
   type JobDialogInitialValues,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog"
-// import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
+} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog"
+// import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
   renderNameDescriptionCell,
   type ColumnConfig,
-} from "@/app/(examples)/dashboard/components/table/columns-factory"
+} from "@/app/(console)/dashboard/components/table/columns-factory"
 import { fetchResourceByName } from "@/app/lib/kubespark/common"
 import { createJob, updateJob } from "@/app/lib/kubespark/jobs"
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { fetchJobRows, type JobResourceRow } from "@/app/lib/kubespark/resource-rows"
 import { deleteJob } from "@/app/lib/kubespark/resource-delete"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"

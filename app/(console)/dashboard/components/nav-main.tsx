@@ -5,8 +5,8 @@ import { IconCloudBolt } from "@tabler/icons-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-import { SidebarAboutDialog } from "@/app/(examples)/dashboard/components/sidebar-about-dialog"
-import type { SidebarMenuItem as KSMenuItem } from "@/app/(examples)/dashboard/components/sidebar-data"
+import { SidebarAboutDialog } from "@/app/(console)/dashboard/components/sidebar-about-dialog"
+import type { SidebarMenuItem as KSMenuItem } from "@/app/(console)/dashboard/components/sidebar-data"
 import {
   SidebarGroup,
   SidebarGroupContent,

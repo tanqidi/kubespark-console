@@ -10,7 +10,7 @@ import type {
   CreateStep,
   SchedulingPolicy,
   WorkloadDialogSnapshot,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.logic"
 import {
   CONTAINER_PORT_PROTOCOL_SET,
   POD_REQUIRED_MESSAGE,
@@ -37,8 +37,8 @@ import {
   toDnsLabelFragment,
   validateContainerPorts,
   validateName,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-workload-dialog.logic"
-import { useContainerEditor } from "@/app/(examples)/dashboard/components/resource-pages/use-container-editor"
+} from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.logic"
+import { useContainerEditor } from "@/app/(console)/dashboard/components/resource-pages/use-container-editor"
 
 type StorageVolumeKind = "persistent" | "ephemeral" | "hostPath"
 type StorageMountMode = "none" | "ro" | "rw"

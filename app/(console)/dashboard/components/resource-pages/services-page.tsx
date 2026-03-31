@@ -3,18 +3,18 @@
 import * as React from "react"
 import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
 
-import { DataTable } from "@/app/(examples)/dashboard/components/data-table"
+import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import {
   CreateServiceDialog,
   type ServiceDialogInitialValues,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-service-dialog"
-// import { ResourceLoadingState } from "@/app/(examples)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
+} from "@/app/(console)/dashboard/components/resource-pages/create-service-dialog"
+// import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
   renderNameDescriptionCell,
   type ColumnConfig,
-} from "@/app/(examples)/dashboard/components/table/columns-factory"
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
+} from "@/app/(console)/dashboard/components/table/columns-factory"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { fetchResourceByName } from "@/app/lib/kubespark/common"
 import {
   fetchServiceRows,

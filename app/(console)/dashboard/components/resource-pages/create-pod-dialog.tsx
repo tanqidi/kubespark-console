@@ -3,12 +3,12 @@
 import * as React from "react"
 import { IconBraces, IconDatabase, IconPencil, IconSettings2, IconStack2, IconTrash } from "@tabler/icons-react"
 import { parse, stringify } from "yaml"
-import { ContainerListPanel } from "@/app/(examples)/dashboard/components/resource-pages/container-list-panel"
-import { CreateContainerDialog } from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog"
-import { DeleteConfirmDialog } from "@/app/(examples)/dashboard/components/resource-pages/delete-confirm-dialog"
-import { StepHeaderNav } from "@/app/(examples)/dashboard/components/resource-pages/step-header-nav"
-import { StorageVolumeList } from "@/app/(examples)/dashboard/components/resource-pages/storage-volume-list"
-import { useContainerEditor } from "@/app/(examples)/dashboard/components/resource-pages/use-container-editor"
+import { ContainerListPanel } from "@/app/(console)/dashboard/components/resource-pages/container-list-panel"
+import { CreateContainerDialog } from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
+import { StorageVolumeList } from "@/app/(console)/dashboard/components/resource-pages/storage-volume-list"
+import { useContainerEditor } from "@/app/(console)/dashboard/components/resource-pages/use-container-editor"
 import {
   asObject,
   asString,
@@ -33,7 +33,7 @@ import {
   resolveDuplicateContainerEnvNameIds,
   toDnsLabelFragment,
   validateContainerPorts,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
 import {
   Dialog,
   DialogClose,

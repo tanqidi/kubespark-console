@@ -29,7 +29,7 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group"
-import { AdvancedToggleCard } from "@/app/(examples)/dashboard/components/resource-pages/advanced-toggle-card"
+import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
 import {
   Select,
   SelectContent,
@@ -75,8 +75,8 @@ import {
   type LifecycleSectionKey,
   type ProbeMode,
   type ProbeSectionKey,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog.logic"
-import { useCreateContainerDialogController } from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog.controller"
+} from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog.logic"
+import { useCreateContainerDialogController } from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog.controller"
 
 export type {
   ContainerDraft,
@@ -93,7 +93,7 @@ export type {
   LifecycleSectionKey,
   ProbeMode,
   ProbeSectionKey,
-} from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog.logic"
 
 type CreateContainerDialogProps = {
   open: boolean

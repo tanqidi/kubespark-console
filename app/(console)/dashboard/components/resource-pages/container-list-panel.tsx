@@ -1,7 +1,7 @@
 "use client"
 
 import { IconPencil, IconTrash } from "@tabler/icons-react"
-import type { ContainerDraft } from "@/app/(examples)/dashboard/components/resource-pages/create-container-dialog.logic"
+import type { ContainerDraft } from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog.logic"
 import { Button } from "@/components/ui/button"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
