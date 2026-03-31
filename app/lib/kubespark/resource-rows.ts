@@ -204,58 +204,24 @@ export async function fetchRouteRows(limit = 300): Promise<RouteResourceRow[]> {
     const updatedAt = resolveUpdatedAt(resource)
     const age = formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined)
 
-    if (!rules.length) {
-      mapped.push({
-        id: `${baseId}-0`,
-        name,
-        description: readDescription(resource),
-        namespace,
-        host: "-",
-        path: "/",
-        service: "-",
-        age,
-        updatedAt,
-      })
-      return
-    }
+    const firstRule = asObject(rules[0])
+    const host = asString(firstRule.host, "-")
+    const http = asObject(firstRule.http)
+    const paths = Array.isArray(http.paths) ? http.paths : []
+    const firstPath = asObject(paths[0])
+    const backend = asObject(firstPath.backend)
+    const serviceObj = asObject(backend.service)
 
-    rules.forEach((rule, ruleIndex) => {
-      const ruleObj = asObject(rule)
-      const host = asString(ruleObj.host)
-      const http = asObject(ruleObj.http)
-      const paths = Array.isArray(http.paths) ? http.paths : []
-
-      if (!paths.length) {
-        mapped.push({
-          id: `${baseId}-${ruleIndex}`,
-          name,
-          description: readDescription(resource),
-          namespace,
-          host,
-          path: "/",
-          service: "-",
-          age,
-          updatedAt,
-        })
-        return
-      }
-
-      paths.forEach((pathItem, pathIndex) => {
-        const pathObj = asObject(pathItem)
-        const backend = asObject(pathObj.backend)
-        const serviceObj = asObject(backend.service)
-        mapped.push({
-          id: `${baseId}-${ruleIndex}-${pathIndex}`,
-          name,
-          description: readDescription(resource),
-          namespace,
-          host,
-          path: asString(pathObj.path, "/"),
-          service: asString(serviceObj.name ?? serviceObj.serviceName),
-          age,
-          updatedAt,
-        })
-      })
+    mapped.push({
+      id: `${baseId}-0`,
+      name,
+      description: readDescription(resource),
+      namespace,
+      host,
+      path: asString(firstPath.path, "/"),
+      service: asString(serviceObj.name ?? serviceObj.serviceName),
+      age,
+      updatedAt,
     })
   })
 

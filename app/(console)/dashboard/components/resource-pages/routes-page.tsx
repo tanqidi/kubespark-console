@@ -3,7 +3,7 @@
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
-import { IconAdjustments, IconEye, IconRoute2, IconSettings2, IconTrash } from "@tabler/icons-react"
+import { IconAdjustments, IconEye, IconPencil, IconRoute2, IconSettings2, IconTrash } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import { parse, stringify } from "yaml"
 
@@ -24,7 +24,13 @@ import {
   type RouteResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
-import { checkIngressExists, createIngress, type IngressPathType } from "@/app/lib/kubespark/routes"
+import {
+  checkIngressExists,
+  createIngress,
+  fetchIngressFormValues,
+  updateIngress,
+  type IngressPathType,
+} from "@/app/lib/kubespark/routes"
 import {
   Dialog,
   DialogClose,
@@ -78,6 +84,14 @@ type NamespaceOption = { id: string; name: string }
 type ServiceOption = { name: string; ports: number[] }
 type PathType = IngressPathType
 type RouteProtocol = "HTTP" | "HTTPS"
+type RouteRuleItem = {
+  host: string
+  path: string
+  serviceName: string
+  servicePort: string
+  protocol: RouteProtocol
+  tlsSecretName: string
+}
 const DEFAULT_PATH_TYPE: PathType = "ImplementationSpecific"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -102,10 +116,10 @@ const routeColumns: ColumnConfig<RouteRow>[] = [
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
   { key: "namespace", label: "命名空间" },
-  { key: "host", label: "域名" },
   { key: "path", label: "路径" },
   { key: "service", label: "服务" },
   { key: "age", label: "运行时间" },
+  { key: "updatedAt", label: "更新日期" },
 ]
 
 const NAME_RULE_MESSAGE =
@@ -167,20 +181,32 @@ function normalizeServicePortInput(rawValue: string): string {
   return digits
 }
 
+function normalizeRuleItem(item: RouteRuleItem): RouteRuleItem {
+  return {
+    host: item.host.trim(),
+    path: item.path.trim(),
+    serviceName: item.serviceName.trim(),
+    servicePort: normalizeServicePortInput(item.servicePort),
+    protocol: item.protocol,
+    tlsSecretName: item.tlsSecretName.trim(),
+  }
+}
+
 function buildRouteYamlText(params: {
   name: string
   namespace: string
   description: string
-  host: string
-  path: string
-  serviceName: string
-  servicePort: string
-  pathType: PathType
-  protocol: RouteProtocol
-  tlsSecretName: string
+  rules: RouteRuleItem[]
   ingressClassName: string
 }): string {
-  const servicePort = Number(params.servicePort.trim())
+  const normalizedRules = params.rules.map(normalizeRuleItem).filter((rule) => rule.host && rule.path && rule.serviceName && rule.servicePort)
+  const tlsMap = new Map<string, Set<string>>()
+  normalizedRules.forEach((rule) => {
+    if (rule.protocol !== "HTTPS" || !rule.tlsSecretName) return
+    const hosts = tlsMap.get(rule.tlsSecretName) ?? new Set<string>()
+    hosts.add(rule.host)
+    tlsMap.set(rule.tlsSecretName, hosts)
+  })
   return stringify(
     {
       apiVersion: "networking.k8s.io/v1",
@@ -202,37 +228,31 @@ function buildRouteYamlText(params: {
         ...(params.ingressClassName.trim()
           ? { ingressClassName: params.ingressClassName.trim() }
           : {}),
-        ...(params.protocol === "HTTPS" && params.tlsSecretName.trim()
+        ...(tlsMap.size > 0
           ? {
-              tls: [
-                {
-                  hosts: [params.host.trim()],
-                  secretName: params.tlsSecretName.trim(),
-                },
-              ],
+              tls: Array.from(tlsMap.entries()).map(([secretName, hosts]) => ({
+                secretName,
+                hosts: Array.from(hosts),
+              })),
             }
           : {}),
-        rules: [
-          {
-            ...(params.host.trim() ? { host: params.host.trim() } : {}),
-            http: {
-              paths: [
-                {
-                  ...(params.path.trim() ? { path: params.path.trim() } : {}),
-                  pathType: params.pathType,
-                  backend: {
-                    service: {
-                      ...(params.serviceName.trim() ? { name: params.serviceName.trim() } : {}),
-                      ...(Number.isFinite(servicePort) && servicePort > 0
-                        ? { port: { number: servicePort } }
-                        : {}),
-                    },
+        rules: normalizedRules.map((rule) => ({
+          host: rule.host,
+          http: {
+            paths: [
+              {
+                path: rule.path,
+                pathType: DEFAULT_PATH_TYPE,
+                backend: {
+                  service: {
+                    name: rule.serviceName,
+                    port: { number: Number(rule.servicePort) },
                   },
                 },
-              ],
-            },
+              },
+            ],
           },
-        ],
+        })),
       },
     },
     {
@@ -247,6 +267,7 @@ function parseRouteYamlText(yamlText: string): {
   name: string
   namespace: string
   description: string
+  rules: RouteRuleItem[]
   host: string
   path: string
   serviceName: string
@@ -275,37 +296,60 @@ function parseRouteYamlText(yamlText: string): {
   const annotations = asObject(metadata.annotations)
   const spec = asObject(root.spec)
   const tlsEntries = Array.isArray(spec.tls) ? spec.tls : []
-  const firstTls = asObject(tlsEntries[0])
+  const tlsSecretByHost = new Map<string, string>()
+  tlsEntries.forEach((entry) => {
+    const tlsEntry = asObject(entry)
+    const secretName = typeof tlsEntry.secretName === "string" ? tlsEntry.secretName : ""
+    const hosts = Array.isArray(tlsEntry.hosts) ? tlsEntry.hosts : []
+    hosts.forEach((host) => {
+      if (typeof host === "string" && host.trim()) tlsSecretByHost.set(host.trim(), secretName)
+    })
+  })
   const rules = Array.isArray(spec.rules) ? spec.rules : []
-  const firstRule = asObject(rules[0])
-  const http = asObject(firstRule.http)
-  const paths = Array.isArray(http.paths) ? http.paths : []
-  const firstPath = asObject(paths[0])
-  const backend = asObject(firstPath.backend)
-  const service = asObject(backend.service)
-  const port = asObject(service.port)
-  const servicePort = asNumber(port.number)
-
-  const pathTypeRaw = firstPath.pathType
-  const pathType: PathType =
-    pathTypeRaw === "Exact" || pathTypeRaw === "ImplementationSpecific" || pathTypeRaw === "Prefix"
-      ? pathTypeRaw
-      : "ImplementationSpecific"
-
-  const tlsSecretName = typeof firstTls.secretName === "string" ? firstTls.secretName : ""
-  const protocol: RouteProtocol = tlsEntries.length > 0 ? "HTTPS" : "HTTP"
+  const parsedRules: RouteRuleItem[] = []
+  rules.forEach((rule) => {
+    const ruleObj = asObject(rule)
+    const host = typeof ruleObj.host === "string" ? ruleObj.host : ""
+    const http = asObject(ruleObj.http)
+    const paths = Array.isArray(http.paths) ? http.paths : []
+    paths.forEach((pathItem) => {
+      const firstPath = asObject(pathItem)
+      const backend = asObject(firstPath.backend)
+      const service = asObject(backend.service)
+      const port = asObject(service.port)
+      const servicePort = asNumber(port.number)
+      const tlsSecretName = tlsSecretByHost.get(host) ?? ""
+      parsedRules.push({
+        host,
+        path: typeof firstPath.path === "string" ? firstPath.path : "",
+        serviceName: typeof service.name === "string" ? service.name : "",
+        servicePort: servicePort && servicePort > 0 ? normalizeServicePortInput(String(servicePort)) : "",
+        protocol: tlsSecretName ? "HTTPS" : "HTTP",
+        tlsSecretName,
+      })
+    })
+  })
+  const firstRule = parsedRules[0] ?? {
+    host: "",
+    path: "/",
+    serviceName: "",
+    servicePort: "",
+    protocol: "HTTP" as RouteProtocol,
+    tlsSecretName: "",
+  }
 
   return {
     name: typeof metadata.name === "string" ? metadata.name : "",
     namespace: typeof metadata.namespace === "string" ? metadata.namespace : "",
     description: typeof annotations.description === "string" ? annotations.description : "",
-    host: typeof firstRule.host === "string" ? firstRule.host : "",
-    path: typeof firstPath.path === "string" ? firstPath.path : "",
-    serviceName: typeof service.name === "string" ? service.name : "",
-    servicePort: servicePort && servicePort > 0 ? normalizeServicePortInput(String(servicePort)) : "",
-    pathType,
-    protocol,
-    tlsSecretName,
+    rules: parsedRules,
+    host: firstRule.host,
+    path: firstRule.path,
+    serviceName: firstRule.serviceName,
+    servicePort: firstRule.servicePort,
+    pathType: DEFAULT_PATH_TYPE,
+    protocol: firstRule.protocol,
+    tlsSecretName: firstRule.tlsSecretName,
     ingressClassName: typeof spec.ingressClassName === "string" ? spec.ingressClassName : "",
   }
 }
@@ -338,6 +382,7 @@ export function RoutesPageClient() {
   const [deleting, setDeleting] = React.useState(false)
 
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const [editingRouteRef, setEditingRouteRef] = React.useState<{ name: string; namespace: string } | null>(null)
   const [createStep, setCreateStep] = React.useState<RouteCreateStep>("basic")
   const [createRuleViewMode, setCreateRuleViewMode] = React.useState<RouteRuleViewMode>("list")
   const [creating, setCreating] = React.useState(false)
@@ -359,6 +404,9 @@ export function RoutesPageClient() {
   const [createServicePort, setCreateServicePort] = React.useState("")
   const [createProtocol, setCreateProtocol] = React.useState<RouteProtocol>("HTTP")
   const [createTlsSecretName, setCreateTlsSecretName] = React.useState("")
+  const [createRules, setCreateRules] = React.useState<RouteRuleItem[]>([])
+  const [editingRuleIndex, setEditingRuleIndex] = React.useState<number | null>(null)
+  const [pendingDeleteRuleIndex, setPendingDeleteRuleIndex] = React.useState<number | null>(null)
   const [createIngressClassName, setCreateIngressClassName] = React.useState("")
 
   const [createNameError, setCreateNameError] = React.useState<string | null>(null)
@@ -371,6 +419,7 @@ export function RoutesPageClient() {
   const [createSubmitError, setCreateSubmitError] = React.useState<string | null>(null)
   const [ruleSaveAttempted, setRuleSaveAttempted] = React.useState(false)
   const createServicePortRef = React.useRef("")
+  const isEditMode = Boolean(editingRouteRef)
 
   React.useEffect(() => {
     createServicePortRef.current = createServicePort
@@ -381,19 +430,13 @@ export function RoutesPageClient() {
     return selected?.ports ?? []
   }, [createServiceName, serviceOptions])
   const hasConfiguredRule = React.useMemo(
-    () =>
-      Boolean(
-        createHost.trim() &&
-          createPath.trim() &&
-          createServiceName.trim() &&
-          createServicePort.trim() &&
-          (createProtocol === "HTTP" || createTlsSecretName.trim())
-      ),
-    [createHost, createPath, createProtocol, createServiceName, createServicePort, createTlsSecretName]
+    () => createRules.length > 0,
+    [createRules]
   )
   const canNavigateCreateSteps = !creating && !(createStep === "rule" && createRuleViewMode === "edit")
 
   const resetCreateForm = React.useCallback(() => {
+    setEditingRouteRef(null)
     setCreateStep("basic")
     setCreateRuleViewMode("list")
     setCreateYamlMode(false)
@@ -409,6 +452,9 @@ export function RoutesPageClient() {
     setCreateServicePort("")
     setCreateProtocol("HTTP")
     setCreateTlsSecretName("")
+    setCreateRules([])
+    setEditingRuleIndex(null)
+    setPendingDeleteRuleIndex(null)
     setCreateIngressClassName("")
     setCreateNameError(null)
     setCreateNamespaceError(null)
@@ -537,26 +583,15 @@ export function RoutesPageClient() {
       name: createName,
       namespace: createNamespace,
       description: createDescription,
-      host: createHost,
-      path: createPath,
-      serviceName: createServiceName,
-      servicePort: createServicePort,
-      pathType: DEFAULT_PATH_TYPE,
-      protocol: createProtocol,
-      tlsSecretName: createTlsSecretName,
+      rules: createRules,
       ingressClassName: createIngressClassName,
     })
   }, [
     createDescription,
-    createHost,
     createIngressClassName,
     createName,
     createNamespace,
-    createPath,
-    createProtocol,
-    createServiceName,
-    createServicePort,
-    createTlsSecretName,
+    createRules,
   ])
 
   const validateBasicStep = React.useCallback(() => {
@@ -576,38 +611,98 @@ export function RoutesPageClient() {
       createProtocol === "HTTPS" && !createTlsSecretName.trim()
         ? "请选择 HTTPS 保密字典"
         : null
+    const normalizedHost = createHost.trim().toLowerCase()
+    const duplicateHost = createRules.some((rule, index) => {
+      if (editingRuleIndex !== null && index === editingRuleIndex) return false
+      return rule.host.trim().toLowerCase() === normalizedHost
+    })
+    const duplicateHostError = duplicateHost
+      ? `域名 ${createHost.trim()} 重复，请更换后重试`
+      : null
     setCreateHostError(hostError)
     setCreatePathError(pathError)
     setCreateServiceError(serviceError)
     setCreateServicePortError(servicePortError)
     setCreateTlsSecretError(tlsSecretError)
-    return !hostError && !pathError && !serviceError && !servicePortError && !tlsSecretError
-  }, [createHost, createPath, createProtocol, createServiceName, createServicePort, createTlsSecretName])
+    if (!hostError && duplicateHostError) setCreateHostError(duplicateHostError)
+    return !hostError && !pathError && !serviceError && !servicePortError && !tlsSecretError && !duplicateHostError
+  }, [createHost, createPath, createProtocol, createRules, createServiceName, createServicePort, createTlsSecretName, editingRuleIndex])
 
   const beginEditRule = React.useCallback(() => {
     setCreateSubmitError(null)
     setRuleSaveAttempted(false)
+    setCreateHost("")
+    setCreatePath("/")
+    setCreateServiceName("")
+    setCreateServicePort("")
+    setCreateProtocol("HTTP")
+    setCreateTlsSecretName("")
+    setCreateHostError(null)
+    setCreatePathError(null)
+    setCreateServiceError(null)
+    setCreateServicePortError(null)
+    setCreateTlsSecretError(null)
+    setEditingRuleIndex(null)
     setCreateRuleViewMode("edit")
   }, [])
 
   const cancelEditRule = React.useCallback(() => {
     setCreateSubmitError(null)
+    setEditingRuleIndex(null)
     setCreateRuleViewMode("list")
   }, [])
 
   const saveRuleDraft = React.useCallback(() => {
     setCreateSubmitError(null)
     if (!validateRuleStep()) return false
+    const nextRule = normalizeRuleItem({
+      host: createHost,
+      path: createPath,
+      serviceName: createServiceName,
+      servicePort: createServicePort,
+      protocol: createProtocol,
+      tlsSecretName: createProtocol === "HTTPS" ? createTlsSecretName : "",
+    })
+    setCreateRules((current) => {
+      if (editingRuleIndex === null) return [...current, nextRule]
+      return current.map((rule, index) => (index === editingRuleIndex ? nextRule : rule))
+    })
     setRuleSaveAttempted(false)
     setCreateRuleViewMode("list")
+    setEditingRuleIndex(null)
+    setCreateHost("")
+    setCreatePath("/")
+    setCreateServiceName("")
+    setCreateServicePort("")
+    setCreateProtocol("HTTP")
+    setCreateTlsSecretName("")
+    setCreateHostError(null)
+    setCreatePathError(null)
+    setCreateServiceError(null)
+    setCreateServicePortError(null)
+    setCreateTlsSecretError(null)
     return true
-  }, [validateRuleStep])
+  }, [
+    createHost,
+    createPath,
+    createProtocol,
+    createServiceName,
+    createServicePort,
+    createTlsSecretName,
+    editingRuleIndex,
+    validateRuleStep,
+  ])
 
   const handleCreateNext = React.useCallback(async () => {
     if (creating || checkingCreateNext) return
     setCreateSubmitError(null)
     if (createStep === "basic") {
       if (!validateBasicStep()) return
+      if (isEditMode) {
+        setRuleSaveAttempted(false)
+        setCreateStep("rule")
+        return
+      }
       setCheckingCreateNext(true)
       try {
         const exists = await checkIngressExists({
@@ -646,6 +741,7 @@ export function RoutesPageClient() {
     createStep,
     creating,
     hasConfiguredRule,
+    isEditMode,
     saveRuleDraft,
     validateBasicStep,
   ])
@@ -659,6 +755,8 @@ export function RoutesPageClient() {
       name: createName,
       namespace: createNamespace,
       description: createDescription,
+      rules: createRules.map((rule) => normalizeRuleItem(rule)),
+      ingressClassName: createIngressClassName,
       host: createHost,
       path: createPath,
       serviceName: createServiceName,
@@ -666,12 +764,18 @@ export function RoutesPageClient() {
       pathType: DEFAULT_PATH_TYPE,
       protocol: createProtocol,
       tlsSecretName: createTlsSecretName,
-      ingressClassName: createIngressClassName,
     }
 
     if (createYamlMode) {
       try {
         draft = parseRouteYamlText(createYamlText)
+        if (isEditMode && editingRouteRef) {
+          draft = {
+            ...draft,
+            name: editingRouteRef.name,
+            namespace: editingRouteRef.namespace,
+          }
+        }
         setCreateName(draft.name)
         setCreateNamespace(draft.namespace)
         setCreateDescription(draft.description)
@@ -681,6 +785,11 @@ export function RoutesPageClient() {
         setCreateServicePort(draft.servicePort)
         setCreateProtocol(draft.protocol)
         setCreateTlsSecretName(draft.tlsSecretName)
+        setCreateRules(
+          draft.rules.length > 0
+            ? draft.rules.map((rule) => normalizeRuleItem(rule))
+            : []
+        )
         setCreateIngressClassName(draft.ingressClassName)
         setCreateRuleViewMode("list")
         setCreateYamlError(null)
@@ -692,14 +801,36 @@ export function RoutesPageClient() {
 
     const nameError = validateRouteName(draft.name)
     const namespaceError = draft.namespace.trim() ? null : "请选择项目"
-    const hostError = validateHost(draft.host)
-    const pathError = validatePath(draft.path)
-    const serviceError = draft.serviceName.trim() ? null : "请选择服务"
-    const servicePortError = validateServicePortText(draft.servicePort)
-    const tlsSecretError =
-      draft.protocol === "HTTPS" && !draft.tlsSecretName.trim()
-        ? "请选择 HTTPS 保密字典"
-        : null
+    const normalizedRules = draft.rules.map((rule) => normalizeRuleItem(rule))
+    const hostError = normalizedRules.length === 0 ? ROUTE_RULE_REQUIRED_MESSAGE : null
+    const duplicateHost = (() => {
+      const seen = new Set<string>()
+      for (const rule of normalizedRules) {
+        const host = rule.host.trim().toLowerCase()
+        if (!host) continue
+        if (seen.has(host)) return rule.host
+        seen.add(host)
+      }
+      return ""
+    })()
+    const hasInvalidRule = normalizedRules.some((rule) => {
+      if (validateHost(rule.host)) return true
+      if (validatePath(rule.path)) return true
+      if (!rule.serviceName) return true
+      if (validateServicePortText(rule.servicePort)) return true
+      if (rule.protocol === "HTTPS" && !rule.tlsSecretName) return true
+      return false
+    })
+    const pathError = hostError
+      ? null
+      : duplicateHost
+        ? `域名 ${duplicateHost} 重复，请更换后重试`
+        : hasInvalidRule
+          ? "存在未完整填写的路由规则"
+          : null
+    const serviceError = null
+    const servicePortError = null
+    const tlsSecretError = null
 
     setCreateNameError(nameError)
     setCreateNamespaceError(namespaceError)
@@ -723,26 +854,41 @@ export function RoutesPageClient() {
 
     setCreating(true)
     try {
-      await createIngress({
+      const payload = {
         name: draft.name.trim().toLowerCase(),
         namespace: draft.namespace.trim(),
-        host: draft.host.trim(),
-        path: draft.path.trim(),
-        serviceName: draft.serviceName.trim(),
-        servicePort: Number(draft.servicePort.trim()),
+        host: normalizedRules[0]?.host ?? "",
+        path: normalizedRules[0]?.path ?? "/",
+        serviceName: normalizedRules[0]?.serviceName ?? "",
+        servicePort: Number(normalizedRules[0]?.servicePort ?? 0),
         pathType: DEFAULT_PATH_TYPE,
-        protocol: draft.protocol,
-        tlsSecretName: draft.protocol === "HTTPS" ? draft.tlsSecretName.trim() : "",
+        protocol: normalizedRules[0]?.protocol ?? "HTTP",
+        tlsSecretName:
+          normalizedRules[0]?.protocol === "HTTPS" ? normalizedRules[0]?.tlsSecretName ?? "" : "",
+        rules: normalizedRules.map((rule) => ({
+          host: rule.host,
+          path: rule.path,
+          serviceName: rule.serviceName,
+          servicePort: Number(rule.servicePort),
+          pathType: DEFAULT_PATH_TYPE,
+          protocol: rule.protocol,
+          tlsSecretName: rule.protocol === "HTTPS" ? rule.tlsSecretName : "",
+        })),
         ingressClassName: draft.ingressClassName.trim(),
         description: draft.description.trim(),
-      })
+      }
+      if (isEditMode) {
+        await updateIngress(payload)
+      } else {
+        await createIngress(payload)
+      }
       const mapped = await fetchRouteRows()
       setRows(mapped)
       setError(null)
       setCreateDialogOpen(false)
       resetCreateForm()
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : "创建失败"
+      const message = submitError instanceof Error ? submitError.message : isEditMode ? "保存失败" : "创建失败"
       if (createYamlMode) {
         setCreateYamlError(message)
       } else {
@@ -759,11 +905,14 @@ export function RoutesPageClient() {
     createNamespace,
     createPath,
     createProtocol,
+    createRules,
     createServiceName,
     createServicePort,
     createTlsSecretName,
     createYamlMode,
     createYamlText,
+    editingRouteRef,
+    isEditMode,
     creating,
     resetCreateForm,
   ])
@@ -800,6 +949,95 @@ export function RoutesPageClient() {
   const requestDelete = React.useCallback((row: RouteRow) => {
     setPendingDeleteRow(row)
   }, [])
+
+  const requestEditRuleItem = React.useCallback((index: number) => {
+    const target = createRules[index]
+    if (!target) return
+    setCreateHost(target.host)
+    setCreatePath(target.path || "/")
+    setCreateServiceName(target.serviceName)
+    setCreateServicePort(target.servicePort)
+    setCreateProtocol(target.protocol)
+    setCreateTlsSecretName(target.tlsSecretName)
+    setCreateHostError(null)
+    setCreatePathError(null)
+    setCreateServiceError(null)
+    setCreateServicePortError(null)
+    setCreateTlsSecretError(null)
+    setEditingRuleIndex(index)
+    setCreateRuleViewMode("edit")
+  }, [createRules])
+
+  const requestDeleteRuleItem = React.useCallback((index: number) => {
+    setPendingDeleteRuleIndex(index)
+  }, [])
+
+  const handleConfirmDeleteRuleItem = React.useCallback(() => {
+    if (pendingDeleteRuleIndex === null) return
+    setCreateRules((current) => current.filter((_, index) => index !== pendingDeleteRuleIndex))
+    if (editingRuleIndex !== null && editingRuleIndex === pendingDeleteRuleIndex) {
+      setEditingRuleIndex(null)
+      setCreateRuleViewMode("list")
+    } else if (editingRuleIndex !== null && editingRuleIndex > pendingDeleteRuleIndex) {
+      setEditingRuleIndex(editingRuleIndex - 1)
+    }
+    setPendingDeleteRuleIndex(null)
+  }, [editingRuleIndex, pendingDeleteRuleIndex])
+
+  const requestEdit = React.useCallback((row: RouteRow) => {
+    if (creating || checkingCreateNext) return
+    setCreateSubmitError(null)
+    setCreateYamlError(null)
+    setCreateRuleViewMode("list")
+    setCreateStep("basic")
+    setCreateYamlMode(false)
+    setCheckingCreateNext(true)
+
+    void fetchIngressFormValues(row.name, row.namespace)
+      .then((draft) => {
+        const nextRules =
+          draft.rules.length > 0
+            ? draft.rules.map((rule) => normalizeRuleItem(rule))
+            : [
+                normalizeRuleItem({
+                  host: draft.host,
+                  path: draft.path || "/",
+                  serviceName: draft.serviceName,
+                  servicePort: draft.servicePort,
+                  protocol: draft.protocol,
+                  tlsSecretName: draft.tlsSecretName,
+                }),
+              ].filter((rule) => rule.host || rule.path || rule.serviceName || rule.servicePort)
+        setEditingRouteRef({ name: row.name, namespace: row.namespace })
+        setCreateName(draft.name)
+        setCreateNamespace(draft.namespace)
+        setCreateDescription(draft.description)
+        setCreateHost(draft.host)
+        setCreatePath(draft.path || "/")
+        setCreateServiceName(draft.serviceName)
+        setCreateServicePort(draft.servicePort)
+        setCreateProtocol(draft.protocol)
+        setCreateTlsSecretName(draft.tlsSecretName)
+        setCreateRules(nextRules)
+        setCreateIngressClassName(draft.ingressClassName)
+        setCreateNameError(null)
+        setCreateNamespaceError(null)
+        setCreateHostError(null)
+        setCreatePathError(null)
+        setCreateServiceError(null)
+        setCreateServicePortError(null)
+        setCreateTlsSecretError(null)
+        setRuleSaveAttempted(false)
+        setCreateDialogOpen(true)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载路由配置失败"
+        setError(message)
+      })
+      .finally(() => {
+        setCheckingCreateNext(false)
+      })
+  }, [checkingCreateNext, creating])
 
   const handleConfirmDelete = React.useCallback(() => {
     if (!pendingDeleteRow || deleting) return
@@ -859,6 +1097,17 @@ export function RoutesPageClient() {
           {
             label: (
               <>
+                <IconPencil className="size-4" />
+                {"编辑"}
+              </>
+            ),
+            onSelect: (row) => {
+              requestEdit(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconTrash className="size-4" />
                 {"删除"}
               </>
@@ -871,7 +1120,7 @@ export function RoutesPageClient() {
           },
         ],
       }),
-    [handleViewYaml, requestDelete]
+    [handleViewYaml, requestDelete, requestEdit]
   )
 
   React.useEffect(() => {
@@ -963,7 +1212,7 @@ export function RoutesPageClient() {
       <Dialog
         open={createDialogOpen}
         onOpenChange={(open) => {
-          if (!open && creating) return
+          if (!open && (creating || checkingCreateNext)) return
           setCreateDialogOpen(open)
           if (!open) resetCreateForm()
         }}
@@ -985,8 +1234,12 @@ export function RoutesPageClient() {
             <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <DialogTitle>创建应用路由</DialogTitle>
-                  <DialogDescription>使用 Kubernetes Ingress 创建应用访问路由。</DialogDescription>
+                  <DialogTitle>{isEditMode ? "编辑应用路由" : "创建应用路由"}</DialogTitle>
+                  <DialogDescription>
+                    {isEditMode
+                      ? "编辑 Kubernetes Ingress 的访问规则与高级配置。"
+                      : "使用 Kubernetes Ingress 创建应用访问路由。"}
+                  </DialogDescription>
                 </div>
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
                   <span className="text-sm font-medium">编辑 YAML</span>
@@ -1002,8 +1255,10 @@ export function RoutesPageClient() {
                       }
                       try {
                         const parsed = parseRouteYamlText(createYamlText)
-                        setCreateName(parsed.name)
-                        setCreateNamespace(parsed.namespace)
+                        const nextName = isEditMode && editingRouteRef ? editingRouteRef.name : parsed.name
+                        const nextNamespace = isEditMode && editingRouteRef ? editingRouteRef.namespace : parsed.namespace
+                        setCreateName(nextName)
+                        setCreateNamespace(nextNamespace)
                         setCreateDescription(parsed.description)
                         setCreateHost(parsed.host)
                         setCreatePath(parsed.path || "/")
@@ -1011,6 +1266,7 @@ export function RoutesPageClient() {
                         setCreateServicePort(parsed.servicePort)
                         setCreateProtocol(parsed.protocol)
                         setCreateTlsSecretName(parsed.tlsSecretName)
+                        setCreateRules(parsed.rules.map((rule) => normalizeRuleItem(rule)))
                         setCreateIngressClassName(parsed.ingressClassName)
                         setCreateRuleViewMode("list")
                         setCreateYamlError(null)
@@ -1019,7 +1275,7 @@ export function RoutesPageClient() {
                         setCreateYamlError(parseError instanceof Error ? parseError.message : "YAML 解析失败")
                       }
                     }}
-                    disabled={creating}
+                    disabled={creating || checkingCreateNext}
                     aria-label="编辑 YAML"
                   />
                 </div>
@@ -1107,13 +1363,13 @@ export function RoutesPageClient() {
                   <FieldGroup className="grid gap-6 md:grid-cols-2">
                     <Field data-invalid={Boolean(createNameError)}>
                       <FieldLabel htmlFor="route-create-name">名称</FieldLabel>
-                      <Input id="route-create-name" value={createName} onChange={(event) => { setCreateName(event.target.value); if (createNameError) setCreateNameError(null) }} placeholder="请输入路由名称" autoComplete="off" aria-invalid={Boolean(createNameError)} disabled={creating} />
+                      <Input id="route-create-name" value={createName} onChange={(event) => { setCreateName(event.target.value); if (createNameError) setCreateNameError(null) }} placeholder="请输入路由名称" autoComplete="off" aria-invalid={Boolean(createNameError)} disabled={creating || isEditMode} />
                       {createNameError ? (<FieldError>{createNameError}</FieldError>) : (<FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>)}
                     </Field>
 
                     <Field data-invalid={Boolean(createNamespaceError)}>
                       <FieldLabel htmlFor="route-create-namespace">项目</FieldLabel>
-                      <Select value={createNamespace} onValueChange={(value) => { setCreateNamespace(value); if (createNamespaceError) setCreateNamespaceError(null) }} disabled={creating}>
+                      <Select value={createNamespace} onValueChange={(value) => { if (isEditMode) return; setCreateNamespace(value); if (createNamespaceError) setCreateNamespaceError(null) }} disabled={creating || isEditMode}>
                         <SelectTrigger id="route-create-namespace" aria-invalid={Boolean(createNamespaceError)}><SelectValue placeholder="请选择项目" /></SelectTrigger>
                         <SelectContent><SelectGroup>{namespaceOptions.map((option) => (<SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>))}</SelectGroup></SelectContent>
                       </Select>
@@ -1138,11 +1394,44 @@ export function RoutesPageClient() {
                       <div className="mt-4 max-h-[50vh] overflow-y-auto pr-2">
                         <div className="flex flex-col gap-0 pb-4">
                           {hasConfiguredRule ? (
-                            <div className="rounded-lg border px-4 py-4">
-                              <div className="text-sm font-semibold">{createHost || "-"}</div>
-                              <div className="mt-1 text-sm text-muted-foreground">
-                                {`${createProtocol} ${createPath || "-"} -> ${createServiceName || "-"}:${createServicePort || "-"}${createProtocol === "HTTPS" && createTlsSecretName ? ` / Secret: ${createTlsSecretName}` : ""}`}
-                              </div>
+                            <div className="flex flex-col gap-3">
+                              {createRules.map((rule, index) => (
+                                <div
+                                  key={`${rule.host}-${rule.path}-${rule.serviceName}-${rule.servicePort}-${index}`}
+                                  className="group/item rounded-lg border px-4 py-4 hover:bg-muted"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <div className="text-sm font-semibold">{rule.host || "-"}</div>
+                                      <div className="mt-1 text-sm text-muted-foreground">
+                                        {`${rule.protocol} ${rule.path || "-"} -> ${rule.serviceName || "-"}:${rule.servicePort || "-"}${rule.protocol === "HTTPS" && rule.tlsSecretName ? ` / Secret: ${rule.tlsSecretName}` : ""}`}
+                                      </div>
+                                    </div>
+                                    <div className="pointer-events-none flex items-center gap-2 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => requestEditRuleItem(index)}
+                                        disabled={creating}
+                                      >
+                                        <IconPencil data-icon="inline-start" />
+                                        编辑
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => requestDeleteRuleItem(index)}
+                                        disabled={creating}
+                                      >
+                                        <IconTrash data-icon="inline-start" />
+                                        删除
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           ) : (
                             <div
@@ -1165,9 +1454,9 @@ export function RoutesPageClient() {
                             onClick={beginEditRule}
                             disabled={creating}
                           >
-                            <span className="text-sm font-semibold">{hasConfiguredRule ? "编辑路由规则" : "添加路由规则"}</span>
+                            <span className="text-sm font-semibold">添加路由规则</span>
                             <span className="mt-1 text-sm text-muted-foreground">
-                              {hasConfiguredRule ? "更新域名、路径和后端服务。" : "添加域名、路径和后端服务映射。"}
+                              添加域名、路径和后端服务映射。
                             </span>
                           </button>
                         </div>
@@ -1390,7 +1679,9 @@ export function RoutesPageClient() {
                     确认保存
                   </Button>
                 ) : createYamlMode || createStep === "advanced" ? (
-                  <Button type="button" onClick={() => void handleCreateSubmit()} disabled={creating || checkingCreateNext}>{creating ? "创建中..." : "创建"}</Button>
+                  <Button type="button" onClick={() => void handleCreateSubmit()} disabled={creating || checkingCreateNext}>
+                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  </Button>
                 ) : (
                   <Button type="button" onClick={() => void handleCreateNext()} disabled={creating || checkingCreateNext}>{checkingCreateNext && createStep === "basic" ? "校验中..." : "下一步"}</Button>
                 )}
@@ -1401,6 +1692,16 @@ export function RoutesPageClient() {
       </Dialog>
 
       <MonacoViewerDialog title="查看YAML" open={yamlOpen} onOpenChange={setYamlOpen} value={yamlContent} language="yaml" loading={yamlLoading} error={yamlError} />
+      <DeleteConfirmDialog
+        open={pendingDeleteRuleIndex !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteRuleIndex(null)
+        }}
+        title="删除路由规则"
+        description="确定删除该路由规则吗？"
+        deleting={false}
+        onConfirm={handleConfirmDeleteRuleItem}
+      />
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
         onOpenChange={(open) => {
