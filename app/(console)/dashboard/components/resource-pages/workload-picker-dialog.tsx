@@ -171,7 +171,9 @@ export function WorkloadPickerDialog({
             value={kindFilter}
             onValueChange={(value) => {
               setKindFilter(value as WorkloadKind)
-              setPagination((current) => ({ ...current, pageIndex: 0 }))
+              setPagination((current) =>
+                current.pageIndex === 0 ? current : { ...current, pageIndex: 0 }
+              )
             }}
             className="w-fit"
           >
@@ -186,7 +188,9 @@ export function WorkloadPickerDialog({
             value={nameQuery}
             onChange={(event) => {
               setNameQuery(event.target.value)
-              setPagination((current) => ({ ...current, pageIndex: 0 }))
+              setPagination((current) =>
+                current.pageIndex === 0 ? current : { ...current, pageIndex: 0 }
+              )
             }}
             placeholder="名称"
             className="h-9 w-52"
@@ -292,7 +296,11 @@ export function WorkloadPickerDialog({
                 variant="outline"
                 size="icon"
                 className="size-8"
-                onClick={() => setPagination((current) => ({ ...current, pageIndex: 0 }))}
+                onClick={() =>
+                  setPagination((current) =>
+                    current.pageIndex === 0 ? current : { ...current, pageIndex: 0 }
+                  )
+                }
                 disabled={isBusy || pageIndex === 0}
               >
                 <IconChevronsLeft />
@@ -333,7 +341,12 @@ export function WorkloadPickerDialog({
                 size="icon"
                 className="size-8"
                 onClick={() =>
-                  setPagination((current) => ({ ...current, pageIndex: pageCount - 1 }))
+                  setPagination((current) => {
+                    const nextPageIndex = pageCount - 1
+                    return current.pageIndex === nextPageIndex
+                      ? current
+                      : { ...current, pageIndex: nextPageIndex }
+                  })
                 }
                 disabled={isBusy || pageIndex >= pageCount - 1}
               >

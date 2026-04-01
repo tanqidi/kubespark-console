@@ -104,50 +104,70 @@ export function useContainerEditor({ deps, submitError, setSubmitError }: Contai
         | "securityContext",
       value: string | boolean | ContainerProbeMap | ContainerLifecycleMap | ContainerSecurityContextDraft
     ) => {
-      setContainers((current) =>
-        current.map((item) =>
-          item.id === id
-            ? (() => {
-                if (field === "image") {
-                  const nextImage = typeof value === "string" ? value : ""
-                  const currentName = item.name.trim()
-                  const siblingNames = new Set(
-                    current
-                      .filter((container) => container.id !== item.id)
-                      .map((container) => deps.toDnsLabelFragment(container.name))
-                      .filter(Boolean)
-                  )
-                  const nextAutoBaseName = deps.resolveContainerNameFromImage(nextImage)
-                  const nextAutoName = nextAutoBaseName
-                    ? deps.ensureUniqueContainerName(nextAutoBaseName, siblingNames)
-                    : ""
-                  const shouldAutoSyncName =
-                    currentName.length === 0 || deps.isAutoContainerNameForImage(currentName, item.image)
+      setContainers((current) => {
+        let changed = false
+        const nextContainers = current.map((item) => {
+          if (item.id !== id) return item
+          if (field === "image") {
+            const nextImage = typeof value === "string" ? value : ""
+            const currentName = item.name.trim()
+            const siblingNames = new Set(
+              current
+                .filter((container) => container.id !== item.id)
+                .map((container) => deps.toDnsLabelFragment(container.name))
+                .filter(Boolean)
+            )
+            const nextAutoBaseName = deps.resolveContainerNameFromImage(nextImage)
+            const nextAutoName = nextAutoBaseName
+              ? deps.ensureUniqueContainerName(nextAutoBaseName, siblingNames)
+              : ""
+            const shouldAutoSyncName =
+              currentName.length === 0 || deps.isAutoContainerNameForImage(currentName, item.image)
+            const nextName = shouldAutoSyncName ? nextAutoName : item.name
+            if (item.image === nextImage && item.name === nextName) return item
+            changed = true
+            return {
+              ...item,
+              image: nextImage,
+              name: nextName,
+            }
+          }
 
-                  return {
-                    ...item,
-                    image: nextImage,
-                    ...(shouldAutoSyncName ? { name: nextAutoName } : {}),
-                  }
-                }
+          const nextFieldValue =
+            field === "syncHostTimezone"
+              ? value === true
+              : field === "probes"
+                ? deps.normalizeProbeMap(value as ContainerProbeMap)
+                : field === "lifecycle"
+                  ? deps.normalizeLifecycleMap(value as ContainerLifecycleMap)
+                  : field === "securityContext"
+                    ? deps.normalizeSecurityContextDraft(value as ContainerSecurityContextDraft)
+                    : value
 
-                return {
-                  ...item,
-                  [field]:
-                    field === "syncHostTimezone"
-                      ? value === true
-                      : field === "probes"
-                        ? deps.normalizeProbeMap(value as ContainerProbeMap)
-                        : field === "lifecycle"
-                          ? deps.normalizeLifecycleMap(value as ContainerLifecycleMap)
-                          : field === "securityContext"
-                            ? deps.normalizeSecurityContextDraft(value as ContainerSecurityContextDraft)
-                            : value,
-                }
-              })()
-            : item
-        )
-      )
+          if (
+            field !== "probes" &&
+            field !== "lifecycle" &&
+            field !== "securityContext" &&
+            item[field] === nextFieldValue
+          ) {
+            return item
+          }
+
+          if (
+            (field === "probes" || field === "lifecycle" || field === "securityContext") &&
+            JSON.stringify(item[field]) === JSON.stringify(nextFieldValue)
+          ) {
+            return item
+          }
+
+          changed = true
+          return {
+            ...item,
+            [field]: nextFieldValue,
+          }
+        })
+        return changed ? nextContainers : current
+      })
       if (editingImageError) setEditingImageError(null)
       setEditingPortFieldErrors({})
       if (submitError) setSubmitError(null)
@@ -175,51 +195,62 @@ export function useContainerEditor({ deps, submitError, setSubmitError }: Contai
 
   const updateContainerPort = React.useCallback(
     (containerId: string, portId: string, field: "protocol" | "name" | "containerPort", value: string) => {
-      setContainers((current) =>
-        current.map((item) => {
+      setContainers((current) => {
+        let changed = false
+        const nextContainers = current.map((item) => {
           if (item.id !== containerId) return item
 
-          return {
-            ...item,
-            ports: item.ports.map((port) => {
-              if (port.id !== portId) return port
+          const nextPorts = item.ports.map((port) => {
+            if (port.id !== portId) return port
 
-              if (field === "protocol") {
-                const nextProtocol = value.toUpperCase()
-                if (!deps.CONTAINER_PORT_PROTOCOL_SET.has(nextProtocol)) return port
-                const normalizedProtocol = nextProtocol as ContainerPortProtocol
-                const replacedName = deps.replaceProtocolPrefixInName(port.name, normalizedProtocol)
-                return {
-                  ...port,
-                  protocol: normalizedProtocol,
-                  name: replacedName ?? port.name,
-                }
-              }
-
-              if (field === "containerPort") {
-                const autoNameBefore = deps.buildAutoPortName(port.protocol, port.containerPort)
-                const autoNameAfter = deps.buildAutoPortName(port.protocol, value)
-                const currentName = port.name.trim()
-                const hasAutoPatternName = deps.isAutoPortNameForProtocol(currentName, port.protocol)
-                const shouldAutoRename =
-                  currentName.length === 0 ||
-                  hasAutoPatternName ||
-                  (Boolean(autoNameBefore) && currentName === autoNameBefore)
-                return {
-                  ...port,
-                  containerPort: value,
-                  ...(shouldAutoRename && autoNameAfter ? { name: autoNameAfter } : {}),
-                }
-              }
-
+            if (field === "protocol") {
+              const nextProtocol = value.toUpperCase()
+              if (!deps.CONTAINER_PORT_PROTOCOL_SET.has(nextProtocol)) return port
+              const normalizedProtocol = nextProtocol as ContainerPortProtocol
+              const replacedName = deps.replaceProtocolPrefixInName(port.name, normalizedProtocol)
+              const nextName = replacedName ?? port.name
+              if (port.protocol === normalizedProtocol && port.name === nextName) return port
               return {
                 ...port,
-                name: value,
+                protocol: normalizedProtocol,
+                name: nextName,
               }
-            }),
+            }
+
+            if (field === "containerPort") {
+              const autoNameBefore = deps.buildAutoPortName(port.protocol, port.containerPort)
+              const autoNameAfter = deps.buildAutoPortName(port.protocol, value)
+              const currentName = port.name.trim()
+              const hasAutoPatternName = deps.isAutoPortNameForProtocol(currentName, port.protocol)
+              const shouldAutoRename =
+                currentName.length === 0 ||
+                hasAutoPatternName ||
+                (Boolean(autoNameBefore) && currentName === autoNameBefore)
+              const nextName = shouldAutoRename && autoNameAfter ? autoNameAfter : port.name
+              if (port.containerPort === value && port.name === nextName) return port
+              return {
+                ...port,
+                containerPort: value,
+                name: nextName,
+              }
+            }
+
+            if (port.name === value) return port
+            return {
+              ...port,
+              name: value,
+            }
+          })
+          const portsChanged = nextPorts.some((port, index) => port !== item.ports[index])
+          if (!portsChanged) return item
+          changed = true
+          return {
+            ...item,
+            ports: nextPorts,
           }
         })
-      )
+        return changed ? nextContainers : current
+      })
       setEditingPortFieldErrors({})
       if (submitError) setSubmitError(null)
     },
@@ -317,16 +348,19 @@ export function useContainerEditor({ deps, submitError, setSubmitError }: Contai
 
   const clearContainerEnv = React.useCallback(
     (containerId: string) => {
-      setContainers((current) =>
-        current.map((item) =>
-          item.id === containerId
-            ? {
-                ...item,
-                env: [],
-              }
-            : item
-        )
-      )
+      setContainers((current) => {
+        let changed = false
+        const next = current.map((item) => {
+          if (item.id !== containerId) return item
+          if (item.env.length === 0) return item
+          changed = true
+          return {
+            ...item,
+            env: [],
+          }
+        })
+        return changed ? next : current
+      })
       setEditingEnvDuplicateIds([])
       if (submitError) setSubmitError(null)
     },

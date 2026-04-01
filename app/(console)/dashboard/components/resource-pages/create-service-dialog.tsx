@@ -1099,9 +1099,17 @@ export function CreateServiceDialog({
 
   const updateSelectorItem = React.useCallback(
     (id: string, field: "key" | "value", value: string) => {
-      setSelectorItems((current) =>
-        current.map((item) => (item.id === id ? { ...item, [field]: value } : item))
-      )
+      let changed = false
+      setSelectorItems((current) => {
+        const next = current.map((item) => {
+          if (item.id !== id) return item
+          if (item[field] === value) return item
+          changed = true
+          return { ...item, [field]: value }
+        })
+        return changed ? next : current
+      })
+      if (!changed) return
       setServiceCompleted(false)
       if (selectorError) setSelectorError(null)
       if (stepError) setStepError(null)
@@ -1111,10 +1119,13 @@ export function CreateServiceDialog({
 
   const removeSelectorItem = React.useCallback(
     (id: string) => {
+      let changed = false
       setSelectorItems((current) => {
         const next = current.filter((item) => item.id !== id)
-        return next
+        changed = next.length !== current.length
+        return changed ? next : current
       })
+      if (!changed) return
       setServiceCompleted(false)
       if (selectorError) setSelectorError(null)
       if (stepError) setStepError(null)
@@ -1147,8 +1158,9 @@ export function CreateServiceDialog({
 
   const updatePortItem = React.useCallback(
     (id: string, field: keyof Omit<PortItem, "id">, value: string) => {
-      setPortItems((current) =>
-        current.map((item) => {
+      let changed = false
+      setPortItems((current) => {
+        const next = current.map((item) => {
           if (item.id !== id) return item
 
           if (field === "targetPort") {
@@ -1167,24 +1179,35 @@ export function CreateServiceDialog({
               hasAutoPatternName ||
               (Boolean(autoNameBefore) && currentName === autoNameBefore)
 
-            const next: PortItem = {
+            const nextName = shouldAutoRename
+              ? autoNameAfter ?? `${resolveProtocolNamePrefix(item.protocol)}-`
+              : item.name
+
+            if (
+              item.targetPort === value &&
+              item.servicePort === nextServicePort &&
+              item.name === nextName
+            ) {
+              return item
+            }
+
+            changed = true
+            return {
               ...item,
               targetPort: value,
               servicePort: nextServicePort,
+              name: nextName,
             }
-
-            if (shouldAutoRename) {
-              next.name = autoNameAfter ?? `${resolveProtocolNamePrefix(item.protocol)}-`
-            }
-
-            return next
           }
 
           if (field !== "protocol") {
+            if (item[field] === value) return item
+            changed = true
             return { ...item, [field]: value }
           }
 
           const nextProtocol = value as PortItem["protocol"]
+          if (item.protocol === nextProtocol) return item
           const next: PortItem = {
             ...item,
             protocol: nextProtocol,
@@ -1192,6 +1215,7 @@ export function CreateServiceDialog({
 
           const replacedName = replaceProtocolPrefixInName(item.name, nextProtocol)
           if (replacedName) {
+            changed = true
             return {
               ...next,
               name: replacedName,
@@ -1202,20 +1226,25 @@ export function CreateServiceDialog({
             const fallbackPort = item.servicePort || item.targetPort
             const autoName = buildAutoPortName(nextProtocol, fallbackPort)
             if (autoName) {
+              changed = true
               return {
                 ...next,
                 name: autoName,
               }
             }
+            changed = true
             return {
               ...next,
               name: `${resolveProtocolNamePrefix(nextProtocol)}-`,
             }
           }
 
+          changed = true
           return next
         })
-      )
+        return changed ? next : current
+      })
+      if (!changed) return
       setServiceCompleted(false)
       if (portError) setPortError(null)
       setPortFieldErrors((current) => {
@@ -1250,7 +1279,13 @@ export function CreateServiceDialog({
 
   const removePortItem = React.useCallback(
     (id: string) => {
-      setPortItems((current) => current.filter((item) => item.id !== id))
+      let changed = false
+      setPortItems((current) => {
+        const next = current.filter((item) => item.id !== id)
+        changed = next.length !== current.length
+        return changed ? next : current
+      })
+      if (!changed) return
       setServiceCompleted(false)
       if (portError) setPortError(null)
       setPortFieldErrors((current) => {

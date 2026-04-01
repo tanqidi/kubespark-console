@@ -605,7 +605,10 @@ export function CreatePodDialog({
 
   const updateStorageVolumeDraft = React.useCallback(
     <K extends keyof StorageVolumeDraft>(field: K, value: StorageVolumeDraft[K]) => {
-      setStorageVolumeDraft((current) => ({ ...current, [field]: value }))
+      setStorageVolumeDraft((current) => {
+        if (current[field] === value) return current
+        return { ...current, [field]: value }
+      })
     },
     []
   )
@@ -616,12 +619,20 @@ export function CreatePodDialog({
       field: K,
       value: StorageVolumeDraft["mounts"][number][K]
     ) => {
-      setStorageVolumeDraft((current) => ({
-        ...current,
-        mounts: current.mounts.map((item) =>
-          item.containerName === containerName ? { ...item, [field]: value } : item
-        ),
-      }))
+      setStorageVolumeDraft((current) => {
+        let changed = false
+        const nextMounts = current.mounts.map((item) => {
+          if (item.containerName !== containerName) return item
+          if (item[field] === value) return item
+          changed = true
+          return { ...item, [field]: value }
+        })
+        if (!changed) return current
+        return {
+          ...current,
+          mounts: nextMounts,
+        }
+      })
     },
     []
   )
@@ -773,7 +784,10 @@ export function CreatePodDialog({
 
   const updateConfigMountDraft = React.useCallback(
     <K extends keyof ConfigMountDraft>(field: K, value: ConfigMountDraft[K]) => {
-      setConfigMountDraft((current) => ({ ...current, [field]: value }))
+      setConfigMountDraft((current) => {
+        if (current[field] === value) return current
+        return { ...current, [field]: value }
+      })
     },
     []
   )
@@ -784,12 +798,20 @@ export function CreatePodDialog({
       field: K,
       value: ConfigMountDraft["mounts"][number][K]
     ) => {
-      setConfigMountDraft((current) => ({
-        ...current,
-        mounts: current.mounts.map((item) =>
-          item.containerName === containerName ? { ...item, [field]: value } : item
-        ),
-      }))
+      setConfigMountDraft((current) => {
+        let changed = false
+        const nextMounts = current.mounts.map((item) => {
+          if (item.containerName !== containerName) return item
+          if (item[field] === value) return item
+          changed = true
+          return { ...item, [field]: value }
+        })
+        if (!changed) return current
+        return {
+          ...current,
+          mounts: nextMounts,
+        }
+      })
     },
     []
   )
