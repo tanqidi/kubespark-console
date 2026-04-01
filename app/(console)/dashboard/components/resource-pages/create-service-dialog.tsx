@@ -13,6 +13,7 @@ import {
 import { parse, stringify } from "yaml"
 
 import { checkServiceExists, createService, updateService } from "@/app/lib/kubespark/services"
+import { createRuntimeId } from "@/app/lib/kubespark/id"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {
@@ -170,7 +171,7 @@ const PORT_PROTOCOL_SET = new Set<string>(PORT_PROTOCOL_OPTIONS)
 
 function createUniqueId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `${prefix}-${crypto.randomUUID()}`
+    return `${prefix}-${createRuntimeId()}`
   }
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
@@ -1978,3 +1979,4 @@ export function CreateServiceDialog({
     </Dialog>
   )
 }
+

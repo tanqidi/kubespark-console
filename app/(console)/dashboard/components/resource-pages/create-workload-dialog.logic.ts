@@ -16,6 +16,7 @@ import type {
   ContainerType,
 } from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog.logic"
 import type { ContainerPortFieldErrors } from "@/app/lib/kubespark/form-validation"
+import { createRuntimeId } from "@/app/lib/kubespark/id"
 import { parse, stringify } from "yaml"
 import {
   applyStorageToVolumesAndMounts,
@@ -754,7 +755,7 @@ export function createContainerDraftFromInitial(
     .filter((item): item is NonNullable<ReturnType<typeof createContainerEnvDraft>> => Boolean(item))
 
   return {
-    id: crypto.randomUUID(),
+    id: createRuntimeId(),
     name: asString(value.name),
     type: value.type === "initContainer" ? "initContainer" : "container",
     image: asString(value.image),
@@ -776,7 +777,7 @@ export function createContainerDraftFromInitial(
     ports:
       Array.isArray(value.ports) && value.ports.length > 0
         ? value.ports.map((port) => ({
-            id: crypto.randomUUID(),
+            id: createRuntimeId(),
             protocol: toOptionalPortProtocol(port.protocol) ?? "TCP",
             name: asString(port.name),
             containerPort: asString(port.containerPort),
@@ -1241,7 +1242,7 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
             const containerPortText = toOptionalIntegerString(portObj.containerPort)
             if (!containerPortText) return null
             return {
-              id: crypto.randomUUID(),
+              id: createRuntimeId(),
               protocol: toOptionalPortProtocol(portObj.protocol) ?? "TCP",
               name: asString(portObj.name),
               containerPort: containerPortText,
@@ -1302,7 +1303,7 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
             : "IfNotPresent"
 
         return {
-          id: crypto.randomUUID(),
+          id: createRuntimeId(),
           name: asString(item.name),
           type,
           image: asString(item.image),
@@ -1446,7 +1447,7 @@ export function parseWorkloadYamlText(kind: WorkloadCreateKind, yamlText: string
 
 export function createContainerDraft(): ContainerDraft {
   return {
-    id: crypto.randomUUID(),
+    id: createRuntimeId(),
     name: "",
     type: "container",
     image: "",
@@ -1468,7 +1469,7 @@ export function createContainerDraft(): ContainerDraft {
 
 export function createContainerPortDraft(index: number): ContainerPortDraft {
   return {
-    id: crypto.randomUUID(),
+    id: createRuntimeId(),
     protocol: "TCP",
     name: `tcp-${index}`,
     containerPort: "",
@@ -1483,7 +1484,7 @@ export function createContainerEnvDraft(defaults?: {
   sourceKey?: string
 }) {
   return {
-    id: crypto.randomUUID(),
+    id: createRuntimeId(),
     source: defaults?.source ?? "custom",
     name: defaults?.name ?? "",
     value: defaults?.value ?? "",
@@ -1613,3 +1614,4 @@ export function toOptionalNonNegativeInt(value: string): number | undefined {
   if (!Number.isFinite(parsed)) return undefined
   return Math.max(0, parsed)
 }
+
