@@ -253,13 +253,14 @@ export async function updatePod(input: UpdatePodInput): Promise<void> {
   const existing = asObject(payload)
   const existingMetadata = asObject(existing.metadata)
   const existingAnnotations = asObject(existingMetadata.annotations)
-  const mergedAnnotations = {
+  const mergedAnnotationsBase = {
     ...existingAnnotations,
     ...buildDescriptionPatch(input.description).annotations,
   }
-  if (mergedAnnotations.description === null) {
-    delete mergedAnnotations.description
-  }
+  const mergedAnnotations =
+    mergedAnnotationsBase.description === null
+      ? (({ description: _description, ...rest }) => rest)(mergedAnnotationsBase)
+      : mergedAnnotationsBase
 
   let spec: Record<string, unknown> | null = null
   if (input.podSpec && typeof input.podSpec === "object" && !Array.isArray(input.podSpec)) {

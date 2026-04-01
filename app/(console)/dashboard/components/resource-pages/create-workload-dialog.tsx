@@ -426,7 +426,7 @@ export function CreateWorkloadDialog({
         sourceName: typeof item.sourceName === "string" ? item.sourceName.trim() : "",
         mounts: Array.isArray(item.mounts)
           ? item.mounts
-              .map((mount) => ({
+              .map((mount): ConfigMountDraft["mounts"][number] => ({
                 containerName: typeof mount.containerName === "string" ? mount.containerName.trim() : "",
                 mountMode: mount.mountMode === "ro" ? "ro" : "none",
                 mountPath: typeof mount.mountPath === "string" ? mount.mountPath.trim() : "",

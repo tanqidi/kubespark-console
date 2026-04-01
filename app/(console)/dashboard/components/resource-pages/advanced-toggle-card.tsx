@@ -23,9 +23,8 @@ export function AdvancedToggleCard({
   onCheckedChange,
   children,
 }: AdvancedToggleCardProps) {
-  const hasBodyContent = React.Children.toArray(children).some(
-    (child) => child !== null && child !== undefined && child !== false
-  )
+  // Keep behavior aligned with previous implementation: ignore null/undefined/false children.
+  const hasBodyContent = React.Children.toArray(children).length > 0
 
   return (
     <div className="rounded-lg border bg-muted/20 p-4">

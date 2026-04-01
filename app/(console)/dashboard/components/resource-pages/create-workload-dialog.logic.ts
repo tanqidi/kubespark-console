@@ -110,8 +110,8 @@ export type WorkloadDialogInitialValues = {
       type?: ContainerType
       image: string
       imagePullPolicy?: "Always" | "IfNotPresent" | "Never"
-      command?: string[]
-      args?: string[]
+      command?: string | string[]
+      args?: string | string[]
       syncHostTimezone?: boolean
       env?: Array<{
         name?: string

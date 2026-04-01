@@ -856,17 +856,18 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
         const normalizedStorageList = (source.pod.storageList ?? [])
           .map((storageItem) => {
-            const normalizedStorageName = storageItem.volumeName.trim()
-            const currentStorageId = storageItem.volumeId.trim()
+            const normalizedStorageName =
+              typeof storageItem.volumeName === "string" ? storageItem.volumeName.trim() : ""
+            const currentStorageId = typeof storageItem.volumeId === "string" ? storageItem.volumeId.trim() : ""
             const normalizedStorageId =
               storageItem.volumeKind === "ephemeral"
                 ? normalizedStorageName
                 : currentStorageId || normalizedStorageName
-            const normalizedStorageMounts = storageItem.mounts
+            const normalizedStorageMounts = (Array.isArray(storageItem.mounts) ? storageItem.mounts : [])
               .map((item) => ({
-                containerName: item.containerName.trim(),
+                containerName: typeof item.containerName === "string" ? item.containerName.trim() : "",
                 mountMode: item.mountMode,
-                mountPath: item.mountPath.trim(),
+                mountPath: typeof item.mountPath === "string" ? item.mountPath.trim() : "",
               }))
               .filter(
                 (item) =>

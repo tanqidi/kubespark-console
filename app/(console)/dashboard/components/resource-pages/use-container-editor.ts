@@ -18,7 +18,7 @@ import {
 
 export type ContainerEditorDeps = {
   CONTAINER_PORT_PROTOCOL_SET: Set<string>
-  buildAutoPortName: (protocol: ContainerPortProtocol, containerPort: string) => string
+  buildAutoPortName: (protocol: ContainerPortProtocol, containerPort: string) => string | null
   createContainerDraft: () => ContainerDraft
   createContainerEnvDraft: (defaults?: {
     source?: ContainerEnvVarSource

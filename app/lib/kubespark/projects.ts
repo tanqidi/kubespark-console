@@ -135,14 +135,12 @@ export async function updateNamespace(input: UpdateNamespaceInput): Promise<void
       ? (existingMetadata.annotations as Record<string, unknown>)
       : {}
 
-  const mergedAnnotations: Record<string, unknown> = {
-    ...existingAnnotations,
-  }
-  if (description) {
-    mergedAnnotations.description = description
-  } else {
-    delete mergedAnnotations.description
-  }
+  const mergedAnnotations: Record<string, unknown> = description
+    ? {
+        ...existingAnnotations,
+        description,
+      }
+    : (({ description: _description, ...rest }) => rest)(existingAnnotations)
 
   const requestBody = {
     apiVersion: "v1",

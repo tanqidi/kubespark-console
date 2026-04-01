@@ -208,6 +208,36 @@ function parseYamlText(yamlText: string): {
   })
 
   const parsedJob = parseJobYamlText("Job", fakeJobYaml)
+  const normalizedConfigList = (parsedJob.pod.configList ?? [])
+    .map((configItem) => {
+      const sourceKind =
+        configItem.sourceKind === "configMap" || configItem.sourceKind === "secret"
+          ? configItem.sourceKind
+          : null
+      const sourceName = typeof configItem.sourceName === "string" ? configItem.sourceName.trim() : ""
+      const mounts = (Array.isArray(configItem.mounts) ? configItem.mounts : [])
+        .map((item) => ({
+          containerName: typeof item.containerName === "string" ? item.containerName.trim() : "",
+          mountMode: item.mountMode === "ro" ? "ro" : "none",
+          mountPath: typeof item.mountPath === "string" ? item.mountPath.trim() : "",
+        }))
+        .filter((item) => item.containerName.length > 0 && item.mountPath.length > 0)
+      if (!sourceKind || !sourceName) return null
+      return {
+        sourceKind,
+        sourceName,
+        ...(mounts.length > 0 ? { mounts } : {}),
+      }
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        sourceKind: "configMap" | "secret"
+        sourceName: string
+        mounts?: Array<{ containerName: string; mountMode: "none" | "ro"; mountPath: string }>
+      } => Boolean(item)
+    )
 
   return {
     snapshot: {
@@ -215,7 +245,7 @@ function parseYamlText(yamlText: string): {
       namespace: asString(metadata.namespace),
       description: asString(annotations.description),
       storageList: parsedJob.pod.storageList ?? [],
-      configList: parsedJob.pod.configList ?? [],
+      configList: normalizedConfigList,
     },
     containers: parsedJob.pod.containers,
   }
@@ -489,16 +519,16 @@ export function CreatePodDialog({
       setEditingStorageVolumeIndex(null)
       setStorageSaveAttempted(false)
 
-      const normalizedConfig = Array.isArray(next.configList)
+      const normalizedConfig: ConfigMountDraft[] = Array.isArray(next.configList)
         ? next.configList
-            .map((item) => ({
+            .map((item): ConfigMountDraft => ({
               sourceKind: item.sourceKind === "secret" ? "secret" : "configMap",
-              sourceName: item.sourceName.trim(),
+              sourceName: typeof item.sourceName === "string" ? item.sourceName.trim() : "",
               mounts: (Array.isArray(item.mounts) ? item.mounts : [])
-                .map((mount) => ({
-                  containerName: mount.containerName.trim(),
+                .map((mount): ConfigMountDraft["mounts"][number] => ({
+                  containerName: typeof mount.containerName === "string" ? mount.containerName.trim() : "",
                   mountMode: mount.mountMode === "ro" ? "ro" : "none",
-                  mountPath: mount.mountPath.trim(),
+                  mountPath: typeof mount.mountPath === "string" ? mount.mountPath.trim() : "",
                 }))
                 .filter((mount) => mount.containerName.length > 0),
             }))

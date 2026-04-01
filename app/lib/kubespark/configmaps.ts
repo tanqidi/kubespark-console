@@ -157,13 +157,14 @@ export async function updateConfigMap(input: UpdateConfigMapInput): Promise<void
   const existing = asObject(payload)
   const existingMetadata = asObject(existing.metadata)
   const existingAnnotations = asObject(existingMetadata.annotations)
-  const mergedAnnotations = {
+  const mergedAnnotationsBase = {
     ...existingAnnotations,
     ...buildDescriptionPatch(input.description).annotations,
   }
-  if (mergedAnnotations.description === null) {
-    delete mergedAnnotations.description
-  }
+  const mergedAnnotations =
+    mergedAnnotationsBase.description === null
+      ? (({ description: _description, ...rest }) => rest)(mergedAnnotationsBase)
+      : mergedAnnotationsBase
 
   const requestBody = {
     apiVersion: "v1",
