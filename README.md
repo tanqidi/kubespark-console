@@ -55,60 +55,27 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
   - 编辑时不强制改写原有卷名。
 - 保存校验按“卷名”维度处理重复，允许“同 PVC、不同卷名”的合法场景。
 
-## 最近迭代亮点（2026-03-31）
+## Kubernetes 部署
 
-- 完成 Job/CronJob 存储配置联调：真实 PVC 拉取、回显一致性、自定义卷名兼容、重复校验优化。
-- 修复容器步骤校验回归：恢复“无容器点击下一步”的卡片警告与拦截行为。
-- 完成应用路由（Ingress）创建/编辑能力：
-  - 支持“路由规则 + 高级设置”多步骤录入与 YAML 模式互转。
-  - 规则按 `host` 聚合展示，支持同一域名多路径维护（新增/编辑/删除）。
-  - 同一 `host` 下路径重复改为行内实时告警，避免底部大段错误提示干扰。
-- 路由提交与 YAML 生成链路修正：
-  - 同一 `host` 的多条路径会合并到同一个 `spec.rules[].http.paths`。
-  - 避免生成重复 `host` 规则块，和 Kubernetes Ingress 结构保持一致。
-- Deployment 创建交互优化：
-  - 高级设置中的“调度策略”创建默认改为未勾选（不自动开启）。
-- 相关改动已通过 ESLint 检查，详见开发进度文档：
-  - [docs/DEVELOPMENT-PROGRESS.md](docs/DEVELOPMENT-PROGRESS.md)
+使用仓库内示例 YAML 创建 `Namespace + RBAC + Deployment + Service`。
 
-## 部署方式（DockerHub + Kubernetes）
+### 1) 应用部署清单
 
-当前推荐部署链路：
+示例文件（按顺序应用）：
 
-1. GitHub Actions 构建并推送镜像到 Docker Hub（标签固定 `:dev`）。
-2. Kubernetes 使用仓库内示例 YAML 一键创建 `Namespace + Deployment + Service(NodePort)`。
-
-### 1) CI 推镜像（dev）
-
-- Workflow：`.github/workflows/docker-image.yml`
-- 触发：`push dev` / `pull_request dev` / `workflow_dispatch`
-- 镜像标签：`${DOCKERHUB_IMAGE}:dev`
-
-需要配置 GitHub 仓库变量：
-
-- `DOCKERHUB_IMAGE`：例如 `tanqidi/kubespark-console`（不要带 `:dev`）
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`（Docker Hub Access Token）
-
-### 2) Kubernetes 部署
-
-示例文件：
-
-- `deployment/kubespark-console-deployment.yaml`
-
-该文件按顺序包含：
-
-- `Namespace`：`kubespark`
-- `Deployment`：`kubespark-console`
-- `Service`：`kubespark-console`（`NodePort: 33088`）
+- `deployment/kubespark-rbac.yaml`（Namespace + ServiceAccount + ClusterRoleBinding）
+- `deployment/kubespark-deployment.yaml`（后端 kubespark Deployment + Service）
+- `deployment/kubespark-console-deployment.yaml`（前端 console Deployment + Service）
 
 应用：
 
 ```bash
+kubectl apply -f deployment/kubespark-rbac.yaml
+kubectl apply -f deployment/kubespark-deployment.yaml
 kubectl apply -f deployment/kubespark-console-deployment.yaml
 ```
 
-### 3) 后端地址配置（关键）
+### 2) 后端地址配置（关键）
 
 控制台通过 `/api/kubespark` 代理访问后端，需在控制台容器设置：
 
@@ -119,7 +86,17 @@ kubectl apply -f deployment/kubespark-console-deployment.yaml
 ```yaml
 env:
   - name: KUBESPARK_API_BASE
-    value: "http://kubesphere-apiserver.kubesphere-system.svc:80"
+    value: "http://kubespark:8080"
+```
+
+### 3) dev 标签镜像更新说明（重要）
+
+当前处于快速迭代阶段，镜像标签固定为 `:dev`。即使 `imagePullPolicy: Always`，当 Pod 未重建时也不会自动替换为新镜像。  
+每次推送新镜像后，建议执行：
+
+```bash
+kubectl rollout restart deployment/kubespark -n kubespark
+kubectl rollout restart deployment/kubespark-console -n kubespark
 ```
 
 ## Shell Recommendation

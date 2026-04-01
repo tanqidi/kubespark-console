@@ -1,22 +1,20 @@
-# KubeSpark React 项目架构总览
+# KubeSpark React 架构文档
 
-更新时间：2026-03-25
+更新时间：2026-04-01
 
 ## 1. 项目定位
 
-本项目是基于 Next.js App Router 的 Kubernetes 控制台前端，目标是：
+本项目是基于 Next.js App Router 的 Kubernetes 控制台前端，主入口 `/dashboard`，当前聚焦：
 
-- 统一通过 GVR 接口访问资源。
-- 提供一致的列表、筛选、YAML 查看、创建/编辑、删除交互。
-- 通过轮询刷新保证页面状态与集群状态逐步一致。
-
-主入口：`/dashboard`。
+- 统一通过 GVR 接口访问资源
+- 提供一致的 CRUD 与 YAML 交互体验
+- 通过轮询机制让页面状态与集群状态逐步一致
 
 ## 2. 分层架构
 
 ```text
 UI 层 (app/(console)/dashboard/components)
-  ├─ 资源页面：workloads/jobs/pods/services/routes/... 
+  ├─ 资源页面：workloads/jobs/pods/services/routes/...
   ├─ 资源弹窗：create-*-dialog.tsx
   ├─ 共享片段：container-list-panel.tsx / storage-volume-list.tsx
   ├─ 通用表格：DataTable + TableToolbar + ColumnsFactory
@@ -24,98 +22,150 @@ UI 层 (app/(console)/dashboard/components)
 
 交互编排层
   ├─ create-*-dialog.controller.ts
-  └─ 共享 Hook：use-container-editor.ts
+  └─ use-container-editor.ts
 
 纯逻辑层
   ├─ create-*-dialog.logic.ts
-  └─ 存储工具：pod-storage-utils.ts
+  └─ pod-storage-utils.ts
 
 领域层 (app/lib/kubespark)
-  ├─ common.ts: 请求、鉴权、响应解包、GVR URL
+  ├─ common.ts: 请求、鉴权、解包、GVR URL
   ├─ resource-rows.ts: 列表映射
-  ├─ resource-yaml.ts/resource-document.ts: YAML 拉取与规范化
+  ├─ resource-yaml.ts / resource-document.ts: YAML 拉取与规范化
   ├─ resource-delete.ts: 删除能力
-  ├─ resource-create.ts: 创建/更新能力聚合导出
-  ├─ jobs.ts/workloads.ts/services.ts/...: 资源写操作实现
-  └─ pod-storage.ts: Job/CronJob 存储挂载拼装共享逻辑
+  ├─ resource-create.ts: 创建/更新聚合导出
+  ├─ jobs.ts / workloads.ts / services.ts / configmaps.ts / secrets.ts
+  └─ pod-storage.ts: Job/CronJob 存储挂载共享拼装
 
 网关层
   └─ app/api/kubespark/[[...path]]/route.ts (GET/POST/PUT/DELETE)
-
-上游层
-  └─ /kapis/v1alpha1/resources/{group}/{version}/{resource}
 ```
 
-## 3. 核心请求链路
+## 3. 目录结构
 
-### 3.1 列表
+```text
+app/
+├─ api/kubespark/[[...path]]/route.ts
+├─ (console)/dashboard/
+│  ├─ [...slug]/page.tsx
+│  └─ components/resource-pages/
+│     ├─ *-page.tsx
+│     ├─ create-*-dialog.tsx
+│     ├─ create-*-dialog.controller.ts
+│     ├─ create-*-dialog.logic.ts
+│     ├─ container-list-panel.tsx
+│     ├─ storage-volume-list.tsx
+│     ├─ pod-storage-utils.ts
+│     └─ use-container-editor.ts
+└─ lib/kubespark/
+   ├─ common.ts
+   ├─ resource-rows.ts
+   ├─ resource-yaml.ts
+   ├─ resource-document.ts
+   ├─ resource-delete.ts
+   ├─ resource-create.ts
+   ├─ jobs.ts / workloads.ts / services.ts / configmaps.ts / secrets.ts
+   ├─ pod-storage.ts
+   └─ auth.ts
+```
 
-页面 `useEffect` 首次加载 + 定时轮询 -> `fetch*Rows` -> `fetchResourceCollection` -> `/api/kubespark` 代理 -> 上游 -> 行映射展示。
+## 4. 路由与页面映射
 
-### 3.2 查看 YAML
+`app/(console)/dashboard/[...slug]/page.tsx` 按 `slug[0]` 映射：
 
-行操作 -> `fetchNamespacedResourceYaml` -> `fetchResourceByName(fieldSelector)` -> `resource-document.ts` 规范化 -> Monaco 展示。
+- `nodes`
+- `projects`
+- `workloads`
+- `jobs`
+- `pods`
+- `services`
+- `routes`
+- `configmaps`
+- `secrets`
+- `volumes`
+- `storageclasses`
 
-### 3.3 创建/编辑
+## 5. 模块能力矩阵
 
-- Job/CronJob：表单快照 -> `jobs.ts(createJob/updateJob)` 组装资源体 -> `POST/PUT`
-- Workload：表单快照先生成 manifest -> `workloads.ts(createWorkload/updateWorkload)` 提交 `payload`
+| 模块 | 列表 | 创建 | 编辑 | 删除 | YAML |
+|---|---|---|---|---|---|
+| Namespace | ✅ | ✅ | ⏳ | ✅ | ✅ |
+| ConfigMap | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Secret | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Service | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Job | ✅ | ✅ | ✅ | ✅ | ✅ |
+| CronJob | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Workload(Deploy/STS/DS) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Pod | ✅ | ⏳ | ⏳ | ✅ | ✅ |
+| Ingress | ✅ | ✅ | ✅ | ✅ | ✅ |
+| PV/PVC | ✅ | ✅ | ⏳ | ✅ | ✅ |
+| StorageClass | ✅ | ⏳ | ⏳ | ✅ | ✅ |
+| Node | ✅ | N/A | N/A | N/A | ⏳ |
 
-### 3.4 删除
+## 6. 核心请求链路
 
-统一删除确认弹窗 -> `resource-delete.ts` -> 删除请求成功后等待轮询刷新。
+1. 列表：`fetch*Rows` -> `fetchResourceCollection` -> `/api/kubespark` -> 上游接口  
+2. 查看 YAML：`fetchResourceByName(fieldSelector)` -> `resource-document.ts` 规范化 -> Monaco  
+3. 创建/编辑：
+- Job/CronJob：结构化表单 -> `jobs.ts` 组装资源体 -> `POST/PUT`
+- Workload：表单构建 manifest -> `workloads.ts` 提交 payload  
+4. 删除：统一确认弹窗 -> `resource-delete.ts` -> 轮询刷新
 
-## 4. 当前关键设计决策
+## 7. 统一客户端细节（`common.ts`）
 
-### 4.1 统一 GVR 与统一代理
+- 路径：`/kapis/v1alpha1/resources/{group}/{version}/{resource}`
+- query：`namespace` / `fieldSelector` / `labelSelector`
+- 自动读取 `kubespark_token` 并注入 `Authorization`
+- GET in-flight 去重
+- envelope 统一解包
+- 401 自动跳转登录
 
-所有资源尽量走同一请求约定，避免模块散落专用接口。
+## 8. API 代理能力
 
-### 4.2 复杂弹窗采用三层结构
+`app/api/kubespark/[[...path]]/route.ts` 当前支持：
 
-- `*.tsx`：视图
-- `*.controller.ts`：状态与提交流程
-- `*.logic.ts`：纯函数与数据转换
+- 已支持：`GET` / `POST` / `PUT` / `DELETE`
+- 未支持：`PATCH`
+- 透传 `Authorization`、query、body
+- 上游失败返回 `502` + `upstreamUrl`
 
-### 4.3 存储与容器能力已做跨模块共享
+## 9. 共享抽取
 
-存储共享：
+存储能力：
 
 - UI：`storage-volume-list.tsx`
 - 前端转换：`pod-storage-utils.ts`
 - 后端拼装：`app/lib/kubespark/pod-storage.ts`
 
-容器共享：
+容器能力：
 
 - UI：`container-list-panel.tsx`
-- 交互逻辑：`use-container-editor.ts`
+- Hook：`use-container-editor.ts`
 
-收益：Job/CronJob 与 Workload 的交互一致、维护入口集中、重复代码显著减少。
+## 10. YAML 规范化
 
-### 4.4 统一校验与错误定位
+`resource-document.ts` 默认清理运行时字段（如 `uid/resourceVersion/managedFields/status`），已覆盖 pod/job/cronjob/service/ingress/configmap/secret/storageclass/pv/pvc/deployment/statefulset/daemonset/namespace 等资源。
 
-`app/lib/kubespark/form-validation.ts` 负责“首错定位 + 滚动聚焦”，业务文案保留在页面侧。
+## 11. 表格与轮询
 
-## 5. 路由与页面组织
+- `DataTable`：选择、分页、列控制、批量删除、拖拽排序
+- `TableToolbar`：正常态/选中态切换
+- 轮询：首次加载 + 每 3 秒静默刷新（失败仅日志）
 
-- `app/(console)/dashboard/[...slug]/page.tsx`：按 slug 分发页面组件
-- `resource-pages/*`：资源页与资源弹窗
-- 当前主页面覆盖：`nodes/projects/workloads/jobs/pods/services/routes/configmaps/secrets/volumes/storageclasses`
+## 12. Dialog 内 Combobox 约定
 
-## 6. 配置与环境变量
+- 在 Dialog 内使用 `ComboboxContent` 必须传 `container` 到弹窗容器 ref。
+- 推荐：`<ComboboxContent anchor={anchor} container={dialogContainerRef} />`
+- 目的：避免 portal 到 `body` 后 hover/选中异常。
 
-- `KUBESPARK_API_BASE`：代理上游地址
-- `NEXT_PUBLIC_API_PROXY_BASE`：前端代理前缀（默认 `/api/kubespark`）
-- `NEXT_PUBLIC_LOCALE`：前端文案语言
-- Windows 终端建议：优先使用 PowerShell 7，其次 Git Bash（避免编码乱码）
+## 13. 环境变量
 
-## 7. 当前边界
+- `KUBESPARK_API_BASE`
+- `NEXT_PUBLIC_API_PROXY_BASE`
+- `NEXT_PUBLIC_LOCALE`
 
-- 代理支持 `GET/POST/PUT/DELETE`，尚未支持 `PATCH`。
-- 监控类能力（指标/告警/日志分析）不在当前 CRUD 首期范围。
+## 14. 当前边界
 
-## 8. 下一步建议
-
-1. 补齐 Ingress/PV(PVC)/StorageClass 的创建/编辑链路。
-2. 继续抽取可重复的表单片段（如策略区、基础信息区）。
-3. 评估 `PATCH` 透传能力，减少全量 `PUT` 负担。
+- 代理层暂未支持 `PATCH`
+- StorageClass/Node 等资源仍有部分 CRUD 缺口
+- 高频输入路径仍有性能优化空间
