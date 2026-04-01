@@ -103,3 +103,9 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+## 社区交流
+
+欢迎加入 KubeSpark 用户交流群，反馈问题、交流使用经验与部署实践：
+
+- QQ 群：`1095765093`
