@@ -75,21 +75,7 @@ kubectl apply -f deployment/kubespark-deployment.yaml
 kubectl apply -f deployment/kubespark-console-deployment.yaml
 ```
 
-### 2) 后端地址配置（关键）
-
-控制台通过 `/api/kubespark` 代理访问后端，需在控制台容器设置：
-
-- `KUBESPARK_API_BASE`：完整 URL（必须带 `http://` 或 `https://`）
-
-例如：
-
-```yaml
-env:
-  - name: KUBESPARK_API_BASE
-    value: "http://kubespark:8080"
-```
-
-### 3) dev 标签镜像更新说明（重要）
+### 2) dev 标签镜像更新说明（重要）
 
 当前处于快速迭代阶段，镜像标签固定为 `:dev`。即使 `imagePullPolicy: Always`，当 Pod 未重建时也不会自动替换为新镜像。  
 每次推送新镜像后，建议执行：
