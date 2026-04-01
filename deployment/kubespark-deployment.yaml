@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubespark
+  namespace: kubespark
+  labels:
+    app: kubespark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubespark
+  template:
+    metadata:
+      labels:
+        app: kubespark
+    spec:
+      serviceAccountName: kubespark-admin
+      containers:
+        - name: kubespark
+          image: tanqidi/kubespark:dev
+          imagePullPolicy: Always
+          ports:
+            - name: tcp-8080
+              containerPort: 8080
+          env:
+            - name: KUBESPARK_USERNAME
+              value: "tanqidi"
+            - name: KUBESPARK_PASSWORD
+              value: "123456"
+            - name: KUBESPARK_JWT_SECRET
+              value: "change-this-to-a-strong-random-secret"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubespark
+  namespace: kubespark
+  labels:
+    app: kubespark
+spec:
+  type: ClusterIP
+  selector:
+    app: kubespark
+  ports:
+    - name: tcp-8080
+      protocol: TCP
+      port: 8080
+      targetPort: tcp-8080
