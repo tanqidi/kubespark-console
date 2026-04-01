@@ -141,6 +141,7 @@ const persistentVolumeClaimColumns: ColumnConfig<PersistentVolumeClaimRow>[] = [
 
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
+const DESCRIPTION_MAX_LENGTH = 256
 
 function validateVolumeName(name: string): string | null {
   const value = name.trim().toLowerCase()
@@ -934,6 +935,10 @@ export function VolumesPageClient() {
 
     const validName = validateVolumeName(nextState.name)
     const validNamespace = nextState.namespace.trim() ? null : "请选择项目"
+    const validDescription =
+      nextState.description.trim().length <= DESCRIPTION_MAX_LENGTH
+        ? null
+        : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
     const storageNumber = Number(nextState.storageRequest.trim())
     const validStorage =
       nextState.storageRequest.trim() && Number.isFinite(storageNumber) && storageNumber > 0
@@ -950,21 +955,32 @@ export function VolumesPageClient() {
     setCreateStorageError(validStorage)
     setCreateStorageClassError(validStorageClass)
 
-    if (validName || validNamespace || validStorage || validStorageClass) {
+    if (validName || validNamespace || validDescription || validStorage || validStorageClass) {
       if (!createYamlMode) {
-        if (validName || validNamespace) {
+        if (validName || validNamespace || validDescription) {
           setCreateStep("basic")
         } else {
           setCreateStep("storage")
         }
       } else {
-        setCreateYamlError(validName ?? validNamespace ?? validStorageClass ?? validStorage ?? null)
+        setCreateYamlError(validName ?? validNamespace ?? validDescription ?? validStorageClass ?? validStorage ?? null)
       }
       return
     }
 
     setCreating(true)
     try {
+      const exists = await checkPersistentVolumeClaimExists({
+        name: nextState.name.trim().toLowerCase(),
+        namespace: nextState.namespace.trim(),
+      })
+      if (exists) {
+        const existsMessage = "卷声明名称已存在，请更换后重试"
+        setCreateNameError(existsMessage)
+        if (createYamlMode) setCreateYamlError(existsMessage)
+        else setCreateStep("basic")
+        return
+      }
       await createPersistentVolumeClaim({
         name: nextState.name.trim().toLowerCase(),
         namespace: nextState.namespace.trim(),
@@ -1127,6 +1143,10 @@ export function VolumesPageClient() {
     }
 
     const validName = validateVolumeName(nextState.name)
+    const validDescription =
+      nextState.description.trim().length <= DESCRIPTION_MAX_LENGTH
+        ? null
+        : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
     const storageNumber = Number(nextState.storageRequest.trim())
     const validStorage =
       nextState.storageRequest.trim() && Number.isFinite(storageNumber) && storageNumber > 0
@@ -1138,19 +1158,27 @@ export function VolumesPageClient() {
     setCreatePvStorageError(validStorage)
     setCreatePvHostPathError(validHostPath)
 
-    if (validName || validStorage || validHostPath) {
+    if (validName || validDescription || validStorage || validHostPath) {
       if (!createPvYamlMode) {
-        if (validName) setCreatePvStep("basic")
+        if (validName || validDescription) setCreatePvStep("basic")
         else if (validStorage) setCreatePvStep("storage")
         else setCreatePvStep("advanced")
       } else {
-        setCreatePvYamlError(validName ?? validStorage ?? validHostPath ?? null)
+        setCreatePvYamlError(validName ?? validDescription ?? validStorage ?? validHostPath ?? null)
       }
       return
     }
 
     setCreatingPv(true)
     try {
+      const exists = await checkPersistentVolumeExists(nextState.name.trim().toLowerCase())
+      if (exists) {
+        const existsMessage = "持久卷名称已存在，请更换后重试"
+        setCreatePvNameError(existsMessage)
+        if (createPvYamlMode) setCreatePvYamlError(existsMessage)
+        else setCreatePvStep("basic")
+        return
+      }
       await createPersistentVolume({
         name: nextState.name.trim().toLowerCase(),
         description: nextState.description.trim(),
@@ -1575,11 +1603,13 @@ export function VolumesPageClient() {
                         value={createDescription}
                         onChange={(event) => setCreateDescription(event.target.value)}
                         placeholder="请输入描述（选填）"
-                        maxLength={256}
+                        maxLength={DESCRIPTION_MAX_LENGTH}
                         className="min-h-24"
                         disabled={creating}
                       />
-                      <FieldDescription>描述将写入资源注解 `description`，最长 256 个字符。</FieldDescription>
+                      <FieldDescription>
+                        描述将写入资源注解 `description`，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                      </FieldDescription>
                     </Field>
                   </FieldGroup>
                 </div>
@@ -1886,11 +1916,13 @@ export function VolumesPageClient() {
                         value={createPvDescription}
                         onChange={(event) => setCreatePvDescription(event.target.value)}
                         placeholder="请输入描述（选填）"
-                        maxLength={256}
+                        maxLength={DESCRIPTION_MAX_LENGTH}
                         className="min-h-24"
                         disabled={creatingPv}
                       />
-                      <FieldDescription>描述将写入资源注解 `description`，最长 256 个字符。</FieldDescription>
+                      <FieldDescription>
+                        描述将写入资源注解 `description`，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                      </FieldDescription>
                     </Field>
                   </FieldGroup>
                 </div>

@@ -64,6 +64,8 @@ const EMPTY_STORAGE_VOLUME_DRAFT: StorageVolumeDraft = {
   mounts: [],
 }
 
+const DESCRIPTION_MAX_LENGTH = 256
+
 export function useCreateJobDialogController(props: CreateJobDialogProps) {
   const {
     open,
@@ -97,6 +99,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   const [savedStorageVolumes, setSavedStorageVolumes] = React.useState<StorageVolumeDraft[]>([])
   const [editingStorageVolumeIndex, setEditingStorageVolumeIndex] = React.useState<number | null>(null)
   const [editingStorageVolume, setEditingStorageVolume] = React.useState(false)
+  const initializedEditKeyRef = React.useRef<string | null>(null)
   const {
     containers,
     setContainers,
@@ -200,11 +203,16 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       setSavedStorageVolumes([])
       setEditingStorageVolumeIndex(null)
       setEditingStorageVolume(false)
+      initializedEditKeyRef.current = null
     }
   }, [open, kind, resetEditorUiState, setContainers])
 
   React.useEffect(() => {
     if (!open || !isEditMode || !initialValues) return
+    const currentEditKey = `${initialValues.namespace.trim()}::${initialValues.name.trim().toLowerCase()}`
+    const firstOpen = initializedEditKeyRef.current === null
+    const switchedTarget = initializedEditKeyRef.current !== currentEditKey
+    if (!firstOpen && !switchedTarget) return
 
     setActiveStep("basic")
     setName(initialValues.name)
@@ -264,6 +272,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     setSavedStorageVolumes(normalizedStorageItems)
     setEditingStorageVolumeIndex(null)
     setEditingStorageVolume(false)
+    initializedEditKeyRef.current = currentEditKey
   }, [initialValues, isEditMode, kind, open, resetEditorUiState, setContainers])
 
   const resolveStorageContainerNames = React.useCallback(() => {
@@ -701,17 +710,23 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
         const normalizedName = (lockedIdentity?.name ?? source.name).trim().toLowerCase()
         const normalizedNamespace = (lockedIdentity?.namespace ?? source.namespace).trim()
+        const normalizedDescription = source.description.trim()
         const normalizedSchedule = kind === "CronJob" ? source.schedule.trim() : ""
         const nextNameError = validateName(normalizedName)
         const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
         const nextScheduleError = kind === "CronJob" && !normalizedSchedule ? CRON_SCHEDULE_REQUIRED_MESSAGE : null
+        const nextDescriptionError =
+          normalizedDescription.length <= DESCRIPTION_MAX_LENGTH
+            ? null
+            : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
         setNameError(nextNameError)
         setNamespaceError(nextNamespaceError)
         setScheduleError(nextScheduleError)
-        if (nextNameError || nextNamespaceError || nextScheduleError) {
+        if (nextNameError || nextNamespaceError || nextScheduleError || nextDescriptionError) {
           if (yamlMode) {
-            setYamlError(nextNameError ?? nextNamespaceError ?? nextScheduleError)
+            setYamlError(nextNameError ?? nextNamespaceError ?? nextScheduleError ?? nextDescriptionError)
           } else {
+            if (nextDescriptionError) setSubmitError(nextDescriptionError)
             setActiveStep("basic")
           }
           return
@@ -901,7 +916,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
           kind,
           name: normalizedName,
           namespace: normalizedNamespace,
-          description: source.description.trim(),
+          description: normalizedDescription,
           ...(kind === "CronJob" ? { schedule: normalizedSchedule } : {}),
           strategy,
           pod,

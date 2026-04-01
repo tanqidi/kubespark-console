@@ -56,6 +56,7 @@ import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 type CreateStep = "basic" | "pod" | "storage" | "advanced"
 const STEP_ORDER: CreateStep[] = ["basic", "pod", "storage", "advanced"]
 const POD_REQUIRED_MESSAGE = "请至少添加一个容器配置"
+const DESCRIPTION_MAX_LENGTH = 256
 
 type PodDialogSnapshot = {
   name: string
@@ -274,6 +275,7 @@ export function CreatePodDialog({
   const [editingConfigMountIndex, setEditingConfigMountIndex] = React.useState<number | null>(null)
   const [pendingDeleteStorageIndex, setPendingDeleteStorageIndex] = React.useState<number | null>(null)
   const [pendingDeleteConfigMountIndex, setPendingDeleteConfigMountIndex] = React.useState<number | null>(null)
+  const lockedIdentityRef = React.useRef<{ name: string; namespace: string } | null>(null)
 
   const {
     containers,
@@ -386,8 +388,20 @@ export function CreatePodDialog({
       setEditingConfigMountIndex(null)
       setPendingDeleteStorageIndex(null)
       setPendingDeleteConfigMountIndex(null)
+      lockedIdentityRef.current = null
     }
   }, [open, setContainers])
+
+  const withLockedIdentity = React.useCallback((snapshot: PodDialogSnapshot): PodDialogSnapshot => {
+    if (!isEditMode) return snapshot
+    const locked = lockedIdentityRef.current
+    if (!locked) return snapshot
+    return {
+      ...snapshot,
+      name: locked.name,
+      namespace: locked.namespace,
+    }
+  }, [isEditMode])
 
   const validateBasic = React.useCallback(() => {
     const nextNameError = validateName(name)
@@ -503,14 +517,18 @@ export function CreatePodDialog({
     if (!open || !isEditMode || !initialYamlText) return
     try {
       const parsed = parseYamlText(initialYamlText)
-      applySnapshot(parsed.snapshot, parsed.containers)
+      lockedIdentityRef.current = {
+        name: parsed.snapshot.name.trim(),
+        namespace: parsed.snapshot.namespace.trim(),
+      }
+      applySnapshot(withLockedIdentity(parsed.snapshot), parsed.containers)
       setYamlText(initialYamlText)
       setYamlError(null)
       setSubmitError(null)
     } catch (error) {
       setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
     }
-  }, [applySnapshot, initialYamlText, isEditMode, open, setSubmitError])
+  }, [applySnapshot, initialYamlText, isEditMode, open, setSubmitError, withLockedIdentity])
 
   const resolveStorageContainerNames = React.useCallback(() => {
     const names =
@@ -826,6 +844,14 @@ export function CreatePodDialog({
 
   const handleCreate = React.useCallback(async () => {
     if (creating) return
+    const normalizedDescription = description.trim()
+    if (normalizedDescription.length > DESCRIPTION_MAX_LENGTH) {
+      const message = `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
+      if (yamlMode) setYamlError(message)
+      setSubmitError(message)
+      setActiveStep("basic")
+      return
+    }
     if (!validateBasic()) {
       setActiveStep("basic")
       return
@@ -847,7 +873,7 @@ export function CreatePodDialog({
       await onSubmit({
         name: name.trim(),
         namespace: namespace.trim(),
-        description: description.trim(),
+        description: normalizedDescription,
         podSpec: podSpec as Record<string, unknown>,
       })
       onOpenChange(false)
@@ -858,6 +884,7 @@ export function CreatePodDialog({
     configuredContainers,
     creating,
     description,
+    yamlMode,
     name,
     namespace,
     onOpenChange,
@@ -914,7 +941,7 @@ export function CreatePodDialog({
                     }
                     try {
                       const parsed = parseYamlText(yamlText)
-                      applySnapshot(parsed.snapshot, parsed.containers)
+                      applySnapshot(withLockedIdentity(parsed.snapshot), parsed.containers)
                       setYamlError(null)
                       setYamlMode(false)
                     } catch (error) {
@@ -1058,11 +1085,13 @@ export function CreatePodDialog({
                       value={description}
                       onChange={(event) => setDescription(event.target.value)}
                       placeholder="请输入描述（选填）"
-                      maxLength={256}
+                      maxLength={DESCRIPTION_MAX_LENGTH}
                       className="min-h-24"
                       disabled={isBusy}
                     />
-                    <FieldDescription>描述将写入资源注解 `description`，最长 256 个字符。</FieldDescription>
+                    <FieldDescription>
+                      描述将写入资源注解 `description`，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                    </FieldDescription>
                   </Field>
                 </FieldGroup>
               </div>
@@ -1428,7 +1457,7 @@ export function CreatePodDialog({
                   onClick={async () => {
                     try {
                       const parsed = parseYamlText(yamlText)
-                      applySnapshot(parsed.snapshot, parsed.containers)
+                      applySnapshot(withLockedIdentity(parsed.snapshot), parsed.containers)
                       setYamlError(null)
                     } catch (error) {
                       setYamlError(error instanceof Error ? error.message : "YAML 解析失败")

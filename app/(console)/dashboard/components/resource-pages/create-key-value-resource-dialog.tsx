@@ -141,6 +141,7 @@ const SECRET_TYPE_OPTIONS = [
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 const DATA_ITEM_REQUIRED_MESSAGE = "请至少添加一个数据项"
+const DESCRIPTION_MAX_LENGTH = 256
 
 function validateName(value: string): string | null {
   if (!value) return "请输入名称"
@@ -296,6 +297,7 @@ export function CreateKeyValueResourceDialog({
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
+  const [descriptionError, setDescriptionError] = React.useState<string | null>(null)
   const [itemsError, setItemsError] = React.useState<string | null>(null)
   const [editingKeyError, setEditingKeyError] = React.useState<string | null>(null)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
@@ -305,6 +307,7 @@ export function CreateKeyValueResourceDialog({
   const [pendingDeleteItemId, setPendingDeleteItemId] = React.useState<string | null>(null)
   const suppressSubmitRef = React.useRef(false)
   const suppressSubmitTimerRef = React.useRef<number | null>(null)
+  const initializedEditKeyRef = React.useRef<string | null>(null)
   const isEditMode = mode === "edit"
 
   const isSecret = kind === "secret"
@@ -331,6 +334,7 @@ export function CreateKeyValueResourceDialog({
   const clearInlineErrors = React.useCallback(() => {
     setNameError(null)
     setNamespaceError(null)
+    setDescriptionError(null)
     setItemsError(null)
     setEditingKeyError(null)
     setSubmitError(null)
@@ -364,6 +368,7 @@ export function CreateKeyValueResourceDialog({
         ? {
             name: initialValues.name.trim().toLowerCase(),
             namespace: initialValues.namespace.trim(),
+            secretType: initialValues.type?.trim() || "Opaque",
           }
         : null,
     [initialValues, isEditMode]
@@ -376,6 +381,7 @@ export function CreateKeyValueResourceDialog({
         ...snapshot,
         name: lockedIdentity.name,
         namespace: lockedIdentity.namespace,
+        secretType: lockedIdentity.secretType,
       }
     },
     [lockedIdentity]
@@ -409,6 +415,7 @@ export function CreateKeyValueResourceDialog({
       setYamlError(null)
       setNameError(null)
       setNamespaceError(null)
+      setDescriptionError(null)
       setItemsError(null)
       setEditingKeyError(null)
       setSubmitError(null)
@@ -417,10 +424,12 @@ export function CreateKeyValueResourceDialog({
       setEditingItemId(null)
       setPendingDeleteItemId(null)
       suppressSubmitRef.current = false
+      initializedEditKeyRef.current = null
       if (typeof window !== "undefined" && suppressSubmitTimerRef.current !== null) {
         window.clearTimeout(suppressSubmitTimerRef.current)
         suppressSubmitTimerRef.current = null
       }
+      return
     }
   }, [open])
 
@@ -434,6 +443,11 @@ export function CreateKeyValueResourceDialog({
 
   React.useEffect(() => {
     if (!open || !isEditMode || !initialValues) return
+
+    const currentEditKey = `${initialValues.namespace.trim()}::${initialValues.name.trim().toLowerCase()}`
+    const firstOpen = initializedEditKeyRef.current === null
+    const switchedTarget = initializedEditKeyRef.current !== currentEditKey
+    if (!firstOpen && !switchedTarget) return
 
     setName(initialValues.name)
     setNamespace(initialValues.namespace)
@@ -451,6 +465,7 @@ export function CreateKeyValueResourceDialog({
     setYamlMode(false)
     setYamlText("")
     clearInlineErrors()
+    initializedEditKeyRef.current = currentEditKey
   }, [clearInlineErrors, initialValues, isEditMode, open])
 
   const editingItem = React.useMemo(
@@ -460,16 +475,19 @@ export function CreateKeyValueResourceDialog({
 
   const updateItem = React.useCallback(
     (id: string, field: "key" | "value", value: string) => {
-      setItems((current) =>
-        current.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                [field]: value,
-              }
-            : item
-        )
-      )
+      setItems((current) => {
+        let changed = false
+        const next = current.map((item) => {
+          if (item.id !== id) return item
+          if (item[field] === value) return item
+          changed = true
+          return {
+            ...item,
+            [field]: value,
+          }
+        })
+        return changed ? next : current
+      })
       if (itemsError) setItemsError(null)
       if (editingKeyError) setEditingKeyError(null)
       if (submitError) setSubmitError(null)
@@ -679,6 +697,8 @@ export function CreateKeyValueResourceDialog({
 
       const resolvedNameError = validateName(nextName)
       const resolvedNamespaceError = nextNamespace ? null : "请选择项目"
+      const resolvedDescriptionError =
+        nextDescription.length <= DESCRIPTION_MAX_LENGTH ? null : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
 
       const cleanedItems = draft.items
         .map((item) => ({
@@ -713,16 +733,19 @@ export function CreateKeyValueResourceDialog({
 
       setNameError(resolvedNameError)
       setNamespaceError(resolvedNamespaceError)
+      setDescriptionError(resolvedDescriptionError)
       setItemsError(resolvedItemsError)
       setSubmitError(null)
 
       if (yamlMode) {
-        if (resolvedNameError || resolvedNamespaceError || resolvedItemsError) {
-          setYamlError(resolvedNameError ?? resolvedNamespaceError ?? resolvedItemsError)
+        if (resolvedNameError || resolvedNamespaceError || resolvedDescriptionError || resolvedItemsError) {
+          setYamlError(
+            resolvedNameError ?? resolvedNamespaceError ?? resolvedDescriptionError ?? resolvedItemsError
+          )
           return
         }
       } else {
-        if (resolvedNameError || resolvedNamespaceError) {
+        if (resolvedNameError || resolvedNamespaceError || resolvedDescriptionError) {
           setActiveTab("basic")
           return
         }
@@ -1008,16 +1031,21 @@ export function CreateKeyValueResourceDialog({
                       value={description}
                       onChange={(event) => {
                         setDescription(event.target.value)
+                        if (descriptionError) setDescriptionError(null)
                         if (yamlError) setYamlError(null)
                       }}
                       placeholder="请输入描述（选填）"
-                      maxLength={256}
+                      maxLength={DESCRIPTION_MAX_LENGTH}
                       className="min-h-24"
                       disabled={creating}
                     />
-                    <FieldDescription>
-                      描述将写入资源注解 `description`，最长 256 个字符。
-                    </FieldDescription>
+                    {descriptionError ? (
+                      <FieldError>{descriptionError}</FieldError>
+                    ) : (
+                      <FieldDescription>
+                        描述将写入资源注解 `description`，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                      </FieldDescription>
+                    )}
                   </Field>
                 </FieldGroup>
               </div>

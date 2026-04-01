@@ -149,6 +149,7 @@ const MONACO_OPTIONS: EditorProps["options"] = {
 
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
+const DESCRIPTION_MAX_LENGTH = 256
 
 function validateName(value: string): string | null {
   if (!value) return "请输入名称"
@@ -614,6 +615,7 @@ export function CreateServiceDialog({
   const [pendingDeletePortId, setPendingDeletePortId] = React.useState<string | null>(null)
   const [selectorAddPromptOpen, setSelectorAddPromptOpen] = React.useState(false)
   const [selectorAddPromptShown, setSelectorAddPromptShown] = React.useState(false)
+  const initializedEditKeyRef = React.useRef<string | null>(null)
   const lastFocusedPortErrorFieldRef = React.useRef<string>("")
   const isBusy = checkingNext || creating
 
@@ -651,11 +653,16 @@ export function CreateServiceDialog({
       setPendingDeletePortId(null)
       setSelectorAddPromptOpen(false)
       setSelectorAddPromptShown(false)
+      initializedEditKeyRef.current = null
     }
   }, [open])
 
   React.useEffect(() => {
     if (!open || !isEditMode || !initialValues) return
+    const currentEditKey = `${initialValues.namespace.trim()}::${initialValues.name.trim().toLowerCase()}`
+    const firstOpen = initializedEditKeyRef.current === null
+    const switchedTarget = initializedEditKeyRef.current !== currentEditKey
+    if (!firstOpen && !switchedTarget) return
 
     setActiveStep("basic")
     setName(initialValues.name)
@@ -691,6 +698,7 @@ export function CreateServiceDialog({
     setBasicCompleted(true)
     setServiceCompleted(true)
     setSelectorAddPromptShown(initialValues.selectors.length > 0)
+    initializedEditKeyRef.current = currentEditKey
   }, [initialValues, isEditMode, open])
 
   React.useEffect(() => {
@@ -1007,6 +1015,11 @@ export function CreateServiceDialog({
     const source = draft ?? getSnapshot()
     const normalizedName = (isEditMode && initialValues ? initialValues.name : source.name).trim().toLowerCase()
     const normalizedNamespace = (isEditMode && initialValues ? initialValues.namespace : source.namespace).trim()
+    const normalizedDescription = source.description.trim()
+    const nextDescriptionError =
+      normalizedDescription.length <= DESCRIPTION_MAX_LENGTH
+        ? null
+        : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
     const nextNameError = validateName(normalizedName)
     const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
     const {
@@ -1029,6 +1042,12 @@ export function CreateServiceDialog({
 
     if (nextNameError || nextNamespaceError) {
       if (yamlMode) setYamlError(nextNameError ?? nextNamespaceError)
+      setActiveStep("basic")
+      return
+    }
+    if (nextDescriptionError) {
+      if (yamlMode) setYamlError(nextDescriptionError)
+      else setStepError(nextDescriptionError)
       setActiveStep("basic")
       return
     }
@@ -1456,12 +1475,12 @@ export function CreateServiceDialog({
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                     placeholder="请输入描述（选填）"
-                    maxLength={256}
+                    maxLength={DESCRIPTION_MAX_LENGTH}
                     className="min-h-24"
                     disabled={isBusy}
                   />
                   <FieldDescription>
-                    描述将写入资源注解 `description`，最长 256 个字符。
+                    描述将写入资源注解 `description`，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
                   </FieldDescription>
                 </Field>
               </FieldGroup>
