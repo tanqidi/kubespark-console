@@ -1,13 +1,24 @@
 "use client"
 
+import * as React from "react"
 import {
-  IconCreditCard,
   IconDotsVertical,
   IconLogout,
   IconNotification,
   IconUserCircle,
 } from "@tabler/icons-react"
+import { useRouter } from "next/navigation"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Avatar,
   AvatarFallback,
@@ -28,6 +39,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { logout } from "@/app/lib/kubespark/auth"
 
 export function NavUser({
   user,
@@ -39,6 +51,14 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false)
+
+  const handleLogoutConfirm = React.useCallback(() => {
+    logout()
+    setLogoutConfirmOpen(false)
+    router.replace("/login")
+  }, [router])
 
   return (
     <SidebarMenu>
@@ -88,10 +108,10 @@ export function NavUser({
                 <IconUserCircle />
                 账户
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              {/*<DropdownMenuItem>
                 <IconCreditCard />
                 费用
-              </DropdownMenuItem>
+              </DropdownMenuItem>*/}
               <DropdownMenuItem>
                 <IconNotification />
                 通知
@@ -99,13 +119,29 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLogoutConfirmOpen(true)}>
                 <IconLogout />
                 退出登录
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+        <AlertDialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认退出登录</AlertDialogTitle>
+              <AlertDialogDescription>
+                退出后将清除本地登录状态，需要重新登录才能继续操作。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction onClick={handleLogoutConfirm}>
+                确定退出
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SidebarMenuItem>
     </SidebarMenu>
   )

@@ -21,7 +21,7 @@ export function LoginClient() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const redirectPath = searchParams?.get("redirect") || "/dashboard";
+  const redirectPath = searchParams?.get("redirect") || "/dashboard/nodes";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
