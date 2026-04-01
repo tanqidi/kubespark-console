@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { IconInnerShadowTop } from "@tabler/icons-react"
+import Link from "next/link"
 
 import { kubesparkSidebarMenu } from "@/app/(console)/dashboard/components/sidebar-data"
 import { NavMain } from "@/app/(console)/dashboard/components/nav-main"
@@ -34,10 +35,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="/dashboard">
+              <Link href="/dashboard">
                 <IconInnerShadowTop className="!size-5" />
                 <span className="text-base font-semibold">KubeSpark</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

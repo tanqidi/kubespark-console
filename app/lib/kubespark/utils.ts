@@ -31,9 +31,14 @@ export function resolveDescriptionFromAnnotations(
   return typeof value === "string" ? value.trim() : ""
 }
 
-export function resolveUpdatedAt(resource: any): string {
-  const metadata = resource?.metadata || {};
-  const status = resource?.status || {};
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
+}
+
+export function resolveUpdatedAt(resource: unknown): string {
+  const root = asRecord(resource)
+  const metadata = asRecord(root.metadata)
+  const status = asRecord(root.status)
   const candidates: string[] = [];
 
   const push = (value: unknown) => {
@@ -43,15 +48,19 @@ export function resolveUpdatedAt(resource: any): string {
   push(metadata.creationTimestamp);
 
   if (Array.isArray(metadata.managedFields)) {
-    metadata.managedFields.forEach((field: any) => push(field?.time));
+    metadata.managedFields.forEach((field) => {
+      const managedField = asRecord(field)
+      push(managedField.time)
+    });
   }
 
   if (Array.isArray(status.conditions)) {
-    status.conditions.forEach((condition: any) => {
-      push(condition?.lastTransitionTime);
-      push(condition?.lastUpdateTime);
-      push(condition?.lastHeartbeatTime);
-      push(condition?.lastProbeTime);
+    status.conditions.forEach((condition) => {
+      const conditionRecord = asRecord(condition)
+      push(conditionRecord.lastTransitionTime);
+      push(conditionRecord.lastUpdateTime);
+      push(conditionRecord.lastHeartbeatTime);
+      push(conditionRecord.lastProbeTime);
     });
   }
 
@@ -60,10 +69,16 @@ export function resolveUpdatedAt(resource: any): string {
   push(status.lastScheduleTime);
 
   if (Array.isArray(status.containerStatuses)) {
-    status.containerStatuses.forEach((container: any) => {
-      push(container?.state?.running?.startedAt);
-      push(container?.state?.terminated?.finishedAt);
-      push(container?.lastState?.terminated?.finishedAt);
+    status.containerStatuses.forEach((container) => {
+      const containerRecord = asRecord(container)
+      const state = asRecord(containerRecord.state)
+      const running = asRecord(state.running)
+      const terminated = asRecord(state.terminated)
+      const lastState = asRecord(containerRecord.lastState)
+      const lastTerminated = asRecord(lastState.terminated)
+      push(running.startedAt);
+      push(terminated.finishedAt);
+      push(lastTerminated.finishedAt);
     });
   }
 
