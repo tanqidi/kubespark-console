@@ -40,9 +40,11 @@ export function NavMain({
               asChild
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
             >
-              <Link href="/dashboard">
+              {/*<Link href="/dashboard/nodes">*/}
+              <Link href="#">
                 <IconCloudBolt />
-                <span>KubeSpark 控制台</span>
+                {/*<span>KubeSpark 控制台</span>*/}
+                <span>k3s测试开发集群</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

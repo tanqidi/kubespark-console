@@ -24,7 +24,7 @@ export type SidebarMenuItem = {
 }
 
 export const kubesparkSidebarMenu: SidebarMenuItem[] = [
-  { title: "概览", labelKey: "overview", path: "/overview", icon: IconLayoutDashboard },
+  // { title: "概览", labelKey: "overview", path: "/overview", icon: IconLayoutDashboard },
   { title: "节点", labelKey: "nodes", path: "/nodes", icon: IconServer },
   { title: "项目", labelKey: "projects", path: "/projects", icon: IconBox },
   {
@@ -57,6 +57,6 @@ export const kubesparkSidebarMenu: SidebarMenuItem[] = [
       { title: "存储类", labelKey: "storageclasses", path: "/storageclasses" },
     ],
   },
-  { title: "集群设置", labelKey: "settings", path: "/settings", icon: IconAdjustments },
+  // { title: "集群设置", labelKey: "settings", path: "/settings", icon: IconAdjustments },
   { title: "关于", labelKey: "about", path: "/about", icon: IconInfoCircle },
 ]

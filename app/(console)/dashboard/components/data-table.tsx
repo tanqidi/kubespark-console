@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import * as React from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -49,6 +49,7 @@ type DataTableProps<TData> = {
   columns: ColumnDef<TData>[]
   getRowId?: (row: TData, index: number) => string
   getRowHref?: (row: TData) => string | null | undefined
+  enableRowNavigation?: boolean
   toolbarStart?: React.ReactNode
   toolbarEnd?: React.ReactNode
   onCreate?: () => void
@@ -105,13 +106,13 @@ export function DataTable<TData extends Record<string, unknown>>({
   columns,
   getRowId,
   getRowHref,
+  enableRowNavigation = false,
   toolbarStart,
   toolbarEnd,
   onCreate,
   onDeleteSelectedRows,
 }: DataTableProps<TData>) {
   const router = useRouter()
-  const pathname = usePathname()
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -138,30 +139,11 @@ export function DataTable<TData extends Record<string, unknown>>({
 
   const resolveRowHref = React.useCallback(
     (row: TData) => {
-      if (getRowHref) return getRowHref(row) ?? null
+      if (!enableRowNavigation || !getRowHref) return null
 
-      const name = (row as { name?: unknown }).name
-      if (typeof name !== "string" || !name.trim()) return null
-
-      const namespace = (row as { namespace?: unknown }).namespace
-      const segments = [pathname, encodeURIComponent(name.trim())]
-
-      const namespaceText =
-        typeof namespace === "string" ? namespace.trim() : ""
-      const normalizedNamespace = namespaceText.toLowerCase()
-      const hasValidNamespace =
-        namespaceText.length > 0 &&
-        normalizedNamespace !== "-" &&
-        normalizedNamespace !== "n/a" &&
-        normalizedNamespace !== "<none>"
-
-      if (hasValidNamespace) {
-        segments.splice(1, 0, encodeURIComponent(namespaceText))
-      }
-
-      return segments.join("/")
+      return getRowHref(row) ?? null
     },
-    [getRowHref, pathname]
+    [enableRowNavigation, getRowHref]
   )
 
   const handleNavigate = React.useCallback(
