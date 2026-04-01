@@ -338,6 +338,7 @@ export type JobDialogSnapshot = {
     restartPolicy: "Never" | "OnFailure"
     containers: ContainerDraft[]
     storageList?: JobStorageInput[]
+    configList?: JobConfigInput[]
   }
 }
 
@@ -348,6 +349,16 @@ export type JobStorageInput = {
   mounts?: Array<{
     containerName: string
     mountMode: "none" | "ro" | "rw"
+    mountPath: string
+  }>
+}
+
+export type JobConfigInput = {
+  sourceKind?: "configMap" | "secret"
+  sourceName?: string
+  mounts?: Array<{
+    containerName: string
+    mountMode: "none" | "ro"
     mountPath: string
   }>
 }
@@ -865,7 +876,8 @@ export function createContainerDraftFromInitial(
 export function buildPodSpecFromContainers(
   restartPolicy: "Never" | "OnFailure",
   containers: ContainerDraft[],
-  storage?: JobStorageInput | JobStorageInput[]
+  storage?: JobStorageInput | JobStorageInput[],
+  configMounts?: JobConfigInput[]
 ): JsonObject {
   const workload: JsonObject[] = []
   const init: JsonObject[] = []
@@ -1021,6 +1033,65 @@ export function buildPodSpecFromContainers(
   }
   applyStorageToVolumesAndMounts(storage, containerSpecs, volumes)
 
+  const configMountList = Array.isArray(configMounts) ? configMounts : []
+  configMountList.forEach((configItem) => {
+    const sourceName = (configItem.sourceName ?? "").trim()
+    if (!sourceName) return
+    const sourceKind = configItem.sourceKind === "secret" ? "secret" : "configMap"
+    const resolvedSourceId = sourceName
+
+    let hasAppliedConfigMount = false
+    const mounts = Array.isArray(configItem.mounts)
+      ? configItem.mounts
+          .map((mount) => ({
+            containerName: mount.containerName.trim(),
+            mountMode: mount.mountMode,
+            mountPath: mount.mountPath.trim(),
+          }))
+          .filter(
+            (mount) =>
+              mount.containerName.length > 0 &&
+              mount.mountMode === "ro" &&
+              mount.mountPath.length > 0
+          )
+      : []
+
+    mounts.forEach((mount) => {
+      const target =
+        containerSpecs.find((item) => item.rawName === mount.containerName) ??
+        containerSpecs.find((item) => item.resolvedName === mount.containerName)
+      if (!target) return
+
+      const existingMounts = Array.isArray(target.spec.volumeMounts)
+        ? (target.spec.volumeMounts as Array<{ name?: string; mountPath?: string }>)
+        : []
+      const duplicated = existingMounts.some(
+        (item) => item.name === resolvedSourceId && item.mountPath === mount.mountPath
+      )
+      if (duplicated) return
+
+      target.spec.volumeMounts = [
+        ...existingMounts,
+        {
+          name: resolvedSourceId,
+          mountPath: mount.mountPath,
+          readOnly: true,
+        },
+      ]
+      hasAppliedConfigMount = true
+    })
+
+    if (!hasAppliedConfigMount) return
+    if (volumes.some((item) => asString(item.name) === resolvedSourceId)) return
+
+    volumes.push({
+      name: resolvedSourceId,
+      ...(sourceKind === "secret"
+        ? { secret: { secretName: sourceName } }
+        : { configMap: { name: sourceName } }),
+    })
+  })
+
   return {
     restartPolicy,
     ...(workload.length > 0 ? { containers: workload } : {}),
@@ -1032,7 +1103,8 @@ export function buildPodSpecFromContainers(
 export function buildJobYamlText(
   kind: JobCreateKind,
   snapshot: JobDialogSnapshot,
-  storage?: JobStorageInput | JobStorageInput[]
+  storage?: JobStorageInput | JobStorageInput[],
+  configMounts?: JobConfigInput[]
 ): string {
   const strategy = {
     ...(toOptionalIntegerString(snapshot.strategy.backoffLimit)
@@ -1058,7 +1130,8 @@ export function buildJobYamlText(
   const podSpec = buildPodSpecFromContainers(
     snapshot.pod.restartPolicy,
     snapshot.pod.containers,
-    storage
+    storage,
+    configMounts
   )
 
   const manifest: JsonObject =
@@ -1232,6 +1305,61 @@ export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDial
   ]
 
   const parsedStorageList = parseStorageListFromPodSpec(podSpec, hostTimeVolumeNames)
+  const parsedConfigList = (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
+    .map((entry) => asObject(entry))
+    .map((volume, index) => {
+      const volumeId = asString(volume.name).trim()
+      const configMap = asObject(volume.configMap)
+      const secret = asObject(volume.secret)
+      const configMapName = asString(configMap.name).trim()
+      const secretName = asString(secret.secretName).trim()
+      const sourceKind = secretName ? "secret" : configMapName ? "configMap" : null
+      const sourceName = secretName || configMapName
+      if (!sourceKind || !sourceName || !volumeId || hostTimeVolumeNames.has(volumeId)) return null
+      return {
+        volumeId,
+        sourceKind,
+        sourceName,
+        index,
+      }
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        volumeId: string
+        sourceKind: "configMap" | "secret"
+        sourceName: string
+        index: number
+      } => Boolean(item)
+    )
+    .map((configItem) => {
+      const allContainers = [
+        ...(Array.isArray(podSpec.containers) ? podSpec.containers : []),
+        ...(Array.isArray(podSpec.initContainers) ? podSpec.initContainers : []),
+      ]
+      const mounts = allContainers
+        .map((entry) => asObject(entry))
+        .flatMap((container) => {
+          const containerName = asString(container.name).trim()
+          const volumeMounts = Array.isArray(container.volumeMounts) ? container.volumeMounts : []
+          return volumeMounts
+            .map((mount) => asObject(mount))
+            .filter((mount) => asString(mount.name).trim() === configItem.volumeId)
+            .map((mount) => ({
+              containerName,
+              mountMode: mount.readOnly === true ? ("ro" as const) : ("none" as const),
+              mountPath: asString(mount.mountPath).trim(),
+            }))
+        })
+        .filter((mount) => mount.containerName.length > 0)
+
+      return {
+        sourceKind: configItem.sourceKind,
+        sourceName: configItem.sourceName,
+        mounts,
+      }
+    })
 
   return {
     name: asString(metadata.name),
@@ -1247,6 +1375,7 @@ export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDial
     pod: {
       restartPolicy: asString(podSpec.restartPolicy) === "OnFailure" ? "OnFailure" : "Never",
       containers: containers.length > 0 ? containers : [],
+      ...(parsedConfigList.length > 0 ? { configList: parsedConfigList } : {}),
       ...(parsedStorageList.length > 0 ? { storageList: parsedStorageList } : {}),
     },
   }
