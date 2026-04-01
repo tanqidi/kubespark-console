@@ -71,6 +71,57 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 - 相关改动已通过 ESLint 检查，详见开发进度文档：
   - [docs/DEVELOPMENT-PROGRESS.md](docs/DEVELOPMENT-PROGRESS.md)
 
+## 部署方式（DockerHub + Kubernetes）
+
+当前推荐部署链路：
+
+1. GitHub Actions 构建并推送镜像到 Docker Hub（标签固定 `:dev`）。
+2. Kubernetes 使用仓库内示例 YAML 一键创建 `Namespace + Deployment + Service(NodePort)`。
+
+### 1) CI 推镜像（dev）
+
+- Workflow：`.github/workflows/docker-image.yml`
+- 触发：`push dev` / `pull_request dev` / `workflow_dispatch`
+- 镜像标签：`${DOCKERHUB_IMAGE}:dev`
+
+需要配置 GitHub 仓库变量：
+
+- `DOCKERHUB_IMAGE`：例如 `tanqidi/kubespark-console`（不要带 `:dev`）
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`（Docker Hub Access Token）
+
+### 2) Kubernetes 部署
+
+示例文件：
+
+- `deployment/kubespark-console-deployment.yaml`
+
+该文件按顺序包含：
+
+- `Namespace`：`kubespark`
+- `Deployment`：`kubespark-console`
+- `Service`：`kubespark-console`（`NodePort: 33088`）
+
+应用：
+
+```bash
+kubectl apply -f deployment/kubespark-console-deployment.yaml
+```
+
+### 3) 后端地址配置（关键）
+
+控制台通过 `/api/kubespark` 代理访问后端，需在控制台容器设置：
+
+- `KUBESPARK_API_BASE`：完整 URL（必须带 `http://` 或 `https://`）
+
+例如：
+
+```yaml
+env:
+  - name: KUBESPARK_API_BASE
+    value: "http://kubesphere-apiserver.kubesphere-system.svc:80"
+```
+
 ## Shell Recommendation
 
 为避免 Windows 终端编码乱码，建议按以下优先级使用：

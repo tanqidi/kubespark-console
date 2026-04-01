@@ -1,6 +1,6 @@
 # 开发进度（CRUD 首期）
 
-更新时间：2026-03-31
+更新时间：2026-04-01
 
 ## 1. 范围说明
 
@@ -105,4 +105,19 @@
   - 同一 `host` 的多条路径会合并到单个 `rules[].http.paths`，避免重复 `host` 规则块。
 - Deployment 高级设置默认值调整：
   - 创建模式下“调度策略”默认未勾选（仅显式开启时才生效）。
+
+## 9. 本轮更新（2026-04-01）
+
+- 完成打包链路收敛：
+  - 修复多处 TypeScript 阻塞项，`npm run build` 可通过。
+  - 修复 CI 中的 ESLint 阻塞错误（保留 warning，不阻塞流水线）。
+- 完成容器化与发布链路：
+  - 新增 `Dockerfile`（Next.js standalone 多阶段构建）。
+  - 新增 `.dockerignore`，减少构建上下文。
+  - GitHub Actions 已支持自动构建并推送 Docker Hub `:dev` 镜像。
+- 新增部署示例清单：
+  - `deployment/kubespark-console-deployment.yaml`
+  - 单文件包含 `Namespace + Deployment + Service(NodePort: 33088)`，可直接 `kubectl apply`。
+- 明确后端接入变量：
+  - 控制台后端地址由 `KUBESPARK_API_BASE` 控制（完整 URL，需带协议）。
 
