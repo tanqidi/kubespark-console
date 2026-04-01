@@ -845,26 +845,24 @@ export function CreateKeyValueResourceDialog({
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 flex-col gap-1">
-                <DialogTitle>{title}</DialogTitle>
-                <DialogDescription>{descriptionText}</DialogDescription>
-              </div>
-              <label
-                htmlFor={`${kind}-yaml-mode`}
-                className="flex shrink-0 items-center gap-3 rounded-full border bg-background px-3 py-1.5 text-sm"
-              >
-                <span className="font-medium">编辑 YAML</span>
+          <div className="flex items-start justify-between border-b bg-muted/15">
+            <DialogHeader className="px-6 py-4">
+              <DialogTitle>{title}</DialogTitle>
+              <DialogDescription>{descriptionText}</DialogDescription>
+            </DialogHeader>
+            <div className="h-full flex items-center me-20">
+              <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                <span className="text-sm font-medium">编辑 YAML</span>
                 <Switch
                   id={`${kind}-yaml-mode`}
                   checked={yamlMode}
                   onCheckedChange={handleYamlModeChange}
                   disabled={isBusy}
+                  aria-label="编辑 YAML"
                 />
-              </label>
+              </div>
             </div>
-          </DialogHeader>
+          </div>
 
           {!yamlMode ? (
             <StepHeaderNav

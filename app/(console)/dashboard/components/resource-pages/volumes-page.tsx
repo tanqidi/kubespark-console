@@ -1428,12 +1428,12 @@ export function VolumesPageClient() {
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
           <div className="flex min-h-0 flex-1 flex-col">
-            <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <DialogTitle>创建持久卷声明</DialogTitle>
-                  <DialogDescription>使用 Kubernetes PersistentVolumeClaim 创建存储声明。</DialogDescription>
-                </div>
+            <div className="flex items-start justify-between border-b bg-muted/15">
+              <DialogHeader className="px-6 py-4">
+                <DialogTitle>创建持久卷声明</DialogTitle>
+                <DialogDescription>使用 Kubernetes PersistentVolumeClaim 创建存储声明。</DialogDescription>
+              </DialogHeader>
+              <div className="h-full flex items-center me-20">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
                   <span className="text-sm font-medium">编辑 YAML</span>
                   <Switch
@@ -1468,7 +1468,7 @@ export function VolumesPageClient() {
                   />
                 </div>
               </div>
-            </DialogHeader>
+            </div>
 
             {!createYamlMode ? (
               <StepHeaderNav
@@ -1770,12 +1770,12 @@ export function VolumesPageClient() {
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
           <div ref={createPvDialogContainerRef} className="flex min-h-0 flex-1 flex-col">
-            <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <DialogTitle>创建持久卷</DialogTitle>
-                  <DialogDescription>使用 Kubernetes PersistentVolume 创建可复用存储卷。</DialogDescription>
-                </div>
+            <div className="flex items-start justify-between border-b bg-muted/15">
+              <DialogHeader className="px-6 py-4">
+                <DialogTitle>创建持久卷</DialogTitle>
+                <DialogDescription>使用 Kubernetes PersistentVolume 创建可复用存储卷。</DialogDescription>
+              </DialogHeader>
+              <div className="h-full flex items-center me-20">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
                   <span className="text-sm font-medium">编辑 YAML</span>
                   <Switch
@@ -1811,7 +1811,7 @@ export function VolumesPageClient() {
                   />
                 </div>
               </div>
-            </DialogHeader>
+            </div>
 
             {!createPvYamlMode ? (
               <StepHeaderNav

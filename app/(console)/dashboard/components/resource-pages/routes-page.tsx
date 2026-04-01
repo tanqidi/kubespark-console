@@ -1408,16 +1408,16 @@ export function RoutesPageClient() {
         >
           <div ref={createDialogPopupLayerRef} className="pointer-events-none absolute inset-0 z-50" />
           <div className="flex min-h-0 flex-1 flex-col">
-            <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <DialogTitle>{isEditMode ? "编辑应用路由" : "创建应用路由"}</DialogTitle>
-                  <DialogDescription>
-                    {isEditMode
-                      ? "编辑 Kubernetes Ingress 的访问规则与高级配置。"
-                      : "使用 Kubernetes Ingress 创建应用访问路由。"}
-                  </DialogDescription>
-                </div>
+            <div className="flex items-start justify-between border-b bg-muted/15">
+              <DialogHeader className="px-6 py-4">
+                <DialogTitle>{isEditMode ? "编辑应用路由" : "创建应用路由"}</DialogTitle>
+                <DialogDescription>
+                  {isEditMode
+                    ? "编辑 Kubernetes Ingress 的访问规则与高级配置。"
+                    : "使用 Kubernetes Ingress 创建应用访问路由。"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="h-full flex items-center me-20">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
                   <span className="text-sm font-medium">编辑 YAML</span>
                   <Switch
@@ -1457,7 +1457,7 @@ export function RoutesPageClient() {
                   />
                 </div>
               </div>
-            </DialogHeader>
+            </div>
 
             {!createYamlMode ? (
               <StepHeaderNav
