@@ -1,0 +1,17 @@
+.git
+.github
+.idea
+.agents
+.next
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+Dockerfile*
+README.md
+*.md
+*.log
+*.local
+.env
+.env.*
+!.env.example
