@@ -49,7 +49,7 @@ export function NavMain({
               <div>
                 <IconCloudBolt />
                 {/*<span>KubeSpark 控制台</span>*/}
-                <span>DEV 开发测试集群</span>
+                <span>开发测试集群</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>

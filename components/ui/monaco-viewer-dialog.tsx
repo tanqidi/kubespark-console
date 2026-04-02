@@ -96,7 +96,7 @@ export function MonacoViewerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          "h-[80vh] max-h-[80vh] w-[min(90vw,130vh)] flex flex-col sm:max-w-270",
+          "h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex flex-col sm:max-w-270",
           className
         )}
       >

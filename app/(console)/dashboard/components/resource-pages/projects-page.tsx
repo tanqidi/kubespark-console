@@ -689,7 +689,7 @@ export function ProjectsPageClient() {
                     {createYamlError ? <FieldError className="mt-3">{createYamlError}</FieldError> : null}
                   </div>
               ) : createStep === "basic" ? (
-                <div className="border-b p-6">
+                <div className="p-6">
                   <div className="mb-4">
                     <h3 className="text-[15px] font-semibold">基本信息</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -742,7 +742,7 @@ export function ProjectsPageClient() {
                   </FieldGroup>
                 </div>
               ) : (
-                <div className="border-b p-6">
+                <div className="p-6">
                   <div className="mb-4">
                     <h3 className="text-[15px] font-semibold">高级设置</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
