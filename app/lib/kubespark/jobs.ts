@@ -57,6 +57,15 @@ export type JobPodContainerSecurityContextInput = {
 
 export type JobPodInput = {
   restartPolicy?: "Never" | "OnFailure"
+  configList?: Array<{
+    sourceKind?: "configMap" | "secret"
+    sourceName?: string
+    mounts?: Array<{
+      containerName: string
+      mountMode: "none" | "ro"
+      mountPath: string
+    }>
+  }>
   storageList?: PodStorageItemInput[]
   storage?: PodStorageItemInput
   containers?: Array<{
@@ -511,6 +520,53 @@ function buildPodContainerSpec(pod?: JobPodInput) {
       ? [pod.storage]
       : []
   applyStorageToPodSpec(storageList, containerSpecs, volumes)
+
+  const configMountList = Array.isArray(pod?.configList) ? pod.configList : []
+  configMountList.forEach((configItem, configIndex) => {
+    const sourceName = (configItem.sourceName ?? "").trim()
+    if (!sourceName) return
+    const sourceKind = configItem.sourceKind === "secret" ? "secret" : "configMap"
+    const volumeName = `config-${configIndex + 1}`
+    const mounts = Array.isArray(configItem.mounts) ? configItem.mounts : []
+
+    mounts.forEach((mount) => {
+      if (mount.mountMode !== "ro") return
+      const mountPath = mount.mountPath.trim()
+      const containerName = mount.containerName.trim()
+      if (!mountPath || !containerName) return
+      const target = containerSpecs.find(
+        (container) =>
+          container.rawName === containerName || container.resolvedName === containerName
+      )
+      if (!target) return
+
+      const existingMounts = Array.isArray(target.spec.volumeMounts)
+        ? (target.spec.volumeMounts as Array<{ name?: string; mountPath?: string }>)
+        : []
+      const duplicated = existingMounts.some(
+        (item) => item.name === volumeName && item.mountPath === mountPath
+      )
+      if (duplicated) return
+
+      target.spec.volumeMounts = [
+        ...existingMounts,
+        {
+          name: volumeName,
+          readOnly: true,
+          mountPath,
+        },
+      ]
+    })
+
+    const hasVolume = volumes.some((item) => item.name === volumeName)
+    if (hasVolume) return
+    volumes.push({
+      name: volumeName,
+      ...(sourceKind === "secret"
+        ? { secret: { secretName: sourceName } }
+        : { configMap: { name: sourceName } }),
+    })
+  })
 
   return {
     ...(containers.length > 0 ? { containers } : {}),

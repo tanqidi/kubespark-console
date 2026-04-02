@@ -7,6 +7,7 @@ import { checkJobExists } from "@/app/lib/kubespark/jobs"
 import type {
   CreateJobDialogProps,
   CreateStep,
+  JobConfigInput,
   JobDialogSnapshot,
 } from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
 import {
@@ -610,12 +611,19 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   )
 
   const handleYamlModeChange = React.useCallback(
-    (checked: boolean) => {
+    (checked: boolean, configMounts?: JobConfigInput[]) => {
       if (isBusy) return
 
       if (checked) {
         const source = withLockedIdentity(getSnapshot())
-        setYamlText(buildJobYamlText(kind, source, source.pod.storageList ?? []))
+        setYamlText(
+          buildJobYamlText(
+            kind,
+            source,
+            source.pod.storageList ?? [],
+            configMounts ?? source.pod.configList ?? []
+          )
+        )
         setYamlError(null)
         setYamlMode(true)
         return
@@ -716,7 +724,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   ])
 
   const handleCreate = React.useCallback(
-    async () => {
+    async (configMounts?: JobConfigInput[]) => {
       if (isBusy || (!isFinalStep && !yamlMode)) return
 
       setSubmitError(null)
@@ -920,11 +928,39 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
             } => Boolean(item)
           )
         const normalizedStorage = normalizedStorageList[0]
+        const normalizedConfigList = (Array.isArray(configMounts) ? configMounts : source.pod.configList ?? [])
+          .map((configItem) => {
+            const sourceKind = configItem.sourceKind === "secret" ? "secret" : "configMap"
+            const sourceName = typeof configItem.sourceName === "string" ? configItem.sourceName.trim() : ""
+            const mounts = (Array.isArray(configItem.mounts) ? configItem.mounts : [])
+              .map((item) => ({
+                containerName: typeof item.containerName === "string" ? item.containerName.trim() : "",
+                mountMode: item.mountMode,
+                mountPath: typeof item.mountPath === "string" ? item.mountPath.trim() : "",
+              }))
+              .filter((item) => item.containerName.length > 0)
+            if (!sourceName) return null
+            return {
+              sourceKind,
+              sourceName,
+              mounts,
+            }
+          })
+          .filter(
+            (
+              item
+            ): item is {
+              sourceKind: "configMap" | "secret"
+              sourceName: string
+              mounts: Array<{ containerName: string; mountMode: "none" | "ro"; mountPath: string }>
+            } => Boolean(item)
+          )
 
         const pod =
           source.pod.restartPolicy === "OnFailure" ||
           normalizedContainers.length > 0 ||
-          normalizedStorageList.length > 0
+          normalizedStorageList.length > 0 ||
+          normalizedConfigList.length > 0
             ? {
                 ...(source.pod.restartPolicy === "OnFailure"
                   ? { restartPolicy: source.pod.restartPolicy }
@@ -936,6 +972,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
                   : {}),
                 ...(normalizedStorage ? { storage: normalizedStorage } : {}),
                 ...(normalizedStorageList.length > 0 ? { storageList: normalizedStorageList } : {}),
+                ...(normalizedConfigList.length > 0 ? { configList: normalizedConfigList } : {}),
               }
             : undefined
 

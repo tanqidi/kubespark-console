@@ -71,6 +71,7 @@ export type JobDialogInitialValues = {
   }
   pod?: {
     restartPolicy?: "Never" | "OnFailure"
+    configList?: JobConfigInput[]
     storageList?: Array<{
       volumeId?: string
       volumeKind?: "persistent" | "ephemeral" | "hostPath"
@@ -199,6 +200,7 @@ export type CreateJobDialogProps = {
     }
     pod?: {
       restartPolicy?: "Never" | "OnFailure"
+      configList?: JobConfigInput[]
       storageList?: Array<{
         volumeId?: string
         volumeKind?: "persistent" | "ephemeral" | "hostPath"

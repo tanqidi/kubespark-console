@@ -391,6 +391,62 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
     }
   })
 
+  const parsedConfigList = (Array.isArray(podSpec.volumes) ? podSpec.volumes : [])
+    .map((entry) => asObject(entry))
+    .map((volume, index) => {
+      const volumeId = asString(volume.name).trim()
+      const configMap = asObject(volume.configMap)
+      const secret = asObject(volume.secret)
+      const configMapName = asString(configMap.name).trim()
+      const secretName = asString(secret.secretName).trim()
+      const sourceKind = secretName ? "secret" : configMapName ? "configMap" : null
+      const sourceName = secretName || configMapName
+      if (!sourceKind || !sourceName || !volumeId || hostTimeVolumeNames.has(volumeId)) return null
+      return {
+        volumeId,
+        sourceKind,
+        sourceName,
+        index,
+      }
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        volumeId: string
+        sourceKind: "configMap" | "secret"
+        sourceName: string
+        index: number
+      } => Boolean(item)
+    )
+    .map((configItem) => {
+      const allContainers = [
+        ...(Array.isArray(podSpec.containers) ? podSpec.containers : []),
+        ...(Array.isArray(podSpec.initContainers) ? podSpec.initContainers : []),
+      ]
+      const mounts = allContainers
+        .map((entry) => asObject(entry))
+        .flatMap((container) => {
+          const containerName = asString(container.name).trim()
+          const volumeMounts = Array.isArray(container.volumeMounts) ? container.volumeMounts : []
+          return volumeMounts
+            .map((mount) => asObject(mount))
+            .filter((mount) => asString(mount.name).trim() === configItem.volumeId)
+            .map((mount) => ({
+              containerName,
+              mountMode: mount.readOnly === true ? ("ro" as const) : ("none" as const),
+              mountPath: asString(mount.mountPath).trim(),
+            }))
+        })
+        .filter((mount) => mount.containerName.length > 0)
+
+      return {
+        sourceKind: configItem.sourceKind,
+        sourceName: configItem.sourceName,
+        mounts,
+      }
+    })
+
   return {
     name: asString(metadata.name) || row.name,
     namespace: asString(metadata.namespace) || row.namespace,
@@ -410,6 +466,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
     },
     pod: {
       restartPolicy: asString(podSpec.restartPolicy) === "OnFailure" ? "OnFailure" : "Never",
+      ...(parsedConfigList.length > 0 ? { configList: parsedConfigList } : {}),
       ...(resolvedStorageList.length > 0 ? { storage: resolvedStorageList[0] } : {}),
       ...(resolvedStorageList.length > 0 ? { storageList: resolvedStorageList } : {}),
       containers,
