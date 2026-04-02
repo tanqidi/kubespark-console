@@ -48,6 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { ProjectNamespaceField } from "@/app/(console)/dashboard/components/resource-pages/project-namespace-field"
 import {
   Field,
   FieldDescription,
@@ -1164,28 +1165,19 @@ export function VolumesPageClient() {
                       )}
                     </Field>
 
-                    <Field data-invalid={Boolean(createNamespaceError)}>
-                      <FieldLabel htmlFor="volume-create-namespace">项目</FieldLabel>
-                      <FilterCombobox
-                        options={namespaceOptions}
-                        value={createNamespace}
-                        onValueChange={(value) => {
-                          setCreateNamespace(value)
-                          if (createNamespaceError) setCreateNamespaceError(null)
-                        }}
-                        placeholder="请选择项目"
-                        emptyText="未找到项目"
-                        className="w-full"
-                        ariaInvalid={Boolean(createNamespaceError)}
-                        disabled={creating}
-                        contentContainer={createDialogPopupLayerRef}
-                      />
-                      {createNamespaceError ? (
-                        <FieldError>{createNamespaceError}</FieldError>
-                      ) : (
-                        <FieldDescription>选择卷声明所属项目。</FieldDescription>
-                      )}
-                    </Field>
+                    <ProjectNamespaceField
+                      id="volume-create-namespace"
+                      options={namespaceOptions}
+                      value={createNamespace}
+                      onValueChange={(value) => {
+                        setCreateNamespace(value)
+                        if (createNamespaceError) setCreateNamespaceError(null)
+                      }}
+                      error={createNamespaceError}
+                      description="选择卷声明所属项目。"
+                      disabled={creating}
+                      contentContainer={createDialogPopupLayerRef}
+                    />
 
                     <Field className="md:col-span-2">
                       <FieldLabel htmlFor="volume-create-description">描述</FieldLabel>

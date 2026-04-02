@@ -77,7 +77,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { ProjectNamespaceField } from "@/app/(console)/dashboard/components/resource-pages/project-namespace-field"
 
 type NamespaceOption = {
   id: string
@@ -1528,30 +1528,21 @@ export function CreateServiceDialog({
                   )}
                 </Field>
 
-                <Field data-invalid={Boolean(namespaceError)}>
-                  <FieldLabel htmlFor="service-create-namespace">项目</FieldLabel>
-                  <FilterCombobox
-                    options={namespaceOptions}
-                    value={namespace}
-                    onValueChange={(value) => {
-                      if (isEditMode) return
-                      setNamespace(value)
-                      if (namespaceError) setNamespaceError(null)
-                      if (stepError) setStepError(null)
-                    }}
-                    placeholder="请选择项目"
-                    emptyText="未找到项目"
-                    className="w-full"
-                    ariaInvalid={Boolean(namespaceError)}
-                    disabled={isBusy || isEditMode}
-                    contentContainer={createDialogPopupLayerRef}
-                  />
-                  {namespaceError ? (
-                    <FieldError>{namespaceError}</FieldError>
-                  ) : (
-                    <FieldDescription>选择服务所属项目。</FieldDescription>
-                  )}
-                </Field>
+                <ProjectNamespaceField
+                  id="service-create-namespace"
+                  options={namespaceOptions}
+                  value={namespace}
+                  onValueChange={(value) => {
+                    if (isEditMode) return
+                    setNamespace(value)
+                    if (namespaceError) setNamespaceError(null)
+                    if (stepError) setStepError(null)
+                  }}
+                  error={namespaceError}
+                  description="选择服务所属项目。"
+                  disabled={isBusy || isEditMode}
+                  contentContainer={createDialogPopupLayerRef}
+                />
 
                 <Field className="md:col-span-2">
                   <FieldLabel htmlFor="service-create-description">描述</FieldLabel>

@@ -52,7 +52,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { ProjectNamespaceField } from "@/app/(console)/dashboard/components/resource-pages/project-namespace-field"
 
 type ResourceKind = "configmap" | "secret"
 
@@ -1031,30 +1031,21 @@ export function CreateKeyValueResourceDialog({
                     )}
                   </Field>
 
-                  <Field data-invalid={Boolean(namespaceError)}>
-                    <FieldLabel htmlFor={`${kind}-create-namespace`}>项目</FieldLabel>
-                    <FilterCombobox
-                      options={namespaceOptions}
-                      value={namespace}
-                      onValueChange={(value) => {
-                        setNamespace(value)
-                        if (namespaceError) setNamespaceError(null)
-                        if (submitError) setSubmitError(null)
-                        if (yamlError) setYamlError(null)
-                      }}
-                      placeholder="请选择项目"
-                      emptyText="未找到项目"
-                      className="w-full"
-                      ariaInvalid={Boolean(namespaceError)}
-                      disabled={creating || isEditMode}
-                      contentContainer={createDialogPopupLayerRef}
-                    />
-                    {namespaceError ? (
-                      <FieldError>{namespaceError}</FieldError>
-                    ) : (
-                      <FieldDescription>选择资源所属项目。</FieldDescription>
-                    )}
-                  </Field>
+                  <ProjectNamespaceField
+                    id={`${kind}-create-namespace`}
+                    options={namespaceOptions}
+                    value={namespace}
+                    onValueChange={(value) => {
+                      setNamespace(value)
+                      if (namespaceError) setNamespaceError(null)
+                      if (submitError) setSubmitError(null)
+                      if (yamlError) setYamlError(null)
+                    }}
+                    error={namespaceError}
+                    description="选择资源所属项目。"
+                    disabled={creating || isEditMode}
+                    contentContainer={createDialogPopupLayerRef}
+                  />
 
                   {isSecret ? (
                     <Field>

@@ -58,7 +58,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { ProjectNamespaceField } from "@/app/(console)/dashboard/components/resource-pages/project-namespace-field"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 type CreateStep = "basic" | "pod" | "storage" | "advanced"
@@ -1149,26 +1149,21 @@ export function CreatePodDialog({
                     {nameError ? <FieldError>{nameError}</FieldError> : <FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>}
                   </Field>
 
-                  <Field data-invalid={Boolean(namespaceError)}>
-                    <FieldLabel htmlFor="create-pod-namespace">项目</FieldLabel>
-                    <FilterCombobox
-                      options={namespaceOptions}
-                      value={namespace}
-                      onValueChange={(value) => {
-                        if (isEditMode) return
-                        setNamespace(value)
-                        if (namespaceError) setNamespaceError(null)
-                        if (submitError) setSubmitError(null)
-                      }}
-                      placeholder="请选择项目"
-                      emptyText="未找到项目"
-                      className="w-full"
-                      ariaInvalid={Boolean(namespaceError)}
-                      disabled={isBusy || isEditMode}
-                      contentContainer={createDialogPopupLayerRef}
-                    />
-                    {namespaceError ? <FieldError>{namespaceError}</FieldError> : <FieldDescription>选择容器组所属项目。</FieldDescription>}
-                  </Field>
+                  <ProjectNamespaceField
+                    id="create-pod-namespace"
+                    options={namespaceOptions}
+                    value={namespace}
+                    onValueChange={(value) => {
+                      if (isEditMode) return
+                      setNamespace(value)
+                      if (namespaceError) setNamespaceError(null)
+                      if (submitError) setSubmitError(null)
+                    }}
+                    error={namespaceError}
+                    description="选择容器组所属项目。"
+                    disabled={isBusy || isEditMode}
+                    contentContainer={createDialogPopupLayerRef}
+                  />
 
                   <Field className="md:col-span-2">
                     <FieldLabel htmlFor="create-pod-description">描述</FieldLabel>

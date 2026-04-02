@@ -48,6 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { ProjectNamespaceField } from "@/app/(console)/dashboard/components/resource-pages/project-namespace-field"
 import {
   Combobox,
   ComboboxContent,
@@ -1678,25 +1679,20 @@ export function RoutesPageClient() {
                       {createNameError ? (<FieldError>{createNameError}</FieldError>) : (<FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>)}
                     </Field>
 
-                    <Field data-invalid={Boolean(createNamespaceError)}>
-                      <FieldLabel htmlFor="route-create-namespace">项目</FieldLabel>
-                      <FilterCombobox
-                        options={namespaceOptions}
-                        value={createNamespace}
-                        onValueChange={(value) => {
-                          if (isEditMode) return
-                          setCreateNamespace(value)
-                          if (createNamespaceError) setCreateNamespaceError(null)
-                        }}
-                        placeholder="请选择项目"
-                        emptyText="未找到项目"
-                        className="w-full"
-                        ariaInvalid={Boolean(createNamespaceError)}
-                        disabled={creating || isEditMode}
-                        contentContainer={createDialogPopupLayerRef}
-                      />
-                      {createNamespaceError ? (<FieldError>{createNamespaceError}</FieldError>) : (<FieldDescription>选择要创建路由的项目。</FieldDescription>)}
-                    </Field>
+                    <ProjectNamespaceField
+                      id="route-create-namespace"
+                      options={namespaceOptions}
+                      value={createNamespace}
+                      onValueChange={(value) => {
+                        if (isEditMode) return
+                        setCreateNamespace(value)
+                        if (createNamespaceError) setCreateNamespaceError(null)
+                      }}
+                      error={createNamespaceError}
+                      description="选择要创建路由的项目。"
+                      disabled={creating || isEditMode}
+                      contentContainer={createDialogPopupLayerRef}
+                    />
 
                     <Field className="md:col-span-2">
                       <FieldLabel htmlFor="route-create-description">描述</FieldLabel>

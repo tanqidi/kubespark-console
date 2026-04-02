@@ -60,7 +60,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useCreateJobDialogController } from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.controller"
 import { ContainerListPanel } from "@/app/(console)/dashboard/components/resource-pages/container-list-panel"
 import { StorageVolumeList } from "@/app/(console)/dashboard/components/resource-pages/storage-volume-list"
-import { FilterCombobox } from "@/components/ui/filter-combobox"
+import { ProjectNamespaceField } from "@/app/(console)/dashboard/components/resource-pages/project-namespace-field"
 import {
   ResourceMetadataEditor,
   hasUserProvidedMetadata,
@@ -728,30 +728,21 @@ export function CreateJobDialog({
                     )}
                   </Field>
 
-                  <Field data-invalid={Boolean(namespaceError)}>
-                    <FieldLabel htmlFor="create-job-namespace">项目</FieldLabel>
-                    <FilterCombobox
-                      options={namespaceOptions}
-                      value={namespace}
-                      onValueChange={(value) => {
-                        if (isEditMode) return
-                        setNamespace(value)
-                        if (namespaceError) setNamespaceError(null)
-                        if (submitError) setSubmitError(null)
-                      }}
-                      placeholder="请选择项目"
-                      emptyText="未找到项目"
-                      className="w-full"
-                      ariaInvalid={Boolean(namespaceError)}
-                      disabled={isBusy || isEditMode}
-                      contentContainer={createDialogPopupLayerRef}
-                    />
-                    {namespaceError ? (
-                      <FieldError>{namespaceError}</FieldError>
-                    ) : (
-                      <FieldDescription>选择任务所属项目。</FieldDescription>
-                    )}
-                  </Field>
+                  <ProjectNamespaceField
+                    id="create-job-namespace"
+                    options={namespaceOptions}
+                    value={namespace}
+                    onValueChange={(value) => {
+                      if (isEditMode) return
+                      setNamespace(value)
+                      if (namespaceError) setNamespaceError(null)
+                      if (submitError) setSubmitError(null)
+                    }}
+                    error={namespaceError}
+                    description="选择任务所属项目。"
+                    disabled={isBusy || isEditMode}
+                    contentContainer={createDialogPopupLayerRef}
+                  />
 
                   {kind === "CronJob" ? (
                     <Field data-invalid={Boolean(scheduleError)}>
