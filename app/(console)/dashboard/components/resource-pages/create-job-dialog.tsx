@@ -535,9 +535,7 @@ export function CreateJobDialog({
                       )}
                     </Field>
                   ) : null}
-                  {kind === "CronJob" ? <div className="hidden md:block" aria-hidden /> : null}
-
-                  <Field className="md:col-span-2">
+                  <Field className={kind === "CronJob" ? "" : "md:col-span-2"}>
                     <FieldLabel htmlFor="create-job-description">描述</FieldLabel>
                     <Textarea
                       id="create-job-description"
