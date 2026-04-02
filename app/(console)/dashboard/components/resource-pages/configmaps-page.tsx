@@ -116,6 +116,7 @@ export function ConfigMapsPageClient() {
         const resource = asObject(payload)
         const metadata = asObject(resource.metadata)
         const annotations = asObject(metadata.annotations)
+        const labels = asObject(metadata.labels)
         const data = asObject(resource.data)
         const items = Object.entries(data).map(([key, value]) => ({
           key,
@@ -126,6 +127,12 @@ export function ConfigMapsPageClient() {
           name: asString(metadata.name, row.name),
           namespace: asString(metadata.namespace, row.namespace),
           description: asString(annotations.description),
+          labels: Object.fromEntries(
+            Object.entries(labels).filter(([, value]) => typeof value === "string")
+          ) as Record<string, string>,
+          annotations: Object.fromEntries(
+            Object.entries(annotations).filter(([, value]) => typeof value === "string")
+          ) as Record<string, string>,
           items: items.length > 0 ? items : [],
         })
         setEditDialogOpen(true)
@@ -257,12 +264,16 @@ export function ConfigMapsPageClient() {
       name: string
       namespace: string
       description: string
+      labels?: Record<string, string>
+      annotations?: Record<string, string>
       items: Array<{ key: string; value: string }>
     }) => {
       await createConfigMap({
         name: payload.name,
         namespace: payload.namespace,
         description: payload.description,
+        labels: payload.labels,
+        annotations: payload.annotations,
         data: Object.fromEntries(payload.items.map((item) => [item.key, item.value])),
       })
       await refreshRows(false)
@@ -275,6 +286,8 @@ export function ConfigMapsPageClient() {
       name: string
       namespace: string
       description: string
+      labels?: Record<string, string>
+      annotations?: Record<string, string>
       items: Array<{ key: string; value: string }>
     }) => {
       if (!editInitialValues) {
@@ -285,6 +298,8 @@ export function ConfigMapsPageClient() {
         name: editInitialValues.name,
         namespace: editInitialValues.namespace,
         description: payload.description,
+        labels: payload.labels,
+        annotations: payload.annotations,
         data: Object.fromEntries(payload.items.map((item) => [item.key, item.value])),
       })
       await refreshRows(false)

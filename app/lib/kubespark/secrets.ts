@@ -7,7 +7,6 @@ import {
 } from "./common"
 import {
   asObject,
-  buildDescriptionPatch,
   buildMetadata,
   checkNamespacedResourceExists,
   type BaseCreateInput,
@@ -196,15 +195,6 @@ export async function updateSecret(input: UpdateSecretInput): Promise<void> {
   })
   const existing = asObject(payload)
   const existingMetadata = asObject(existing.metadata)
-  const existingAnnotations = asObject(existingMetadata.annotations)
-  const mergedAnnotationsBase = {
-    ...existingAnnotations,
-    ...buildDescriptionPatch(input.description).annotations,
-  }
-  const mergedAnnotations =
-    mergedAnnotationsBase.description === null
-      ? (({ description: _description, ...rest }) => rest)(mergedAnnotationsBase)
-      : mergedAnnotationsBase
 
   const requestBody = {
     apiVersion: "v1",
@@ -216,10 +206,8 @@ export async function updateSecret(input: UpdateSecretInput): Promise<void> {
         typeof existingMetadata.resourceVersion === "string"
           ? existingMetadata.resourceVersion
           : undefined,
-      ...(Object.keys(mergedAnnotations).length > 0 ? { annotations: mergedAnnotations } : {}),
-      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
-        ? { labels: existingMetadata.labels }
-        : {}),
+      ...(metadata.annotations ? { annotations: metadata.annotations } : {}),
+      ...(metadata.labels ? { labels: metadata.labels } : {}),
     },
     type: secretType,
     ...(typeof existing.immutable === "boolean" ? { immutable: existing.immutable } : {}),

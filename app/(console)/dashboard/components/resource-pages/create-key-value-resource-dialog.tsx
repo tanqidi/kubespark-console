@@ -15,6 +15,13 @@ import { checkConfigMapExists } from "@/app/lib/kubespark/configmaps"
 import { checkSecretExists } from "@/app/lib/kubespark/secrets"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
+import {
+  ResourceMetadataEditor,
+  hasUserProvidedMetadata,
+  metadataEntriesToRecord,
+  metadataRecordToEntries,
+  type MetadataEntry,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -53,7 +60,7 @@ type NamespaceOption = {
   name: string
 }
 
-type DialogTab = "basic" | "data"
+type DialogTab = "basic" | "data" | "advanced"
 type DataViewMode = "list" | "edit"
 
 type KeyValueItem = {
@@ -66,6 +73,8 @@ type DialogSnapshot = {
   name: string
   namespace: string
   description: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
   secretType: string
   items: KeyValueItem[]
 }
@@ -74,6 +83,8 @@ export type KeyValueDialogInitialValues = {
   name: string
   namespace: string
   description?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
   type?: string
   items: Array<{ key: string; value: string }>
 }
@@ -82,6 +93,8 @@ type SubmitPayload = {
   name: string
   namespace: string
   description: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
   type?: string
   items: Array<{ key: string; value: string }>
 }
@@ -187,11 +200,14 @@ function asString(value: unknown): string {
 
 function buildResourceManifest(kind: ResourceKind, snapshot: DialogSnapshot) {
   const metadata: JsonObject = {}
-  const annotations: JsonObject = {}
+  const labels = metadataEntriesToRecord(snapshot.labels)
+  const annotations = metadataEntriesToRecord(snapshot.annotations)
 
   if (snapshot.name.trim()) metadata.name = snapshot.name.trim()
   if (snapshot.namespace.trim()) metadata.namespace = snapshot.namespace.trim()
+  if (Object.keys(labels).length > 0) metadata.labels = labels
   if (snapshot.description.trim()) annotations.description = snapshot.description.trim()
+  else delete annotations.description
   if (Object.keys(annotations).length > 0) metadata.annotations = annotations
 
   const manifest: JsonObject = {
@@ -248,6 +264,7 @@ function parseYamlText(kind: ResourceKind, yamlText: string): DialogSnapshot {
 
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
+  const labels = asObject(metadata.labels)
   const itemSource =
     kind === "secret"
       ? (() => {
@@ -265,6 +282,16 @@ function parseYamlText(kind: ResourceKind, yamlText: string): DialogSnapshot {
     name: asString(metadata.name),
     namespace: asString(metadata.namespace),
     description: asString(annotations.description),
+    labels: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(labels).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
+    annotations: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(annotations).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
     secretType: kind === "secret" ? asString(root.type) || "Opaque" : "Opaque",
     items: items.length > 0 ? items : [createEmptyItem()],
   }
@@ -288,6 +315,9 @@ export function CreateKeyValueResourceDialog({
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [metadataEnabled, setMetadataEnabled] = React.useState(false)
+  const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
+  const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
   const [secretType, setSecretType] = React.useState("Opaque")
   const [items, setItems] = React.useState<KeyValueItem[]>(() => [createEmptyItem()])
   const [creating, setCreating] = React.useState(false)
@@ -346,16 +376,21 @@ export function CreateKeyValueResourceDialog({
       name,
       namespace,
       description,
+      labels: labelEntries,
+      annotations: annotationEntries,
       secretType,
       items,
     }),
-    [description, items, name, namespace, secretType]
+    [annotationEntries, description, items, labelEntries, name, namespace, secretType]
   )
 
   const applySnapshot = React.useCallback((snapshot: DialogSnapshot) => {
     setName(snapshot.name)
     setNamespace(snapshot.namespace)
     setDescription(snapshot.description)
+    setLabelEntries(snapshot.labels)
+    setAnnotationEntries(snapshot.annotations)
+    setMetadataEnabled(hasUserProvidedMetadata(snapshot.labels, snapshot.annotations))
     setSecretType(snapshot.secretType || "Opaque")
     setItems(snapshot.items.length > 0 ? snapshot.items : [createEmptyItem()])
     setDataViewMode("list")
@@ -406,6 +441,9 @@ export function CreateKeyValueResourceDialog({
       setName("")
       setNamespace("")
       setDescription("")
+      setMetadataEnabled(false)
+      setLabelEntries([{ key: "", value: "" }])
+      setAnnotationEntries([{ key: "", value: "" }])
       setSecretType("Opaque")
       setItems([createEmptyItem()])
       setCreating(false)
@@ -452,6 +490,11 @@ export function CreateKeyValueResourceDialog({
     setName(initialValues.name)
     setNamespace(initialValues.namespace)
     setDescription(initialValues.description ?? "")
+    const nextLabelEntries = metadataRecordToEntries(initialValues.labels ?? {})
+    const nextAnnotationEntries = metadataRecordToEntries(initialValues.annotations ?? {})
+    setLabelEntries(nextLabelEntries)
+    setAnnotationEntries(nextAnnotationEntries)
+    setMetadataEnabled(hasUserProvidedMetadata(nextLabelEntries, nextAnnotationEntries))
     setSecretType(initialValues.type?.trim() || "Opaque")
     setItems(
       initialValues.items.length > 0
@@ -594,6 +637,60 @@ export function CreateKeyValueResourceDialog({
     setSubmitError(null)
   }, [])
 
+  const goToDataStep = React.useCallback(() => {
+    setActiveTab("data")
+    setSubmitError(null)
+  }, [])
+
+  const validateDataItems = React.useCallback((draftItems: KeyValueItem[]) => {
+    const cleanedItems = draftItems
+      .map((item) => ({
+        key: item.key.trim(),
+        value: item.value,
+      }))
+      .filter((item) => item.key.length > 0 || item.value.length > 0)
+
+    let resolvedItemsError: string | null = null
+    const seen = new Set<string>()
+
+    if (cleanedItems.length === 0) {
+      resolvedItemsError = DATA_ITEM_REQUIRED_MESSAGE
+    }
+
+    cleanedItems.forEach((item, index) => {
+      if (resolvedItemsError) return
+      if (!item.key) {
+        resolvedItemsError = `第 ${index + 1} 个数据项缺少键名`
+        return
+      }
+      if (!/^[A-Za-z0-9._-]+$/.test(item.key)) {
+        resolvedItemsError = `数据项键名 ${item.key} 格式无效`
+        return
+      }
+      if (seen.has(item.key)) {
+        resolvedItemsError = `数据项键名 ${item.key} 重复`
+        return
+      }
+      seen.add(item.key)
+    })
+
+    return { cleanedItems, resolvedItemsError }
+  }, [])
+
+  const goToAdvancedStep = React.useCallback(() => {
+    if (creating || checkingNext) return
+    const { resolvedItemsError } = validateDataItems(items)
+    setItemsError(resolvedItemsError)
+    if (resolvedItemsError) {
+      setActiveTab("data")
+      setDataViewMode("list")
+      return
+    }
+    setActiveTab("advanced")
+    setDataViewMode("list")
+    setSubmitError(null)
+  }, [checkingNext, creating, items, validateDataItems])
+
   const handleYamlModeChange = React.useCallback(
     (checked: boolean) => {
       if (creating || checkingNext) return
@@ -673,10 +770,10 @@ export function CreateKeyValueResourceDialog({
   }, [checkingNext, creating, isEditMode, isSecret, kind, name, namespace])
 
   const handleSubmit = React.useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
+    async () => {
       if (suppressSubmitRef.current) return
       if (creating || checkingNext) return
+      if (!yamlMode && activeTab !== "advanced") return
 
       let draft = getSnapshot()
 
@@ -700,36 +797,7 @@ export function CreateKeyValueResourceDialog({
       const resolvedDescriptionError =
         nextDescription.length <= DESCRIPTION_MAX_LENGTH ? null : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
 
-      const cleanedItems = draft.items
-        .map((item) => ({
-          key: item.key.trim(),
-          value: item.value,
-        }))
-        .filter((item) => item.key.length > 0 || item.value.length > 0)
-
-      let resolvedItemsError: string | null = null
-      const seen = new Set<string>()
-
-      if (cleanedItems.length === 0) {
-        resolvedItemsError = DATA_ITEM_REQUIRED_MESSAGE
-      }
-
-      cleanedItems.forEach((item, index) => {
-        if (resolvedItemsError) return
-        if (!item.key) {
-          resolvedItemsError = `第 ${index + 1} 个数据项缺少键名`
-          return
-        }
-        if (!/^[A-Za-z0-9._-]+$/.test(item.key)) {
-          resolvedItemsError = `数据项键名 ${item.key} 格式无效`
-          return
-        }
-        if (seen.has(item.key)) {
-          resolvedItemsError = `数据项键名 ${item.key} 重复`
-          return
-        }
-        seen.add(item.key)
-      })
+      const { cleanedItems, resolvedItemsError } = validateDataItems(draft.items)
 
       setNameError(resolvedNameError)
       setNamespaceError(resolvedNamespaceError)
@@ -782,6 +850,8 @@ export function CreateKeyValueResourceDialog({
           name: nextName,
           namespace: nextNamespace,
           description: nextDescription,
+          labels: metadataEntriesToRecord(draft.labels),
+          annotations: metadataEntriesToRecord(draft.annotations),
           ...(isSecret ? { type: draft.secretType.trim() || "Opaque" } : {}),
           items: cleanedItems,
         })
@@ -819,11 +889,13 @@ export function CreateKeyValueResourceDialog({
       isEditMode,
       isSecret,
       kind,
+      activeTab,
       onOpenChange,
       onSubmit,
       withLockedIdentity,
       yamlMode,
       yamlText,
+      validateDataItems,
     ]
   )
 
@@ -844,7 +916,7 @@ export function CreateKeyValueResourceDialog({
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <form onSubmit={(event) => event.preventDefault()} className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-start justify-between border-b bg-muted/15">
             <DialogHeader className="px-6 py-4">
               <DialogTitle>{title}</DialogTitle>
@@ -889,11 +961,43 @@ export function CreateKeyValueResourceDialog({
                   icon: <IconAdjustmentsHorizontal className="size-4" />,
                   disabled: !canNavigateStep,
                   onClick: () => {
+                    if (!canNavigateStep) return
                     if (activeTab === "data") {
                       setSubmitError(null)
                       return
                     }
-                    void handleNextStep()
+                    if (activeTab === "basic") {
+                      void handleNextStep()
+                      return
+                    }
+                    goToDataStep()
+                  },
+                },
+                {
+                  id: "advanced",
+                  title: "高级设置",
+                  status:
+                    activeTab === "advanced"
+                      ? "当前"
+                      : hasUserProvidedMetadata(labelEntries, annotationEntries)
+                        ? "已设置"
+                        : "未设置",
+                  active: activeTab === "advanced",
+                  icon: <IconAdjustmentsHorizontal className="size-4" />,
+                  disabled: !canNavigateStep,
+                  onClick: () => {
+                    if (!canNavigateStep) return
+                    if (activeTab === "basic") {
+                      void handleNextStep()
+                      return
+                    }
+                    if (activeTab === "data") {
+                      goToAdvancedStep()
+                      return
+                    }
+                    setActiveTab("advanced")
+                    setDataViewMode("list")
+                    setSubmitError(null)
                   },
                 },
               ]}
@@ -1047,7 +1151,7 @@ export function CreateKeyValueResourceDialog({
                   </Field>
                 </FieldGroup>
               </div>
-            ) : (
+            ) : activeTab === "data" ? (
               <div className="">
                 {dataViewMode === "list" ? (
                   <>
@@ -1184,6 +1288,32 @@ export function CreateKeyValueResourceDialog({
                   </>
                 )}
               </div>
+            ) : (
+              <div>
+                <div className="mb-4">
+                  <h3 className="text-[15px] font-semibold">高级设置</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    补充标签与注解信息，便于检索、分类和后续治理。
+                  </p>
+                </div>
+                <FieldGroup className="grid gap-4 md:grid-cols-2">
+                  <Field className="md:col-span-2">
+                    <ResourceMetadataEditor
+                      checked={metadataEnabled}
+                      onCheckedChange={setMetadataEnabled}
+                      labels={labelEntries}
+                      setLabels={setLabelEntries}
+                      annotations={annotationEntries}
+                      setAnnotations={setAnnotationEntries}
+                      description={description}
+                      setDescription={setDescription}
+                      disabled={isBusy}
+                      titleText="统一管理资源的标签与注解信息。"
+                    />
+                  </Field>
+                </FieldGroup>
+                {submitError ? <FieldError className="mt-4">{submitError}</FieldError> : null}
+              </div>
             )}
           </div>
 
@@ -1206,7 +1336,7 @@ export function CreateKeyValueResourceDialog({
                     取消
                   </Button>
                 </DialogClose>
-                <Button type="submit" disabled={isBusy}>
+                <Button type="button" onClick={() => void handleSubmit()} disabled={isBusy}>
                   {creating
                     ? isEditMode
                       ? "保存中..."
@@ -1236,7 +1366,7 @@ export function CreateKeyValueResourceDialog({
                 </Button>
               </div>
             </DialogFooter>
-          ) : (
+          ) : activeTab === "data" ? (
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button
@@ -1247,7 +1377,27 @@ export function CreateKeyValueResourceDialog({
                 >
                   上一步
                 </Button>
-                <Button type="submit" disabled={isBusy}>
+                <Button
+                  type="button"
+                  onClick={goToAdvancedStep}
+                  disabled={isBusy}
+                >
+                  下一步
+                </Button>
+              </div>
+            </DialogFooter>
+          ) : (
+            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+              <div className="flex w-full items-center justify-between gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={goToDataStep}
+                  disabled={isBusy}
+                >
+                  上一步
+                </Button>
+                <Button type="button" onClick={() => void handleSubmit()} disabled={isBusy}>
                   {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                 </Button>
               </div>
