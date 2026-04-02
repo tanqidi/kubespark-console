@@ -77,6 +77,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { FilterCombobox } from "@/components/ui/filter-combobox"
 
 type NamespaceOption = {
   id: string
@@ -646,6 +647,7 @@ export function CreateServiceDialog({
   const [selectorAddPromptShown, setSelectorAddPromptShown] = React.useState(false)
   const initializedEditKeyRef = React.useRef<string | null>(null)
   const lastFocusedPortErrorFieldRef = React.useRef<string>("")
+  const createDialogPopupLayerRef = React.useRef<HTMLDivElement | null>(null)
   const isBusy = checkingNext || creating
 
   const title = isEditMode ? "编辑服务" : "创建服务"
@@ -1413,7 +1415,7 @@ export function CreateServiceDialog({
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
-
+        <div ref={createDialogPopupLayerRef} className="pointer-events-none absolute inset-0 z-50" />
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-start justify-between border-b bg-muted/15">
             <DialogHeader className="px-6 py-4">
@@ -1528,7 +1530,8 @@ export function CreateServiceDialog({
 
                 <Field data-invalid={Boolean(namespaceError)}>
                   <FieldLabel htmlFor="service-create-namespace">项目</FieldLabel>
-                  <Select
+                  <FilterCombobox
+                    options={namespaceOptions}
                     value={namespace}
                     onValueChange={(value) => {
                       if (isEditMode) return
@@ -1536,24 +1539,13 @@ export function CreateServiceDialog({
                       if (namespaceError) setNamespaceError(null)
                       if (stepError) setStepError(null)
                     }}
+                    placeholder="请选择项目"
+                    emptyText="未找到项目"
+                    className="w-full"
+                    ariaInvalid={Boolean(namespaceError)}
                     disabled={isBusy || isEditMode}
-                  >
-                    <SelectTrigger
-                      id="service-create-namespace"
-                      aria-invalid={Boolean(namespaceError)}
-                    >
-                      <SelectValue placeholder="请选择项目" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {namespaceOptions.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            {option.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    contentContainer={createDialogPopupLayerRef}
+                  />
                   {namespaceError ? (
                     <FieldError>{namespaceError}</FieldError>
                   ) : (

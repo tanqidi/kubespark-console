@@ -58,6 +58,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 type CreateStep = "basic" | "pod" | "storage" | "advanced"
@@ -338,6 +339,7 @@ export function CreatePodDialog({
   const [pendingDeleteStorageIndex, setPendingDeleteStorageIndex] = React.useState<number | null>(null)
   const [pendingDeleteConfigMountIndex, setPendingDeleteConfigMountIndex] = React.useState<number | null>(null)
   const lockedIdentityRef = React.useRef<{ name: string; namespace: string } | null>(null)
+  const createDialogPopupLayerRef = React.useRef<HTMLDivElement | null>(null)
 
   const {
     containers,
@@ -1005,6 +1007,7 @@ export function CreatePodDialog({
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
+        <div ref={createDialogPopupLayerRef} className="pointer-events-none absolute inset-0 z-50" />
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-start justify-between border-b bg-muted/15">
             <DialogHeader className="px-6 py-4">
@@ -1148,7 +1151,8 @@ export function CreatePodDialog({
 
                   <Field data-invalid={Boolean(namespaceError)}>
                     <FieldLabel htmlFor="create-pod-namespace">项目</FieldLabel>
-                    <Select
+                    <FilterCombobox
+                      options={namespaceOptions}
                       value={namespace}
                       onValueChange={(value) => {
                         if (isEditMode) return
@@ -1156,21 +1160,13 @@ export function CreatePodDialog({
                         if (namespaceError) setNamespaceError(null)
                         if (submitError) setSubmitError(null)
                       }}
+                      placeholder="请选择项目"
+                      emptyText="未找到项目"
+                      className="w-full"
+                      ariaInvalid={Boolean(namespaceError)}
                       disabled={isBusy || isEditMode}
-                    >
-                      <SelectTrigger id="create-pod-namespace" aria-invalid={Boolean(namespaceError)}>
-                        <SelectValue placeholder="请选择项目" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {namespaceOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      contentContainer={createDialogPopupLayerRef}
+                    />
                     {namespaceError ? <FieldError>{namespaceError}</FieldError> : <FieldDescription>选择容器组所属项目。</FieldDescription>}
                   </Field>
 

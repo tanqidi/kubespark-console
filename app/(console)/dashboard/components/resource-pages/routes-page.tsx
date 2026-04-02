@@ -1680,10 +1680,21 @@ export function RoutesPageClient() {
 
                     <Field data-invalid={Boolean(createNamespaceError)}>
                       <FieldLabel htmlFor="route-create-namespace">项目</FieldLabel>
-                      <Select value={createNamespace} onValueChange={(value) => { if (isEditMode) return; setCreateNamespace(value); if (createNamespaceError) setCreateNamespaceError(null) }} disabled={creating || isEditMode}>
-                        <SelectTrigger id="route-create-namespace" aria-invalid={Boolean(createNamespaceError)}><SelectValue placeholder="请选择项目" /></SelectTrigger>
-                        <SelectContent><SelectGroup>{namespaceOptions.map((option) => (<SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>))}</SelectGroup></SelectContent>
-                      </Select>
+                      <FilterCombobox
+                        options={namespaceOptions}
+                        value={createNamespace}
+                        onValueChange={(value) => {
+                          if (isEditMode) return
+                          setCreateNamespace(value)
+                          if (createNamespaceError) setCreateNamespaceError(null)
+                        }}
+                        placeholder="请选择项目"
+                        emptyText="未找到项目"
+                        className="w-full"
+                        ariaInvalid={Boolean(createNamespaceError)}
+                        disabled={creating || isEditMode}
+                        contentContainer={createDialogPopupLayerRef}
+                      />
                       {createNamespaceError ? (<FieldError>{createNamespaceError}</FieldError>) : (<FieldDescription>选择要创建路由的项目。</FieldDescription>)}
                     </Field>
 

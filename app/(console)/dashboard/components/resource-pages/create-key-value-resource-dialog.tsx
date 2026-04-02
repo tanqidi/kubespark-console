@@ -52,6 +52,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { FilterCombobox } from "@/components/ui/filter-combobox"
 
 type ResourceKind = "configmap" | "secret"
 
@@ -336,6 +337,7 @@ export function CreateKeyValueResourceDialog({
   const [editingItemId, setEditingItemId] = React.useState<string | null>(null)
   const [pendingDeleteItemId, setPendingDeleteItemId] = React.useState<string | null>(null)
   const initializedEditKeyRef = React.useRef<string | null>(null)
+  const createDialogPopupLayerRef = React.useRef<HTMLDivElement | null>(null)
   const isEditMode = mode === "edit"
 
   const isSecret = kind === "secret"
@@ -883,6 +885,7 @@ export function CreateKeyValueResourceDialog({
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
+        <div ref={createDialogPopupLayerRef} className="pointer-events-none absolute inset-0 z-50" />
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-start justify-between border-b bg-muted/15">
             <DialogHeader className="px-6 py-4">
@@ -1030,7 +1033,8 @@ export function CreateKeyValueResourceDialog({
 
                   <Field data-invalid={Boolean(namespaceError)}>
                     <FieldLabel htmlFor={`${kind}-create-namespace`}>项目</FieldLabel>
-                    <Select
+                    <FilterCombobox
+                      options={namespaceOptions}
                       value={namespace}
                       onValueChange={(value) => {
                         setNamespace(value)
@@ -1038,24 +1042,13 @@ export function CreateKeyValueResourceDialog({
                         if (submitError) setSubmitError(null)
                         if (yamlError) setYamlError(null)
                       }}
+                      placeholder="请选择项目"
+                      emptyText="未找到项目"
+                      className="w-full"
+                      ariaInvalid={Boolean(namespaceError)}
                       disabled={creating || isEditMode}
-                    >
-                      <SelectTrigger
-                        id={`${kind}-create-namespace`}
-                        aria-invalid={Boolean(namespaceError)}
-                      >
-                        <SelectValue placeholder="请选择项目" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {namespaceOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      contentContainer={createDialogPopupLayerRef}
+                    />
                     {namespaceError ? (
                       <FieldError>{namespaceError}</FieldError>
                     ) : (

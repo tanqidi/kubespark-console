@@ -363,6 +363,7 @@ export function VolumesPageClient() {
   const [createStorageError, setCreateStorageError] = React.useState<string | null>(null)
   const [createStorageClassError, setCreateStorageClassError] = React.useState<string | null>(null)
   const [createSubmitError, setCreateSubmitError] = React.useState<string | null>(null)
+  const createDialogPopupLayerRef = React.useRef<HTMLDivElement | null>(null)
 
   const handleViewPvcYaml = React.useCallback((row: PersistentVolumeClaimRow) => {
     setYamlOpen(true)
@@ -1020,6 +1021,7 @@ export function VolumesPageClient() {
           onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
+          <div ref={createDialogPopupLayerRef} className="pointer-events-none absolute inset-0 z-50" />
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
@@ -1164,27 +1166,20 @@ export function VolumesPageClient() {
 
                     <Field data-invalid={Boolean(createNamespaceError)}>
                       <FieldLabel htmlFor="volume-create-namespace">项目</FieldLabel>
-                      <Select
+                      <FilterCombobox
+                        options={namespaceOptions}
                         value={createNamespace}
                         onValueChange={(value) => {
                           setCreateNamespace(value)
                           if (createNamespaceError) setCreateNamespaceError(null)
                         }}
+                        placeholder="请选择项目"
+                        emptyText="未找到项目"
+                        className="w-full"
+                        ariaInvalid={Boolean(createNamespaceError)}
                         disabled={creating}
-                      >
-                        <SelectTrigger id="volume-create-namespace" aria-invalid={Boolean(createNamespaceError)}>
-                          <SelectValue placeholder="请选择项目" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {namespaceOptions.map((option) => (
-                              <SelectItem key={option.id} value={option.id}>
-                                {option.name}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
+                        contentContainer={createDialogPopupLayerRef}
+                      />
                       {createNamespaceError ? (
                         <FieldError>{createNamespaceError}</FieldError>
                       ) : (
