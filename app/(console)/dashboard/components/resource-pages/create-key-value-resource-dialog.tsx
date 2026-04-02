@@ -335,8 +335,6 @@ export function CreateKeyValueResourceDialog({
   const [dataViewMode, setDataViewMode] = React.useState<DataViewMode>("list")
   const [editingItemId, setEditingItemId] = React.useState<string | null>(null)
   const [pendingDeleteItemId, setPendingDeleteItemId] = React.useState<string | null>(null)
-  const suppressSubmitRef = React.useRef(false)
-  const suppressSubmitTimerRef = React.useRef<number | null>(null)
   const initializedEditKeyRef = React.useRef<string | null>(null)
   const isEditMode = mode === "edit"
 
@@ -422,20 +420,6 @@ export function CreateKeyValueResourceDialog({
     [lockedIdentity]
   )
 
-  const armSubmitSuppression = React.useCallback(() => {
-    suppressSubmitRef.current = true
-
-    if (typeof window !== "undefined") {
-      if (suppressSubmitTimerRef.current !== null) {
-        window.clearTimeout(suppressSubmitTimerRef.current)
-      }
-      suppressSubmitTimerRef.current = window.setTimeout(() => {
-        suppressSubmitRef.current = false
-        suppressSubmitTimerRef.current = null
-      }, 240)
-    }
-  }, [])
-
   React.useEffect(() => {
     if (!open) {
       setName("")
@@ -461,23 +445,10 @@ export function CreateKeyValueResourceDialog({
       setDataViewMode("list")
       setEditingItemId(null)
       setPendingDeleteItemId(null)
-      suppressSubmitRef.current = false
       initializedEditKeyRef.current = null
-      if (typeof window !== "undefined" && suppressSubmitTimerRef.current !== null) {
-        window.clearTimeout(suppressSubmitTimerRef.current)
-        suppressSubmitTimerRef.current = null
-      }
       return
     }
   }, [open])
-
-  React.useEffect(() => {
-    return () => {
-      if (typeof window !== "undefined" && suppressSubmitTimerRef.current !== null) {
-        window.clearTimeout(suppressSubmitTimerRef.current)
-      }
-    }
-  }, [])
 
   React.useEffect(() => {
     if (!open || !isEditMode || !initialValues) return
@@ -594,7 +565,6 @@ export function CreateKeyValueResourceDialog({
 
   const returnToList = React.useCallback(() => {
     if (!editingItem) {
-      armSubmitSuppression()
       setDataViewMode("list")
       setEditingItemId(null)
       return
@@ -618,19 +588,17 @@ export function CreateKeyValueResourceDialog({
 
     setEditingKeyError(null)
     setItemsError(null)
-    armSubmitSuppression()
     setDataViewMode("list")
     setEditingItemId(null)
-  }, [armSubmitSuppression, editingItem, items])
+  }, [editingItem, items])
 
   const cancelEditItem = React.useCallback(() => {
     setEditingKeyError(null)
     setItemsError(null)
     setSubmitError(null)
-    armSubmitSuppression()
     setDataViewMode("list")
     setEditingItemId(null)
-  }, [armSubmitSuppression])
+  }, [])
 
   const goToBasicStep = React.useCallback(() => {
     setActiveTab("basic")
@@ -771,7 +739,6 @@ export function CreateKeyValueResourceDialog({
 
   const handleSubmit = React.useCallback(
     async () => {
-      if (suppressSubmitRef.current) return
       if (creating || checkingNext) return
       if (!yamlMode && activeTab !== "advanced") return
 
@@ -916,7 +883,7 @@ export function CreateKeyValueResourceDialog({
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
-        <form onSubmit={(event) => event.preventDefault()} className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-start justify-between border-b bg-muted/15">
             <DialogHeader className="px-6 py-4">
               <DialogTitle>{title}</DialogTitle>
@@ -1403,7 +1370,7 @@ export function CreateKeyValueResourceDialog({
               </div>
             </DialogFooter>
           )}
-        </form>
+        </div>
 
         <DeleteConfirmDialog
           open={Boolean(pendingDeleteItem)}

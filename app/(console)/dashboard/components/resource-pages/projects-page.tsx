@@ -266,8 +266,7 @@ export function ProjectsPageClient() {
   }, [])
 
   const handleCreateSubmit = React.useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
+    () => {
       if (creating) return
 
       let nextName = (editingRow?.name ?? createName).trim()
@@ -464,7 +463,7 @@ export function ProjectsPageClient() {
           onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
-          <form onSubmit={handleCreateSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
                 <DialogTitle>{dialogTitle}</DialogTitle>
@@ -606,11 +605,11 @@ export function ProjectsPageClient() {
                   取消
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={creating}>
+              <Button type="button" onClick={() => handleCreateSubmit()} disabled={creating}>
                 {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
 
