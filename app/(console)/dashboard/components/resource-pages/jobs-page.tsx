@@ -1,7 +1,8 @@
 ﻿"use client"
 
 import * as React from "react"
-import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
+import { IconDotsVertical, IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
+import type { ColumnDef } from "@tanstack/react-table"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import {
@@ -24,6 +25,15 @@ import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -521,50 +531,60 @@ export function JobsPageClient() {
       })
   }, [])
 
-  const columns = React.useMemo(
-    () =>
-      createColumns<JobRow>({
-        columns: jobColumns,
-        actionItems: [
-          {
-            label: (
-              <>
-                <IconEye className="size-4" />
-                {"\u67e5\u770b YAML"}
-              </>
-            ),
-            onSelect: (row) => {
-              handleViewYaml(row)
-            },
-          },
-          {
-            label: (
-              <>
-                <IconPencil className="size-4" />
-                {"编辑"}
-              </>
-            ),
-            onSelect: (row) => {
-              handleEdit(row)
-            },
-          },
-          {
-            label: (
-              <>
-                <IconTrash className="size-4" />
-                {"\u5220\u9664"}
-              </>
-            ),
-            variant: "destructive",
-            withSeparator: true,
-            onSelect: (row) => {
-              requestDelete(row)
-            },
-          },
-        ],
-      }),
-    [handleEdit, handleViewYaml, requestDelete]
-  )
+  const columns = React.useMemo(() => {
+    const baseColumns = createColumns<JobRow>({
+      columns: jobColumns,
+      includeActions: false,
+    })
+
+    const actionColumn: ColumnDef<JobRow> = {
+      id: "actions",
+      header: "",
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => {
+        const current = row.original
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="flex size-8 text-muted-foreground data-[state=open]:bg-muted focus-visible:ring-0 focus-visible:border-transparent"
+                size="icon"
+              >
+                <IconDotsVertical />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-32">
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={() => handleViewYaml(current)}>
+                  <IconEye className="size-4" />
+                  {"\u67e5\u770b YAML"}
+                </DropdownMenuItem>
+                {current.kind === "CronJob" ? (
+                  <DropdownMenuItem onSelect={() => handleEdit(current)}>
+                    <IconPencil className="size-4" />
+                    编辑
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => requestDelete(current)}
+                >
+                  <IconTrash className="size-4" />
+                  {"\u5220\u9664"}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      },
+    }
+
+    return [...baseColumns, actionColumn]
+  }, [handleEdit, handleViewYaml, requestDelete])
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
     if (!silent) {
