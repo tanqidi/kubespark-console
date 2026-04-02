@@ -547,9 +547,6 @@ export function VolumesPageClient() {
           .sort((a, b) => a.localeCompare(b))
           .map((name) => ({ id: name, name }))
         setNamespaceOptions(ns)
-        if (!createNamespace && ns.length > 0) {
-          setCreateNamespace(ns[0]?.name ?? "")
-        }
         const classes = (
           storageClasses.items as Array<{
             metadata?: { name?: string; annotations?: Record<string, unknown> }

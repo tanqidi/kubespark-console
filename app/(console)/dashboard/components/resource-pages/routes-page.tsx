@@ -602,9 +602,6 @@ export function RoutesPageClient() {
           .sort((a, b) => a.localeCompare(b))
           .map((name) => ({ id: name, name }))
         setNamespaceOptions(mapped)
-        if (!createNamespace && mapped.length > 0) {
-          setCreateNamespace(mapped[0]?.name ?? "")
-        }
       })
       .catch((loadError) => {
         if (cancelled) return
