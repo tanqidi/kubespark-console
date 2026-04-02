@@ -130,8 +130,8 @@ const routeColumns: ColumnConfig<RouteRow>[] = [
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
   { key: "namespace", label: "命名空间" },
-  { key: "path", label: "路径" },
-  { key: "service", label: "服务" },
+  // { key: "path", label: "路径" },
+  // { key: "service", label: "服务" },
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新日期" },
 ]
