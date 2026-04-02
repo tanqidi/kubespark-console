@@ -586,13 +586,13 @@ export function ProjectsPageClient() {
                         name="description"
                         value={createDescription}
                         onChange={(event) => setCreateDescription(event.target.value)}
-                        placeholder="请输入描述（选填）"
+                        placeholder="请输入描述"
                         maxLength={256}
                         className="min-h-28"
                         disabled={creating}
                       />
                       <FieldDescription>
-                        描述将写入资源注解 `description`，最长 256 个字符。
+                        描述将写入资源注解 description，最长 256 个字符。
                       </FieldDescription>
                     </Field>
                   </FieldGroup>

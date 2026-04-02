@@ -1032,7 +1032,7 @@ export function CreateKeyValueResourceDialog({
                         if (descriptionError) setDescriptionError(null)
                         if (yamlError) setYamlError(null)
                       }}
-                      placeholder="请输入描述（选填）"
+                      placeholder="请输入描述"
                       maxLength={DESCRIPTION_MAX_LENGTH}
                       className="min-h-24"
                       disabled={creating}
@@ -1041,7 +1041,7 @@ export function CreateKeyValueResourceDialog({
                       <FieldError>{descriptionError}</FieldError>
                     ) : (
                       <FieldDescription>
-                        描述将写入资源注解 `description`，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                        描述将写入资源注解 description，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
                       </FieldDescription>
                     )}
                   </Field>

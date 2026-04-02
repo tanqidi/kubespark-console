@@ -1146,13 +1146,13 @@ export function VolumesPageClient() {
                         id="volume-create-description"
                         value={createDescription}
                         onChange={(event) => setCreateDescription(event.target.value)}
-                        placeholder="请输入描述（选填）"
+                        placeholder="请输入描述"
                         maxLength={DESCRIPTION_MAX_LENGTH}
                         className="min-h-24"
                         disabled={creating}
                       />
                       <FieldDescription>
-                        描述将写入资源注解 `description`，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                        描述将写入资源注解 description，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
                       </FieldDescription>
                     </Field>
                   </FieldGroup>

@@ -750,13 +750,13 @@ export function CreateWorkloadDialog({
                       id="create-job-description"
                       value={description}
                       onChange={(event) => setDescription(event.target.value)}
-                      placeholder="请输入描述（选填）"
+                      placeholder="请输入描述"
                       maxLength={256}
                       className="min-h-24"
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      描述将写入资源注解 `description`，最长 256 个字符。
+                      描述将写入资源注解 description，最长 256 个字符。
                     </FieldDescription>
                   </Field>
                 </FieldGroup>

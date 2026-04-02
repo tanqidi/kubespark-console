@@ -195,6 +195,33 @@ function normalizeRuleItem(item: RouteRuleItem): RouteRuleItem {
   }
 }
 
+function normalizeMetadataEntries(entries: MetadataEntry[]): MetadataEntry[] {
+  return entries.map((item) => ({
+    key: item.key.trim(),
+    value: item.value.trim(),
+  }))
+}
+
+function metadataEntriesToRecord(entries: MetadataEntry[]): Record<string, string> {
+  return Object.fromEntries(
+    normalizeMetadataEntries(entries)
+      .filter((item) => item.key.length > 0)
+      .map((item) => [item.key, item.value])
+  ) as Record<string, string>
+}
+
+function metadataRecordToEntries(
+  record: Record<string, string>,
+  options?: { excludeKeys?: string[] }
+): MetadataEntry[] {
+  const exclude = new Set((options?.excludeKeys ?? []).map((item) => item.trim()))
+  const entries = Object.entries(record)
+    .filter(([key]) => !exclude.has(key.trim()))
+    .map(([key, value]) => ({ key: key.trim(), value: value.trim() }))
+    .filter((item) => item.key.length > 0)
+  return entries.length > 0 ? entries : [{ key: "", value: "" }]
+}
+
 function normalizeHostKey(host: string): string {
   return host.trim().toLowerCase()
 }
@@ -205,6 +232,8 @@ function buildRouteYamlText(params: {
   description: string
   rules: RouteRuleItem[]
   ingressClassName: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
 }): string {
   const normalizedRules = params.rules.map(normalizeRuleItem).filter((rule) => rule.host && rule.path && rule.serviceName && rule.servicePort)
   const tlsMap = new Map<string, Set<string>>()
@@ -231,6 +260,14 @@ function buildRouteYamlText(params: {
     })
     pathsByHost.set(rule.host, paths)
   })
+  const metadataLabels = metadataEntriesToRecord(params.labels)
+  const metadataAnnotations = metadataEntriesToRecord(params.annotations)
+  if (params.description.trim()) {
+    metadataAnnotations.description = params.description.trim()
+  } else {
+    delete metadataAnnotations.description
+  }
+
   return stringify(
     {
       apiVersion: "networking.k8s.io/v1",
@@ -238,15 +275,8 @@ function buildRouteYamlText(params: {
       metadata: {
         ...(params.name.trim() ? { name: params.name.trim() } : {}),
         ...(params.namespace.trim() ? { namespace: params.namespace.trim() } : {}),
-        ...(
-          params.description.trim()
-            ? {
-                annotations: {
-                  ...(params.description.trim() ? { description: params.description.trim() } : {}),
-                },
-              }
-            : {}
-        ),
+        ...(Object.keys(metadataLabels).length > 0 ? { labels: metadataLabels } : {}),
+        ...(Object.keys(metadataAnnotations).length > 0 ? { annotations: metadataAnnotations } : {}),
       },
       spec: {
         ...(params.ingressClassName.trim()
@@ -289,6 +319,8 @@ function parseRouteYamlText(yamlText: string): {
   name: string
   namespace: string
   description: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
   rules: RouteRuleItem[]
   host: string
   path: string
@@ -316,6 +348,7 @@ function parseRouteYamlText(yamlText: string): {
 
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
+  const labels = asObject(metadata.labels)
   const spec = asObject(root.spec)
   const tlsEntries = Array.isArray(spec.tls) ? spec.tls : []
   const tlsSecretByHost = new Map<string, string>()
@@ -364,6 +397,17 @@ function parseRouteYamlText(yamlText: string): {
     name: typeof metadata.name === "string" ? metadata.name : "",
     namespace: typeof metadata.namespace === "string" ? metadata.namespace : "",
     description: typeof annotations.description === "string" ? annotations.description : "",
+    labels: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(labels).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
+    annotations: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(annotations).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>,
+      { excludeKeys: ["description"] }
+    ),
     rules: parsedRules,
     host: firstRule.host,
     path: firstRule.path,
@@ -520,6 +564,11 @@ export function RoutesPageClient() {
     })
     return Array.from(groups.entries()).map(([hostKey, group]) => ({ hostKey, ...group }))
   }, [createRules])
+  const hasMetadataConfigured = React.useMemo(() => {
+    const hasLabel = labelEntries.some((item) => item.key.trim().length > 0)
+    const hasAnnotation = annotationEntries.some((item) => item.key.trim().length > 0)
+    return hasLabel || hasAnnotation
+  }, [annotationEntries, labelEntries])
   const canNavigateCreateSteps = !creating && !(createStep === "rule" && createRuleViewMode === "edit")
 
   const resetCreateForm = React.useCallback(() => {
@@ -708,13 +757,17 @@ export function RoutesPageClient() {
       description: createDescription,
       rules: createRules,
       ingressClassName: createIngressClassName,
+      labels: labelEntries,
+      annotations: annotationEntries,
     })
   }, [
+    annotationEntries,
     createDescription,
     createIngressClassName,
     createName,
     createNamespace,
     createRules,
+    labelEntries,
   ])
 
   const validateBasicStep = React.useCallback(() => {
@@ -955,6 +1008,8 @@ export function RoutesPageClient() {
       name: createName,
       namespace: createNamespace,
       description: createDescription,
+      labels: labelEntries,
+      annotations: annotationEntries,
       rules: createRules.map((rule) => normalizeRuleItem(rule)),
       ingressClassName: createIngressClassName,
       host: createHost,
@@ -979,6 +1034,12 @@ export function RoutesPageClient() {
         setCreateName(draft.name)
         setCreateNamespace(draft.namespace)
         setCreateDescription(draft.description)
+        setLabelEntries(draft.labels)
+        setAnnotationEntries(draft.annotations)
+        setMetadataEnabled(
+          draft.labels.some((item) => item.key.trim().length > 0) ||
+          draft.annotations.some((item) => item.key.trim().length > 0)
+        )
         setCreateHost(draft.host)
         setCreatePath(draft.path || "/")
         setCreateServiceName(draft.serviceName)
@@ -1098,6 +1159,8 @@ export function RoutesPageClient() {
         })),
         ingressClassName: draft.ingressClassName.trim(),
         description: draft.description.trim(),
+        labels: metadataEntriesToRecord(draft.labels),
+        annotations: metadataEntriesToRecord(draft.annotations),
       }
       if (isEditMode) {
         await updateIngress(payload)
@@ -1120,6 +1183,7 @@ export function RoutesPageClient() {
       setCreating(false)
     }
   }, [
+    annotationEntries,
     createDescription,
     createHost,
     createIngressClassName,
@@ -1135,6 +1199,7 @@ export function RoutesPageClient() {
     createYamlText,
     editingRouteRef,
     isEditMode,
+    labelEntries,
     creating,
     resetCreateForm,
   ])
@@ -1257,6 +1322,16 @@ export function RoutesPageClient() {
         setCreateName(draft.name)
         setCreateNamespace(draft.namespace)
         setCreateDescription(draft.description)
+        setLabelEntries(
+          metadataRecordToEntries(draft.labels)
+        )
+        setAnnotationEntries(
+          metadataRecordToEntries(draft.annotations, { excludeKeys: ["description"] })
+        )
+        setMetadataEnabled(
+          Object.keys(draft.labels).length > 0 ||
+          Object.entries(draft.annotations).some(([key]) => key !== "description")
+        )
         setCreateHost(draft.host)
         setCreatePath(draft.path || "/")
         setCreateServiceName(draft.serviceName)
@@ -1396,6 +1471,7 @@ export function RoutesPageClient() {
 
     void loadRows(false)
     const timer = window.setInterval(() => {
+      if (createDialogOpen) return
       void loadRows(true)
     }, 3000)
 
@@ -1403,7 +1479,7 @@ export function RoutesPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [])
+  }, [createDialogOpen])
 
   const listNamespaceOptions = React.useMemo(
     () =>
@@ -1425,31 +1501,54 @@ export function RoutesPageClient() {
     )
   }
 
-  const nsQuery = namespaceQuery.trim().toLowerCase()
-  const nmQuery = nameQuery.trim().toLowerCase()
-  const filteredRows = rows.filter((row) => {
-    if (nsQuery && row.namespace.toLowerCase() !== nsQuery) return false
-    if (nmQuery && !row.name.toLowerCase().includes(nmQuery)) return false
-    return true
-  })
+  const filteredRows = React.useMemo(() => {
+    const nsQuery = namespaceQuery.trim().toLowerCase()
+    const nmQuery = nameQuery.trim().toLowerCase()
+    return rows.filter((row) => {
+      if (nsQuery && row.namespace.toLowerCase() !== nsQuery) return false
+      if (nmQuery && !row.name.toLowerCase().includes(nmQuery)) return false
+      return true
+    })
+  }, [nameQuery, namespaceQuery, rows])
 
-  const routeFilters = (
-    <>
-      <FilterCombobox
-        options={listNamespaceOptions}
-        value={namespaceQuery}
-        onValueChange={setNamespaceQuery}
-        placeholder={"命名空间"}
-        emptyText={"未找到命名空间"}
-        className="w-40"
+  const routeFilters = React.useMemo(
+    () => (
+      <>
+        <FilterCombobox
+          options={listNamespaceOptions}
+          value={namespaceQuery}
+          onValueChange={setNamespaceQuery}
+          placeholder={"命名空间"}
+          emptyText={"未找到命名空间"}
+          className="w-40"
+        />
+        <Input
+          value={nameQuery}
+          onChange={(event) => setNameQuery(event.target.value)}
+          placeholder={"名称"}
+          className="h-9 w-40"
+        />
+      </>
+    ),
+    [listNamespaceOptions, nameQuery, namespaceQuery]
+  )
+
+  const openCreateDialog = React.useCallback(() => {
+    resetCreateForm()
+    setCreateDialogOpen(true)
+  }, [resetCreateForm])
+
+  const tableNode = React.useMemo(
+    () => (
+      <DataTable
+        data={filteredRows}
+        columns={columns}
+        toolbarEnd={routeFilters}
+        onCreate={openCreateDialog}
+        onDeleteSelectedRows={handleDeleteSelectedRows}
       />
-      <Input
-        value={nameQuery}
-        onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"名称"}
-        className="h-9 w-40"
-      />
-    </>
+    ),
+    [columns, filteredRows, handleDeleteSelectedRows, openCreateDialog, routeFilters]
   )
 
   return (
@@ -1505,6 +1604,12 @@ export function RoutesPageClient() {
                         setCreateName(nextName)
                         setCreateNamespace(nextNamespace)
                         setCreateDescription(parsed.description)
+                        setLabelEntries(parsed.labels)
+                        setAnnotationEntries(parsed.annotations)
+                        setMetadataEnabled(
+                          parsed.labels.some((item) => item.key.trim().length > 0) ||
+                          parsed.annotations.some((item) => item.key.trim().length > 0)
+                        )
                         setCreateHost(parsed.host)
                         setCreatePath(parsed.path || "/")
                         setCreateServiceName(parsed.serviceName)
@@ -1564,7 +1669,7 @@ export function RoutesPageClient() {
                     status:
                       createStep === "advanced"
                         ? "当前"
-                        : createIngressClassName.trim()
+                        : hasMetadataConfigured
                           ? "已设置"
                           : "未设置",
                     active: createStep === "advanced",
@@ -1623,8 +1728,8 @@ export function RoutesPageClient() {
 
                     <Field className="md:col-span-2">
                       <FieldLabel htmlFor="route-create-description">描述</FieldLabel>
-                      <Textarea id="route-create-description" value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} placeholder="请输入描述（选填）" maxLength={256} className="min-h-24" disabled={creating} />
-                      <FieldDescription>描述将写入资源注解 `description`，最长 256 个字符。</FieldDescription>
+                      <Textarea id="route-create-description" value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} placeholder="请输入描述" maxLength={256} className="min-h-24" disabled={creating} />
+                      <FieldDescription>描述将写入资源注解 description，最长 256 个字符。</FieldDescription>
                     </Field>
                   </FieldGroup>
                 </div>
@@ -2205,16 +2310,7 @@ export function RoutesPageClient() {
         deleting={deleting}
         onConfirm={handleConfirmDelete}
       />
-      <DataTable
-        data={filteredRows}
-        columns={columns}
-        toolbarEnd={routeFilters}
-        onCreate={() => {
-          resetCreateForm()
-          setCreateDialogOpen(true)
-        }}
-        onDeleteSelectedRows={handleDeleteSelectedRows}
-      />
+      {tableNode}
     </>
   )
 }

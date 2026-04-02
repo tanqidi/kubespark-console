@@ -35,6 +35,8 @@ export type CreateIngressInput = {
   rules?: IngressRuleInput[]
   ingressClassName?: string
   description?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
 }
 
 export type UpdateIngressInput = CreateIngressInput
@@ -60,6 +62,8 @@ export type IngressFormValues = {
     tlsSecretName: string
   }>
   ingressClassName: string
+  labels: Record<string, string>
+  annotations: Record<string, string>
 }
 
 function normalizeNamespace(namespace: string): string {
@@ -223,9 +227,18 @@ export async function createIngress(input: CreateIngressInput): Promise<void> {
   const spec = buildIngressSpec(input)
   const ingressClassName = input.ingressClassName?.trim() ?? ""
   const description = input.description?.trim() ?? ""
-
-  const annotations: Record<string, string> = {}
+  const labels: Record<string, string> = Object.fromEntries(
+    Object.entries(input.labels ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && typeof value === "string"
+    )
+  ) as Record<string, string>
+  const annotations: Record<string, string> = Object.fromEntries(
+    Object.entries(input.annotations ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && typeof value === "string"
+    )
+  ) as Record<string, string>
   if (description) annotations.description = description
+  else delete annotations.description
 
   const requestBody = {
     apiVersion: "networking.k8s.io/v1",
@@ -233,6 +246,7 @@ export async function createIngress(input: CreateIngressInput): Promise<void> {
     metadata: {
       name,
       namespace,
+      ...(Object.keys(labels).length > 0 ? { labels } : {}),
       ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
     },
     spec: {
@@ -262,6 +276,7 @@ export async function fetchIngressFormValues(name: string, namespace: string): P
   const root = asObject(payload)
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
+  const labels = asObject(metadata.labels)
   const spec = asObject(root.spec)
   const tlsEntries = Array.isArray(spec.tls) ? spec.tls : []
   const tlsSecretByHost = new Map<string, string>()
@@ -330,6 +345,12 @@ export async function fetchIngressFormValues(name: string, namespace: string): P
     tlsSecretName: firstRule.tlsSecretName,
     rules,
     ingressClassName: asString(spec.ingressClassName),
+    labels: Object.fromEntries(
+      Object.entries(labels).filter(([, value]) => typeof value === "string")
+    ) as Record<string, string>,
+    annotations: Object.fromEntries(
+      Object.entries(annotations).filter(([, value]) => typeof value === "string")
+    ) as Record<string, string>,
   }
 }
 
@@ -339,18 +360,24 @@ export async function updateIngress(input: UpdateIngressInput): Promise<void> {
   const spec = buildIngressSpec(input)
   const ingressClassName = input.ingressClassName?.trim() ?? ""
   const description = input.description?.trim() ?? ""
+  const labels: Record<string, string> = Object.fromEntries(
+    Object.entries(input.labels ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && typeof value === "string"
+    )
+  ) as Record<string, string>
+  const annotations: Record<string, string> = Object.fromEntries(
+    Object.entries(input.annotations ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && typeof value === "string"
+    )
+  ) as Record<string, string>
+  if (description) annotations.description = description
+  else delete annotations.description
 
   const { payload } = await fetchResourceByName<unknown>("networking.k8s.io", "v1", "ingresses", name, {
     namespace,
   })
   const existing = asObject(payload)
   const existingMetadata = asObject(existing.metadata)
-  const existingAnnotations = asObject(existingMetadata.annotations)
-  const nextAnnotations: Record<string, string> = Object.fromEntries(
-    Object.entries(existingAnnotations).filter(([, value]) => typeof value === "string")
-  ) as Record<string, string>
-  if (description) nextAnnotations.description = description
-  else delete nextAnnotations.description
 
   const requestBody = {
     apiVersion: "networking.k8s.io/v1",
@@ -362,10 +389,8 @@ export async function updateIngress(input: UpdateIngressInput): Promise<void> {
         typeof existingMetadata.resourceVersion === "string"
           ? existingMetadata.resourceVersion
           : undefined,
-      ...(Object.keys(nextAnnotations).length > 0 ? { annotations: nextAnnotations } : {}),
-      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
-        ? { labels: existingMetadata.labels }
-        : {}),
+      ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
+      ...(Object.keys(labels).length > 0 ? { labels } : {}),
     },
     spec: {
       ...(ingressClassName ? { ingressClassName } : {}),
