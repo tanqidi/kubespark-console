@@ -9,6 +9,7 @@ import { parse, stringify } from "yaml"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
+import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import {
@@ -85,6 +86,7 @@ type NamespaceOption = { id: string; name: string }
 type ServiceOption = { name: string; ports: number[] }
 type PathType = IngressPathType
 type RouteProtocol = "HTTP" | "HTTPS"
+type MetadataEntry = { key: string; value: string }
 type RouteRuleItem = {
   host: string
   path: string
@@ -437,8 +439,16 @@ export function RoutesPageClient() {
   const [createServicePortError, setCreateServicePortError] = React.useState<string | null>(null)
   const [createTlsSecretError, setCreateTlsSecretError] = React.useState<string | null>(null)
   const [createSubmitError, setCreateSubmitError] = React.useState<string | null>(null)
+  const [metadataEnabled, setMetadataEnabled] = React.useState(false)
+  const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([
+    { key: "", value: "" },
+  ])
+  const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([
+    { key: "", value: "" },
+  ])
   const [ruleRowErrorMap, setRuleRowErrorMap] = React.useState<Record<number, string>>({})
   const [ruleSaveAttempted, setRuleSaveAttempted] = React.useState(false)
+  const [draftHostKey, setDraftHostKey] = React.useState<string | null>(null)
   const createServicePortRef = React.useRef("")
   const isEditMode = Boolean(editingRouteRef)
 
@@ -456,9 +466,9 @@ export function RoutesPageClient() {
     const target = createRules[editingRuleIndex]
     return target ? normalizeHostKey(target.host) : null
   }, [createRules, editingRuleIndex])
-  const activeHostSourceKey = editingSourceHostKey ?? currentHostKey
+  const activeHostSourceKey = editingSourceHostKey ?? draftHostKey ?? currentHostKey
   const currentHostPathRuleIndexes = React.useMemo(() => {
-    if (!activeHostSourceKey) return []
+    if (activeHostSourceKey === null) return []
     return createRules.reduce<number[]>((acc, rule, index) => {
       if (normalizeHostKey(rule.host) === activeHostSourceKey) acc.push(index)
       return acc
@@ -530,6 +540,7 @@ export function RoutesPageClient() {
     setCreateProtocol("HTTP")
     setCreateTlsSecretName("")
     setCreateRules([])
+    setDraftHostKey(null)
     setEditingRuleIndex(null)
     setPendingDeleteRuleHostKey(null)
     setCreateIngressClassName("")
@@ -541,6 +552,9 @@ export function RoutesPageClient() {
     setCreateServicePortError(null)
     setCreateTlsSecretError(null)
     setCreateSubmitError(null)
+    setMetadataEnabled(false)
+    setAnnotationEntries([{ key: "", value: "" }])
+    setLabelEntries([{ key: "", value: "" }])
     setRuleRowErrorMap({})
     setRuleSaveAttempted(false)
   }, [])
@@ -656,6 +670,37 @@ export function RoutesPageClient() {
     }
   }, [createProtocol, createTlsSecretError, createTlsSecretName])
 
+  React.useEffect(() => {
+    if (createStep !== "rule" || createRuleViewMode !== "edit") return
+    if (editingRuleIndex !== null) return
+    if (draftHostKey === null) return
+
+    const nextHostKey = normalizeHostKey(createHost)
+    if (nextHostKey === draftHostKey) return
+
+    setCreateRules((current) =>
+      current.map((rule) =>
+        normalizeHostKey(rule.host) === draftHostKey
+          ? normalizeRuleItem({
+              ...rule,
+              host: createHost,
+              protocol: createProtocol,
+              tlsSecretName: createProtocol === "HTTPS" ? createTlsSecretName : "",
+            })
+          : rule
+      )
+    )
+    setDraftHostKey(nextHostKey)
+  }, [
+    createHost,
+    createProtocol,
+    createRuleViewMode,
+    createStep,
+    createTlsSecretName,
+    draftHostKey,
+    editingRuleIndex,
+  ])
+
   const buildCreateYaml = React.useCallback(() => {
     return buildRouteYamlText({
       name: createName,
@@ -721,16 +766,34 @@ export function RoutesPageClient() {
     setCreateServicePortError(null)
     setCreateTlsSecretError(null)
     setRuleRowErrorMap({})
+    setDraftHostKey("")
+    setCreateRules((current) => [
+      ...current,
+      normalizeRuleItem({
+        host: "",
+        path: "/",
+        serviceName: "",
+        servicePort: "",
+        protocol: "HTTP",
+        tlsSecretName: "",
+      }),
+    ])
     setEditingRuleIndex(null)
     setCreateRuleViewMode("edit")
   }, [])
 
   const cancelEditRule = React.useCallback(() => {
     setCreateSubmitError(null)
+    if (editingRuleIndex === null && draftHostKey !== null) {
+      setCreateRules((current) =>
+        current.filter((rule) => normalizeHostKey(rule.host) !== draftHostKey)
+      )
+    }
+    setDraftHostKey(null)
     setEditingRuleIndex(null)
     setRuleRowErrorMap({})
     setCreateRuleViewMode("list")
-  }, [])
+  }, [draftHostKey, editingRuleIndex])
 
   const saveRuleDraft = React.useCallback((options?: { stayInEdit?: boolean }) => {
     setCreateSubmitError(null)
@@ -807,6 +870,7 @@ export function RoutesPageClient() {
     )
     setRuleSaveAttempted(false)
     setRuleRowErrorMap({})
+    setDraftHostKey(null)
     setCreateRuleViewMode(options?.stayInEdit ? "edit" : "list")
     setEditingRuleIndex(null)
     return true
@@ -1124,6 +1188,7 @@ export function RoutesPageClient() {
     setCreateServiceError(null)
     setCreateServicePortError(null)
     setCreateTlsSecretError(null)
+    setDraftHostKey(hostKey)
     setEditingRuleIndex(index)
     setCreateRuleViewMode("edit")
   }, [createRules])
@@ -1157,6 +1222,7 @@ export function RoutesPageClient() {
     setCreateRules((current) =>
       current.filter((rule) => normalizeHostKey(rule.host) !== pendingDeleteRuleHostKey)
     )
+    setDraftHostKey(null)
     setEditingRuleIndex(null)
     setCreateRuleViewMode("list")
     setPendingDeleteRuleHostKey(null)
@@ -1166,6 +1232,7 @@ export function RoutesPageClient() {
     if (creating || checkingCreateNext) return
     setCreateSubmitError(null)
     setCreateYamlError(null)
+    setDraftHostKey(null)
     setCreateRuleViewMode("list")
     setCreateStep("basic")
     setCreateYamlMode(false)
@@ -1894,12 +1961,183 @@ export function RoutesPageClient() {
                 </div>
               ) : (
                 <div>
-                  <div className="mb-4"><h3 className="text-[15px] font-semibold">高级设置</h3><p className="mt-1 text-sm text-muted-foreground">可选配置 IngressClass。</p></div>
                   <FieldGroup className="grid gap-6 md:grid-cols-2">
-                    <Field>
-                      <FieldLabel htmlFor="route-create-ingress-class">IngressClass</FieldLabel>
-                      <Input id="route-create-ingress-class" value={createIngressClassName} onChange={(event) => setCreateIngressClassName(event.target.value)} placeholder="例如：nginx（选填）" autoComplete="off" disabled={creating} />
-                      <FieldDescription>填写后将写入 `spec.ingressClassName`。</FieldDescription>
+                    <Field className="md:col-span-2">
+                      <AdvancedToggleCard
+                        checked={metadataEnabled}
+                        disabled={creating}
+                        ariaLabel="添加元数据"
+                        title="添加元数据"
+                        description="为路由添加元数据。"
+                        onCheckedChange={(checked) => {
+                          if (creating) return
+                          setMetadataEnabled(checked)
+                        }}
+                      >
+                        <div className="space-y-6">
+                          <div>
+                            <div className="mb-2 text-sm">注解</div>
+                            <div className="space-y-3">
+                              {annotationEntries.map((entry, index) => (
+                                <div
+                                  key={`annotation-${index}`}
+                                  className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                                >
+                                  <InputGroup>
+                                    <InputGroupAddon>
+                                      <InputGroupText>键</InputGroupText>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                      value={entry.key}
+                                      onChange={(event) => {
+                                        const nextValue = event.target.value
+                                        setAnnotationEntries((current) =>
+                                          current.map((item, itemIndex) =>
+                                            itemIndex === index ? { ...item, key: nextValue } : item
+                                          )
+                                        )
+                                      }}
+                                      autoComplete="off"
+                                      disabled={creating}
+                                      className="min-w-0"
+                                    />
+                                  </InputGroup>
+                                  <InputGroup>
+                                    <InputGroupAddon>
+                                      <InputGroupText>值</InputGroupText>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                      value={entry.value}
+                                      onChange={(event) => {
+                                        const nextValue = event.target.value
+                                        setAnnotationEntries((current) =>
+                                          current.map((item, itemIndex) =>
+                                            itemIndex === index ? { ...item, value: nextValue } : item
+                                          )
+                                        )
+                                      }}
+                                      autoComplete="off"
+                                      disabled={creating}
+                                      className="min-w-0"
+                                    />
+                                  </InputGroup>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setAnnotationEntries((current) =>
+                                        current.length <= 1
+                                          ? [{ key: "", value: "" }]
+                                          : current.filter((_, itemIndex) => itemIndex !== index)
+                                      )
+                                    }}
+                                    disabled={creating}
+                                    className="shrink-0"
+                                    aria-label="删除注解"
+                                  >
+                                    <IconTrash data-icon="inline-start" />
+                                    删除
+                                  </Button>
+                                </div>
+                              ))}
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() =>
+                                    setAnnotationEntries((current) => [...current, { key: "", value: "" }])
+                                  }
+                                  disabled={creating}
+                                >
+                                  添加
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="mb-2 text-sm">标签</div>
+                            <div className="space-y-3">
+                              {labelEntries.map((entry, index) => (
+                                <div
+                                  key={`label-${index}`}
+                                  className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                                >
+                                  <InputGroup>
+                                    <InputGroupAddon>
+                                      <InputGroupText>键</InputGroupText>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                      value={entry.key}
+                                      onChange={(event) => {
+                                        const nextValue = event.target.value
+                                        setLabelEntries((current) =>
+                                          current.map((item, itemIndex) =>
+                                            itemIndex === index ? { ...item, key: nextValue } : item
+                                          )
+                                        )
+                                      }}
+                                      autoComplete="off"
+                                      disabled={creating}
+                                      className="min-w-0"
+                                    />
+                                  </InputGroup>
+                                  <InputGroup>
+                                    <InputGroupAddon>
+                                      <InputGroupText>值</InputGroupText>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                      value={entry.value}
+                                      onChange={(event) => {
+                                        const nextValue = event.target.value
+                                        setLabelEntries((current) =>
+                                          current.map((item, itemIndex) =>
+                                            itemIndex === index ? { ...item, value: nextValue } : item
+                                          )
+                                        )
+                                      }}
+                                      autoComplete="off"
+                                      disabled={creating}
+                                      className="min-w-0"
+                                    />
+                                  </InputGroup>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setLabelEntries((current) =>
+                                        current.length <= 1
+                                          ? [{ key: "", value: "" }]
+                                          : current.filter((_, itemIndex) => itemIndex !== index)
+                                      )
+                                    }}
+                                    disabled={creating}
+                                    className="shrink-0"
+                                    aria-label="删除标签"
+                                  >
+                                    <IconTrash data-icon="inline-start" />
+                                    删除
+                                  </Button>
+                                </div>
+                              ))}
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() =>
+                                    setLabelEntries((current) => [...current, { key: "", value: "" }])
+                                  }
+                                  disabled={creating}
+                                >
+                                  添加
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </AdvancedToggleCard>
                     </Field>
                   </FieldGroup>
                 </div>
