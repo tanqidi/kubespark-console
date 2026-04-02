@@ -6,7 +6,6 @@ import {
 } from "./common"
 import {
   asObject,
-  buildDescriptionPatch,
   buildMetadata,
   checkNamespacedResourceExists,
   type BaseCreateInput,
@@ -637,21 +636,6 @@ export async function updateJob(input: UpdateJobInput): Promise<void> {
 
   const existing = asObject(payload)
   const existingMetadata = asObject(existing.metadata)
-  const existingAnnotations = asObject(existingMetadata.annotations)
-  const nextDescription = buildDescriptionPatch(input.description).annotations.description
-  let mergedAnnotations: Record<string, unknown> = {
-    ...existingAnnotations,
-  }
-  if (nextDescription === null) {
-    mergedAnnotations = Object.fromEntries(
-      Object.entries(mergedAnnotations).filter(([key]) => key !== "description")
-    )
-  } else {
-    mergedAnnotations = {
-      ...mergedAnnotations,
-      description: nextDescription,
-    }
-  }
 
   const nextSpec =
     input.kind === "CronJob"
@@ -700,10 +684,8 @@ export async function updateJob(input: UpdateJobInput): Promise<void> {
         typeof existingMetadata.resourceVersion === "string"
           ? existingMetadata.resourceVersion
           : undefined,
-      ...(Object.keys(mergedAnnotations).length > 0 ? { annotations: mergedAnnotations } : {}),
-      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
-        ? { labels: existingMetadata.labels }
-        : {}),
+      ...(metadata.annotations ? { annotations: metadata.annotations } : {}),
+      ...(metadata.labels ? { labels: metadata.labels } : {}),
     },
     spec: nextSpec,
   }

@@ -164,6 +164,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
   const resource = asObject(payload)
   const metadata = asObject(resource.metadata)
   const annotations = asObject(metadata.annotations)
+  const labels = asObject(metadata.labels)
   const spec = asObject(resource.spec)
   const strategySource =
     kind === "CronJob" ? asObject(asObject(asObject(spec.jobTemplate).spec)) : spec
@@ -384,6 +385,12 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
     name: asString(metadata.name) || row.name,
     namespace: asString(metadata.namespace) || row.namespace,
     description: asString(annotations.description),
+    labels: Object.fromEntries(
+      Object.entries(labels).filter(([, value]) => typeof value === "string")
+    ) as Record<string, string>,
+    annotations: Object.fromEntries(
+      Object.entries(annotations).filter(([, value]) => typeof value === "string")
+    ) as Record<string, string>,
     schedule: kind === "CronJob" ? asString(spec.schedule).trim() || DEFAULT_CRON_SCHEDULE : undefined,
     strategy: {
       backoffLimit: toOptionalIntegerString(strategySource.backoffLimit),

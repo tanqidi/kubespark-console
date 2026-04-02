@@ -40,6 +40,12 @@ import {
   validateName,
 } from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
 import { useContainerEditor } from "@/app/(console)/dashboard/components/resource-pages/use-container-editor"
+import {
+  hasUserProvidedMetadata,
+  metadataEntriesToRecord,
+  metadataRecordToEntries,
+  type MetadataEntry,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
 
 type StorageVolumeKind = "persistent" | "ephemeral" | "hostPath"
 type StorageMountMode = "none" | "ro" | "rw"
@@ -80,6 +86,9 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [metadataEnabled, setMetadataEnabled] = React.useState(false)
+  const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
+  const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
   const [schedule, setSchedule] = React.useState(kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : "")
   const [backoffLimit, setBackoffLimit] = React.useState("")
   const [completions, setCompletions] = React.useState("")
@@ -182,6 +191,9 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       setName("")
       setNamespace("")
       setDescription("")
+      setMetadataEnabled(false)
+      setLabelEntries([{ key: "", value: "" }])
+      setAnnotationEntries([{ key: "", value: "" }])
       setSchedule(kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : "")
       setBackoffLimit("")
       setCompletions("")
@@ -218,6 +230,11 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     setName(initialValues.name)
     setNamespace(initialValues.namespace)
     setDescription(initialValues.description ?? "")
+    const initialLabelEntries = metadataRecordToEntries(initialValues.labels ?? {})
+    const initialAnnotationEntries = metadataRecordToEntries(initialValues.annotations ?? {})
+    setLabelEntries(initialLabelEntries)
+    setAnnotationEntries(initialAnnotationEntries)
+    setMetadataEnabled(hasUserProvidedMetadata(initialLabelEntries, initialAnnotationEntries))
     setSchedule((initialValues.schedule ?? "").trim() || (kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : ""))
     setBackoffLimit(initialValues.strategy?.backoffLimit ?? "")
     setCompletions(initialValues.strategy?.completions ?? "")
@@ -487,6 +504,8 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
         name,
         namespace,
         description,
+        labels: metadataEntriesToRecord(labelEntries),
+        annotations: metadataEntriesToRecord(annotationEntries),
         schedule,
         strategy: {
           backoffLimit,
@@ -511,8 +530,10 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       completions,
       containers,
       description,
+      annotationEntries,
       editingStorageVolume,
       editingStorageVolumeIndex,
+      labelEntries,
       name,
       namespace,
       schedule,
@@ -527,6 +548,11 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     setName(snapshot.name)
     setNamespace(snapshot.namespace)
     setDescription(snapshot.description)
+    const nextLabelEntries = metadataRecordToEntries(snapshot.labels)
+    const nextAnnotationEntries = metadataRecordToEntries(snapshot.annotations)
+    setLabelEntries(nextLabelEntries)
+    setAnnotationEntries(nextAnnotationEntries)
+    setMetadataEnabled(hasUserProvidedMetadata(nextLabelEntries, nextAnnotationEntries))
     setSchedule(snapshot.schedule)
     setBackoffLimit(snapshot.strategy.backoffLimit)
     setCompletions(snapshot.strategy.completions)
@@ -918,6 +944,8 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
           name: normalizedName,
           namespace: normalizedNamespace,
           description: normalizedDescription,
+          labels: source.labels,
+          annotations: source.annotations,
           ...(kind === "CronJob" ? { schedule: normalizedSchedule } : {}),
           strategy,
           pod,
@@ -967,6 +995,12 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     currentStepIndex,
     cancelEditStorageVolume,
     description,
+    metadataEnabled,
+    setMetadataEnabled,
+    labelEntries,
+    setLabelEntries,
+    annotationEntries,
+    setAnnotationEntries,
     dialogDescription,
     dialogTitle,
     editingContainer,

@@ -9,7 +9,13 @@ import { parse, stringify } from "yaml"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 // import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
-import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
+import {
+  ResourceMetadataEditor,
+  hasUserProvidedMetadata,
+  metadataEntriesToRecord,
+  metadataRecordToEntries,
+  type MetadataEntry,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import {
@@ -86,7 +92,6 @@ type NamespaceOption = { id: string; name: string }
 type ServiceOption = { name: string; ports: number[] }
 type PathType = IngressPathType
 type RouteProtocol = "HTTP" | "HTTPS"
-type MetadataEntry = { key: string; value: string }
 type RuleRowErrors = {
   path?: string
   service?: string
@@ -198,53 +203,6 @@ function normalizeRuleItem(item: RouteRuleItem): RouteRuleItem {
     protocol: item.protocol,
     tlsSecretName: item.tlsSecretName.trim(),
   }
-}
-
-function normalizeMetadataEntries(entries: MetadataEntry[]): MetadataEntry[] {
-  return entries.map((item) => ({
-    key: item.key.trim(),
-    value: item.value.trim(),
-  }))
-}
-
-function isDescriptionAnnotationKey(key: string): boolean {
-  return key.trim().toLowerCase() === "description"
-}
-
-function isIgnoredMetadataAnnotationKey(key: string): boolean {
-  const normalized = key.trim().toLowerCase()
-  return (
-    normalized === "description" ||
-    normalized === "deployment.kubernetes.io/revision"
-  )
-}
-
-function hasUserProvidedMetadata(labels: MetadataEntry[], annotations: MetadataEntry[]): boolean {
-  const hasLabel = labels.some((item) => item.key.trim().length > 0)
-  const hasAnnotation = annotations.some(
-    (item) => item.key.trim().length > 0 && !isIgnoredMetadataAnnotationKey(item.key)
-  )
-  return hasLabel || hasAnnotation
-}
-
-function metadataEntriesToRecord(entries: MetadataEntry[]): Record<string, string> {
-  return Object.fromEntries(
-    normalizeMetadataEntries(entries)
-      .filter((item) => item.key.length > 0)
-      .map((item) => [item.key, item.value])
-  ) as Record<string, string>
-}
-
-function metadataRecordToEntries(
-  record: Record<string, string>,
-  options?: { excludeKeys?: string[] }
-): MetadataEntry[] {
-  const exclude = new Set((options?.excludeKeys ?? []).map((item) => item.trim()))
-  const entries = Object.entries(record)
-    .filter(([key]) => !exclude.has(key.trim()))
-    .map(([key, value]) => ({ key: key.trim(), value: value.trim() }))
-    .filter((item) => item.key.length > 0)
-  return entries.length > 0 ? entries : [{ key: "", value: "" }]
 }
 
 function normalizeHostKey(host: string): string {
@@ -741,27 +699,6 @@ export function RoutesPageClient() {
       if (createTlsSecretError) setCreateTlsSecretError(null)
     }
   }, [createProtocol, createTlsSecretError, createTlsSecretName])
-
-  React.useEffect(() => {
-    const description = createDescription.trim()
-    setAnnotationEntries((current) => {
-      const descriptionIndex = current.findIndex((item) => isDescriptionAnnotationKey(item.key))
-      if (!description) {
-        if (descriptionIndex < 0) return current
-        if ((current[descriptionIndex]?.value ?? "") === "") return current
-        return current.map((item, index) =>
-          index === descriptionIndex ? { ...item, value: "" } : item
-        )
-      }
-      if (descriptionIndex < 0) {
-        return [...current, { key: "description", value: description }]
-      }
-      if ((current[descriptionIndex]?.value ?? "") === description) return current
-      return current.map((item, index) =>
-        index === descriptionIndex ? { ...item, value: description } : item
-      )
-    })
-  }, [createDescription])
 
   React.useEffect(() => {
     if (createStep !== "rule" || createRuleViewMode !== "edit") return
@@ -2087,8 +2024,8 @@ export function RoutesPageClient() {
                                       >
                                         <ComboboxEmpty>未找到端口，可直接输入</ComboboxEmpty>
                                         <ComboboxList>
-                                          {(item) => (
-                                            <ComboboxItem key={item} value={item}>
+                                          {(item, index) => (
+                                            <ComboboxItem key={`${item}-${index}`} value={item}>
                                               {item}
                                             </ComboboxItem>
                                           )}
@@ -2134,196 +2071,17 @@ export function RoutesPageClient() {
                   </div>
                   <FieldGroup className="grid gap-6 md:grid-cols-2">
                     <Field className="md:col-span-2">
-                      <AdvancedToggleCard
+                      <ResourceMetadataEditor
                         checked={metadataEnabled}
+                        onCheckedChange={setMetadataEnabled}
+                        labels={labelEntries}
+                        setLabels={setLabelEntries}
+                        annotations={annotationEntries}
+                        setAnnotations={setAnnotationEntries}
+                        description={createDescription}
+                        setDescription={setCreateDescription}
                         disabled={creating}
-                        ariaLabel="添加元数据"
-                        title="添加元数据"
-                        description="统一管理路由的标签与注解信息。"
-                        onCheckedChange={(checked) => {
-                          if (creating) return
-                          if (!checked) {
-                            const description = createDescription.trim()
-                            setLabelEntries([{ key: "", value: "" }])
-                            setAnnotationEntries(
-                              description
-                                ? [{ key: "description", value: description }]
-                                : [{ key: "", value: "" }]
-                            )
-                          }
-                          setMetadataEnabled(checked)
-                        }}
-                      >
-                        <div className="">
-                          <div>
-                            <FieldLabel className="mb-2">标签</FieldLabel>
-                            <div className="space-y-3">
-                              {labelEntries.map((entry, index) => (
-                                <div
-                                  key={`label-${index}`}
-                                  className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-                                >
-                                  <InputGroup>
-                                    <InputGroupAddon>
-                                      <InputGroupText>键</InputGroupText>
-                                    </InputGroupAddon>
-                                    <InputGroupInput
-                                      value={entry.key}
-                                      onChange={(event) => {
-                                        const nextValue = event.target.value
-                                        setLabelEntries((current) =>
-                                          current.map((item, itemIndex) =>
-                                            itemIndex === index ? { ...item, key: nextValue } : item
-                                          )
-                                        )
-                                      }}
-                                      autoComplete="off"
-                                      disabled={creating}
-                                      className="min-w-0"
-                                    />
-                                  </InputGroup>
-                                  <InputGroup>
-                                    <InputGroupAddon>
-                                      <InputGroupText>值</InputGroupText>
-                                    </InputGroupAddon>
-                                    <InputGroupInput
-                                      value={entry.value}
-                                      onChange={(event) => {
-                                        const nextValue = event.target.value
-                                        setLabelEntries((current) =>
-                                          current.map((item, itemIndex) =>
-                                            itemIndex === index ? { ...item, value: nextValue } : item
-                                          )
-                                        )
-                                      }}
-                                      autoComplete="off"
-                                      disabled={creating}
-                                      className="min-w-0"
-                                    />
-                                  </InputGroup>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setLabelEntries((current) =>
-                                        current.length <= 1
-                                          ? [{ key: "", value: "" }]
-                                          : current.filter((_, itemIndex) => itemIndex !== index)
-                                      )
-                                    }}
-                                    disabled={creating}
-                                    className="shrink-0"
-                                    aria-label="删除标签"
-                                  >
-                                    <IconTrash data-icon="inline-start" />
-                                    删除
-                                  </Button>
-                                </div>
-                              ))}
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() =>
-                                    setLabelEntries((current) => [...current, { key: "", value: "" }])
-                                  }
-                                  disabled={creating}
-                                >
-                                  添加
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <FieldLabel className="mb-2">注解</FieldLabel>
-                            <div className="space-y-3">
-                              {annotationEntries.map((entry, index) => (
-                                <div
-                                  key={`annotation-${index}`}
-                                  className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-                                >
-                                  <InputGroup>
-                                    <InputGroupAddon>
-                                      <InputGroupText>键</InputGroupText>
-                                    </InputGroupAddon>
-                                    <InputGroupInput
-                                      value={entry.key}
-                                      onChange={(event) => {
-                                        const nextValue = event.target.value
-                                        setAnnotationEntries((current) =>
-                                          current.map((item, itemIndex) =>
-                                            itemIndex === index ? { ...item, key: nextValue } : item
-                                          )
-                                        )
-                                        if (isDescriptionAnnotationKey(nextValue)) {
-                                          setCreateDescription(entry.value)
-                                        }
-                                      }}
-                                      autoComplete="off"
-                                      disabled={creating}
-                                      className="min-w-0"
-                                    />
-                                  </InputGroup>
-                                  <InputGroup>
-                                    <InputGroupAddon>
-                                      <InputGroupText>值</InputGroupText>
-                                    </InputGroupAddon>
-                                    <InputGroupInput
-                                      value={entry.value}
-                                      onChange={(event) => {
-                                        const nextValue = event.target.value
-                                        setAnnotationEntries((current) =>
-                                          current.map((item, itemIndex) =>
-                                            itemIndex === index ? { ...item, value: nextValue } : item
-                                          )
-                                        )
-                                        if (isDescriptionAnnotationKey(entry.key)) {
-                                          setCreateDescription(nextValue)
-                                        }
-                                      }}
-                                      autoComplete="off"
-                                      disabled={creating}
-                                      className="min-w-0"
-                                    />
-                                  </InputGroup>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setAnnotationEntries((current) =>
-                                        current.length <= 1
-                                          ? [{ key: "", value: "" }]
-                                          : current.filter((_, itemIndex) => itemIndex !== index)
-                                      )
-                                    }}
-                                    disabled={creating}
-                                    className="shrink-0"
-                                    aria-label="删除注解"
-                                  >
-                                    <IconTrash data-icon="inline-start" />
-                                    删除
-                                  </Button>
-                                </div>
-                              ))}
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() =>
-                                    setAnnotationEntries((current) => [...current, { key: "", value: "" }])
-                                  }
-                                  disabled={creating}
-                                >
-                                  添加
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </AdvancedToggleCard>
+                      />
                     </Field>
                   </FieldGroup>
                 </div>

@@ -57,6 +57,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { useCreateJobDialogController } from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.controller"
 import { ContainerListPanel } from "@/app/(console)/dashboard/components/resource-pages/container-list-panel"
 import { StorageVolumeList } from "@/app/(console)/dashboard/components/resource-pages/storage-volume-list"
+import {
+  ResourceMetadataEditor,
+  hasUserProvidedMetadata,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 export type { JobDialogInitialValues } from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
@@ -105,6 +109,12 @@ export function CreateJobDialog({
     cancelEditStorageVolume,
     currentStepIndex,
     description,
+    metadataEnabled,
+    setMetadataEnabled,
+    labelEntries,
+    setLabelEntries,
+    annotationEntries,
+    setAnnotationEntries,
     dialogDescription,
     dialogTitle,
     editingContainer,
@@ -399,7 +409,12 @@ export function CreateJobDialog({
               {
                 id: "advanced",
                 title: "高级设置",
-                status: activeStep === "advanced" ? "当前" : "未设置",
+                status:
+                  activeStep === "advanced"
+                    ? "当前"
+                    : hasUserProvidedMetadata(labelEntries, annotationEntries)
+                      ? "已设置"
+                      : "未设置",
                 active: activeStep === "advanced",
                 icon: <IconStack2 className="size-4" />,
                 disabled: !canNavigateStep,
@@ -925,10 +940,26 @@ export function CreateJobDialog({
               </div>
             ) : (
               <div>
-                <div className="mb-3">
+                <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">高级设置</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
                 </div>
+                <FieldGroup className="grid gap-4 md:grid-cols-2">
+                  <Field className="md:col-span-2">
+                    <ResourceMetadataEditor
+                      checked={metadataEnabled}
+                      onCheckedChange={setMetadataEnabled}
+                      labels={labelEntries}
+                      setLabels={setLabelEntries}
+                      annotations={annotationEntries}
+                      setAnnotations={setAnnotationEntries}
+                      description={description}
+                      setDescription={setDescription}
+                      disabled={isBusy}
+                      titleText="统一管理任务的标签与注解信息。"
+                    />
+                  </Field>
+                </FieldGroup>
               </div>
             )}
 

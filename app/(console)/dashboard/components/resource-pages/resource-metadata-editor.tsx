@@ -4,6 +4,10 @@ import * as React from "react"
 import { IconTrash } from "@tabler/icons-react"
 
 import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
+import {
+  isAutoMetadataAnnotationKey,
+  isAutoMetadataLabelKey,
+} from "@/app/lib/kubespark/metadata-ignore"
 import { Button } from "@/components/ui/button"
 import { FieldLabel } from "@/components/ui/field"
 import {
@@ -20,18 +24,20 @@ export function isDescriptionAnnotationKey(key: string): boolean {
 }
 
 function isIgnoredMetadataAnnotationKey(key: string): boolean {
-  const normalized = key.trim().toLowerCase()
-  return (
-    normalized === "description" ||
-    normalized === "deployment.kubernetes.io/revision"
-  )
+  return isAutoMetadataAnnotationKey(key)
+}
+
+function isIgnoredMetadataLabelKey(key: string): boolean {
+  return isAutoMetadataLabelKey(key)
 }
 
 export function hasUserProvidedMetadata(
   labels: MetadataEntry[],
   annotations: MetadataEntry[]
 ): boolean {
-  const hasLabel = labels.some((item) => item.key.trim().length > 0)
+  const hasLabel = labels.some(
+    (item) => item.key.trim().length > 0 && !isIgnoredMetadataLabelKey(item.key)
+  )
   const hasAnnotation = annotations.some(
     (item) => item.key.trim().length > 0 && !isIgnoredMetadataAnnotationKey(item.key)
   )

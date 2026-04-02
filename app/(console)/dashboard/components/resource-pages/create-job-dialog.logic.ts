@@ -60,6 +60,8 @@ export type JobDialogInitialValues = {
   name: string
   namespace: string
   description?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
   schedule?: string
   strategy?: {
     backoffLimit?: string
@@ -186,6 +188,8 @@ export type CreateJobDialogProps = {
     name: string
     namespace: string
     description: string
+    labels?: Record<string, string>
+    annotations?: Record<string, string>
     schedule?: string
     strategy?: {
       backoffLimit?: number
@@ -328,6 +332,8 @@ export type JobDialogSnapshot = {
   name: string
   namespace: string
   description: string
+  labels: Record<string, string>
+  annotations: Record<string, string>
   schedule: string
   strategy: {
     backoffLimit: string
@@ -1124,9 +1130,18 @@ export function buildJobYamlText(
   const metadata: JsonObject = {
     name: snapshot.name.trim().toLowerCase(),
     namespace: snapshot.namespace.trim(),
-    ...(snapshot.description.trim()
-      ? { annotations: { description: snapshot.description.trim() } }
-      : {}),
+    ...(Object.keys(snapshot.labels).length > 0 ? { labels: snapshot.labels } : {}),
+    ...(() => {
+      const annotations = {
+        ...snapshot.annotations,
+      }
+      if (snapshot.description.trim()) {
+        annotations.description = snapshot.description.trim()
+      } else {
+        delete annotations.description
+      }
+      return Object.keys(annotations).length > 0 ? { annotations } : {}
+    })(),
   }
   const podSpec = buildPodSpecFromContainers(
     snapshot.pod.restartPolicy,
@@ -1185,6 +1200,7 @@ export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDial
 
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
+  const labels = asObject(metadata.labels)
   const spec = asObject(root.spec)
   const strategySource =
     kind === "CronJob"
@@ -1366,6 +1382,12 @@ export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDial
     name: asString(metadata.name),
     namespace: asString(metadata.namespace),
     description: asString(annotations.description),
+    labels: Object.fromEntries(
+      Object.entries(labels).filter(([, value]) => typeof value === "string")
+    ) as Record<string, string>,
+    annotations: Object.fromEntries(
+      Object.entries(annotations).filter(([, value]) => typeof value === "string")
+    ) as Record<string, string>,
     schedule: kind === "CronJob" ? asString(spec.schedule).trim() || DEFAULT_CRON_SCHEDULE : "",
     strategy: {
       backoffLimit: toOptionalIntegerString(strategySource.backoffLimit),
@@ -1534,7 +1556,7 @@ export function resolveSubmitErrorMessage(error: unknown, kind: JobCreateKind): 
 export function resolveStepDescription(step: CreateStep): string {
   switch (step) {
     case "advanced":
-      return "高级设置功能即将开放。"
+      return "补充标签与注解信息，便于检索、分类和后续治理。"
     default:
       return ""
   }
