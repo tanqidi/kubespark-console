@@ -28,8 +28,6 @@ import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import {
-  checkPersistentVolumeExists,
-  createPersistentVolume,
   checkPersistentVolumeClaimExists,
   createPersistentVolumeClaim,
 } from "@/app/lib/kubespark/volumes"
@@ -43,18 +41,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
-import {
-  Combobox,
-  ComboboxChip,
-  ComboboxChips,
-  ComboboxChipsInput,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxItem,
-  ComboboxList,
-  ComboboxValue,
-  useComboboxAnchor,
-} from "@/components/ui/combobox"
 import {
   Field,
   FieldDescription,
@@ -91,7 +77,6 @@ type StorageClassOption = { name: string; isDefault: boolean }
 type VolumeCreateStep = "basic" | "storage" | "advanced"
 type AccessMode = "ReadWriteOnce" | "ReadOnlyMany" | "ReadWriteMany" | "ReadWriteOncePod"
 type VolumeMode = "Filesystem" | "Block"
-type ReclaimPolicy = "Retain" | "Delete"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -291,183 +276,6 @@ function parsePvcYamlText(yamlText: string): {
   }
 }
 
-function buildPvYamlText(params: {
-  name: string
-  description: string
-  accessMode: AccessMode
-  storageRequest: string
-  storageUnit: string
-  storageClassName: string
-  volumeMode: VolumeMode
-  reclaimPolicy: ReclaimPolicy
-  hostPath: string
-  nodeNames: string[]
-}): string {
-  const requestStorage = `${params.storageRequest.trim()}${params.storageUnit}`
-  return stringify(
-    {
-      apiVersion: "v1",
-      kind: "PersistentVolume",
-      metadata: {
-        ...(params.name.trim() ? { name: params.name.trim() } : {}),
-        ...(params.description.trim()
-          ? { annotations: { description: params.description.trim() } }
-          : {}),
-      },
-      spec: {
-        capacity: {
-          ...(params.storageRequest.trim() ? { storage: requestStorage } : {}),
-        },
-        accessModes: [params.accessMode],
-        ...(params.storageClassName.trim() ? { storageClassName: params.storageClassName.trim() } : {}),
-        ...(params.volumeMode ? { volumeMode: params.volumeMode } : {}),
-        ...(params.reclaimPolicy ? { persistentVolumeReclaimPolicy: params.reclaimPolicy } : {}),
-        hostPath: {
-          ...(params.hostPath.trim() ? { path: params.hostPath.trim() } : {}),
-          type: "DirectoryOrCreate",
-        },
-        ...(params.nodeNames.length > 0
-          ? {
-              nodeAffinity: {
-                required: {
-                  nodeSelectorTerms: [
-                    {
-                      matchExpressions: [
-                        {
-                          key: "kubernetes.io/hostname",
-                          operator: "In",
-                          values: params.nodeNames,
-                        },
-                      ],
-                    },
-                  ],
-                },
-              },
-            }
-          : {}),
-      },
-    },
-    {
-      indent: 2,
-      lineWidth: 0,
-      sortMapEntries: false,
-    }
-  )
-}
-
-function parsePvYamlText(yamlText: string): {
-  name: string
-  description: string
-  accessMode: AccessMode
-  storageRequest: string
-  storageUnit: string
-  storageClassName: string
-  volumeMode: VolumeMode
-  reclaimPolicy: ReclaimPolicy
-  hostPath: string
-  nodeNames: string[]
-} {
-  const normalized = yamlText.trim()
-  if (!normalized) throw new Error("请输入 YAML 内容")
-  const parsed = parse(normalized)
-  const root =
-    typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null
-  if (!root) throw new Error("YAML 内容格式无效")
-
-  const kind = typeof root.kind === "string" ? root.kind.trim() : ""
-  if (kind && kind !== "PersistentVolume") {
-    throw new Error("YAML 资源类型必须是 PersistentVolume")
-  }
-
-  const metadata =
-    typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
-      ? (root.metadata as Record<string, unknown>)
-      : {}
-  const annotations =
-    typeof metadata.annotations === "object" &&
-    metadata.annotations !== null &&
-    !Array.isArray(metadata.annotations)
-      ? (metadata.annotations as Record<string, unknown>)
-      : {}
-  const spec =
-    typeof root.spec === "object" && root.spec !== null && !Array.isArray(root.spec)
-      ? (root.spec as Record<string, unknown>)
-      : {}
-  const accessModes = Array.isArray(spec.accessModes) ? spec.accessModes : []
-
-  const capacity =
-    typeof spec.capacity === "object" && spec.capacity !== null && !Array.isArray(spec.capacity)
-      ? (spec.capacity as Record<string, unknown>)
-      : {}
-  const storageRaw = typeof capacity.storage === "string" ? capacity.storage : ""
-  const parsedStorage = parseStorageRequest(storageRaw)
-
-  const hostPathObj =
-    typeof spec.hostPath === "object" && spec.hostPath !== null && !Array.isArray(spec.hostPath)
-      ? (spec.hostPath as Record<string, unknown>)
-      : {}
-
-  const nodeAffinity =
-    typeof spec.nodeAffinity === "object" &&
-    spec.nodeAffinity !== null &&
-    !Array.isArray(spec.nodeAffinity)
-      ? (spec.nodeAffinity as Record<string, unknown>)
-      : {}
-  const required =
-    typeof nodeAffinity.required === "object" &&
-    nodeAffinity.required !== null &&
-    !Array.isArray(nodeAffinity.required)
-      ? (nodeAffinity.required as Record<string, unknown>)
-      : {}
-  const firstTerm = Array.isArray(required.nodeSelectorTerms) ? required.nodeSelectorTerms[0] : null
-  const firstTermObj =
-    typeof firstTerm === "object" && firstTerm !== null && !Array.isArray(firstTerm)
-      ? (firstTerm as Record<string, unknown>)
-      : {}
-  const firstExpr = Array.isArray(firstTermObj.matchExpressions) ? firstTermObj.matchExpressions[0] : null
-  const firstExprObj =
-    typeof firstExpr === "object" && firstExpr !== null && !Array.isArray(firstExpr)
-      ? (firstExpr as Record<string, unknown>)
-      : {}
-  const nodeValues = Array.isArray(firstExprObj.values)
-    ? firstExprObj.values.filter((item): item is string => typeof item === "string")
-    : []
-
-  const accessMode =
-    accessModes[0] === "ReadOnlyMany" ||
-    accessModes[0] === "ReadWriteMany" ||
-    accessModes[0] === "ReadWriteOncePod" ||
-    accessModes[0] === "ReadWriteOnce"
-      ? (accessModes[0] as AccessMode)
-      : "ReadWriteOnce"
-
-  const volumeMode =
-    spec.volumeMode === "Block" || spec.volumeMode === "Filesystem"
-      ? (spec.volumeMode as VolumeMode)
-      : "Filesystem"
-
-  const reclaimPolicy =
-    spec.persistentVolumeReclaimPolicy === "Retain" ||
-    spec.persistentVolumeReclaimPolicy === "Delete"
-      ? (spec.persistentVolumeReclaimPolicy as ReclaimPolicy)
-      : "Retain"
-
-  return {
-    name: typeof metadata.name === "string" ? metadata.name : "",
-    description: typeof annotations.description === "string" ? annotations.description : "",
-    accessMode,
-    storageRequest: parsedStorage.value,
-    storageUnit: parsedStorage.unit || "Gi",
-    storageClassName: typeof spec.storageClassName === "string" ? spec.storageClassName : "",
-    volumeMode,
-    reclaimPolicy,
-    hostPath: typeof hostPathObj.path === "string" ? hostPathObj.path : "",
-    nodeNames: nodeValues,
-  }
-}
-
 function resolveErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message
   if (
@@ -508,7 +316,6 @@ export function VolumesPageClient() {
   const [createYamlError, setCreateYamlError] = React.useState<string | null>(null)
   const [namespaceOptions, setNamespaceOptions] = React.useState<NamespaceOption[]>([])
   const [storageClassOptions, setStorageClassOptions] = React.useState<StorageClassOption[]>([])
-  const [nodeOptions, setNodeOptions] = React.useState<string[]>([])
   const [createName, setCreateName] = React.useState("")
   const [createNamespace, setCreateNamespace] = React.useState("")
   const [createDescription, setCreateDescription] = React.useState("")
@@ -523,29 +330,6 @@ export function VolumesPageClient() {
   const [createStorageError, setCreateStorageError] = React.useState<string | null>(null)
   const [createStorageClassError, setCreateStorageClassError] = React.useState<string | null>(null)
   const [createSubmitError, setCreateSubmitError] = React.useState<string | null>(null)
-  const [createPvDialogOpen, setCreatePvDialogOpen] = React.useState(false)
-  const [createPvStep, setCreatePvStep] = React.useState<VolumeCreateStep>("basic")
-  const [creatingPv, setCreatingPv] = React.useState(false)
-  const [checkingCreatePvNext, setCheckingCreatePvNext] = React.useState(false)
-  const [createPvYamlMode, setCreatePvYamlMode] = React.useState(false)
-  const [createPvYamlText, setCreatePvYamlText] = React.useState("")
-  const [createPvYamlError, setCreatePvYamlError] = React.useState<string | null>(null)
-  const [createPvName, setCreatePvName] = React.useState("")
-  const [createPvDescription, setCreatePvDescription] = React.useState("")
-  const [createPvAccessMode, setCreatePvAccessMode] = React.useState<AccessMode>("ReadWriteOnce")
-  const [createPvStorageRequest, setCreatePvStorageRequest] = React.useState("10")
-  const [createPvStorageUnit, setCreatePvStorageUnit] = React.useState("Gi")
-  const [createPvStorageClassName, setCreatePvStorageClassName] = React.useState("")
-  const [createPvVolumeMode, setCreatePvVolumeMode] = React.useState<VolumeMode>("Filesystem")
-  const [createPvReclaimPolicy, setCreatePvReclaimPolicy] = React.useState<ReclaimPolicy>("Retain")
-  const [createPvHostPath, setCreatePvHostPath] = React.useState("/data/pv")
-  const [createPvNodeNames, setCreatePvNodeNames] = React.useState<string[]>([])
-  const [createPvNameError, setCreatePvNameError] = React.useState<string | null>(null)
-  const [createPvStorageError, setCreatePvStorageError] = React.useState<string | null>(null)
-  const [createPvHostPathError, setCreatePvHostPathError] = React.useState<string | null>(null)
-  const [createPvSubmitError, setCreatePvSubmitError] = React.useState<string | null>(null)
-  const createPvNodeAnchor = useComboboxAnchor()
-  const createPvDialogContainerRef = React.useRef<HTMLDivElement | null>(null)
 
   const handleViewPvcYaml = React.useCallback((row: PersistentVolumeClaimRow) => {
     setYamlOpen(true)
@@ -710,37 +494,14 @@ export function VolumesPageClient() {
     setCreateSubmitError(null)
   }, [])
 
-  const resetCreatePvForm = React.useCallback(() => {
-    setCreatePvStep("basic")
-    setCreatePvYamlMode(false)
-    setCheckingCreatePvNext(false)
-    setCreatePvYamlText("")
-    setCreatePvYamlError(null)
-    setCreatePvName("")
-    setCreatePvDescription("")
-    setCreatePvAccessMode("ReadWriteOnce")
-    setCreatePvStorageRequest("10")
-    setCreatePvStorageUnit("Gi")
-    setCreatePvStorageClassName("")
-    setCreatePvVolumeMode("Filesystem")
-    setCreatePvReclaimPolicy("Retain")
-    setCreatePvHostPath("/data/pv")
-    setCreatePvNodeNames([])
-    setCreatePvNameError(null)
-    setCreatePvStorageError(null)
-    setCreatePvHostPathError(null)
-    setCreatePvSubmitError(null)
-  }, [])
-
   React.useEffect(() => {
-    if (!createDialogOpen && !createPvDialogOpen) return
+    if (!createDialogOpen) return
     let cancelled = false
     void Promise.all([
       fetchNamespaces(),
       fetchResourceCollection("storage.k8s.io", "v1", "storageclasses"),
-      fetchResourceCollection("core", "v1", "nodes"),
     ])
-      .then(([namespaces, storageClasses, nodes]) => {
+      .then(([namespaces, storageClasses]) => {
         if (cancelled) return
         const ns = namespaces
           .map((item) => item.name.trim())
@@ -773,28 +534,12 @@ export function VolumesPageClient() {
         ) {
           setCreateStorageClassName(preferredStorageClassName)
         }
-        if (
-          !createPvStorageClassName.trim() ||
-          !classes.some((item) => item.name === createPvStorageClassName.trim())
-        ) {
-          setCreatePvStorageClassName(preferredStorageClassName)
-        }
-        const nodeNames = (
-          nodes.items as Array<{
-            metadata?: { name?: string }
-          }>
-        )
-          .map((item) => item.metadata?.name?.trim() ?? "")
-          .filter((item) => item.length > 0)
-          .sort((a, b) => a.localeCompare(b))
-        setNodeOptions(nodeNames)
       })
       .catch((loadError: unknown) => {
         if (cancelled) return
         console.error("[Volumes] load create dialog options failed", loadError)
         setNamespaceOptions([])
         setStorageClassOptions([])
-        setNodeOptions([])
       })
 
     return () => {
@@ -803,8 +548,6 @@ export function VolumesPageClient() {
   }, [
     createDialogOpen,
     createNamespace,
-    createPvDialogOpen,
-    createPvStorageClassName,
     createStorageClassName,
   ])
 
@@ -1022,205 +765,6 @@ export function VolumesPageClient() {
     createYamlText,
     creating,
     resetCreateForm,
-  ])
-
-  const buildCreatePvYaml = React.useCallback(() => {
-    return buildPvYamlText({
-      name: createPvName,
-      description: createPvDescription,
-      accessMode: createPvAccessMode,
-      storageRequest: createPvStorageRequest,
-      storageUnit: createPvStorageUnit,
-      storageClassName: createPvStorageClassName,
-      volumeMode: createPvVolumeMode,
-      reclaimPolicy: createPvReclaimPolicy,
-      hostPath: createPvHostPath,
-      nodeNames: createPvNodeNames,
-    })
-  }, [
-    createPvAccessMode,
-    createPvDescription,
-    createPvHostPath,
-    createPvName,
-    createPvNodeNames,
-    createPvReclaimPolicy,
-    createPvStorageClassName,
-    createPvStorageRequest,
-    createPvStorageUnit,
-    createPvVolumeMode,
-  ])
-
-  const validateCreatePvBasicStep = React.useCallback(() => {
-    const nextNameError = validateVolumeName(createPvName)
-    setCreatePvNameError(nextNameError)
-    return !nextNameError
-  }, [createPvName])
-
-  const validateCreatePvStorageStep = React.useCallback(() => {
-    const request = createPvStorageRequest.trim()
-    if (!request) {
-      setCreatePvStorageError("请输入申请容量")
-      return false
-    }
-    const parsed = Number(request)
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setCreatePvStorageError("申请容量必须大于 0")
-      return false
-    }
-    setCreatePvStorageError(null)
-    return true
-  }, [createPvStorageRequest])
-
-  const handleCreatePvNext = React.useCallback(async () => {
-    if (creatingPv || checkingCreatePvNext) return
-    setCreatePvSubmitError(null)
-    if (createPvStep === "basic") {
-      if (!validateCreatePvBasicStep()) return
-      setCheckingCreatePvNext(true)
-      try {
-        const exists = await checkPersistentVolumeExists(createPvName.trim().toLowerCase())
-        if (exists) {
-          setCreatePvNameError("持久卷名称已存在，请更换后重试")
-          return
-        }
-        setCreatePvStep("storage")
-      } catch (error) {
-        setCreatePvSubmitError(error instanceof Error ? error.message : "持久卷名称校验失败，请稍后重试")
-      } finally {
-        setCheckingCreatePvNext(false)
-      }
-      return
-    }
-
-    if (createPvStep === "storage") {
-      if (!validateCreatePvStorageStep()) return
-      setCreatePvStep("advanced")
-    }
-  }, [
-    checkingCreatePvNext,
-    createPvName,
-    createPvStep,
-    creatingPv,
-    validateCreatePvBasicStep,
-    validateCreatePvStorageStep,
-  ])
-
-  const handleCreatePvSubmit = React.useCallback(async () => {
-    if (creatingPv) return
-    setCreatePvSubmitError(null)
-
-    let nextState = {
-      name: createPvName,
-      description: createPvDescription,
-      accessMode: createPvAccessMode,
-      storageRequest: createPvStorageRequest,
-      storageUnit: createPvStorageUnit,
-      storageClassName: createPvStorageClassName,
-      volumeMode: createPvVolumeMode,
-      reclaimPolicy: createPvReclaimPolicy,
-      hostPath: createPvHostPath,
-      nodeNames: createPvNodeNames,
-    }
-
-    if (createPvYamlMode) {
-      try {
-        nextState = parsePvYamlText(createPvYamlText)
-        setCreatePvName(nextState.name)
-        setCreatePvDescription(nextState.description)
-        setCreatePvAccessMode(nextState.accessMode)
-        setCreatePvStorageRequest(normalizeStorageRequest(nextState.storageRequest))
-        setCreatePvStorageUnit(nextState.storageUnit)
-        setCreatePvStorageClassName(nextState.storageClassName)
-        setCreatePvVolumeMode(nextState.volumeMode)
-        setCreatePvReclaimPolicy(nextState.reclaimPolicy)
-        setCreatePvHostPath(nextState.hostPath)
-        setCreatePvNodeNames(nextState.nodeNames)
-        setCreatePvYamlError(null)
-      } catch (parseError: unknown) {
-        setCreatePvYamlError(parseError instanceof Error ? parseError.message : "YAML 解析失败")
-        return
-      }
-    }
-
-    const validName = validateVolumeName(nextState.name)
-    const validDescription =
-      nextState.description.trim().length <= DESCRIPTION_MAX_LENGTH
-        ? null
-        : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
-    const storageNumber = Number(nextState.storageRequest.trim())
-    const validStorage =
-      nextState.storageRequest.trim() && Number.isFinite(storageNumber) && storageNumber > 0
-        ? null
-        : "申请容量必须大于 0"
-    const validHostPath = nextState.hostPath.trim() ? null : "请输入主机路径"
-
-    setCreatePvNameError(validName)
-    setCreatePvStorageError(validStorage)
-    setCreatePvHostPathError(validHostPath)
-
-    if (validName || validDescription || validStorage || validHostPath) {
-      if (!createPvYamlMode) {
-        if (validName || validDescription) setCreatePvStep("basic")
-        else if (validStorage) setCreatePvStep("storage")
-        else setCreatePvStep("advanced")
-      } else {
-        setCreatePvYamlError(validName ?? validDescription ?? validStorage ?? validHostPath ?? null)
-      }
-      return
-    }
-
-    setCreatingPv(true)
-    try {
-      const exists = await checkPersistentVolumeExists(nextState.name.trim().toLowerCase())
-      if (exists) {
-        const existsMessage = "持久卷名称已存在，请更换后重试"
-        setCreatePvNameError(existsMessage)
-        if (createPvYamlMode) setCreatePvYamlError(existsMessage)
-        else setCreatePvStep("basic")
-        return
-      }
-      await createPersistentVolume({
-        name: nextState.name.trim().toLowerCase(),
-        description: nextState.description.trim(),
-        accessMode: nextState.accessMode,
-        storageRequest: `${nextState.storageRequest.trim()}${nextState.storageUnit}`,
-        storageClassName: nextState.storageClassName.trim(),
-        volumeMode: nextState.volumeMode,
-        reclaimPolicy: nextState.reclaimPolicy,
-        hostPath: nextState.hostPath.trim(),
-        nodeNames: nextState.nodeNames,
-      })
-      const { persistentVolumeClaims: pvcRows, persistentVolumes: pvRows } = await fetchVolumeRows()
-      setPersistentVolumeClaims(pvcRows)
-      setPersistentVolumes(pvRows)
-      setError(null)
-      setCreatePvDialogOpen(false)
-      resetCreatePvForm()
-    } catch (submitError: unknown) {
-      const message = submitError instanceof Error ? submitError.message : "创建失败"
-      if (createPvYamlMode) {
-        setCreatePvYamlError(message)
-      } else {
-        setCreatePvSubmitError(message)
-      }
-    } finally {
-      setCreatingPv(false)
-    }
-  }, [
-    createPvAccessMode,
-    createPvDescription,
-    createPvHostPath,
-    createPvName,
-    createPvNodeNames,
-    createPvReclaimPolicy,
-    createPvStorageClassName,
-    createPvStorageRequest,
-    createPvStorageUnit,
-    createPvVolumeMode,
-    createPvYamlMode,
-    createPvYamlText,
-    creatingPv,
-    resetCreatePvForm,
   ])
 
   const pvcColumns = React.useMemo(
@@ -1756,424 +1300,6 @@ export function VolumesPageClient() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={createPvDialogOpen}
-        onOpenChange={(open) => {
-          if (!open && creatingPv) return
-          setCreatePvDialogOpen(open)
-          if (!open) resetCreatePvForm()
-        }}
-      >
-        <DialogContent
-          className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
-          onInteractOutside={(event) => event.preventDefault()}
-          onEscapeKeyDown={(event) => event.preventDefault()}
-        >
-          <div ref={createPvDialogContainerRef} className="flex min-h-0 flex-1 flex-col">
-            <div className="flex items-start justify-between border-b bg-muted/15">
-              <DialogHeader className="px-6 py-4">
-                <DialogTitle>创建持久卷</DialogTitle>
-                <DialogDescription>使用 Kubernetes PersistentVolume 创建可复用存储卷。</DialogDescription>
-              </DialogHeader>
-              <div className="h-full flex items-center me-20">
-                <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                  <span className="text-sm font-medium">编辑 YAML</span>
-                  <Switch
-                    checked={createPvYamlMode}
-                    onCheckedChange={(checked) => {
-                      if (creatingPv) return
-                      if (checked) {
-                        setCreatePvYamlText(buildCreatePvYaml())
-                        setCreatePvYamlError(null)
-                        setCreatePvYamlMode(true)
-                        return
-                      }
-                      try {
-                        const parsed = parsePvYamlText(createPvYamlText)
-                        setCreatePvName(parsed.name)
-                        setCreatePvDescription(parsed.description)
-                        setCreatePvAccessMode(parsed.accessMode)
-                        setCreatePvStorageRequest(normalizeStorageRequest(parsed.storageRequest))
-                        setCreatePvStorageUnit(parsed.storageUnit)
-                        setCreatePvStorageClassName(parsed.storageClassName)
-                        setCreatePvVolumeMode(parsed.volumeMode)
-                        setCreatePvReclaimPolicy(parsed.reclaimPolicy)
-                        setCreatePvHostPath(parsed.hostPath)
-                        setCreatePvNodeNames(parsed.nodeNames)
-                        setCreatePvYamlError(null)
-                        setCreatePvYamlMode(false)
-                      } catch (parseError) {
-                        setCreatePvYamlError(parseError instanceof Error ? parseError.message : "YAML 解析失败")
-                      }
-                    }}
-                    disabled={creatingPv}
-                    aria-label="编辑 YAML"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {!createPvYamlMode ? (
-              <StepHeaderNav
-                items={[
-                  {
-                    id: "basic",
-                    title: "基本信息",
-                    status: createPvStep === "basic" ? "当前" : createPvName.trim() ? "已设置" : "未设置",
-                    active: createPvStep === "basic",
-                    icon: <IconSettings2 className="size-4" />,
-                    disabled: creatingPv,
-                    onClick: () => setCreatePvStep("basic"),
-                  },
-                  {
-                    id: "storage",
-                    title: "存储设置",
-                    status:
-                      createPvStep === "storage"
-                        ? "当前"
-                        : createPvStorageRequest.trim()
-                          ? "已设置"
-                          : "未设置",
-                    active: createPvStep === "storage",
-                    icon: <IconDatabase className="size-4" />,
-                    disabled: creatingPv,
-                    onClick: () => setCreatePvStep("storage"),
-                  },
-                  {
-                    id: "advanced",
-                    title: "高级设置",
-                    status:
-                      createPvStep === "advanced"
-                        ? "当前"
-                        : createPvHostPath.trim() || createPvNodeNames.length > 0
-                          ? "已设置"
-                          : "未设置",
-                    active: createPvStep === "advanced",
-                    icon: <IconAdjustments className="size-4" />,
-                    disabled: creatingPv,
-                    onClick: () => setCreatePvStep("advanced"),
-                  },
-                ]}
-              />
-            ) : null}
-
-            <div
-              className={
-                createPvYamlMode
-                  ? "min-h-0 flex-1 px-6 py-6"
-                  : "min-h-0 flex-1 overflow-y-auto px-6 py-6"
-              }
-            >
-              {createPvYamlMode ? (
-                <div className="flex h-full min-h-0 flex-col">
-                  <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border">
-                    <MonacoEditor
-                      language="yaml"
-                      theme="vs-dark"
-                      value={createPvYamlText}
-                      onChange={(value) => {
-                        setCreatePvYamlText(value ?? "")
-                        if (createPvYamlError) setCreatePvYamlError(null)
-                      }}
-                      options={MONACO_OPTIONS}
-                      height="100%"
-                    />
-                  </div>
-                  {createPvYamlError ? <FieldError className="mt-3">{createPvYamlError}</FieldError> : null}
-                </div>
-              ) : createPvStep === "basic" ? (
-                <div>
-                  <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">基本信息</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">填写持久卷名称和描述信息。</p>
-                  </div>
-                  <FieldGroup className="grid gap-6 md:grid-cols-2">
-                    <Field data-invalid={Boolean(createPvNameError)} className="md:col-span-2">
-                      <FieldLabel htmlFor="pv-create-name">名称</FieldLabel>
-                      <Input
-                        id="pv-create-name"
-                        value={createPvName}
-                        onChange={(event) => {
-                          setCreatePvName(event.target.value)
-                          if (createPvNameError) setCreatePvNameError(null)
-                        }}
-                        placeholder="请输入持久卷名称"
-                        autoComplete="off"
-                        aria-invalid={Boolean(createPvNameError)}
-                        disabled={creatingPv}
-                      />
-                      {createPvNameError ? (
-                        <FieldError>{createPvNameError}</FieldError>
-                      ) : (
-                        <FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>
-                      )}
-                    </Field>
-
-                    <Field className="md:col-span-2">
-                      <FieldLabel htmlFor="pv-create-description">描述</FieldLabel>
-                      <Textarea
-                        id="pv-create-description"
-                        value={createPvDescription}
-                        onChange={(event) => setCreatePvDescription(event.target.value)}
-                        placeholder="请输入描述（选填）"
-                        maxLength={DESCRIPTION_MAX_LENGTH}
-                        className="min-h-24"
-                        disabled={creatingPv}
-                      />
-                      <FieldDescription>
-                        描述将写入资源注解 `description`，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
-                      </FieldDescription>
-                    </Field>
-                  </FieldGroup>
-                </div>
-              ) : createPvStep === "storage" ? (
-                <div>
-                  <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">存储设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">设置访问模式、容量、存储类和回收策略。</p>
-                  </div>
-                  <FieldGroup className="grid gap-6 md:grid-cols-2">
-                    <Field>
-                      <FieldLabel htmlFor="pv-create-access-mode">访问模式</FieldLabel>
-                      <Select
-                        value={createPvAccessMode}
-                        onValueChange={(value) => {
-                          if (
-                            value === "ReadWriteOnce" ||
-                            value === "ReadOnlyMany" ||
-                            value === "ReadWriteMany" ||
-                            value === "ReadWriteOncePod"
-                          ) {
-                            setCreatePvAccessMode(value)
-                          }
-                        }}
-                        disabled={creatingPv}
-                      >
-                        <SelectTrigger id="pv-create-access-mode">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="ReadWriteOnce">ReadWriteOnce</SelectItem>
-                            <SelectItem value="ReadOnlyMany">ReadOnlyMany</SelectItem>
-                            <SelectItem value="ReadWriteMany">ReadWriteMany</SelectItem>
-                            <SelectItem value="ReadWriteOncePod">ReadWriteOncePod</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-
-                    <Field data-invalid={Boolean(createPvStorageError)}>
-                      <FieldLabel htmlFor="pv-create-storage-request">容量</FieldLabel>
-                      <InputGroup>
-                        <InputGroupInput
-                          id="pv-create-storage-request"
-                          value={createPvStorageRequest}
-                          onChange={(event) => {
-                            setCreatePvStorageRequest(normalizeStorageRequest(event.target.value))
-                            if (createPvStorageError) setCreatePvStorageError(null)
-                          }}
-                          inputMode="decimal"
-                          placeholder="例如：10"
-                          autoComplete="off"
-                          aria-invalid={Boolean(createPvStorageError)}
-                          disabled={creatingPv}
-                        />
-                        <InputGroupAddon align="inline-end">
-                          <InputGroupText>Gi</InputGroupText>
-                        </InputGroupAddon>
-                      </InputGroup>
-                      {createPvStorageError ? <FieldError>{createPvStorageError}</FieldError> : null}
-                    </Field>
-
-                    <Field>
-                      <FieldLabel htmlFor="pv-create-storage-class">存储类</FieldLabel>
-                      <Select
-                        value={createPvStorageClassName}
-                        onValueChange={setCreatePvStorageClassName}
-                        disabled={creatingPv}
-                      >
-                        <SelectTrigger id="pv-create-storage-class">
-                          <SelectValue placeholder="请选择存储类（可选）" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {storageClassOptions.map((option) => (
-                              <SelectItem key={option.name} value={option.name}>
-                                {option.name}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-
-                    <Field>
-                      <FieldLabel htmlFor="pv-create-reclaim-policy">回收策略</FieldLabel>
-                      <Select
-                        value={createPvReclaimPolicy}
-                        onValueChange={(value) => {
-                          if (value === "Retain" || value === "Delete") {
-                            setCreatePvReclaimPolicy(value)
-                          }
-                        }}
-                        disabled={creatingPv}
-                      >
-                        <SelectTrigger id="pv-create-reclaim-policy">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="Retain">Retain</SelectItem>
-                            <SelectItem value="Delete">Delete</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                  </FieldGroup>
-                </div>
-              ) : (
-                <div>
-                  <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">高级设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">设置主机路径和可选节点约束。</p>
-                  </div>
-                  <FieldGroup className="grid gap-6 md:grid-cols-2">
-                    <Field data-invalid={Boolean(createPvHostPathError)} className="md:col-span-2">
-                      <FieldLabel htmlFor="pv-create-host-path">主机路径</FieldLabel>
-                      <Input
-                        id="pv-create-host-path"
-                        value={createPvHostPath}
-                        onChange={(event) => {
-                          setCreatePvHostPath(event.target.value)
-                          if (createPvHostPathError) setCreatePvHostPathError(null)
-                        }}
-                        placeholder="例如：/data/pv"
-                        autoComplete="off"
-                        aria-invalid={Boolean(createPvHostPathError)}
-                        disabled={creatingPv}
-                      />
-                      {createPvHostPathError ? (
-                        <FieldError>{createPvHostPathError}</FieldError>
-                      ) : (
-                        <FieldDescription>将使用 hostPath 作为 PV 的卷源。</FieldDescription>
-                      )}
-                    </Field>
-
-                    <Field>
-                      <FieldLabel htmlFor="pv-create-volume-mode">卷模式</FieldLabel>
-                      <Select
-                        value={createPvVolumeMode}
-                        onValueChange={(value) => {
-                          if (value === "Filesystem" || value === "Block") {
-                            setCreatePvVolumeMode(value)
-                          }
-                        }}
-                        disabled={creatingPv}
-                      >
-                        <SelectTrigger id="pv-create-volume-mode">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="Filesystem">Filesystem</SelectItem>
-                            <SelectItem value="Block">Block</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-
-                    <Field>
-                      <FieldLabel>节点（可选）</FieldLabel>
-                      <Combobox
-                        multiple
-                        autoHighlight
-                        items={nodeOptions}
-                        value={createPvNodeNames}
-                        onValueChange={(values) => {
-                          const nextValues = Array.isArray(values)
-                            ? values.filter((item): item is string => typeof item === "string")
-                            : []
-                          setCreatePvNodeNames(nextValues)
-                        }}
-                        disabled={creatingPv}
-                      >
-                        <ComboboxChips ref={createPvNodeAnchor} className="w-full">
-                          <ComboboxValue>
-                            {(values) => (
-                              <>
-                                {(values as string[]).map((value) => (
-                                  <ComboboxChip key={value}>{value}</ComboboxChip>
-                                ))}
-                                <ComboboxChipsInput
-                                  placeholder={(values as string[]).length > 0 ? "" : "请选择节点"}
-                                />
-                              </>
-                            )}
-                          </ComboboxValue>
-                        </ComboboxChips>
-                        <ComboboxContent anchor={createPvNodeAnchor} container={createPvDialogContainerRef}>
-                          <ComboboxEmpty>未找到节点</ComboboxEmpty>
-                          <ComboboxList>
-                            {(item) => (
-                              <ComboboxItem key={item} value={item}>
-                                {item}
-                              </ComboboxItem>
-                            )}
-                          </ComboboxList>
-                        </ComboboxContent>
-                      </Combobox>
-                      <FieldDescription>可多选，提交后将写入 nodeAffinity 节点约束。</FieldDescription>
-                    </Field>
-                  </FieldGroup>
-                </div>
-              )}
-
-              {createPvSubmitError ? <FieldError className="mt-4">{createPvSubmitError}</FieldError> : null}
-            </div>
-
-            <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
-              <div className="flex w-full items-center justify-between gap-3">
-                {createPvYamlMode || createPvStep === "basic" ? (
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={creatingPv || checkingCreatePvNext}>
-                      取消
-                    </Button>
-                  </DialogClose>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setCreatePvStep(createPvStep === "advanced" ? "storage" : "basic")}
-                    disabled={creatingPv || checkingCreatePvNext}
-                  >
-                    上一步
-                  </Button>
-                )}
-
-                {createPvYamlMode || createPvStep === "advanced" ? (
-                  <Button
-                    type="button"
-                    onClick={() => void handleCreatePvSubmit()}
-                    disabled={creatingPv || checkingCreatePvNext}
-                  >
-                    {creatingPv ? "创建中..." : "创建"}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={() => void handleCreatePvNext()}
-                    disabled={creatingPv || checkingCreatePvNext}
-                  >
-                    {checkingCreatePvNext && createPvStep === "basic" ? "校验中..." : "下一步"}
-                  </Button>
-                )}
-              </div>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <MonacoViewerDialog
         title="查看YAML"
         open={yamlOpen}
@@ -2223,10 +1349,6 @@ export function VolumesPageClient() {
           columns={pvColumns}
           toolbarStart={volumeTabs}
           toolbarEnd={volumeFilters}
-          onCreate={() => {
-            resetCreatePvForm()
-            setCreatePvDialogOpen(true)
-          }}
           onDeleteSelectedRows={handleDeleteSelectedPvRows}
         />
       )}

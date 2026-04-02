@@ -64,6 +64,7 @@ import {
   InputGroupText,
 } from "@/components/ui/input-group"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import {
   Select,
   SelectContent,
@@ -1573,41 +1574,43 @@ export function RoutesPageClient() {
                           {hasConfiguredRule ? (
                             <div className="flex flex-col gap-3">
                               {routeRuleHostGroups.map((group) => (
-                                <div
+                                <Item
                                   key={`rule-host-${group.hostKey}`}
-                                  className="group/item rounded-lg border px-4 py-4 hover:bg-muted"
+                                  variant="outline"
+                                  size="sm"
+                                  className="hover:bg-muted"
                                 >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <div className="text-sm font-semibold">{group.host || "-"}</div>
-                                      <div className="mt-1 text-sm text-muted-foreground">
-                                        {`${group.protocol} ${group.summaries.join("；")}${group.protocol === "HTTPS" && group.tlsSecretName ? ` / Secret: ${group.tlsSecretName}` : ""}`}
-                                      </div>
-                                    </div>
-                                    <div className="pointer-events-none flex items-center gap-2 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => requestEditRuleItem(group.hostKey)}
-                                        disabled={creating}
-                                      >
-                                        <IconPencil data-icon="inline-start" />
-                                        编辑
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => requestDeleteRuleItem(group.hostKey)}
-                                        disabled={creating}
-                                      >
-                                        <IconTrash data-icon="inline-start" />
-                                        删除
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
+                                  <ItemContent className="min-w-0">
+                                    <ItemTitle className="min-w-0 truncate">
+                                      {group.host || "-"}
+                                    </ItemTitle>
+                                    <ItemDescription className="min-w-0 truncate">
+                                      {`${group.protocol} ${group.summaries.join("；")}${group.protocol === "HTTPS" && group.tlsSecretName ? ` / Secret: ${group.tlsSecretName}` : ""}`}
+                                    </ItemDescription>
+                                  </ItemContent>
+                                  <ItemActions className="pointer-events-none gap-2 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => requestEditRuleItem(group.hostKey)}
+                                      disabled={creating}
+                                    >
+                                      <IconPencil data-icon="inline-start" />
+                                      编辑
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => requestDeleteRuleItem(group.hostKey)}
+                                      disabled={creating}
+                                    >
+                                      <IconTrash data-icon="inline-start" />
+                                      删除
+                                    </Button>
+                                  </ItemActions>
+                                </Item>
                               ))}
                             </div>
                           ) : (
