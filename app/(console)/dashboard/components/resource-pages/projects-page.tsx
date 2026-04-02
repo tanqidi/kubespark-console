@@ -9,6 +9,13 @@ import { parse, stringify } from "yaml"
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
+import {
+  ResourceMetadataEditor,
+  hasUserProvidedMetadata,
+  metadataEntriesToRecord,
+  metadataRecordToEntries,
+  type MetadataEntry,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
 // import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -20,9 +27,11 @@ import {
   deleteNamespace,
   fetchNamespaceYaml,
   fetchNamespaces,
+  type CreateNamespaceInput,
   type NamespaceRow,
   updateNamespace,
 } from "@/app/lib/kubespark/projects"
+import { fetchResourceByName } from "@/app/lib/kubespark/common"
 import {
   Dialog,
   DialogClose,
@@ -114,16 +123,24 @@ function validateProjectName(name: string): string | null {
   return null
 }
 
-function buildProjectYamlText(params: { name: string; description: string }): string {
+function buildProjectYamlText(params: {
+  name: string
+  description: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
+}): string {
+  const labels = metadataEntriesToRecord(params.labels)
+  const annotations = metadataEntriesToRecord(params.annotations)
+  if (params.description.trim()) annotations.description = params.description.trim()
+  else delete annotations.description
   return stringify(
     {
       apiVersion: "v1",
       kind: "Namespace",
       metadata: {
         ...(params.name.trim() ? { name: params.name.trim() } : {}),
-        ...(params.description.trim()
-          ? { annotations: { description: params.description.trim() } }
-          : {}),
+        ...(Object.keys(labels).length > 0 ? { labels } : {}),
+        ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
       },
     },
     {
@@ -134,7 +151,12 @@ function buildProjectYamlText(params: { name: string; description: string }): st
   )
 }
 
-function parseProjectYamlText(yamlText: string): { name: string; description: string } {
+function parseProjectYamlText(yamlText: string): {
+  name: string
+  description: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
+} {
   const normalized = yamlText.trim()
   if (!normalized) throw new Error("请输入 YAML 内容")
 
@@ -158,14 +180,31 @@ function parseProjectYamlText(yamlText: string): { name: string; description: st
     !Array.isArray(metadata.annotations)
       ? (metadata.annotations as Record<string, unknown>)
       : {}
+  const labels =
+    typeof metadata.labels === "object" &&
+    metadata.labels !== null &&
+    !Array.isArray(metadata.labels)
+      ? (metadata.labels as Record<string, unknown>)
+      : {}
 
   return {
     name: typeof metadata.name === "string" ? metadata.name : "",
     description: typeof annotations.description === "string" ? annotations.description : "",
+    labels: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(labels).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
+    annotations: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(annotations).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
   }
 }
 
 export function ProjectsPageClient() {
+  type ProjectDialogStep = "basic" | "advanced"
   const [rows, setRows] = React.useState<NamespaceRow[]>([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -180,12 +219,16 @@ export function ProjectsPageClient() {
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [createName, setCreateName] = React.useState("")
   const [createDescription, setCreateDescription] = React.useState("")
+  const [metadataEnabled, setMetadataEnabled] = React.useState(false)
+  const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
+  const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
   const [createNameInvalid, setCreateNameInvalid] = React.useState(false)
   const [createNameError, setCreateNameError] = React.useState<string | null>(null)
   const [createYamlMode, setCreateYamlMode] = React.useState(false)
   const [createYamlText, setCreateYamlText] = React.useState("")
   const [createYamlError, setCreateYamlError] = React.useState<string | null>(null)
   const [creating, setCreating] = React.useState(false)
+  const [createStep, setCreateStep] = React.useState<ProjectDialogStep>("basic")
   const isEditMode = Boolean(editingRow)
   const dialogTitle = isEditMode ? "编辑项目" : "创建项目"
   const dialogDescription = isEditMode
@@ -224,15 +267,59 @@ export function ProjectsPageClient() {
   }, [])
 
   const requestEdit = React.useCallback((row: NamespaceRow) => {
-    setEditingRow(row)
-    setCreateName(row.name)
-    setCreateDescription(row.description ?? "")
-    setCreateNameInvalid(false)
-    setCreateNameError(null)
-    setCreateYamlMode(false)
-    setCreateYamlText("")
-    setCreateYamlError(null)
-    setCreateDialogOpen(true)
+    void fetchResourceByName<unknown>("core", "v1", "namespaces", row.name)
+      .then(({ payload }) => {
+        const resource =
+          typeof payload === "object" && payload !== null && !Array.isArray(payload)
+            ? (payload as Record<string, unknown>)
+            : {}
+        const metadata =
+          typeof resource.metadata === "object" &&
+          resource.metadata !== null &&
+          !Array.isArray(resource.metadata)
+            ? (resource.metadata as Record<string, unknown>)
+            : {}
+        const labels =
+          typeof metadata.labels === "object" &&
+          metadata.labels !== null &&
+          !Array.isArray(metadata.labels)
+            ? (metadata.labels as Record<string, unknown>)
+            : {}
+        const annotations =
+          typeof metadata.annotations === "object" &&
+          metadata.annotations !== null &&
+          !Array.isArray(metadata.annotations)
+            ? (metadata.annotations as Record<string, unknown>)
+            : {}
+        const initialLabels = metadataRecordToEntries(
+          Object.fromEntries(
+            Object.entries(labels).filter(([, value]) => typeof value === "string")
+          ) as Record<string, string>
+        )
+        const initialAnnotations = metadataRecordToEntries(
+          Object.fromEntries(
+            Object.entries(annotations).filter(([, value]) => typeof value === "string")
+          ) as Record<string, string>
+        )
+
+        setEditingRow(row)
+        setCreateName(row.name)
+        setCreateDescription(row.description ?? "")
+        setLabelEntries(initialLabels)
+        setAnnotationEntries(initialAnnotations)
+        setMetadataEnabled(hasUserProvidedMetadata(initialLabels, initialAnnotations))
+        setCreateNameInvalid(false)
+        setCreateNameError(null)
+        setCreateYamlMode(false)
+        setCreateYamlText("")
+        setCreateYamlError(null)
+        setCreateStep("basic")
+        setCreateDialogOpen(true)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载项目详情失败"
+        setError(message)
+      })
   }, [])
 
   const handleConfirmDelete = React.useCallback(() => {
@@ -271,14 +358,21 @@ export function ProjectsPageClient() {
 
       let nextName = (editingRow?.name ?? createName).trim()
       let nextDescription = createDescription.trim()
+      let nextLabels = metadataEntriesToRecord(labelEntries)
+      let nextAnnotations = metadataEntriesToRecord(annotationEntries)
 
       if (createYamlMode) {
         try {
           const parsed = parseProjectYamlText(createYamlText)
           nextName = isEditMode ? (editingRow?.name ?? "").trim() : parsed.name.trim()
           nextDescription = parsed.description.trim()
+          nextLabels = metadataEntriesToRecord(parsed.labels)
+          nextAnnotations = metadataEntriesToRecord(parsed.annotations)
           if (!isEditMode) setCreateName(nextName)
           setCreateDescription(nextDescription)
+          setLabelEntries(parsed.labels)
+          setAnnotationEntries(parsed.annotations)
+          setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
           setCreateYamlError(null)
         } catch (error) {
           setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
@@ -299,9 +393,15 @@ export function ProjectsPageClient() {
       setCreateYamlError(null)
       setCreating(true)
 
+      const requestPayload: CreateNamespaceInput = {
+        name: nextName,
+        description: nextDescription,
+        labels: nextLabels,
+        annotations: nextAnnotations,
+      }
       const request = isEditMode
-        ? updateNamespace({ name: nextName, description: nextDescription })
-        : createNamespace({ name: nextName, description: nextDescription })
+        ? updateNamespace(requestPayload)
+        : createNamespace(requestPayload)
 
       void request
         .then(async () => {
@@ -309,9 +409,13 @@ export function ProjectsPageClient() {
           setEditingRow(null)
           setCreateName("")
           setCreateDescription("")
+          setMetadataEnabled(false)
+          setLabelEntries([{ key: "", value: "" }])
+          setAnnotationEntries([{ key: "", value: "" }])
           setCreateYamlMode(false)
           setCreateYamlText("")
           setCreateYamlError(null)
+          setCreateStep("basic")
           const items = await fetchNamespaces()
           setRows(items)
           setError(null)
@@ -329,7 +433,17 @@ export function ProjectsPageClient() {
           setCreating(false)
         })
     },
-    [createDescription, createName, createYamlMode, createYamlText, creating, editingRow, isEditMode]
+    [
+      annotationEntries,
+      createDescription,
+      createName,
+      createYamlMode,
+      createYamlText,
+      creating,
+      editingRow,
+      isEditMode,
+      labelEntries,
+    ]
   )
 
   const columns = React.useMemo(
@@ -450,11 +564,17 @@ export function ProjectsPageClient() {
           setCreateDialogOpen(open)
           if (!open) {
             setEditingRow(null)
+            setCreateName("")
+            setCreateDescription("")
+            setMetadataEnabled(false)
+            setLabelEntries([{ key: "", value: "" }])
+            setAnnotationEntries([{ key: "", value: "" }])
             setCreateNameInvalid(false)
             setCreateNameError(null)
             setCreateYamlMode(false)
             setCreateYamlText("")
             setCreateYamlError(null)
+            setCreateStep("basic")
           }
         }}
       >
@@ -481,6 +601,8 @@ export function ProjectsPageClient() {
                           buildProjectYamlText({
                             name: editingRow?.name ?? createName,
                             description: createDescription,
+                            labels: labelEntries,
+                            annotations: annotationEntries,
                           })
                         )
                         setCreateYamlError(null)
@@ -494,6 +616,9 @@ export function ProjectsPageClient() {
                           setCreateName(parsed.name)
                         }
                         setCreateDescription(parsed.description)
+                        setLabelEntries(parsed.labels)
+                        setAnnotationEntries(parsed.annotations)
+                        setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
                         setCreateYamlError(null)
                         setCreateYamlMode(false)
                       } catch (error) {
@@ -513,11 +638,31 @@ export function ProjectsPageClient() {
                   {
                     id: "basic",
                     title: "基本信息",
-                    status: "当前",
-                    active: true,
+                    status: createStep === "basic" ? "当前" : "已设置",
+                    active: createStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: creating,
-                    onClick: () => {},
+                    onClick: () => {
+                      if (creating) return
+                      setCreateStep("basic")
+                    },
+                  },
+                  {
+                    id: "advanced",
+                    title: "高级设置",
+                    status:
+                      createStep === "advanced"
+                        ? "当前"
+                        : hasUserProvidedMetadata(labelEntries, annotationEntries)
+                          ? "已设置"
+                          : "未设置",
+                    active: createStep === "advanced",
+                    icon: <IconSettings2 className="size-4" />,
+                    disabled: creating,
+                    onClick: () => {
+                      if (creating) return
+                      setCreateStep("advanced")
+                    },
                   },
                 ]}
               />
@@ -543,7 +688,7 @@ export function ProjectsPageClient() {
                     </div>
                     {createYamlError ? <FieldError className="mt-3">{createYamlError}</FieldError> : null}
                   </div>
-              ) : (
+              ) : createStep === "basic" ? (
                 <div className="border-b p-6">
                   <div className="mb-4">
                     <h3 className="text-[15px] font-semibold">基本信息</h3>
@@ -596,18 +741,67 @@ export function ProjectsPageClient() {
                     </Field>
                   </FieldGroup>
                 </div>
+              ) : (
+                <div className="border-b p-6">
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">高级设置</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      补充标签与注解信息，便于检索、分类和后续治理。
+                    </p>
+                  </div>
+                  <FieldGroup className="flex flex-col gap-4">
+                    <Field>
+                      <ResourceMetadataEditor
+                        checked={metadataEnabled}
+                        onCheckedChange={setMetadataEnabled}
+                        labels={labelEntries}
+                        setLabels={setLabelEntries}
+                        annotations={annotationEntries}
+                        setAnnotations={setAnnotationEntries}
+                        description={createDescription}
+                        setDescription={setCreateDescription}
+                        disabled={creating}
+                        titleText="统一管理项目的标签与注解信息。"
+                      />
+                    </Field>
+                  </FieldGroup>
+                </div>
               )}
             </div>
 
             <DialogFooter className="border-t bg-background px-6 py-5">
-              <DialogClose asChild>
-                <Button type="button" variant="outline" disabled={creating}>
-                  取消
-                </Button>
-              </DialogClose>
-              <Button type="button" onClick={() => handleCreateSubmit()} disabled={creating}>
-                {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
-              </Button>
+              {createYamlMode ? (
+                <>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline" disabled={creating}>
+                      取消
+                    </Button>
+                  </DialogClose>
+                  <Button type="button" onClick={() => handleCreateSubmit()} disabled={creating}>
+                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  </Button>
+                </>
+              ) : createStep === "basic" ? (
+                <>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline" disabled={creating}>
+                      取消
+                    </Button>
+                  </DialogClose>
+                  <Button type="button" disabled={creating} onClick={() => setCreateStep("advanced")}>
+                    下一步
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button type="button" variant="outline" disabled={creating} onClick={() => setCreateStep("basic")}>
+                    上一步
+                  </Button>
+                  <Button type="button" onClick={() => handleCreateSubmit()} disabled={creating}>
+                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </div>
         </DialogContent>
@@ -643,11 +837,15 @@ export function ProjectsPageClient() {
           setEditingRow(null)
           setCreateName("")
           setCreateDescription("")
+          setMetadataEnabled(false)
+          setLabelEntries([{ key: "", value: "" }])
+          setAnnotationEntries([{ key: "", value: "" }])
           setCreateNameInvalid(false)
           setCreateNameError(null)
           setCreateYamlMode(false)
           setCreateYamlText("")
           setCreateYamlError(null)
+          setCreateStep("basic")
           setCreateDialogOpen(true)
         }}
         toolbarEnd={projectFilters}

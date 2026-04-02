@@ -44,11 +44,15 @@ export type NamespaceYamlResult = {
 export type CreateNamespaceInput = {
   name: string
   description?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
 }
 
 export type UpdateNamespaceInput = {
   name: string
   description?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
 }
 
 function normalizeKubernetesNamespaceName(name: string): string {
@@ -87,17 +91,23 @@ export async function fetchNamespaces(): Promise<NamespaceRow[]> {
 export async function createNamespace(input: CreateNamespaceInput): Promise<void> {
   const name = normalizeKubernetesNamespaceName(input.name)
   const description = input.description?.trim() ?? ""
+  const labels = Object.fromEntries(
+    Object.entries(input.labels ?? {}).filter(([key]) => key.trim().length > 0)
+  ) as Record<string, string>
+  const annotations = Object.fromEntries(
+    Object.entries(input.annotations ?? {}).filter(([key]) => key.trim().length > 0)
+  ) as Record<string, string>
+  if (description) annotations.description = description
+  else delete annotations.description
 
   const metadata: {
     name: string
+    labels?: Record<string, string>
     annotations?: Record<string, string>
   } = { name }
 
-  if (description) {
-    metadata.annotations = {
-      "description": description,
-    }
-  }
+  if (Object.keys(labels).length > 0) metadata.labels = labels
+  if (Object.keys(annotations).length > 0) metadata.annotations = annotations
 
   const requestBody = {
     apiVersion: "v1",
@@ -118,6 +128,14 @@ export async function createNamespace(input: CreateNamespaceInput): Promise<void
 export async function updateNamespace(input: UpdateNamespaceInput): Promise<void> {
   const name = normalizeKubernetesNamespaceName(input.name)
   const description = input.description?.trim() ?? ""
+  const labels = Object.fromEntries(
+    Object.entries(input.labels ?? {}).filter(([key]) => key.trim().length > 0)
+  ) as Record<string, string>
+  const annotations = Object.fromEntries(
+    Object.entries(input.annotations ?? {}).filter(([key]) => key.trim().length > 0)
+  ) as Record<string, string>
+  if (description) annotations.description = description
+  else delete annotations.description
 
   const { payload } = await fetchResourceByName<unknown>("core", "v1", "namespaces", name)
   const existing =
@@ -128,20 +146,6 @@ export async function updateNamespace(input: UpdateNamespaceInput): Promise<void
     typeof existing.metadata === "object" && existing.metadata !== null && !Array.isArray(existing.metadata)
       ? (existing.metadata as Record<string, unknown>)
       : {}
-  const existingAnnotations =
-    typeof existingMetadata.annotations === "object" &&
-    existingMetadata.annotations !== null &&
-    !Array.isArray(existingMetadata.annotations)
-      ? (existingMetadata.annotations as Record<string, unknown>)
-      : {}
-
-  const mergedAnnotations: Record<string, unknown> = description
-    ? {
-        ...existingAnnotations,
-        description,
-      }
-    : (({ description: _description, ...rest }) => rest)(existingAnnotations)
-
   const requestBody = {
     apiVersion: "v1",
     kind: "Namespace",
@@ -151,10 +155,8 @@ export async function updateNamespace(input: UpdateNamespaceInput): Promise<void
         typeof existingMetadata.resourceVersion === "string"
           ? existingMetadata.resourceVersion
           : undefined,
-      ...(Object.keys(mergedAnnotations).length > 0 ? { annotations: mergedAnnotations } : {}),
-      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
-        ? { labels: existingMetadata.labels }
-        : {}),
+      ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
+      ...(Object.keys(labels).length > 0 ? { labels } : {}),
     },
   }
 

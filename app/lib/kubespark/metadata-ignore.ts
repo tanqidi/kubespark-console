@@ -16,6 +16,7 @@ export const AUTO_LABEL_KEYS = new Set<string>([
   "batch.kubernetes.io/job-name",
   "controller-uid",
   "job-name",
+  "kubernetes.io/metadata.name"
 ])
 
 export function isAutoMetadataAnnotationKey(key: string): boolean {
