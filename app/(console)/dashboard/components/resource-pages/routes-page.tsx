@@ -87,6 +87,11 @@ type ServiceOption = { name: string; ports: number[] }
 type PathType = IngressPathType
 type RouteProtocol = "HTTP" | "HTTPS"
 type MetadataEntry = { key: string; value: string }
+type RuleRowErrors = {
+  path?: string
+  service?: string
+  servicePort?: string
+}
 type RouteRuleItem = {
   host: string
   path: string
@@ -200,6 +205,18 @@ function normalizeMetadataEntries(entries: MetadataEntry[]): MetadataEntry[] {
     key: item.key.trim(),
     value: item.value.trim(),
   }))
+}
+
+function isDescriptionAnnotationKey(key: string): boolean {
+  return key.trim().toLowerCase() === "description"
+}
+
+function hasUserProvidedMetadata(labels: MetadataEntry[], annotations: MetadataEntry[]): boolean {
+  const hasLabel = labels.some((item) => item.key.trim().length > 0)
+  const hasAnnotation = annotations.some(
+    (item) => item.key.trim().length > 0 && !isDescriptionAnnotationKey(item.key)
+  )
+  return hasLabel || hasAnnotation
 }
 
 function metadataEntriesToRecord(entries: MetadataEntry[]): Record<string, string> {
@@ -405,8 +422,7 @@ function parseRouteYamlText(yamlText: string): {
     annotations: metadataRecordToEntries(
       Object.fromEntries(
         Object.entries(annotations).filter(([, value]) => typeof value === "string")
-      ) as Record<string, string>,
-      { excludeKeys: ["description"] }
+      ) as Record<string, string>
     ),
     rules: parsedRules,
     host: firstRule.host,
@@ -490,7 +506,7 @@ export function RoutesPageClient() {
   const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([
     { key: "", value: "" },
   ])
-  const [ruleRowErrorMap, setRuleRowErrorMap] = React.useState<Record<number, string>>({})
+  const [ruleRowErrorMap, setRuleRowErrorMap] = React.useState<Record<number, RuleRowErrors>>({})
   const [ruleSaveAttempted, setRuleSaveAttempted] = React.useState(false)
   const [draftHostKey, setDraftHostKey] = React.useState<string | null>(null)
   const createServicePortRef = React.useRef("")
@@ -564,11 +580,10 @@ export function RoutesPageClient() {
     })
     return Array.from(groups.entries()).map(([hostKey, group]) => ({ hostKey, ...group }))
   }, [createRules])
-  const hasMetadataConfigured = React.useMemo(() => {
-    const hasLabel = labelEntries.some((item) => item.key.trim().length > 0)
-    const hasAnnotation = annotationEntries.some((item) => item.key.trim().length > 0)
-    return hasLabel || hasAnnotation
-  }, [annotationEntries, labelEntries])
+  const hasMetadataConfigured = React.useMemo(
+    () => hasUserProvidedMetadata(labelEntries, annotationEntries),
+    [annotationEntries, labelEntries]
+  )
   const canNavigateCreateSteps = !creating && !(createStep === "rule" && createRuleViewMode === "edit")
 
   const resetCreateForm = React.useCallback(() => {
@@ -718,6 +733,27 @@ export function RoutesPageClient() {
       if (createTlsSecretError) setCreateTlsSecretError(null)
     }
   }, [createProtocol, createTlsSecretError, createTlsSecretName])
+
+  React.useEffect(() => {
+    const description = createDescription.trim()
+    setAnnotationEntries((current) => {
+      const descriptionIndex = current.findIndex((item) => isDescriptionAnnotationKey(item.key))
+      if (!description) {
+        if (descriptionIndex < 0) return current
+        if ((current[descriptionIndex]?.value ?? "") === "") return current
+        return current.map((item, index) =>
+          index === descriptionIndex ? { ...item, value: "" } : item
+        )
+      }
+      if (descriptionIndex < 0) {
+        return [...current, { key: "description", value: description }]
+      }
+      if ((current[descriptionIndex]?.value ?? "") === description) return current
+      return current.map((item, index) =>
+        index === descriptionIndex ? { ...item, value: description } : item
+      )
+    })
+  }, [createDescription])
 
   React.useEffect(() => {
     if (createStep !== "rule" || createRuleViewMode !== "edit") return
@@ -871,23 +907,25 @@ export function RoutesPageClient() {
       return false
     }
 
-    const rowErrors: Record<number, string> = {}
+    const rowErrors: Record<number, RuleRowErrors> = {}
     for (let i = 0; i < targetIndexes.length; i += 1) {
       const index = targetIndexes[i] ?? 0
       const rule = createRules[index]
       if (!rule) continue
+      const nextErrors: RuleRowErrors = {}
       const pathError = validatePath(rule.path)
       if (pathError) {
-        rowErrors[index] = pathError
-        continue
+        nextErrors.path = pathError
       }
       if (!rule.serviceName.trim()) {
-        rowErrors[index] = "请选择服务"
-        continue
+        nextErrors.service = "请选择服务"
       }
       const portError = validateServicePortText(rule.servicePort)
       if (portError) {
-        rowErrors[index] = portError
+        nextErrors.servicePort = portError
+      }
+      if (Object.keys(nextErrors).length > 0) {
+        rowErrors[index] = nextErrors
       }
     }
     const hostPathSet = new Map<string, number>()
@@ -898,8 +936,14 @@ export function RoutesPageClient() {
       const pathKey = rule.path.trim()
       const firstIndex = hostPathSet.get(pathKey)
       if (firstIndex !== undefined) {
-        rowErrors[firstIndex] = "路径重复"
-        rowErrors[index] = "路径重复"
+        rowErrors[firstIndex] = {
+          ...(rowErrors[firstIndex] ?? {}),
+          path: "路径重复",
+        }
+        rowErrors[index] = {
+          ...(rowErrors[index] ?? {}),
+          path: "路径重复",
+        }
       } else {
         hostPathSet.set(pathKey, index)
       }
@@ -1036,10 +1080,7 @@ export function RoutesPageClient() {
         setCreateDescription(draft.description)
         setLabelEntries(draft.labels)
         setAnnotationEntries(draft.annotations)
-        setMetadataEnabled(
-          draft.labels.some((item) => item.key.trim().length > 0) ||
-          draft.annotations.some((item) => item.key.trim().length > 0)
-        )
+        setMetadataEnabled(hasUserProvidedMetadata(draft.labels, draft.annotations))
         setCreateHost(draft.host)
         setCreatePath(draft.path || "/")
         setCreateServiceName(draft.serviceName)
@@ -1261,7 +1302,7 @@ export function RoutesPageClient() {
   const removeRuleItem = React.useCallback((targetIndex: number) => {
     setCreateRules((current) => current.filter((_, index) => index !== targetIndex))
     setRuleRowErrorMap((current) => {
-      const next: Record<number, string> = {}
+      const next: Record<number, RuleRowErrors> = {}
       Object.entries(current).forEach(([key, message]) => {
         const index = Number(key)
         if (!Number.isInteger(index)) return
@@ -1326,11 +1367,13 @@ export function RoutesPageClient() {
           metadataRecordToEntries(draft.labels)
         )
         setAnnotationEntries(
-          metadataRecordToEntries(draft.annotations, { excludeKeys: ["description"] })
+          metadataRecordToEntries(draft.annotations)
         )
         setMetadataEnabled(
-          Object.keys(draft.labels).length > 0 ||
-          Object.entries(draft.annotations).some(([key]) => key !== "description")
+          hasUserProvidedMetadata(
+            metadataRecordToEntries(draft.labels),
+            metadataRecordToEntries(draft.annotations)
+          )
         )
         setCreateHost(draft.host)
         setCreatePath(draft.path || "/")
@@ -1471,7 +1514,6 @@ export function RoutesPageClient() {
 
     void loadRows(false)
     const timer = window.setInterval(() => {
-      if (createDialogOpen) return
       void loadRows(true)
     }, 3000)
 
@@ -1479,7 +1521,7 @@ export function RoutesPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [createDialogOpen])
+  }, [])
 
   const listNamespaceOptions = React.useMemo(
     () =>
@@ -1501,54 +1543,31 @@ export function RoutesPageClient() {
     )
   }
 
-  const filteredRows = React.useMemo(() => {
-    const nsQuery = namespaceQuery.trim().toLowerCase()
-    const nmQuery = nameQuery.trim().toLowerCase()
-    return rows.filter((row) => {
-      if (nsQuery && row.namespace.toLowerCase() !== nsQuery) return false
-      if (nmQuery && !row.name.toLowerCase().includes(nmQuery)) return false
-      return true
-    })
-  }, [nameQuery, namespaceQuery, rows])
+  const nsQuery = namespaceQuery.trim().toLowerCase()
+  const nmQuery = nameQuery.trim().toLowerCase()
+  const filteredRows = rows.filter((row) => {
+    if (nsQuery && row.namespace.toLowerCase() !== nsQuery) return false
+    if (nmQuery && !row.name.toLowerCase().includes(nmQuery)) return false
+    return true
+  })
 
-  const routeFilters = React.useMemo(
-    () => (
-      <>
-        <FilterCombobox
-          options={listNamespaceOptions}
-          value={namespaceQuery}
-          onValueChange={setNamespaceQuery}
-          placeholder={"命名空间"}
-          emptyText={"未找到命名空间"}
-          className="w-40"
-        />
-        <Input
-          value={nameQuery}
-          onChange={(event) => setNameQuery(event.target.value)}
-          placeholder={"名称"}
-          className="h-9 w-40"
-        />
-      </>
-    ),
-    [listNamespaceOptions, nameQuery, namespaceQuery]
-  )
-
-  const openCreateDialog = React.useCallback(() => {
-    resetCreateForm()
-    setCreateDialogOpen(true)
-  }, [resetCreateForm])
-
-  const tableNode = React.useMemo(
-    () => (
-      <DataTable
-        data={filteredRows}
-        columns={columns}
-        toolbarEnd={routeFilters}
-        onCreate={openCreateDialog}
-        onDeleteSelectedRows={handleDeleteSelectedRows}
+  const routeFilters = (
+    <>
+      <FilterCombobox
+        options={listNamespaceOptions}
+        value={namespaceQuery}
+        onValueChange={setNamespaceQuery}
+        placeholder={"命名空间"}
+        emptyText={"未找到命名空间"}
+        className="w-40"
       />
-    ),
-    [columns, filteredRows, handleDeleteSelectedRows, openCreateDialog, routeFilters]
+      <Input
+        value={nameQuery}
+        onChange={(event) => setNameQuery(event.target.value)}
+        placeholder={"名称"}
+        className="h-9 w-40"
+      />
+    </>
   )
 
   return (
@@ -1606,10 +1625,7 @@ export function RoutesPageClient() {
                         setCreateDescription(parsed.description)
                         setLabelEntries(parsed.labels)
                         setAnnotationEntries(parsed.annotations)
-                        setMetadataEnabled(
-                          parsed.labels.some((item) => item.key.trim().length > 0) ||
-                          parsed.annotations.some((item) => item.key.trim().length > 0)
-                        )
+                        setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
                         setCreateHost(parsed.host)
                         setCreatePath(parsed.path || "/")
                         setCreateServiceName(parsed.serviceName)
@@ -1904,9 +1920,12 @@ export function RoutesPageClient() {
                               {currentHostPathRuleIndexes.map((ruleIndex) => {
                                 const rule = createRules[ruleIndex]
                                 if (!rule) return null
-                                const rowErrorMessage = duplicatePathRuleIndexSet.has(ruleIndex)
+                                const rowError = ruleRowErrorMap[ruleIndex]
+                                const pathErrorMessage = duplicatePathRuleIndexSet.has(ruleIndex)
                                   ? "路径重复"
-                                  : (ruleRowErrorMap[ruleIndex] ?? null)
+                                  : (rowError?.path ?? null)
+                                const serviceErrorMessage = rowError?.service ?? null
+                                const servicePortErrorMessage = rowError?.servicePort ?? null
                                 return (
                                 <div
                                   key={`route-path-row-${ruleIndex}`}
@@ -1926,10 +1945,15 @@ export function RoutesPageClient() {
                                               itemIndex === ruleIndex ? { ...item, path: nextPath } : item
                                             )
                                           )
-                                          if (ruleRowErrorMap[ruleIndex]) {
+                                          if (ruleRowErrorMap[ruleIndex]?.path) {
                                             setRuleRowErrorMap((current) => {
                                               const next = { ...current }
-                                              delete next[ruleIndex]
+                                              const prev = next[ruleIndex]
+                                              if (!prev) return next
+                                              const rest = { ...prev }
+                                              delete rest.path
+                                              if (Object.keys(rest).length > 0) next[ruleIndex] = rest
+                                              else delete next[ruleIndex]
                                               return next
                                             })
                                           }
@@ -1938,105 +1962,135 @@ export function RoutesPageClient() {
                                         autoComplete="off"
                                         aria-invalid={
                                           duplicatePathRuleIndexSet.has(ruleIndex) ||
-                                          Boolean(ruleRowErrorMap[ruleIndex])
+                                          Boolean(ruleRowErrorMap[ruleIndex]?.path)
                                         }
                                         disabled={creating}
                                       />
                                     </InputGroup>
-                                    {rowErrorMessage ? (
-                                      <FieldError>{rowErrorMessage}</FieldError>
+                                    {pathErrorMessage ? (
+                                      <FieldError>{pathErrorMessage}</FieldError>
                                     ) : null}
                                   </div>
-                                  <FilterCombobox
-                                    options={serviceOptions.map((option) => ({ id: option.name, name: option.name }))}
-                                    value={rule.serviceName}
-                                    onValueChange={(value) => {
-                                      const next = serviceOptions.find((item) => item.name === value)
-                                      const nextPort =
-                                        next?.ports.length === 1 ? String(next.ports[0]) : ""
-                                      setCreateRules((current) =>
-                                        current.map((item, itemIndex) =>
-                                          itemIndex === ruleIndex
-                                            ? { ...item, serviceName: value, servicePort: nextPort }
-                                            : item
+                                  <div className="flex flex-col gap-1">
+                                    <FilterCombobox
+                                      options={serviceOptions.map((option) => ({ id: option.name, name: option.name }))}
+                                      value={rule.serviceName}
+                                      onValueChange={(value) => {
+                                        const next = serviceOptions.find((item) => item.name === value)
+                                        const nextPort =
+                                          next?.ports.length === 1 ? String(next.ports[0]) : ""
+                                        setCreateRules((current) =>
+                                          current.map((item, itemIndex) =>
+                                            itemIndex === ruleIndex
+                                              ? { ...item, serviceName: value, servicePort: nextPort }
+                                              : item
+                                          )
                                         )
-                                      )
-                                      if (ruleRowErrorMap[ruleIndex]) {
-                                        setRuleRowErrorMap((current) => {
-                                          const nextMap = { ...current }
-                                          delete nextMap[ruleIndex]
-                                          return nextMap
-                                        })
-                                      }
-                                    }}
-                                    placeholder="服务"
-                                    emptyText="当前项目暂无可选服务"
-                                    className="w-full"
-                                    disabled={creating}
-                                    contentContainer={createDialogPopupLayerRef}
-                                  />
-                                  <Combobox
-                                    items={
-                                      (serviceOptions.find((item) => item.name === rule.serviceName)?.ports ?? []).map(
-                                        (port) => `${port}`
-                                      )
-                                    }
-                                    value={rule.servicePort.trim() ? rule.servicePort : null}
-                                    inputValue={rule.servicePort}
-                                    onInputValueChange={(value) => {
-                                      const nextPort = normalizeServicePortInput(value ?? "")
-                                      setCreateRules((current) =>
-                                        current.map((item, itemIndex) =>
-                                          itemIndex === ruleIndex ? { ...item, servicePort: nextPort } : item
-                                        )
-                                      )
-                                      if (ruleRowErrorMap[ruleIndex]) {
-                                        setRuleRowErrorMap((current) => {
-                                          const nextMap = { ...current }
-                                          delete nextMap[ruleIndex]
-                                          return nextMap
-                                        })
-                                      }
-                                    }}
-                                    onValueChange={(item) => {
-                                      const nextPort = normalizeServicePortInput(item ?? "")
-                                      setCreateRules((current) =>
-                                        current.map((value, itemIndex) =>
-                                          itemIndex === ruleIndex ? { ...value, servicePort: nextPort } : value
-                                        )
-                                      )
-                                      if (ruleRowErrorMap[ruleIndex]) {
-                                        setRuleRowErrorMap((current) => {
-                                          const nextMap = { ...current }
-                                          delete nextMap[ruleIndex]
-                                          return nextMap
-                                        })
-                                      }
-                                    }}
-                                    disabled={creating}
-                                  >
-                                    <ComboboxInput
-                                      placeholder="端口"
+                                        if (ruleRowErrorMap[ruleIndex]?.service || ruleRowErrorMap[ruleIndex]?.servicePort) {
+                                          setRuleRowErrorMap((current) => {
+                                            const nextMap = { ...current }
+                                            const prev = nextMap[ruleIndex]
+                                            if (!prev) return nextMap
+                                            const rest = { ...prev }
+                                            delete rest.service
+                                            delete rest.servicePort
+                                            if (Object.keys(rest).length > 0) nextMap[ruleIndex] = rest
+                                            else delete nextMap[ruleIndex]
+                                            return nextMap
+                                          })
+                                        }
+                                      }}
+                                      placeholder="服务"
+                                      emptyText="当前项目暂无可选服务"
                                       className="w-full"
-                                      inputMode="numeric"
-                                      pattern="[0-9]*"
-                                      maxLength={5}
+                                      ariaInvalid={Boolean(serviceErrorMessage)}
                                       disabled={creating}
+                                      contentContainer={createDialogPopupLayerRef}
                                     />
-                                    <ComboboxContent
-                                      container={createDialogPopupLayerRef}
-                                      className="pointer-events-auto"
+                                    {serviceErrorMessage ? (
+                                      <FieldError>{serviceErrorMessage}</FieldError>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <Combobox
+                                      items={Array.from(
+                                        new Set(
+                                          (serviceOptions.find((item) => item.name === rule.serviceName)?.ports ?? []).map(
+                                            (port) => `${port}`
+                                          )
+                                        )
+                                      )}
+                                      value={rule.servicePort.trim() ? rule.servicePort : null}
+                                      inputValue={rule.servicePort}
+                                      onInputValueChange={(value) => {
+                                        const nextPort = normalizeServicePortInput(value ?? "")
+                                        setCreateRules((current) =>
+                                          current.map((item, itemIndex) =>
+                                            itemIndex === ruleIndex ? { ...item, servicePort: nextPort } : item
+                                          )
+                                        )
+                                        if (ruleRowErrorMap[ruleIndex]?.servicePort) {
+                                          setRuleRowErrorMap((current) => {
+                                            const nextMap = { ...current }
+                                            const prev = nextMap[ruleIndex]
+                                            if (!prev) return nextMap
+                                            const rest = { ...prev }
+                                            delete rest.servicePort
+                                            if (Object.keys(rest).length > 0) nextMap[ruleIndex] = rest
+                                            else delete nextMap[ruleIndex]
+                                            return nextMap
+                                          })
+                                        }
+                                      }}
+                                      onValueChange={(item) => {
+                                        const nextPort = normalizeServicePortInput(item ?? "")
+                                        setCreateRules((current) =>
+                                          current.map((value, itemIndex) =>
+                                            itemIndex === ruleIndex ? { ...value, servicePort: nextPort } : value
+                                          )
+                                        )
+                                        if (ruleRowErrorMap[ruleIndex]?.servicePort) {
+                                          setRuleRowErrorMap((current) => {
+                                            const nextMap = { ...current }
+                                            const prev = nextMap[ruleIndex]
+                                            if (!prev) return nextMap
+                                            const rest = { ...prev }
+                                            delete rest.servicePort
+                                            if (Object.keys(rest).length > 0) nextMap[ruleIndex] = rest
+                                            else delete nextMap[ruleIndex]
+                                            return nextMap
+                                          })
+                                        }
+                                      }}
+                                      disabled={creating}
                                     >
-                                      <ComboboxEmpty>未找到端口，可直接输入</ComboboxEmpty>
-                                      <ComboboxList>
-                                        {(item) => (
-                                          <ComboboxItem key={item} value={item}>
-                                            {item}
-                                          </ComboboxItem>
-                                        )}
-                                      </ComboboxList>
-                                    </ComboboxContent>
-                                  </Combobox>
+                                      <ComboboxInput
+                                        placeholder="端口"
+                                        className="w-full"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={5}
+                                        aria-invalid={Boolean(servicePortErrorMessage)}
+                                        disabled={creating}
+                                      />
+                                      <ComboboxContent
+                                        container={createDialogPopupLayerRef}
+                                        className="pointer-events-auto"
+                                      >
+                                        <ComboboxEmpty>未找到端口，可直接输入</ComboboxEmpty>
+                                        <ComboboxList>
+                                          {(item) => (
+                                            <ComboboxItem key={item} value={item}>
+                                              {item}
+                                            </ComboboxItem>
+                                          )}
+                                        </ComboboxList>
+                                      </ComboboxContent>
+                                    </Combobox>
+                                    {servicePortErrorMessage ? (
+                                      <FieldError>{servicePortErrorMessage}</FieldError>
+                                    ) : null}
+                                  </div>
                                   <Button
                                     type="button"
                                     size="sm"
@@ -2080,6 +2134,15 @@ export function RoutesPageClient() {
                         description="统一管理路由的标签与注解信息。"
                         onCheckedChange={(checked) => {
                           if (creating) return
+                          if (!checked) {
+                            const description = createDescription.trim()
+                            setLabelEntries([{ key: "", value: "" }])
+                            setAnnotationEntries(
+                              description
+                                ? [{ key: "description", value: description }]
+                                : [{ key: "", value: "" }]
+                            )
+                          }
                           setMetadataEnabled(checked)
                         }}
                       >
@@ -2186,6 +2249,9 @@ export function RoutesPageClient() {
                                             itemIndex === index ? { ...item, key: nextValue } : item
                                           )
                                         )
+                                        if (isDescriptionAnnotationKey(nextValue)) {
+                                          setCreateDescription(entry.value)
+                                        }
                                       }}
                                       autoComplete="off"
                                       disabled={creating}
@@ -2205,6 +2271,9 @@ export function RoutesPageClient() {
                                             itemIndex === index ? { ...item, value: nextValue } : item
                                           )
                                         )
+                                        if (isDescriptionAnnotationKey(entry.key)) {
+                                          setCreateDescription(nextValue)
+                                        }
                                       }}
                                       autoComplete="off"
                                       disabled={creating}
@@ -2310,7 +2379,16 @@ export function RoutesPageClient() {
         deleting={deleting}
         onConfirm={handleConfirmDelete}
       />
-      {tableNode}
+      <DataTable
+        data={filteredRows}
+        columns={columns}
+        toolbarEnd={routeFilters}
+        onCreate={() => {
+          resetCreateForm()
+          setCreateDialogOpen(true)
+        }}
+        onDeleteSelectedRows={handleDeleteSelectedRows}
+      />
     </>
   )
 }
