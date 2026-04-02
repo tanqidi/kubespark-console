@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import * as React from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -54,10 +54,7 @@ type DataTableProps<TData> = {
   toolbarEnd?: React.ReactNode
   onCreate?: () => void
   onDeleteSelectedRows?: (rows: TData[]) => void | Promise<void>
-  columnVisibilityStorageKey?: string | false
 }
-
-const COLUMN_VISIBILITY_STORAGE_PREFIX = "kubespark:table-columns:v1:"
 
 function DraggableRow<TData>({
   row,
@@ -114,10 +111,8 @@ export function DataTable<TData extends Record<string, unknown>>({
   toolbarEnd,
   onCreate,
   onDeleteSelectedRows,
-  columnVisibilityStorageKey,
 }: DataTableProps<TData>) {
   const router = useRouter()
-  const pathname = usePathname()
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -130,7 +125,6 @@ export function DataTable<TData extends Record<string, unknown>>({
     pageIndex: 0,
     pageSize: 10,
   })
-  const hasRestoredColumnVisibilityRef = React.useRef(false)
 
   const resolveRowId = React.useCallback(
     (row: TData, index: number) => {
@@ -178,28 +172,6 @@ export function DataTable<TData extends Record<string, unknown>>({
     return firstAccessorColumn?.accessorKey ?? null
   }, [columns])
 
-  const resolvedColumnVisibilityStorageKey = React.useMemo(() => {
-    if (columnVisibilityStorageKey === false) return null
-    if (typeof columnVisibilityStorageKey === "string" && columnVisibilityStorageKey.trim()) {
-      return `${COLUMN_VISIBILITY_STORAGE_PREFIX}${columnVisibilityStorageKey.trim()}`
-    }
-
-    const columnIds = columns
-      .map((column) => {
-        const id = (column as { id?: unknown }).id
-        if (typeof id === "string" && id.length > 0) return id
-        const accessorKey = (column as { accessorKey?: unknown }).accessorKey
-        if (typeof accessorKey === "string" && accessorKey.length > 0) return accessorKey
-        return ""
-      })
-      .filter((id) => id.length > 0)
-      .sort((a, b) => a.localeCompare(b))
-      .join("|")
-
-    if (!columnIds) return null
-    return `${COLUMN_VISIBILITY_STORAGE_PREFIX}${pathname || "unknown"}:${columnIds}`
-  }, [columnVisibilityStorageKey, columns, pathname])
-
   const table = useReactTable({
     data,
     columns,
@@ -225,48 +197,6 @@ export function DataTable<TData extends Record<string, unknown>>({
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
-
-  React.useEffect(() => {
-    hasRestoredColumnVisibilityRef.current = false
-    if (!resolvedColumnVisibilityStorageKey || typeof window === "undefined") return
-
-    try {
-      const raw = window.localStorage.getItem(resolvedColumnVisibilityStorageKey)
-      if (!raw) {
-        hasRestoredColumnVisibilityRef.current = true
-        return
-      }
-      const parsed = JSON.parse(raw) as unknown
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        hasRestoredColumnVisibilityRef.current = true
-        return
-      }
-
-      const nextVisibility: VisibilityState = {}
-      for (const [key, value] of Object.entries(parsed)) {
-        if (typeof value === "boolean") nextVisibility[key] = value
-      }
-      setColumnVisibility(nextVisibility)
-    } catch (error) {
-      console.error("[DataTable] restore column visibility failed", error)
-    } finally {
-      hasRestoredColumnVisibilityRef.current = true
-    }
-  }, [resolvedColumnVisibilityStorageKey])
-
-  React.useEffect(() => {
-    if (!resolvedColumnVisibilityStorageKey || typeof window === "undefined") return
-    if (!hasRestoredColumnVisibilityRef.current) return
-
-    try {
-      window.localStorage.setItem(
-        resolvedColumnVisibilityStorageKey,
-        JSON.stringify(columnVisibility)
-      )
-    } catch (error) {
-      console.error("[DataTable] persist column visibility failed", error)
-    }
-  }, [columnVisibility, resolvedColumnVisibilityStorageKey])
 
   const handleDeleteSelected = React.useCallback(() => {
     const selectedRows = table
