@@ -252,15 +252,22 @@ export async function updatePod(input: UpdatePodInput): Promise<void> {
   })
   const existing = asObject(payload)
   const existingMetadata = asObject(existing.metadata)
-  const existingAnnotations = asObject(existingMetadata.annotations)
-  const mergedAnnotationsBase = {
-    ...existingAnnotations,
-    ...buildDescriptionPatch(input.description).annotations,
+  const annotations = Object.fromEntries(
+    Object.entries(input.annotations ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && value.trim().length >= 0
+    )
+  ) as Record<string, string>
+  const nextDescription = buildDescriptionPatch(input.description).annotations.description
+  if (typeof nextDescription === "string" && nextDescription.trim()) {
+    annotations.description = nextDescription.trim()
+  } else {
+    delete annotations.description
   }
-  const mergedAnnotations =
-    mergedAnnotationsBase.description === null
-      ? (({ description: _description, ...rest }) => rest)(mergedAnnotationsBase)
-      : mergedAnnotationsBase
+  const labels = Object.fromEntries(
+    Object.entries(input.labels ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && value.trim().length >= 0
+    )
+  ) as Record<string, string>
 
   let spec: Record<string, unknown> | null = null
   if (input.podSpec && typeof input.podSpec === "object" && !Array.isArray(input.podSpec)) {
@@ -325,10 +332,8 @@ export async function updatePod(input: UpdatePodInput): Promise<void> {
         typeof existingMetadata.resourceVersion === "string"
           ? existingMetadata.resourceVersion
           : undefined,
-      ...(Object.keys(mergedAnnotations).length > 0 ? { annotations: mergedAnnotations } : {}),
-      ...(typeof existingMetadata.labels === "object" && existingMetadata.labels !== null
-        ? { labels: existingMetadata.labels }
-        : {}),
+      ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
+      ...(Object.keys(labels).length > 0 ? { labels } : {}),
     },
     spec,
   }

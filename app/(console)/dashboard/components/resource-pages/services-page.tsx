@@ -127,6 +127,12 @@ export function ServicesPageClient() {
           !Array.isArray(metadata.annotations)
             ? (metadata.annotations as Record<string, unknown>)
             : {}
+        const labels =
+          typeof metadata.labels === "object" &&
+          metadata.labels !== null &&
+          !Array.isArray(metadata.labels)
+            ? (metadata.labels as Record<string, unknown>)
+            : {}
         const spec =
           typeof resource.spec === "object" && resource.spec !== null && !Array.isArray(resource.spec)
             ? (resource.spec as Record<string, unknown>)
@@ -180,6 +186,12 @@ export function ServicesPageClient() {
           name: typeof metadata.name === "string" ? metadata.name : row.name,
           namespace: typeof metadata.namespace === "string" ? metadata.namespace : row.namespace,
           description: typeof annotations.description === "string" ? annotations.description : "",
+          labels: Object.fromEntries(
+            Object.entries(labels).filter(([, value]) => typeof value === "string")
+          ) as Record<string, string>,
+          annotations: Object.fromEntries(
+            Object.entries(annotations).filter(([, value]) => typeof value === "string")
+          ) as Record<string, string>,
           internalAccessMode: spec.clusterIP === "None" ? "headless" : "virtual-ip",
           selectors: Object.entries(selector).map(([key, value]) => ({
             key,

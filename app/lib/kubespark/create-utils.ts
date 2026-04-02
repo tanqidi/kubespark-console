@@ -5,6 +5,7 @@ export type JsonObject = Record<string, unknown>
 export type ResourceMetadata = {
   name: string
   namespace: string
+  labels?: Record<string, string>
   annotations?: Record<string, string>
 }
 
@@ -12,6 +13,8 @@ export type BaseCreateInput = {
   name: string
   namespace: string
   description?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
 }
 
 export type ExistenceCheckInput = {
@@ -48,17 +51,24 @@ export function buildMetadata(input: BaseCreateInput): ResourceMetadata {
   }
 
   const description = input.description?.trim() ?? ""
+  const labels = Object.fromEntries(
+    Object.entries(input.labels ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && value.trim().length >= 0
+    )
+  ) as Record<string, string>
+  const annotations = Object.fromEntries(
+    Object.entries(input.annotations ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && value.trim().length >= 0
+    )
+  ) as Record<string, string>
+  if (description) annotations.description = description
+  else delete annotations.description
 
   return {
     name,
     namespace,
-    ...(description
-      ? {
-          annotations: {
-            description,
-          },
-        }
-      : {}),
+    ...(Object.keys(labels).length > 0 ? { labels } : {}),
+    ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
   }
 }
 

@@ -9,6 +9,13 @@ import { parse, stringify } from "yaml"
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
+import {
+  ResourceMetadataEditor,
+  hasUserProvidedMetadata,
+  metadataEntriesToRecord,
+  metadataRecordToEntries,
+  type MetadataEntry,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
 // import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -148,6 +155,8 @@ function buildPvcYamlText(params: {
   name: string
   namespace: string
   description: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
   accessMode: AccessMode
   storageRequest: string
   storageUnit: string
@@ -156,6 +165,10 @@ function buildPvcYamlText(params: {
   volumeName: string
 }): string {
   const requestStorage = `${params.storageRequest.trim()}${params.storageUnit}`
+  const labels = metadataEntriesToRecord(params.labels)
+  const annotations = metadataEntriesToRecord(params.annotations)
+  if (params.description.trim()) annotations.description = params.description.trim()
+  else delete annotations.description
   return stringify(
     {
       apiVersion: "v1",
@@ -163,9 +176,8 @@ function buildPvcYamlText(params: {
       metadata: {
         ...(params.name.trim() ? { name: params.name.trim() } : {}),
         ...(params.namespace.trim() ? { namespace: params.namespace.trim() } : {}),
-        ...(params.description.trim()
-          ? { annotations: { description: params.description.trim() } }
-          : {}),
+        ...(Object.keys(labels).length > 0 ? { labels } : {}),
+        ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
       },
       spec: {
         accessModes: [params.accessMode],
@@ -201,6 +213,8 @@ function parsePvcYamlText(yamlText: string): {
   name: string
   namespace: string
   description: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
   accessMode: AccessMode
   storageRequest: string
   storageUnit: string
@@ -231,6 +245,12 @@ function parsePvcYamlText(yamlText: string): {
     metadata.annotations !== null &&
     !Array.isArray(metadata.annotations)
       ? (metadata.annotations as Record<string, unknown>)
+      : {}
+  const labels =
+    typeof metadata.labels === "object" &&
+    metadata.labels !== null &&
+    !Array.isArray(metadata.labels)
+      ? (metadata.labels as Record<string, unknown>)
       : {}
   const spec =
     typeof root.spec === "object" && root.spec !== null && !Array.isArray(root.spec)
@@ -267,6 +287,16 @@ function parsePvcYamlText(yamlText: string): {
     name: typeof metadata.name === "string" ? metadata.name : "",
     namespace: typeof metadata.namespace === "string" ? metadata.namespace : "",
     description: typeof annotations.description === "string" ? annotations.description : "",
+    labels: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(labels).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
+    annotations: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(annotations).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
     accessMode,
     storageRequest: parsedStorage.value,
     storageUnit: parsedStorage.unit || "Gi",
@@ -325,6 +355,9 @@ export function VolumesPageClient() {
   const [createStorageClassName, setCreateStorageClassName] = React.useState("")
   const [createVolumeMode, setCreateVolumeMode] = React.useState<VolumeMode>("Filesystem")
   const [createVolumeName, setCreateVolumeName] = React.useState("")
+  const [metadataEnabled, setMetadataEnabled] = React.useState(false)
+  const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
+  const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
   const [createNameError, setCreateNameError] = React.useState<string | null>(null)
   const [createNamespaceError, setCreateNamespaceError] = React.useState<string | null>(null)
   const [createStorageError, setCreateStorageError] = React.useState<string | null>(null)
@@ -487,6 +520,9 @@ export function VolumesPageClient() {
     setCreateStorageClassName("")
     setCreateVolumeMode("Filesystem")
     setCreateVolumeName("")
+    setMetadataEnabled(false)
+    setLabelEntries([{ key: "", value: "" }])
+    setAnnotationEntries([{ key: "", value: "" }])
     setCreateNameError(null)
     setCreateNamespaceError(null)
     setCreateStorageError(null)
@@ -556,6 +592,8 @@ export function VolumesPageClient() {
       name: createName,
       namespace: createNamespace,
       description: createDescription,
+      labels: labelEntries,
+      annotations: annotationEntries,
       accessMode: createAccessMode,
       storageRequest: createStorageRequest,
       storageUnit: createStorageUnit,
@@ -565,9 +603,11 @@ export function VolumesPageClient() {
     })
   }, [
     createAccessMode,
+    annotationEntries,
     createDescription,
     createName,
     createNamespace,
+    labelEntries,
     createStorageClassName,
     createStorageRequest,
     createStorageUnit,
@@ -649,6 +689,8 @@ export function VolumesPageClient() {
       name: createName,
       namespace: createNamespace,
       description: createDescription,
+      labels: labelEntries,
+      annotations: annotationEntries,
       accessMode: createAccessMode,
       storageRequest: createStorageRequest,
       storageUnit: createStorageUnit,
@@ -663,6 +705,9 @@ export function VolumesPageClient() {
         setCreateName(nextState.name)
         setCreateNamespace(nextState.namespace)
         setCreateDescription(nextState.description)
+        setLabelEntries(nextState.labels)
+        setAnnotationEntries(nextState.annotations)
+        setMetadataEnabled(hasUserProvidedMetadata(nextState.labels, nextState.annotations))
         setCreateAccessMode(nextState.accessMode)
         setCreateStorageRequest(normalizeStorageRequest(nextState.storageRequest))
         setCreateStorageUnit(nextState.storageUnit)
@@ -728,6 +773,8 @@ export function VolumesPageClient() {
         name: nextState.name.trim().toLowerCase(),
         namespace: nextState.namespace.trim(),
         description: nextState.description.trim(),
+        labels: metadataEntriesToRecord(nextState.labels),
+        annotations: metadataEntriesToRecord(nextState.annotations),
         accessMode: nextState.accessMode,
         storageRequest: `${nextState.storageRequest.trim()}${nextState.storageUnit}`,
         storageClassName: nextState.storageClassName.trim(),
@@ -752,9 +799,11 @@ export function VolumesPageClient() {
     }
   }, [
     createAccessMode,
+    annotationEntries,
     createDescription,
     createName,
     createNamespace,
+    labelEntries,
     createStorageClassName,
     createStorageRequest,
     createStorageUnit,
@@ -995,6 +1044,9 @@ export function VolumesPageClient() {
                         setCreateName(parsed.name)
                         setCreateNamespace(parsed.namespace)
                         setCreateDescription(parsed.description)
+                        setLabelEntries(parsed.labels)
+                        setAnnotationEntries(parsed.annotations)
+                        setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
                         setCreateAccessMode(parsed.accessMode)
                         setCreateStorageRequest(normalizeStorageRequest(parsed.storageRequest))
                         setCreateStorageUnit(parsed.storageUnit)
@@ -1046,7 +1098,7 @@ export function VolumesPageClient() {
                     status:
                       createStep === "advanced"
                         ? "当前"
-                        : createVolumeMode !== "Filesystem" || createVolumeName.trim()
+                        : hasUserProvidedMetadata(labelEntries, annotationEntries)
                           ? "已设置"
                           : "未设置",
                     active: createStep === "advanced",
@@ -1254,8 +1306,23 @@ export function VolumesPageClient() {
                 <div>
                   <div className="mb-4">
                     <h3 className="text-[15px] font-semibold">高级设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">更多高级能力后续逐步开放，敬请期待。</p>
+                    <p className="mt-1 text-sm text-muted-foreground">补充标签与注解信息，便于检索、分类和后续治理。</p>
                   </div>
+                  <FieldGroup className="grid gap-6 md:grid-cols-2">
+                    <Field className="md:col-span-2">
+                      <ResourceMetadataEditor
+                        checked={metadataEnabled}
+                        onCheckedChange={setMetadataEnabled}
+                        labels={labelEntries}
+                        setLabels={setLabelEntries}
+                        annotations={annotationEntries}
+                        setAnnotations={setAnnotationEntries}
+                        description={createDescription}
+                        setDescription={setCreateDescription}
+                        disabled={creating}
+                      />
+                    </Field>
+                  </FieldGroup>
                 </div>
               )}
 

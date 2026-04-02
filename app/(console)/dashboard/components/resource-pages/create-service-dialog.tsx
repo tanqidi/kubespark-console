@@ -17,6 +17,13 @@ import { createRuntimeId } from "@/app/lib/kubespark/id"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {
+  ResourceMetadataEditor,
+  hasUserProvidedMetadata,
+  metadataEntriesToRecord,
+  metadataRecordToEntries,
+  type MetadataEntry,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
+import {
   WorkloadPickerDialog,
 } from "@/app/(console)/dashboard/components/resource-pages/workload-picker-dialog"
 import {
@@ -109,6 +116,8 @@ export type ServiceDialogInitialValues = {
   name: string
   namespace: string
   description?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
   internalAccessMode: InternalAccessMode
   selectors: Array<{ key: string; value: string }>
   ports: Array<{
@@ -127,6 +136,8 @@ type ServiceDialogSnapshot = {
   name: string
   namespace: string
   description: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
   internalAccessMode: InternalAccessMode
   selectorItems: SelectorItem[]
   portItems: PortItem[]
@@ -268,11 +279,14 @@ function replaceProtocolPrefixInName(
 
 function buildServiceManifest(snapshot: ServiceDialogSnapshot): JsonObject {
   const metadata: JsonObject = {}
-  const annotations: JsonObject = {}
+  const annotations = metadataEntriesToRecord(snapshot.annotations)
+  const labels = metadataEntriesToRecord(snapshot.labels)
 
   if (snapshot.name.trim()) metadata.name = snapshot.name.trim().toLowerCase()
   if (snapshot.namespace.trim()) metadata.namespace = snapshot.namespace.trim()
   if (snapshot.description.trim()) annotations.description = snapshot.description.trim()
+  else delete annotations.description
+  if (Object.keys(labels).length > 0) metadata.labels = labels
   if (Object.keys(annotations).length > 0) metadata.annotations = annotations
 
   const selector = Object.fromEntries(
@@ -354,6 +368,7 @@ function parseServiceYamlText(yamlText: string): ServiceDialogSnapshot {
 
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
+  const labels = asObject(metadata.labels)
   const spec = asObject(root.spec)
 
   const internalAccessMode: InternalAccessMode =
@@ -404,6 +419,16 @@ function parseServiceYamlText(yamlText: string): ServiceDialogSnapshot {
     name: asString(metadata.name),
     namespace: asString(metadata.namespace),
     description: asString(annotations.description),
+    labels: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(labels).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
+    annotations: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(annotations).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
     internalAccessMode,
     selectorItems,
     portItems,
@@ -593,6 +618,9 @@ export function CreateServiceDialog({
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [metadataEnabled, setMetadataEnabled] = React.useState(false)
+  const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
+  const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
   const [internalAccessMode, setInternalAccessMode] = React.useState<InternalAccessMode>("virtual-ip")
   const [selectorItems, setSelectorItems] = React.useState<SelectorItem[]>([])
   const [portItems, setPortItems] = React.useState<PortItem[]>([])
@@ -631,6 +659,9 @@ export function CreateServiceDialog({
       setName("")
       setNamespace("")
       setDescription("")
+      setMetadataEnabled(false)
+      setLabelEntries([{ key: "", value: "" }])
+      setAnnotationEntries([{ key: "", value: "" }])
       setInternalAccessMode("virtual-ip")
       setSelectorItems([])
       setPortItems([])
@@ -669,6 +700,11 @@ export function CreateServiceDialog({
     setName(initialValues.name)
     setNamespace(initialValues.namespace)
     setDescription(initialValues.description ?? "")
+    const initialLabelEntries = metadataRecordToEntries(initialValues.labels ?? {})
+    const initialAnnotationEntries = metadataRecordToEntries(initialValues.annotations ?? {})
+    setLabelEntries(initialLabelEntries)
+    setAnnotationEntries(initialAnnotationEntries)
+    setMetadataEnabled(hasUserProvidedMetadata(initialLabelEntries, initialAnnotationEntries))
     setInternalAccessMode(initialValues.internalAccessMode)
     setSelectorItems(
       initialValues.selectors.length > 0
@@ -738,6 +774,8 @@ export function CreateServiceDialog({
       name,
       namespace,
       description,
+      labels: labelEntries,
+      annotations: annotationEntries,
       internalAccessMode,
       selectorItems,
       portItems,
@@ -745,10 +783,12 @@ export function CreateServiceDialog({
       enableSessionAffinity,
     }),
     [
+      annotationEntries,
       description,
       enableNodePort,
       enableSessionAffinity,
       internalAccessMode,
+      labelEntries,
       name,
       namespace,
       portItems,
@@ -760,6 +800,9 @@ export function CreateServiceDialog({
     setName(snapshot.name)
     setNamespace(snapshot.namespace)
     setDescription(snapshot.description)
+    setLabelEntries(snapshot.labels)
+    setAnnotationEntries(snapshot.annotations)
+    setMetadataEnabled(hasUserProvidedMetadata(snapshot.labels, snapshot.annotations))
     setInternalAccessMode(snapshot.internalAccessMode)
     setSelectorItems(snapshot.selectorItems)
     setPortItems(snapshot.portItems)
@@ -955,12 +998,16 @@ export function CreateServiceDialog({
         useDraft
         ? {
             description: useDraft.description,
+            labels: useDraft.labels,
+            annotations: useDraft.annotations,
             internalAccessMode: useDraft.internalAccessMode,
             enableNodePort: useDraft.enableNodePort,
             enableSessionAffinity: useDraft.enableSessionAffinity,
           }
         : {
             description,
+            labels: labelEntries,
+            annotations: annotationEntries,
             internalAccessMode,
             enableNodePort,
             enableSessionAffinity,
@@ -970,6 +1017,8 @@ export function CreateServiceDialog({
         name: normalizedName,
         namespace: normalizedNamespace,
         description: source.description.trim(),
+        labels: metadataEntriesToRecord(source.labels),
+        annotations: metadataEntriesToRecord(source.annotations),
         internalAccessMode: source.internalAccessMode,
         enableNodePort: source.enableNodePort,
         enableSessionAffinity: source.enableSessionAffinity,
@@ -988,7 +1037,15 @@ export function CreateServiceDialog({
         await createService(payload)
       }
     },
-    [description, enableNodePort, enableSessionAffinity, internalAccessMode, isEditMode]
+    [
+      annotationEntries,
+      description,
+      enableNodePort,
+      enableSessionAffinity,
+      internalAccessMode,
+      isEditMode,
+      labelEntries,
+    ]
   )
 
   const handleCreateSubmit = React.useCallback(async () => {
@@ -1408,7 +1465,7 @@ export function CreateServiceDialog({
                   status:
                     activeStep === "advanced"
                       ? "当前"
-                      : enableNodePort || enableSessionAffinity
+                      : enableNodePort || enableSessionAffinity || hasUserProvidedMetadata(labelEntries, annotationEntries)
                         ? "已设置"
                         : "未设置",
                   active: activeStep === "advanced",
@@ -1771,6 +1828,17 @@ export function CreateServiceDialog({
                 </p>
               </div>
               <div className="flex flex-col gap-4">
+                <ResourceMetadataEditor
+                  checked={metadataEnabled}
+                  onCheckedChange={setMetadataEnabled}
+                  labels={labelEntries}
+                  setLabels={setLabelEntries}
+                  annotations={annotationEntries}
+                  setAnnotations={setAnnotationEntries}
+                  description={description}
+                  setDescription={setDescription}
+                  disabled={isBusy}
+                />
                 <Item
                   variant="outline"
                   size="sm"

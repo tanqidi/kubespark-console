@@ -9,6 +9,8 @@ export type CreatePersistentVolumeClaimInput = {
   name: string
   namespace: string
   description?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
   accessMode: AccessMode
   storageRequest: string
   storageClassName?: string
@@ -67,6 +69,7 @@ export async function createPersistentVolumeClaim(
   const metadata: {
     name: string
     namespace: string
+    labels?: Record<string, string>
     annotations?: Record<string, string>
   } = {
     name,
@@ -74,10 +77,23 @@ export async function createPersistentVolumeClaim(
   }
 
   const description = input.description?.trim() ?? ""
-  if (description) {
-    metadata.annotations = {
-      description,
-    }
+  const labels = Object.fromEntries(
+    Object.entries(input.labels ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && value.trim().length >= 0
+    )
+  ) as Record<string, string>
+  if (Object.keys(labels).length > 0) {
+    metadata.labels = labels
+  }
+  const annotations = Object.fromEntries(
+    Object.entries(input.annotations ?? {}).filter(
+      ([key, value]) => key.trim().length > 0 && value.trim().length >= 0
+    )
+  ) as Record<string, string>
+  if (description) annotations.description = description
+  else delete annotations.description
+  if (Object.keys(annotations).length > 0) {
+    metadata.annotations = annotations
   }
 
   const requestBody = {

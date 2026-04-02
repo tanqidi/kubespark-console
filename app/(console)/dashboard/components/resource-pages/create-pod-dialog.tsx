@@ -10,6 +10,13 @@ import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pag
 import { StorageVolumeList } from "@/app/(console)/dashboard/components/resource-pages/storage-volume-list"
 import { useContainerEditor } from "@/app/(console)/dashboard/components/resource-pages/use-container-editor"
 import {
+  ResourceMetadataEditor,
+  hasUserProvidedMetadata,
+  metadataEntriesToRecord,
+  metadataRecordToEntries,
+  type MetadataEntry,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
+import {
   asObject,
   asString,
   buildAutoPortName,
@@ -62,6 +69,8 @@ type PodDialogSnapshot = {
   name: string
   namespace: string
   description: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
   storageList?: Array<{
     volumeId?: string
     volumeKind?: "persistent" | "ephemeral" | "hostPath"
@@ -159,9 +168,15 @@ function buildYamlText(
       metadata: {
         ...(snapshot.name.trim() ? { name: snapshot.name.trim() } : {}),
         ...(snapshot.namespace.trim() ? { namespace: snapshot.namespace.trim() } : {}),
-        ...(snapshot.description.trim()
-          ? { annotations: { description: snapshot.description.trim() } }
+        ...(Object.keys(metadataEntriesToRecord(snapshot.labels)).length > 0
+          ? { labels: metadataEntriesToRecord(snapshot.labels) }
           : {}),
+        ...(() => {
+          const annotations = metadataEntriesToRecord(snapshot.annotations)
+          if (snapshot.description.trim()) annotations.description = snapshot.description.trim()
+          else delete annotations.description
+          return Object.keys(annotations).length > 0 ? { annotations } : {}
+        })(),
       },
       spec: podSpec,
     },
@@ -190,6 +205,7 @@ function parseYamlText(yamlText: string): {
 
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
+  const labels = asObject(metadata.labels)
   const fakeJobYaml = stringify({
     apiVersion: "batch/v1",
     kind: "Job",
@@ -199,6 +215,7 @@ function parseYamlText(yamlText: string): {
       ...(asString(annotations.description).trim()
         ? { annotations: { description: asString(annotations.description).trim() } }
         : {}),
+      ...(Object.keys(labels).length > 0 ? { labels } : {}),
     },
     spec: {
       template: {
@@ -244,6 +261,16 @@ function parseYamlText(yamlText: string): {
       name: asString(metadata.name),
       namespace: asString(metadata.namespace),
       description: asString(annotations.description),
+      labels: metadataRecordToEntries(
+        Object.fromEntries(
+          Object.entries(labels).filter(([, value]) => typeof value === "string")
+        ) as Record<string, string>
+      ),
+      annotations: metadataRecordToEntries(
+        Object.fromEntries(
+          Object.entries(annotations).filter(([, value]) => typeof value === "string")
+        ) as Record<string, string>
+      ),
       storageList: parsedJob.pod.storageList ?? [],
       configList: normalizedConfigList,
     },
@@ -261,6 +288,8 @@ type CreatePodDialogProps = {
     name: string
     namespace: string
     description: string
+    labels: Record<string, string>
+    annotations: Record<string, string>
     podSpec: Record<string, unknown>
   }) => Promise<void>
 }
@@ -278,6 +307,9 @@ export function CreatePodDialog({
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [metadataEnabled, setMetadataEnabled] = React.useState(false)
+  const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
+  const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
   const [nameError, setNameError] = React.useState<string | null>(null)
   const [namespaceError, setNamespaceError] = React.useState<string | null>(null)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
@@ -391,6 +423,9 @@ export function CreatePodDialog({
       setName("")
       setNamespace("")
       setDescription("")
+      setMetadataEnabled(false)
+      setLabelEntries([{ key: "", value: "" }])
+      setAnnotationEntries([{ key: "", value: "" }])
       setNameError(null)
       setNamespaceError(null)
       setSubmitError(null)
@@ -454,6 +489,8 @@ export function CreatePodDialog({
       name,
       namespace,
       description,
+      labels: labelEntries,
+      annotations: annotationEntries,
       storageList: savedStorageVolumes.map((item) => ({
         volumeId: item.volumeId.trim(),
         volumeKind: item.volumeKind,
@@ -478,7 +515,7 @@ export function CreatePodDialog({
           .filter((mount) => mount.containerName.length > 0),
       })),
     }),
-    [description, name, namespace, savedConfigMounts, savedStorageVolumes]
+    [annotationEntries, description, labelEntries, name, namespace, savedConfigMounts, savedStorageVolumes]
   )
 
   const applySnapshot = React.useCallback(
@@ -486,6 +523,9 @@ export function CreatePodDialog({
       setName(next.name)
       setNamespace(next.namespace)
       setDescription(next.description)
+      setLabelEntries(next.labels)
+      setAnnotationEntries(next.annotations)
+      setMetadataEnabled(hasUserProvidedMetadata(next.labels, next.annotations))
       setContainers(Array.isArray(parsedContainers) ? parsedContainers.slice(0, 1) : [])
       const normalizedStorage = Array.isArray(next.storageList)
         ? next.storageList
@@ -926,6 +966,8 @@ export function CreatePodDialog({
         name: name.trim(),
         namespace: namespace.trim(),
         description: normalizedDescription,
+        labels: metadataEntriesToRecord(labelEntries),
+        annotations: metadataEntriesToRecord(annotationEntries),
         podSpec: podSpec as Record<string, unknown>,
       })
       onOpenChange(false)
@@ -933,9 +975,11 @@ export function CreatePodDialog({
       setCreating(false)
     }
   }, [
+    annotationEntries,
     configuredContainers,
     creating,
     description,
+    labelEntries,
     yamlMode,
     name,
     namespace,
@@ -1046,7 +1090,7 @@ export function CreatePodDialog({
                 {
                   id: "advanced",
                   title: "高级设置",
-                  status: activeStep === "advanced" ? "当前" : "未设置",
+                  status: activeStep === "advanced" ? "当前" : hasUserProvidedMetadata(labelEntries, annotationEntries) ? "已设置" : "未设置",
                   active: activeStep === "advanced",
                   icon: <IconStack2 className="size-4" />,
                   disabled: isBusy,
@@ -1492,7 +1536,27 @@ export function CreatePodDialog({
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">高级设置正在规划中，当前版本暂不开放。</p>
+              <div>
+                <div className="mb-4">
+                  <h3 className="text-[15px] font-semibold">高级设置</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">补充标签与注解信息，便于检索、分类和后续治理。</p>
+                </div>
+                <FieldGroup className="grid gap-6 md:grid-cols-2">
+                  <Field className="md:col-span-2">
+                    <ResourceMetadataEditor
+                      checked={metadataEnabled}
+                      onCheckedChange={setMetadataEnabled}
+                      labels={labelEntries}
+                      setLabels={setLabelEntries}
+                      annotations={annotationEntries}
+                      setAnnotations={setAnnotationEntries}
+                      description={description}
+                      setDescription={setDescription}
+                      disabled={isBusy}
+                    />
+                  </Field>
+                </FieldGroup>
+              </div>
             )}
           </div>
 
