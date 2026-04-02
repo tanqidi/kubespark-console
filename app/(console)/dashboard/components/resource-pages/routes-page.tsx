@@ -1630,12 +1630,14 @@ export function RoutesPageClient() {
                 </div>
               ) : createStep === "rule" ? (
                 <div>
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">路由规则</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      配置域名、路径与后端服务映射关系。
+                    </p>
+                  </div>
                   {createRuleViewMode === "list" ? (
                     <>
-                      <div className="mb-4">
-                        <h3 className="text-[15px] font-semibold">路由规则</h3>
-                      </div>
-
                       <div className="mt-4 max-h-[50vh] overflow-y-auto pr-2">
                         <div className="flex flex-col gap-0 pb-4">
                           {hasConfiguredRule ? (
@@ -1711,10 +1713,6 @@ export function RoutesPageClient() {
                     </>
                   ) : (
                     <>
-                      <div className="mb-4">
-                        <h3 className="text-[15px] font-semibold">录入路由规则</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">设置域名、路径与后端服务。</p>
-                      </div>
                       <FieldGroup className="grid gap-6 md:grid-cols-2">
                         <Field data-invalid={Boolean(createHostError)}>
                           <FieldLabel htmlFor="route-create-host">域名</FieldLabel>
@@ -1961,6 +1959,12 @@ export function RoutesPageClient() {
                 </div>
               ) : (
                 <div>
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">高级设置</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      补充标签与注解信息，便于检索、分类和后续治理。
+                    </p>
+                  </div>
                   <FieldGroup className="grid gap-6 md:grid-cols-2">
                     <Field className="md:col-span-2">
                       <AdvancedToggleCard
@@ -1968,96 +1972,15 @@ export function RoutesPageClient() {
                         disabled={creating}
                         ariaLabel="添加元数据"
                         title="添加元数据"
-                        description="为路由添加元数据。"
+                        description="统一管理路由的标签与注解信息。"
                         onCheckedChange={(checked) => {
                           if (creating) return
                           setMetadataEnabled(checked)
                         }}
                       >
-                        <div className="space-y-6">
+                        <div className="">
                           <div>
-                            <div className="mb-2 text-sm">注解</div>
-                            <div className="space-y-3">
-                              {annotationEntries.map((entry, index) => (
-                                <div
-                                  key={`annotation-${index}`}
-                                  className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-                                >
-                                  <InputGroup>
-                                    <InputGroupAddon>
-                                      <InputGroupText>键</InputGroupText>
-                                    </InputGroupAddon>
-                                    <InputGroupInput
-                                      value={entry.key}
-                                      onChange={(event) => {
-                                        const nextValue = event.target.value
-                                        setAnnotationEntries((current) =>
-                                          current.map((item, itemIndex) =>
-                                            itemIndex === index ? { ...item, key: nextValue } : item
-                                          )
-                                        )
-                                      }}
-                                      autoComplete="off"
-                                      disabled={creating}
-                                      className="min-w-0"
-                                    />
-                                  </InputGroup>
-                                  <InputGroup>
-                                    <InputGroupAddon>
-                                      <InputGroupText>值</InputGroupText>
-                                    </InputGroupAddon>
-                                    <InputGroupInput
-                                      value={entry.value}
-                                      onChange={(event) => {
-                                        const nextValue = event.target.value
-                                        setAnnotationEntries((current) =>
-                                          current.map((item, itemIndex) =>
-                                            itemIndex === index ? { ...item, value: nextValue } : item
-                                          )
-                                        )
-                                      }}
-                                      autoComplete="off"
-                                      disabled={creating}
-                                      className="min-w-0"
-                                    />
-                                  </InputGroup>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setAnnotationEntries((current) =>
-                                        current.length <= 1
-                                          ? [{ key: "", value: "" }]
-                                          : current.filter((_, itemIndex) => itemIndex !== index)
-                                      )
-                                    }}
-                                    disabled={creating}
-                                    className="shrink-0"
-                                    aria-label="删除注解"
-                                  >
-                                    <IconTrash data-icon="inline-start" />
-                                    删除
-                                  </Button>
-                                </div>
-                              ))}
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() =>
-                                    setAnnotationEntries((current) => [...current, { key: "", value: "" }])
-                                  }
-                                  disabled={creating}
-                                >
-                                  添加
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="mb-2 text-sm">标签</div>
+                            <FieldLabel className="mb-2">标签</FieldLabel>
                             <div className="space-y-3">
                               {labelEntries.map((entry, index) => (
                                 <div
@@ -2128,6 +2051,87 @@ export function RoutesPageClient() {
                                   variant="outline"
                                   onClick={() =>
                                     setLabelEntries((current) => [...current, { key: "", value: "" }])
+                                  }
+                                  disabled={creating}
+                                >
+                                  添加
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <FieldLabel className="mb-2">注解</FieldLabel>
+                            <div className="space-y-3">
+                              {annotationEntries.map((entry, index) => (
+                                <div
+                                  key={`annotation-${index}`}
+                                  className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                                >
+                                  <InputGroup>
+                                    <InputGroupAddon>
+                                      <InputGroupText>键</InputGroupText>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                      value={entry.key}
+                                      onChange={(event) => {
+                                        const nextValue = event.target.value
+                                        setAnnotationEntries((current) =>
+                                          current.map((item, itemIndex) =>
+                                            itemIndex === index ? { ...item, key: nextValue } : item
+                                          )
+                                        )
+                                      }}
+                                      autoComplete="off"
+                                      disabled={creating}
+                                      className="min-w-0"
+                                    />
+                                  </InputGroup>
+                                  <InputGroup>
+                                    <InputGroupAddon>
+                                      <InputGroupText>值</InputGroupText>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                      value={entry.value}
+                                      onChange={(event) => {
+                                        const nextValue = event.target.value
+                                        setAnnotationEntries((current) =>
+                                          current.map((item, itemIndex) =>
+                                            itemIndex === index ? { ...item, value: nextValue } : item
+                                          )
+                                        )
+                                      }}
+                                      autoComplete="off"
+                                      disabled={creating}
+                                      className="min-w-0"
+                                    />
+                                  </InputGroup>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setAnnotationEntries((current) =>
+                                        current.length <= 1
+                                          ? [{ key: "", value: "" }]
+                                          : current.filter((_, itemIndex) => itemIndex !== index)
+                                      )
+                                    }}
+                                    disabled={creating}
+                                    className="shrink-0"
+                                    aria-label="删除注解"
+                                  >
+                                    <IconTrash data-icon="inline-start" />
+                                    删除
+                                  </Button>
+                                </div>
+                              ))}
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() =>
+                                    setAnnotationEntries((current) => [...current, { key: "", value: "" }])
                                   }
                                   disabled={creating}
                                 >
