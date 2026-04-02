@@ -211,10 +211,18 @@ function isDescriptionAnnotationKey(key: string): boolean {
   return key.trim().toLowerCase() === "description"
 }
 
+function isIgnoredMetadataAnnotationKey(key: string): boolean {
+  const normalized = key.trim().toLowerCase()
+  return (
+    normalized === "description" ||
+    normalized === "deployment.kubernetes.io/revision"
+  )
+}
+
 function hasUserProvidedMetadata(labels: MetadataEntry[], annotations: MetadataEntry[]): boolean {
   const hasLabel = labels.some((item) => item.key.trim().length > 0)
   const hasAnnotation = annotations.some(
-    (item) => item.key.trim().length > 0 && !isDescriptionAnnotationKey(item.key)
+    (item) => item.key.trim().length > 0 && !isIgnoredMetadataAnnotationKey(item.key)
   )
   return hasLabel || hasAnnotation
 }

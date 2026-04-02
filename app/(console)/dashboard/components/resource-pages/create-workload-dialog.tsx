@@ -66,6 +66,10 @@ import { useCreateWorkloadDialogController } from "@/app/(console)/dashboard/com
 import { ContainerListPanel } from "@/app/(console)/dashboard/components/resource-pages/container-list-panel"
 import { StorageVolumeList } from "@/app/(console)/dashboard/components/resource-pages/storage-volume-list"
 import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
+import {
+  ResourceMetadataEditor,
+  hasUserProvidedMetadata,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 export type { WorkloadDialogInitialValues } from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.logic"
@@ -130,6 +134,12 @@ export function CreateWorkloadDialog({
     cancelEditStorageVolume,
     currentStepIndex,
     description,
+    metadataEnabled,
+    setMetadataEnabled,
+    labelEntries,
+    setLabelEntries,
+    annotationEntries,
+    setAnnotationEntries,
     dialogDescription,
     dialogTitle,
     editingContainer,
@@ -648,7 +658,14 @@ export function CreateWorkloadDialog({
               {
                 id: "advanced",
                 title: "高级设置",
-                status: activeStep === "advanced" ? "当前" : "未设置",
+                status:
+                  activeStep === "advanced"
+                    ? "当前"
+                    : rollingUpdateEnabled ||
+                        schedulingPolicyEnabled ||
+                        hasUserProvidedMetadata(labelEntries, annotationEntries)
+                      ? "已设置"
+                      : "未设置",
                 active: activeStep === "advanced",
                 icon: <IconStack2 className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -1243,6 +1260,19 @@ export function CreateWorkloadDialog({
                   <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
                 </div>
                 <FieldGroup className="grid gap-4 md:grid-cols-2">
+                  <Field className="md:col-span-2">
+                    <ResourceMetadataEditor
+                      checked={metadataEnabled}
+                      onCheckedChange={setMetadataEnabled}
+                      labels={labelEntries}
+                      setLabels={setLabelEntries}
+                      annotations={annotationEntries}
+                      setAnnotations={setAnnotationEntries}
+                      description={description}
+                      setDescription={setDescription}
+                      disabled={isBusy}
+                    />
+                  </Field>
                   {kind === "Deployment" ? (
                     <Field className="md:col-span-2">
                       <AdvancedToggleCard

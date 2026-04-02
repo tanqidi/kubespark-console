@@ -60,6 +60,8 @@ export type WorkloadDialogInitialValues = {
   name: string
   namespace: string
   description?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
   schedule?: string
   strategy?: {
     backoffLimit?: string
@@ -234,6 +236,8 @@ export type WorkloadDialogSnapshot = {
   name: string
   namespace: string
   description: string
+  labels: Record<string, string>
+  annotations: Record<string, string>
   schedule: string
   strategy: {
     backoffLimit: string
@@ -1090,9 +1094,18 @@ export function buildWorkloadManifest(
   const metadata: JsonObject = {
     name: metadataName,
     namespace: metadataNamespace,
-    ...(snapshot.description.trim()
-      ? { annotations: { description: snapshot.description.trim() } }
-      : {}),
+    ...(Object.keys(snapshot.labels).length > 0 ? { labels: snapshot.labels } : {}),
+    ...(() => {
+      const annotations = {
+        ...snapshot.annotations,
+      }
+      if (snapshot.description.trim()) {
+        annotations.description = snapshot.description.trim()
+      } else {
+        delete annotations.description
+      }
+      return Object.keys(annotations).length > 0 ? { annotations } : {}
+    })(),
   }
   const podSpec = buildPodSpecFromContainers(
     "Always",
@@ -1191,6 +1204,7 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
 
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
+  const labels = asObject(metadata.labels)
   const spec = asObject(root.spec)
   const template = asObject(spec.template)
   const podSpec = asObject(template.spec)
@@ -1408,6 +1422,12 @@ function parseWorkloadRoot(kind: WorkloadCreateKind, root: JsonObject): Workload
     name: asString(metadata.name),
     namespace: asString(metadata.namespace),
     description: asString(annotations.description),
+    labels: Object.fromEntries(
+      Object.entries(labels).filter(([, value]) => typeof value === "string")
+    ) as Record<string, string>,
+    annotations: Object.fromEntries(
+      Object.entries(annotations).filter(([, value]) => typeof value === "string")
+    ) as Record<string, string>,
     schedule: "",
     strategy: {
       backoffLimit: kind === "DaemonSet" ? "" : toOptionalIntegerString(spec.replicas),

@@ -19,13 +19,21 @@ export function isDescriptionAnnotationKey(key: string): boolean {
   return key.trim().toLowerCase() === "description"
 }
 
+function isIgnoredMetadataAnnotationKey(key: string): boolean {
+  const normalized = key.trim().toLowerCase()
+  return (
+    normalized === "description" ||
+    normalized === "deployment.kubernetes.io/revision"
+  )
+}
+
 export function hasUserProvidedMetadata(
   labels: MetadataEntry[],
   annotations: MetadataEntry[]
 ): boolean {
   const hasLabel = labels.some((item) => item.key.trim().length > 0)
   const hasAnnotation = annotations.some(
-    (item) => item.key.trim().length > 0 && !isDescriptionAnnotationKey(item.key)
+    (item) => item.key.trim().length > 0 && !isIgnoredMetadataAnnotationKey(item.key)
   )
   return hasLabel || hasAnnotation
 }
@@ -83,6 +91,13 @@ export function ResourceMetadataEditor({
         )
       }
       if (descriptionIndex < 0) {
+        const hasOnlyEmptyRow =
+          current.length === 1 &&
+          (current[0]?.key.trim() ?? "") === "" &&
+          (current[0]?.value.trim() ?? "") === ""
+        if (hasOnlyEmptyRow) {
+          return [{ key: "description", value: descriptionText }]
+        }
         return [...current, { key: "description", value: descriptionText }]
       }
       if ((current[descriptionIndex]?.value ?? "") === descriptionText) return current
@@ -101,6 +116,19 @@ export function ResourceMetadataEditor({
       description={titleText}
       onCheckedChange={(nextChecked) => {
         if (disabled) return
+        if (nextChecked) {
+          if (labels.length === 0) {
+            setLabels([{ key: "", value: "" }])
+          }
+          if (annotations.length === 0) {
+            const descriptionText = description.trim()
+            setAnnotations(
+              descriptionText
+                ? [{ key: "description", value: descriptionText }]
+                : [{ key: "", value: "" }]
+            )
+          }
+        }
         if (!nextChecked) {
           const descriptionText = description.trim()
           setLabels([{ key: "", value: "" }])
@@ -279,4 +307,3 @@ export function ResourceMetadataEditor({
     </AdvancedToggleCard>
   )
 }
-
