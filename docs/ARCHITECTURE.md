@@ -1,6 +1,6 @@
 # KubeSpark React 架构文档
 
-更新时间：2026-04-01
+更新时间：2026-04-03
 
 ## 1. 项目定位
 
@@ -14,32 +14,36 @@
 
 ```text
 UI 层 (app/(console)/dashboard/components)
-  ├─ 资源页面：workloads/jobs/pods/services/routes/...
+  ├─ 资源页面：resource-pages/*/*-page.tsx
   ├─ 资源弹窗：create-*-dialog.tsx
   ├─ 共享片段：container-list-panel.tsx / storage-volume-list.tsx
   ├─ 通用表格：DataTable + TableToolbar + ColumnsFactory
-  └─ 通用弹窗：DeleteConfirmDialog + MonacoViewerDialog
+  └─ 通用弹窗：DeleteConfirmDialog + MonacoViewerDialog + LogViewerDialog + TerminalViewerDialog
 
 交互编排层
   ├─ create-*-dialog.controller.ts
-  └─ use-container-editor.ts
+  └─ use-container-editor.ts（终端页由页面组件直接编排）
 
 纯逻辑层
   ├─ create-*-dialog.logic.ts
   └─ pod-storage-utils.ts
 
 领域层 (app/lib/kubespark)
-  ├─ common.ts: 请求、鉴权、解包、GVR URL
+  ├─ common.ts: 请求、鉴权、解包、GVR URL（HTTP）
   ├─ resource-rows.ts: 列表映射
   ├─ resource-yaml.ts / resource-document.ts: YAML 拉取与规范化
   ├─ resource-delete.ts: 删除能力
   ├─ resource-create.ts: 创建/更新聚合导出
-  ├─ jobs.ts / workloads.ts / services.ts / configmaps.ts / secrets.ts
+  ├─ jobs.ts / workloads.ts / services.ts / configmaps.ts / secrets.ts / pods.ts
   └─ pod-storage.ts: Job/CronJob 存储挂载共享拼装
 
 网关层
-  ├─ app/api/kubespark/[[...path]]/route.ts (GET/POST/PUT/DELETE)
-  └─ server.js (WebSocket upgrade: /api/kubespark-ws/*)
+  ├─ app/api/kubespark/[[...path]]/route.ts
+  │  └─ HTTP 代理：GET/POST/PUT/DELETE
+  └─ server.js
+     ├─ WS 代理：/api/kubespark-ws/*
+     ├─ 非业务 upgrade（如 /_next/webpack-hmr）转交 Next
+     └─ 终端认证桥接：前端首帧 auth(token) -> 上游 Authorization: Bearer <token>
 ```
 
 ## 3. 目录结构

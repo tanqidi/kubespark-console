@@ -92,9 +92,7 @@ kubectl apply -f deployment/kubespark-console-deployment.yaml
 
 ### 2) dev 标签镜像更新说明（重要）
 
-当前处于快速迭代阶段，镜像标签固定为 `:dev`。即使 `imagePullPolicy: Always`，当 Pod 未重建时也不会自动替换为新镜像。  
-每次推送新镜像后，建议执行：
-
+当前处于快速迭代阶段，镜像统一使用 :dev 标签。即使配置了 imagePullPolicy: Always，已运行的 Pod 也不会自动替换为最新镜像。由于 GitHub Actions 会持续推送新镜像，建议你不定期执行以下命令，拉取并应用最新镜像，以便及时体验新功能与修复。
 ```bash
 kubectl rollout restart deployment/kubespark -n kubespark
 kubectl rollout restart deployment/kubespark-console -n kubespark
