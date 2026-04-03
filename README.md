@@ -64,6 +64,12 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 - 路由创建流程中项目不再自动带入默认值，改为用户显式选择/输入。
 - Job/CronJob 的“配置挂载”流程补齐为与 Workload 一致（新增、编辑、删除、YAML 联动）。
 
+### 8. 容器日志与终端
+
+- Pod 支持日志查看（普通/实时）与日志下载（默认最近 2000 行）。
+- Pod 支持终端会话（`/bin/sh`）并通过 WebSocket 与后端 `exec` 子资源交互。
+- 前端终端连接统一走同源 `/api/kubespark-ws/*` 代理，不直接暴露后端地址。
+
 ## Kubernetes 部署
 
 使用仓库内示例 YAML 创建 `Namespace + RBAC + Deployment + Service`。
@@ -112,6 +118,18 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### WebSocket 代理说明
+
+- 使用自定义 Node server：`server.js`（用于处理 WebSocket upgrade）。
+- 脚本：
+  - `npm run dev` -> `node server.js --dev`
+  - `npm run start` -> `node server.js --prod`
+- 代理规则：
+  - HTTP：`/api/kubespark/*`
+  - WS：`/api/kubespark-ws/*`
+
+上游地址由 `KUBESPARK_API_BASE` 指定（默认：`http://172.31.0.88:8080`）。
 
 ## 社区交流
 

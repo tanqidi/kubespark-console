@@ -38,7 +38,8 @@ UI 层 (app/(console)/dashboard/components)
   └─ pod-storage.ts: Job/CronJob 存储挂载共享拼装
 
 网关层
-  └─ app/api/kubespark/[[...path]]/route.ts (GET/POST/PUT/DELETE)
+  ├─ app/api/kubespark/[[...path]]/route.ts (GET/POST/PUT/DELETE)
+  └─ server.js (WebSocket upgrade: /api/kubespark-ws/*)
 ```
 
 ## 3. 目录结构
@@ -85,22 +86,9 @@ app/
 - `volumes`
 - `storageclasses`
 
-## 5. 模块能力矩阵
+## 5. 进度文档说明
 
-| 模块 | 列表 | 创建 | 编辑 | 删除 | YAML |
-|---|---|---|---|---|---|
-| Namespace | ✅ | ✅ | ⏳ | ✅ | ✅ |
-| ConfigMap | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Secret | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Service | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Job | ✅ | ✅ | ✅ | ✅ | ✅ |
-| CronJob | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Workload(Deploy/STS/DS) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Pod | ✅ | ⏳ | ⏳ | ✅ | ✅ |
-| Ingress | ✅ | ✅ | ✅ | ✅ | ✅ |
-| PV/PVC | ✅ | ✅ | ⏳ | ✅ | ✅ |
-| StorageClass | ✅ | ⏳ | ⏳ | ✅ | ✅ |
-| Node | ✅ | N/A | N/A | N/A | ⏳ |
+资源维度进度（能力矩阵）统一维护在 `docs/DEVELOPMENT-PROGRESS.md`，本架构文档不再重复维护，避免双处不一致。
 
 ## 6. 核心请求链路
 
@@ -128,6 +116,12 @@ app/
 - 未支持：`PATCH`
 - 透传 `Authorization`、query、body
 - 上游失败返回 `502` + `upstreamUrl`
+
+`server.js` 当前支持：
+
+- `/api/kubespark-ws/*` WebSocket upgrade 代理
+- 非 `/api/kubespark-ws/*` 的 upgrade（如 `/_next/webpack-hmr`）交还 Next 处理
+- 终端链路中，前端先建立同源 WS，再由代理连接后端 exec WS
 
 ## 9. 共享抽取
 

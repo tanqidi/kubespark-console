@@ -15,6 +15,7 @@
 前端默认走 Next.js 代理：
 
 - 代理前缀：`/api/kubespark`
+- WebSocket 代理前缀：`/api/kubespark-ws`
 - 资源基础路径：
   `/api/kubespark/kapis/v1alpha1/resources/{group}/{version}/{resource}`
 
@@ -27,6 +28,15 @@
 - 请求头：`Authorization: Bearer {token}`
 - token 来源：`localStorage/sessionStorage` 的 `kubespark_token`
 - 401：前端会跳转登录页并携带 `redirect`
+
+### 3.1 WebSocket（终端 exec）认证约定
+
+- 浏览器先连接同源 WS：`/api/kubespark-ws/kapis/v1alpha1/resources/.../exec?...`
+- 建连后客户端发送首帧：
+  - `{ "op": "auth", "token": "<kubespark_token>" }`
+- Node 代理使用该 token 向上游 WS 注入：
+  - `Authorization: Bearer <token>`
+- URL query 不再携带 `token`
 
 ## 4. 响应解包约定
 
@@ -150,6 +160,7 @@
 - `404`：GVR 路径或资源名错误
 - `405`：方法不支持或错误详情路径
 - `502`：代理无法连通上游（检查 `KUBESPARK_API_BASE`）
+- `WebSocket 1006`：重点检查 WS 代理是否生效（`server.js` 是否启动、路径是否 `/api/kubespark-ws/*`）
 
 ## 12. 代码对应
 
