@@ -47,6 +47,7 @@ export function PodsPageClient() {
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [logsOpen, setLogsOpen] = React.useState(false)
   const [logsTitle, setLogsTitle] = React.useState("查看日志")
+  const [logsSubtitle, setLogsSubtitle] = React.useState("查看 Kubernetes Pod 的日志内容。")
   const [logsContent, setLogsContent] = React.useState("")
   const [logsLoading, setLogsLoading] = React.useState(false)
   const [logsError, setLogsError] = React.useState<string | null>(null)
@@ -85,7 +86,8 @@ export function PodsPageClient() {
 
   const handleViewLogs = React.useCallback((row: PodRow) => {
     setLogsOpen(true)
-    setLogsTitle(`容器日志 · ${row.namespace}/${row.name}`)
+    setLogsTitle("查看日志")
+    setLogsSubtitle(`查看 Kubernetes Pod（${row.namespace}/${row.name}）的日志内容。`)
     setLogsTarget({ name: row.name, namespace: row.namespace })
     setLogsContent("")
   }, [])
@@ -429,7 +431,7 @@ export function PodsPageClient() {
           }
         }}
         title={logsTitle}
-        subtitle="展示 Pod 最近日志输出。"
+        subtitle={logsSubtitle}
         realtime={realtimeLogs}
         onRealtimeChange={setRealtimeLogs}
         loading={logsLoading}

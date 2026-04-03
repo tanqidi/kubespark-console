@@ -49,6 +49,7 @@ export function LogViewerDialog({
   content,
 }: LogViewerDialogProps) {
   const [terminalHost, setTerminalHost] = React.useState<HTMLDivElement | null>(null)
+  const [fullscreen, setFullscreen] = React.useState(false)
   const terminalRef = React.useRef<Terminal | null>(null)
   const fitAddonRef = React.useRef<FitAddon | null>(null)
   const lastRenderedRef = React.useRef("")
@@ -153,8 +154,14 @@ export function LogViewerDialog({
     if (!open) {
       disposeTerminal()
       setTerminalHost(null)
+      setFullscreen(false)
     }
   }, [disposeTerminal, open])
+
+  React.useEffect(() => {
+    if (!open) return
+    scheduleFit()
+  }, [fullscreen, open, scheduleFit])
 
   React.useEffect(() => {
     return () => {
@@ -165,7 +172,11 @@ export function LogViewerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-270"
+        className={
+          fullscreen
+            ? "flex h-screen min-h-screen max-h-screen w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:max-w-none"
+            : "flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-270"
+        }
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
         <div className="flex items-start justify-between border-b bg-muted/15">
@@ -173,7 +184,15 @@ export function LogViewerDialog({
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{subtitle}</DialogDescription>
           </DialogHeader>
-          <div className="h-full flex items-center me-20">
+          <div className="h-full flex items-center gap-3 me-20">
+            <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+              <span className="text-sm font-medium">全屏</span>
+              <Switch
+                checked={fullscreen}
+                onCheckedChange={setFullscreen}
+                aria-label="全屏"
+              />
+            </div>
             <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
               <span className="text-sm font-medium">实时日志</span>
               <Switch
