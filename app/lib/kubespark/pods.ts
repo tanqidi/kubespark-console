@@ -1,5 +1,4 @@
 import {
-  API_PROXY_BASE,
   buildResourceCollectionEndpoint,
   buildResourceItemEndpoint,
   fetchJsonDeduped,
@@ -119,31 +118,11 @@ export function buildPodExecWsEndpoint(
   }
 
   const routePath = `/kapis/v1alpha1/resources/core/v1/pods/${encodeURIComponent(name)}/exec`
-  const defaultWsBase = "ws://172.31.0.88:8080"
-  const explicitBase = process.env.NEXT_PUBLIC_KUBESPARK_WS_BASE?.trim()
-  if (explicitBase) {
-    const normalized = explicitBase.endsWith("/") ? explicitBase.slice(0, -1) : explicitBase
-    return `${normalized}${routePath}?${params.toString()}`
-  }
-
   if (typeof window !== "undefined") {
-    if (/^https?:\/\//.test(API_PROXY_BASE)) {
-      try {
-        const parsed = new URL(API_PROXY_BASE)
-        const protocol = parsed.protocol === "https:" ? "wss" : "ws"
-        return `${protocol}://${parsed.host}${routePath}?${params.toString()}`
-      } catch {
-        // fallback below
-      }
-    }
-
-    if (window.location.protocol === "https:") {
-      return `${defaultWsBase.replace(/^ws:\/\//, "wss://")}${routePath}?${params.toString()}`
-    }
-    return `${defaultWsBase}${routePath}?${params.toString()}`
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws"
+    return `${protocol}://${window.location.host}/api/kubespark-ws${routePath}?${params.toString()}`
   }
-
-  return `${defaultWsBase}${routePath}?${params.toString()}`
+  return `ws://localhost:3000/api/kubespark-ws${routePath}?${params.toString()}`
 }
 
 export type CreatePodInput = BaseCreateInput & {
