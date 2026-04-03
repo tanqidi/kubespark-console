@@ -1,9 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { IconBraces, IconDownload, IconUpload } from "@tabler/icons-react"
+import { IconDownload, IconUpload } from "@tabler/icons-react"
 
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 
 type YamlModeActionsProps = {
   checked: boolean
@@ -27,6 +29,7 @@ export function YamlModeActions({
   downloadDisabled = false,
 }: YamlModeActionsProps) {
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+  const switchId = React.useId()
 
   const handleTriggerUpload = React.useCallback(() => {
     if (disabled || uploadDisabled) return
@@ -60,6 +63,7 @@ export function YamlModeActions({
             type="button"
             variant="outline"
             size="icon"
+            className="rounded-full"
             onClick={handleTriggerUpload}
             disabled={disabled || uploadDisabled}
             aria-label="上传 YAML"
@@ -72,6 +76,7 @@ export function YamlModeActions({
             type="button"
             variant="outline"
             size="icon"
+            className="rounded-full"
             onClick={onDownloadYaml}
             disabled={disabled || downloadDisabled}
             aria-label="下载 YAML"
@@ -83,18 +88,16 @@ export function YamlModeActions({
         </>
       ) : null}
 
-      <Button
-        type="button"
-        variant={checked ? "default" : "outline"}
-        size="icon"
-        onClick={() => onCheckedChange(!checked)}
-        disabled={disabled}
-        aria-label="编辑 YAML"
-        title="编辑 YAML"
-      >
-        <IconBraces />
-        <span className="sr-only">编辑 YAML</span>
-      </Button>
+      <div className="flex items-center space-x-2 rounded-full border bg-background px-4 py-2">
+        <Switch
+          id={switchId}
+          checked={checked}
+          onCheckedChange={onCheckedChange}
+          disabled={disabled}
+          aria-label="编辑 YAML"
+        />
+        <Label htmlFor={switchId}>编辑 YAML</Label>
+      </div>
 
       <input
         ref={fileInputRef}
