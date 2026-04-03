@@ -10,6 +10,7 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 ![YAML 查看](docs/img/img_2.png)
 ![CronJob 多步骤编辑](docs/img/img_3.png)
 ![容器录入弹窗](docs/img/img_4.png)
+![实时容器日志](docs/img/img_5.png)
 
 ## 核心能力（当前）
 
