@@ -3,6 +3,7 @@
 import * as React from "react"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
+import { IconDownload } from "@tabler/icons-react"
 import "@xterm/xterm/css/xterm.css"
 
 import {
@@ -12,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 
 const LOG_TERMINAL_THEME = {
@@ -35,6 +37,8 @@ type LogViewerDialogProps = {
   loading?: boolean
   error?: string | null
   content: string
+  onDownload?: () => void
+  downloadDisabled?: boolean
 }
 
 export function LogViewerDialog({
@@ -47,6 +51,8 @@ export function LogViewerDialog({
   loading = false,
   error = null,
   content,
+  onDownload,
+  downloadDisabled = false,
 }: LogViewerDialogProps) {
   const [terminalHost, setTerminalHost] = React.useState<HTMLDivElement | null>(null)
   const [fullscreen, setFullscreen] = React.useState(false)
@@ -185,6 +191,19 @@ export function LogViewerDialog({
             <DialogDescription>{subtitle}</DialogDescription>
           </DialogHeader>
           <div className="h-full flex items-center gap-3 me-20">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-full"
+              onClick={onDownload}
+              disabled={downloadDisabled}
+              aria-label="下载日志"
+              title="下载日志"
+            >
+              <IconDownload />
+              <span className="sr-only">下载日志</span>
+            </Button>
             <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
               <span className="text-sm font-medium">全屏</span>
               <Switch

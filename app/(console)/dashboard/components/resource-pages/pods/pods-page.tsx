@@ -164,6 +164,21 @@ export function PodsPageClient() {
     }
   }, [])
 
+  const handleDownloadLogs = React.useCallback(() => {
+    if (!logsContent) return
+    const fileNameBase = logsTarget?.name?.trim() || "container-logs"
+    const safeBase = fileNameBase.replace(/[\\/:*?"<>|]/g, "_")
+    const blob = new Blob([logsContent], { type: "text/plain;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${safeBase}.txt`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }, [logsContent, logsTarget?.name])
+
   const requestDelete = React.useCallback((row: PodRow) => {
     setPendingDeleteRow(row)
   }, [])
@@ -437,6 +452,8 @@ export function PodsPageClient() {
         loading={logsLoading}
         error={logsError}
         content={logsContent}
+        onDownload={handleDownloadLogs}
+        downloadDisabled={!logsContent}
       />
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
