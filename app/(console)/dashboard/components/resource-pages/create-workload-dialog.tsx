@@ -59,7 +59,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useCreateWorkloadDialogController } from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.controller"
@@ -67,6 +66,7 @@ import { ContainerListPanel } from "@/app/(console)/dashboard/components/resourc
 import { StorageVolumeList } from "@/app/(console)/dashboard/components/resource-pages/storage-volume-list"
 import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
 import { ProjectNamespaceField } from "@/app/(console)/dashboard/components/resource-pages/project-namespace-field"
+import { YamlModeActions } from "@/app/(console)/dashboard/components/resource-pages/yaml-mode-actions"
 import {
   ResourceMetadataEditor,
   hasUserProvidedMetadata,
@@ -579,6 +579,30 @@ export function CreateWorkloadDialog({
       setEditingConfigMountIndex(editingConfigMountIndex - 1)
     }
   }, [editingConfigMountIndex])
+
+  const handleUploadYamlText = React.useCallback(
+    (content: string) => {
+      setYamlText(content)
+      if (yamlError) setYamlError(null)
+    },
+    [setYamlError, setYamlText, yamlError]
+  )
+
+  const handleDownloadYaml = React.useCallback(() => {
+    if (typeof window === "undefined") return
+    const normalizedName = name.trim().replace(/[^a-zA-Z0-9-_.]+/g, "-")
+    const fileName = `${(normalizedName || kind.toLowerCase())}.yaml`
+    const blob = new Blob([yamlText], { type: "text/yaml;charset=utf-8" })
+    const url = window.URL.createObjectURL(blob)
+    const link = window.document.createElement("a")
+    link.href = url
+    link.download = fileName
+    window.document.body.appendChild(link)
+    link.click()
+    window.document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }, [kind, name, yamlText])
+
   return (
     <Dialog
       open={open}
@@ -600,15 +624,14 @@ export function CreateWorkloadDialog({
               <DialogDescription>{dialogDescription}</DialogDescription>
             </DialogHeader>
             <div className="h-full flex items-center me-20">
-              <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                <span className="text-sm font-medium">编辑 YAML</span>
-                <Switch
-                  checked={yamlMode}
-                  onCheckedChange={(checked) => handleYamlModeChange(checked, savedConfigMounts)}
-                  disabled={isBusy}
-                  aria-label="编辑 YAML"
-                />
-              </div>
+              <YamlModeActions
+                checked={yamlMode}
+                onCheckedChange={(checked) => handleYamlModeChange(checked, savedConfigMounts)}
+                disabled={isBusy}
+                onUploadYamlText={handleUploadYamlText}
+                onDownloadYaml={handleDownloadYaml}
+                downloadDisabled={!yamlMode}
+              />
             </div>
           </div>
 
