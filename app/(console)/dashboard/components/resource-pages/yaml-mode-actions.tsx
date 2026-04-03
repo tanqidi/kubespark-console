@@ -1,10 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { IconDownload, IconUpload } from "@tabler/icons-react"
+import { IconBraces, IconDownload, IconUpload } from "@tabler/icons-react"
 
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 
 type YamlModeActionsProps = {
   checked: boolean
@@ -84,15 +83,18 @@ export function YamlModeActions({
         </>
       ) : null}
 
-      <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-        <span className="text-sm font-medium">编辑 YAML</span>
-        <Switch
-          checked={checked}
-          onCheckedChange={onCheckedChange}
-          disabled={disabled}
-          aria-label="编辑 YAML"
-        />
-      </div>
+      <Button
+        type="button"
+        variant={checked ? "default" : "outline"}
+        size="icon"
+        onClick={() => onCheckedChange(!checked)}
+        disabled={disabled}
+        aria-label="编辑 YAML"
+        title="编辑 YAML"
+      >
+        <IconBraces />
+        <span className="sr-only">编辑 YAML</span>
+      </Button>
 
       <input
         ref={fileInputRef}
