@@ -119,6 +119,7 @@ export function buildPodExecWsEndpoint(
   }
 
   const routePath = `/kapis/v1alpha1/resources/core/v1/pods/${encodeURIComponent(name)}/exec`
+  const defaultWsBase = "ws://172.31.0.88:8080"
   const explicitBase = process.env.NEXT_PUBLIC_KUBESPARK_WS_BASE?.trim()
   if (explicitBase) {
     const normalized = explicitBase.endsWith("/") ? explicitBase.slice(0, -1) : explicitBase
@@ -136,17 +137,13 @@ export function buildPodExecWsEndpoint(
       }
     }
 
-    // Dev fallback: frontend usually on :3000, backend on :8080.
-    if (window.location.port === "3000") {
-      const protocol = window.location.protocol === "https:" ? "wss" : "ws"
-      return `${protocol}://${window.location.hostname}:8080${routePath}?${params.toString()}`
+    if (window.location.protocol === "https:") {
+      return `${defaultWsBase.replace(/^ws:\/\//, "wss://")}${routePath}?${params.toString()}`
     }
-
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws"
-    return `${protocol}://${window.location.host}${routePath}?${params.toString()}`
+    return `${defaultWsBase}${routePath}?${params.toString()}`
   }
 
-  return `ws://localhost:8080${routePath}?${params.toString()}`
+  return `${defaultWsBase}${routePath}?${params.toString()}`
 }
 
 export type CreatePodInput = BaseCreateInput & {

@@ -142,6 +142,7 @@ export function TerminalViewerDialog({
     const ws = new WebSocket(wsUrl)
     ws.binaryType = "arraybuffer"
     socketRef.current = ws
+    terminal.writeln(`\x1b[90m[ws] ${wsUrl}\x1b[0m`)
 
     ws.onopen = () => {
       terminal.writeln("\x1b[32m[connected]\x1b[0m")
@@ -186,8 +187,9 @@ export function TerminalViewerDialog({
     ws.onerror = () => {
       terminal.writeln("\r\n\x1b[31m[network error]\x1b[0m")
     }
-    ws.onclose = () => {
-      terminal.writeln("\r\n\x1b[33m[disconnected]\x1b[0m")
+    ws.onclose = (event) => {
+      const reason = event.reason ? ` ${event.reason}` : ""
+      terminal.writeln(`\r\n\x1b[33m[disconnected code=${event.code}${reason}]\x1b[0m`)
     }
 
     return () => {
