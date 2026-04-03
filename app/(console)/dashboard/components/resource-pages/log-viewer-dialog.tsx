@@ -15,9 +15,10 @@ import {
 import { Switch } from "@/components/ui/switch"
 
 const LOG_TERMINAL_THEME = {
-  background: "#000000",
-  foreground: "#f3f4f6",
-  cursor: "#f3f4f6",
+  background: "#0b1220",
+  foreground: "#e2e8f0",
+  cursor: "#93c5fd",
+  selectionBackground: "rgba(148,163,184,0.25)",
 }
 
 function toTerminalText(value: string): string {
@@ -65,6 +66,8 @@ export function LogViewerDialog({
       convertEol: true,
       disableStdin: true,
       fontSize: 13,
+      lineHeight: 1.3,
+      letterSpacing: 0.2,
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace",
       theme: LOG_TERMINAL_THEME,
       cursorBlink: false,
@@ -182,8 +185,8 @@ export function LogViewerDialog({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-hidden p-6">
-          <div className="relative h-full overflow-hidden rounded-md border bg-black">
-              <div ref={setTerminalHost} className="h-full w-full" />
+          <div className="relative h-full overflow-hidden rounded-lg border border-slate-700/60 bg-slate-950/95 shadow-inner">
+              <div ref={setTerminalHost} className="h-full w-full px-2 py-2" />
             {loading ? (
               <div className="absolute inset-0 bg-black/60 p-4 text-sm text-zinc-300">日志加载中...</div>
             ) : null}
