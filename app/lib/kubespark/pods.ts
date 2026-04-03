@@ -75,6 +75,26 @@ export type PodLogsResult = {
   text: string
 }
 
+export function buildPodLogsEndpoint(
+  namespace: string,
+  name: string,
+  options?: { container?: string; tailLines?: number; follow?: boolean }
+): string {
+  const itemUrl = buildResourceItemEndpoint("core", "v1", "pods", name, namespace)
+  const [basePath, queryString = ""] = itemUrl.split("?")
+  const params = new URLSearchParams(queryString)
+
+  if (options?.container?.trim()) params.set("container", options.container.trim())
+  if (typeof options?.tailLines === "number" && Number.isFinite(options.tailLines) && options.tailLines > 0) {
+    params.set("tailLines", String(Math.floor(options.tailLines)))
+  }
+  if (typeof options?.follow === "boolean") {
+    params.set("follow", String(options.follow))
+  }
+
+  return `${basePath}/log${params.toString() ? `?${params.toString()}` : ""}`
+}
+
 export type CreatePodInput = BaseCreateInput & {
   container?: {
     name?: string
@@ -389,16 +409,7 @@ export async function fetchNamespacedPodLogs(
   name: string,
   options?: { container?: string; tailLines?: number }
 ): Promise<PodLogsResult> {
-  const itemUrl = buildResourceItemEndpoint("core", "v1", "pods", name, namespace)
-  const [basePath, queryString = ""] = itemUrl.split("?")
-  const params = new URLSearchParams(queryString)
-
-  if (options?.container?.trim()) params.set("container", options.container.trim())
-  if (typeof options?.tailLines === "number" && Number.isFinite(options.tailLines) && options.tailLines > 0) {
-    params.set("tailLines", String(Math.floor(options.tailLines)))
-  }
-
-  const requestUrl = `${basePath}/log${params.toString() ? `?${params.toString()}` : ""}`
+  const requestUrl = buildPodLogsEndpoint(namespace, name, options)
   const text = await fetchText(requestUrl)
 
   return { requestUrl, text }

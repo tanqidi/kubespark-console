@@ -11,14 +11,16 @@ import {
   renderNameDescriptionCell,
 } from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
+  buildPodLogsEndpoint,
   deletePod,
   createPod,
-  fetchNamespacedPodLogs,
   fetchNamespacedPodYaml,
+  fetchNamespacedPodLogs,
   fetchPodResourceRows,
   updatePod,
   type PodResourceRow,
 } from "@/app/lib/kubespark/pods"
+import { fetchTextStream } from "@/app/lib/kubespark/common"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
@@ -32,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 
 type PodRow = PodResourceRow
 
@@ -54,6 +57,9 @@ export function PodsPageClient() {
   const [logsContent, setLogsContent] = React.useState("")
   const [logsLoading, setLogsLoading] = React.useState(false)
   const [logsError, setLogsError] = React.useState<string | null>(null)
+  const [logsTarget, setLogsTarget] = React.useState<Pick<PodRow, "name" | "namespace"> | null>(null)
+  const [realtimeLogs, setRealtimeLogs] = React.useState(false)
+  const logsAbortRef = React.useRef<AbortController | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PodRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -87,25 +93,81 @@ export function PodsPageClient() {
   const handleViewLogs = React.useCallback((row: PodRow) => {
     setLogsOpen(true)
     setLogsTitle(`容器日志 · ${row.namespace}/${row.name}`)
+    setLogsTarget({ name: row.name, namespace: row.namespace })
+    setLogsContent("")
+  }, [])
+
+  React.useEffect(() => {
+    if (!logsOpen || !logsTarget) return
+
+    logsAbortRef.current?.abort()
+    const controller = new AbortController()
+    logsAbortRef.current = controller
+
     setLogsError(null)
     setLogsLoading(true)
-    setLogsContent("")
 
-    void fetchNamespacedPodLogs(row.namespace, row.name, { tailLines: 500 })
-      .then(({ text }) => {
-        setLogsContent(text || "(无日志输出)")
+    if (!realtimeLogs) {
+      void fetchNamespacedPodLogs(logsTarget.namespace, logsTarget.name, { tailLines: 500 })
+        .then(({ text }) => {
+          if (controller.signal.aborted) return
+          setLogsContent(text || "(无日志输出)")
+        })
+        .catch((e: unknown) => {
+          if (controller.signal.aborted) return
+          const message = e instanceof Error ? e.message : "加载日志失败"
+          setLogsError(message)
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLogsLoading(false)
+        })
+      return () => {
+        controller.abort()
+      }
+    }
+
+    const requestUrl = buildPodLogsEndpoint(logsTarget.namespace, logsTarget.name, {
+      tailLines: 200,
+      follow: true,
+    })
+
+    void fetchTextStream(requestUrl, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.body) {
+          throw new Error("日志流不可用")
+        }
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder("utf-8")
+
+        setLogsContent("")
+        setLogsLoading(false)
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          if (!value || controller.signal.aborted) continue
+          const chunk = decoder.decode(value, { stream: true })
+          if (chunk) {
+            setLogsContent((prev) => `${prev}${chunk}`)
+          }
+        }
       })
       .catch((e: unknown) => {
+        if (controller.signal.aborted) return
         const message = e instanceof Error ? e.message : "加载日志失败"
         setLogsError(message)
-        console.error("[Pods] view logs request failed", {
-          pod: { name: row.name, namespace: row.namespace },
-          error: e,
-        })
-      })
-      .finally(() => {
         setLogsLoading(false)
       })
+
+    return () => {
+      controller.abort()
+    }
+  }, [logsOpen, logsTarget, realtimeLogs])
+
+  React.useEffect(() => {
+    return () => {
+      logsAbortRef.current?.abort()
+    }
   }, [])
 
   const requestDelete = React.useCallback((row: PodRow) => {
@@ -196,7 +258,7 @@ export function PodsPageClient() {
               handleViewLogs(row)
             },
           },
-          {
+          /*{
             label: (
               <>
                 <IconPencil className="size-4" />
@@ -206,7 +268,7 @@ export function PodsPageClient() {
             onSelect: (row) => {
               handleEdit(row)
             },
-          },
+          },*/
           {
             label: (
               <>
@@ -365,22 +427,43 @@ export function PodsPageClient() {
         loading={yamlLoading}
         error={yamlError}
       />
-      <Dialog open={logsOpen} onOpenChange={setLogsOpen}>
-        <DialogContent className="sm:max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>{logsTitle}</DialogTitle>
-            <DialogDescription>展示 Pod 最近日志输出。</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[65vh] overflow-auto rounded-md border bg-black p-4">
-            {logsLoading ? (
-              <p className="text-sm text-zinc-300">日志加载中...</p>
-            ) : logsError ? (
-              <p className="text-sm text-red-400">{logsError}</p>
-            ) : (
-              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-5 text-zinc-100">
-                {logsContent || "(无日志输出)"}
-              </pre>
-            )}
+      <Dialog
+        open={logsOpen}
+        onOpenChange={(open) => {
+          setLogsOpen(open)
+          if (!open) {
+            logsAbortRef.current?.abort()
+            setRealtimeLogs(false)
+          }
+        }}
+      >
+        <DialogContent className="h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex flex-col sm:max-w-270">
+          <div className="flex items-start justify-between gap-4">
+            <DialogHeader>
+              <DialogTitle>{logsTitle}</DialogTitle>
+              <DialogDescription>展示 Pod 最近日志输出。</DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+              <span className="text-sm font-medium">实时日志</span>
+              <Switch
+                checked={realtimeLogs}
+                onCheckedChange={setRealtimeLogs}
+                aria-label="实时日志"
+              />
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="h-full overflow-auto rounded-md border bg-black p-4">
+              {logsLoading ? (
+                <p className="text-sm text-zinc-300">日志加载中...</p>
+              ) : logsError ? (
+                <p className="text-sm text-red-400">{logsError}</p>
+              ) : (
+                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-5 text-zinc-100">
+                  {logsContent || "(无日志输出)"}
+                </pre>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

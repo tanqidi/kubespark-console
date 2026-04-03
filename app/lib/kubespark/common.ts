@@ -245,6 +245,50 @@ export async function fetchText(url: string, init: RequestInit = {}): Promise<st
   return res.text();
 }
 
+export async function fetchTextStream(url: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const token = getToken();
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+
+  const res = await fetch(url, { cache: "no-store", ...init, headers });
+  if (!res.ok) {
+    if (res.status === 401) {
+      if (typeof window !== "undefined") {
+        const currentPath = window.location.pathname + window.location.search;
+        window.location.href = currentPath !== "/login" ? `/login?redirect=${encodeURIComponent(currentPath)}` : "/login";
+        return new Promise<Response>(() => {});
+      }
+      throw new Error("未授权，请先登录");
+    }
+
+    let detailMessage = "";
+    try {
+      const text = await res.text();
+      if (text) {
+        try {
+          const parsed = JSON.parse(text) as Record<string, unknown>;
+          const message = parsed?.message;
+          if (typeof message === "string" && message.trim()) {
+            detailMessage = message.trim();
+          } else {
+            detailMessage = text.slice(0, 300);
+          }
+        } catch {
+          detailMessage = text.slice(0, 300);
+        }
+      }
+    } catch {}
+
+    throw new Error(
+      detailMessage
+        ? `请求失败，状态码 ${res.status}：${detailMessage}`
+        : `请求失败，状态码 ${res.status}`
+    );
+  }
+
+  return res;
+}
+
 export async function deleteResource(group: string, version: string, resource: string, name: string, namespace?: string): Promise<void> {
   const url = buildResourceItemEndpoint(group, version, resource, name, namespace);
   await fetchJsonDeduped<unknown>(url, { method: "DELETE" });
