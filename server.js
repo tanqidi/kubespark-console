@@ -38,13 +38,30 @@ app.prepare().then(() => {
 
     wss.handleUpgrade(req, socket, head, (clientSocket) => {
       const target = buildWsTarget(req.url)
-      const upstreamSocket = new WebSocket(target)
+      let upstreamSocket = null
+      let upstreamOpen = false
+      const bufferedFrames = []
 
-      upstreamSocket.on("open", () => {
-        clientSocket.on("message", (data, isBinary) => {
-          if (upstreamSocket.readyState === WebSocket.OPEN) {
-            upstreamSocket.send(data, { binary: isBinary })
+      const flushBufferedFrames = () => {
+        if (!upstreamSocket || upstreamSocket.readyState !== WebSocket.OPEN) return
+        while (bufferedFrames.length > 0) {
+          const frame = bufferedFrames.shift()
+          if (!frame) continue
+          upstreamSocket.send(frame.data, { binary: frame.isBinary })
+        }
+      }
+
+      const connectUpstream = (token) => {
+        if (upstreamSocket) return
+        const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+        upstreamSocket = new WebSocket(target, { headers })
+
+        upstreamSocket.on("open", () => {
+          upstreamOpen = true
+          if (clientSocket.readyState === WebSocket.OPEN) {
+            clientSocket.send(JSON.stringify({ op: "connected" }))
           }
+          flushBufferedFrames()
         })
 
         upstreamSocket.on("message", (data, isBinary) => {
@@ -52,23 +69,57 @@ app.prepare().then(() => {
             clientSocket.send(data, { binary: isBinary })
           }
         })
+
+        upstreamSocket.on("close", () => {
+          if (clientSocket.readyState === WebSocket.OPEN) clientSocket.close()
+        })
+
+        upstreamSocket.on("error", (err) => {
+          if (clientSocket.readyState === WebSocket.OPEN) {
+            clientSocket.send(
+              JSON.stringify({ op: "error", message: `upstream websocket error: ${err.message}` })
+            )
+            clientSocket.close()
+          }
+        })
+      }
+
+      const parseAuthToken = (data) => {
+        try {
+          const raw = typeof data === "string" ? data : data.toString("utf8")
+          const msg = JSON.parse(raw)
+          if (msg && msg.op === "auth" && typeof msg.token === "string" && msg.token.trim()) {
+            return msg.token.trim()
+          }
+        } catch {}
+        return ""
+      }
+
+      clientSocket.on("message", (data, isBinary) => {
+        if (!upstreamSocket) {
+          const token = parseAuthToken(data)
+          if (token) {
+            connectUpstream(token)
+            return
+          }
+          connectUpstream("")
+        }
+
+        if (upstreamSocket && upstreamOpen && upstreamSocket.readyState === WebSocket.OPEN) {
+          upstreamSocket.send(data, { binary: isBinary })
+          return
+        }
+
+        if (bufferedFrames.length < 128) {
+          bufferedFrames.push({ data, isBinary })
+        }
       })
 
       clientSocket.on("close", () => {
-        if (upstreamSocket.readyState === WebSocket.OPEN) upstreamSocket.close()
-      })
-      upstreamSocket.on("close", () => {
-        if (clientSocket.readyState === WebSocket.OPEN) clientSocket.close()
-      })
-
-      upstreamSocket.on("error", (err) => {
-        if (clientSocket.readyState === WebSocket.OPEN) {
-          clientSocket.send(JSON.stringify({ op: "error", message: `upstream websocket error: ${err.message}` }))
-          clientSocket.close()
-        }
+        if (upstreamSocket && upstreamSocket.readyState === WebSocket.OPEN) upstreamSocket.close()
       })
       clientSocket.on("error", () => {
-        if (upstreamSocket.readyState === WebSocket.OPEN) upstreamSocket.close()
+        if (upstreamSocket && upstreamSocket.readyState === WebSocket.OPEN) upstreamSocket.close()
       })
     })
   })

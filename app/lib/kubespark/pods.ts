@@ -102,14 +102,12 @@ export function buildPodExecWsEndpoint(
     container?: string
     command?: string[]
     tty?: boolean
-    token?: string
   }
 ): string {
   const params = new URLSearchParams()
   params.set("namespace", namespace)
   if (options?.container?.trim()) params.set("container", options.container.trim())
-  if (typeof options?.tty === "boolean") params.set("tty", String(options.tty))
-  if (options?.token?.trim()) params.set("token", options.token.trim())
+  params.set("tty", String(options?.tty ?? true))
   if (Array.isArray(options?.command)) {
     options.command
       .map((item) => item.trim())

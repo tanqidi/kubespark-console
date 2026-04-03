@@ -23,7 +23,7 @@ const TERMINAL_THEME = {
 }
 
 type ExecServerMessage = {
-  op: "stdout" | "stderr" | "error" | "exit"
+  op: "stdout" | "stderr" | "error" | "exit" | "connected"
   data?: string
   message?: string
 }
@@ -145,8 +145,12 @@ export function TerminalViewerDialog({
     terminal.writeln(`\x1b[90m[ws] ${wsUrl}\x1b[0m`)
 
     ws.onopen = () => {
-      terminal.writeln("\x1b[32m[connected]\x1b[0m")
-      sendResize()
+      const token =
+        (typeof window !== "undefined"
+          ? localStorage.getItem("kubespark_token") || sessionStorage.getItem("kubespark_token")
+          : "") || ""
+      ws.send(JSON.stringify({ op: "auth", token }))
+      terminal.writeln("\x1b[90m[proxy connected]\x1b[0m")
     }
 
     ws.onmessage = (event) => {
@@ -155,6 +159,11 @@ export function TerminalViewerDialog({
           const parsed = JSON.parse(raw) as ExecServerMessage
           if (parsed.op === "stdout" || parsed.op === "stderr") {
             if (parsed.data) terminal.write(parsed.data)
+            return
+          }
+          if (parsed.op === "connected") {
+            terminal.writeln("\x1b[32m[connected]\x1b[0m")
+            sendResize()
             return
           }
           if (parsed.op === "error") {

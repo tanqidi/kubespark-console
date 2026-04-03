@@ -100,14 +100,8 @@ export function PodsPageClient() {
   }, [])
 
   const handleOpenTerminal = React.useCallback((row: PodRow) => {
-    const token =
-      (typeof window !== "undefined"
-        ? localStorage.getItem("kubespark_token") || sessionStorage.getItem("kubespark_token")
-        : "") || ""
     const wsUrl = buildPodExecWsEndpoint(row.namespace, row.name, {
-      tty: true,
       command: ["/bin/sh"],
-      token,
     })
     setTerminalTitle("查看终端")
     setTerminalSubtitle(`连接 Kubernetes Pod（${row.namespace}/${row.name}）的终端会话。`)
