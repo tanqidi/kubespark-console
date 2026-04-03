@@ -1,12 +1,12 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
-import { CreateWorkloadDialog } from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog"
-import { parseWorkloadPayload } from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.logic"
-import type { WorkloadDialogInitialValues } from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog"
+import { CreateWorkloadDialog } from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog"
+import { parseWorkloadPayload } from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog.logic"
+import type { WorkloadDialogInitialValues } from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog"
 // import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,

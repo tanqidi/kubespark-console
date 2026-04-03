@@ -10,7 +10,7 @@ import type {
   CreateStep,
   SchedulingPolicy,
   WorkloadDialogSnapshot,
-} from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog.logic"
 import {
   CONTAINER_PORT_PROTOCOL_SET,
   POD_REQUIRED_MESSAGE,
@@ -37,7 +37,7 @@ import {
   toDnsLabelFragment,
   validateContainerPorts,
   validateName,
-} from "@/app/(console)/dashboard/components/resource-pages/create-workload-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog.logic"
 import { useContainerEditor } from "@/app/(console)/dashboard/components/resource-pages/use-container-editor"
 import {
   hasUserProvidedMetadata,

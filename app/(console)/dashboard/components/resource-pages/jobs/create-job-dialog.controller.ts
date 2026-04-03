@@ -9,7 +9,7 @@ import type {
   CreateStep,
   JobConfigInput,
   JobDialogSnapshot,
-} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/jobs/create-job-dialog.logic"
 import {
   CONTAINER_PORT_PROTOCOL_SET,
   CRON_SCHEDULE_REQUIRED_MESSAGE,
@@ -39,7 +39,7 @@ import {
   toOptionalNonNegativeInt,
   validateContainerPorts,
   validateName,
-} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/jobs/create-job-dialog.logic"
 import { useContainerEditor } from "@/app/(console)/dashboard/components/resource-pages/use-container-editor"
 import {
   hasUserProvidedMetadata,
@@ -1106,3 +1106,4 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     yamlText,
   }
 }
+

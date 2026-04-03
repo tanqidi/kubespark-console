@@ -40,7 +40,7 @@ import {
   resolveDuplicateContainerEnvNameIds,
   toDnsLabelFragment,
   validateContainerPorts,
-} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog.logic"
+} from "@/app/(console)/dashboard/components/resource-pages/jobs/create-job-dialog.logic"
 import {
   Dialog,
   DialogClose,
@@ -1749,3 +1749,4 @@ export function CreatePodDialog({
     </Dialog>
   )
 }
+

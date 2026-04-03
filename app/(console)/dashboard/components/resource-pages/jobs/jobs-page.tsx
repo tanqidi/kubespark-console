@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import { IconDotsVertical, IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
@@ -8,7 +8,7 @@ import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import {
   CreateJobDialog,
   type JobDialogInitialValues,
-} from "@/app/(console)/dashboard/components/resource-pages/create-job-dialog"
+} from "@/app/(console)/dashboard/components/resource-pages/jobs/create-job-dialog"
 // import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -822,3 +822,4 @@ export function JobsPageClient() {
     </>
   )
 }
+

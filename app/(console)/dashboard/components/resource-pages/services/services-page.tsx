@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
@@ -7,7 +7,7 @@ import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import {
   CreateServiceDialog,
   type ServiceDialogInitialValues,
-} from "@/app/(console)/dashboard/components/resource-pages/create-service-dialog"
+} from "@/app/(console)/dashboard/components/resource-pages/services/create-service-dialog"
 // import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -436,3 +436,4 @@ export function ServicesPageClient() {
     </>
   )
 }
+

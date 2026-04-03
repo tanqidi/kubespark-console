@@ -1,10 +1,10 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
-import { CreatePodDialog } from "@/app/(console)/dashboard/components/resource-pages/create-pod-dialog"
+import { CreatePodDialog } from "@/app/(console)/dashboard/components/resource-pages/pods/create-pod-dialog"
 // import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
@@ -341,3 +341,4 @@ export function PodsPageClient() {
     </>
   )
 }
+

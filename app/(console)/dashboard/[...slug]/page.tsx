@@ -17,7 +17,7 @@ import { ResourceDetailPage } from "@/app/(console)/dashboard/components/resourc
 import {
   WorkloadDetailTemplate,
   type WorkloadDetailKind,
-} from "@/app/(console)/dashboard/components/resource-pages/workload-detail-templates"
+} from "@/app/(console)/dashboard/components/resource-pages/workloads/workload-detail-templates"
 
 const sectionRenderers = {
   nodes: NodesPageClient,
