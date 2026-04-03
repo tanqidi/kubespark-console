@@ -23,18 +23,11 @@ import {
 import { fetchTextStream } from "@/app/lib/kubespark/common"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { LogViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/log-viewer-dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
 
 type PodRow = PodResourceRow
 
@@ -427,7 +420,7 @@ export function PodsPageClient() {
         loading={yamlLoading}
         error={yamlError}
       />
-      <Dialog
+      <LogViewerDialog
         open={logsOpen}
         onOpenChange={(open) => {
           setLogsOpen(open)
@@ -436,39 +429,14 @@ export function PodsPageClient() {
             setRealtimeLogs(false)
           }
         }}
-      >
-        <DialogContent className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-270">
-          <div className="flex items-start justify-between border-b bg-muted/15">
-            <DialogHeader className="px-6 py-4">
-              <DialogTitle>{logsTitle}</DialogTitle>
-              <DialogDescription>展示 Pod 最近日志输出。</DialogDescription>
-            </DialogHeader>
-            <div className="h-full flex items-center me-20">
-              <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                <span className="text-sm font-medium">实时日志</span>
-                <Switch
-                  checked={realtimeLogs}
-                  onCheckedChange={setRealtimeLogs}
-                  aria-label="实时日志"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden p-6">
-            <div className="h-full overflow-auto rounded-md border bg-black p-4">
-              {logsLoading ? (
-                <p className="text-sm text-zinc-300">日志加载中...</p>
-              ) : logsError ? (
-                <p className="text-sm text-red-400">{logsError}</p>
-              ) : (
-                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-5 text-zinc-100">
-                  {logsContent || "(无日志输出)"}
-                </pre>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        title={logsTitle}
+        subtitle="展示 Pod 最近日志输出。"
+        realtime={realtimeLogs}
+        onRealtimeChange={setRealtimeLogs}
+        loading={logsLoading}
+        error={logsError}
+        content={logsContent}
+      />
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
         onOpenChange={(open) => {
