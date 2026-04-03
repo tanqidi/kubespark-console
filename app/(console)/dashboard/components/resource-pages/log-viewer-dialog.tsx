@@ -67,7 +67,7 @@ export function LogViewerDialog({
       convertEol: true,
       disableStdin: true,
       fontSize: 13,
-      lineHeight: 1.3,
+      lineHeight: 1.35,
       letterSpacing: 0.2,
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace",
       theme: LOG_TERMINAL_THEME,
