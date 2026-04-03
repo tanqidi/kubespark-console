@@ -132,7 +132,6 @@ export function PodsPageClient() {
         const reader = response.body.getReader()
         const decoder = new TextDecoder("utf-8")
 
-        setLogsContent("")
         setLogsLoading(false)
 
         while (true) {

@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
-import type { EditorProps } from "@monaco-editor/react"
-import dynamic from "next/dynamic"
+import { FitAddon } from "@xterm/addon-fit"
+import { Terminal } from "@xterm/xterm"
+import "@xterm/xterm/css/xterm.css"
 
 import {
   Dialog,
@@ -13,19 +14,14 @@ import {
 } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
-  ssr: false,
-})
+const LOG_TERMINAL_THEME = {
+  background: "#000000",
+  foreground: "#f3f4f6",
+  cursor: "#f3f4f6",
+}
 
-const LOG_EDITOR_OPTIONS: EditorProps["options"] = {
-  readOnly: true,
-  minimap: { enabled: false },
-  stickyScroll: { enabled: false },
-  wordWrap: "on",
-  scrollBeyondLastLine: false,
-  lineNumbers: "off",
-  glyphMargin: false,
-  folding: false,
+function toTerminalText(value: string): string {
+  return value.replace(/\r?\n/g, "\r\n")
 }
 
 type LogViewerDialogProps = {
@@ -51,9 +47,124 @@ export function LogViewerDialog({
   error = null,
   content,
 }: LogViewerDialogProps) {
+  const [terminalHost, setTerminalHost] = React.useState<HTMLDivElement | null>(null)
+  const terminalRef = React.useRef<Terminal | null>(null)
+  const fitAddonRef = React.useRef<FitAddon | null>(null)
+  const lastRenderedRef = React.useRef("")
+  const latestContentRef = React.useRef(content)
+  const fitTimerRefs = React.useRef<number[]>([])
+
+  React.useEffect(() => {
+    latestContentRef.current = content
+  }, [content])
+
+  const initTerminal = React.useCallback(() => {
+    if (terminalRef.current || !terminalHost) return
+
+    const terminal = new Terminal({
+      convertEol: true,
+      disableStdin: true,
+      fontSize: 13,
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace",
+      theme: LOG_TERMINAL_THEME,
+      cursorBlink: false,
+      scrollback: 20000,
+    })
+    const fitAddon = new FitAddon()
+    terminal.loadAddon(fitAddon)
+    terminal.open(terminalHost)
+    fitAddon.fit()
+
+    terminalRef.current = terminal
+    fitAddonRef.current = fitAddon
+    const initial = latestContentRef.current || "(无日志输出)"
+    terminal.write(toTerminalText(initial))
+    lastRenderedRef.current = initial
+  }, [terminalHost])
+
+  const scheduleFit = React.useCallback(() => {
+    const fitAddon = fitAddonRef.current
+    if (!fitAddon) return
+
+    fitAddon.fit()
+    const t1 = window.setTimeout(() => fitAddonRef.current?.fit(), 50)
+    const t2 = window.setTimeout(() => fitAddonRef.current?.fit(), 150)
+    const t3 = window.setTimeout(() => fitAddonRef.current?.fit(), 300)
+    fitTimerRefs.current.push(t1, t2, t3)
+    window.requestAnimationFrame(() => fitAddonRef.current?.fit())
+  }, [])
+
+  const disposeTerminal = React.useCallback(() => {
+    fitTimerRefs.current.forEach((timer) => window.clearTimeout(timer))
+    fitTimerRefs.current = []
+    fitAddonRef.current?.dispose()
+    terminalRef.current?.dispose()
+    fitAddonRef.current = null
+    terminalRef.current = null
+    lastRenderedRef.current = ""
+  }, [])
+
+  React.useEffect(() => {
+    if (!open) return
+    initTerminal()
+    const term = terminalRef.current
+    const fitAddon = fitAddonRef.current
+    const container = terminalHost
+    if (!term || !fitAddon || !container) return
+
+    const observer = new ResizeObserver(() => {
+      fitAddon.fit()
+    })
+    observer.observe(container)
+    scheduleFit()
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [initTerminal, open, scheduleFit, terminalHost])
+
+  React.useEffect(() => {
+    if (!open || loading || Boolean(error)) return
+    const term = terminalRef.current
+    if (!term) return
+
+    const next = content || "(无日志输出)"
+    const prev = lastRenderedRef.current
+    if (next === prev) return
+
+    const nearBottom = term.buffer.active.baseY - term.buffer.active.viewportY <= 1
+    scheduleFit()
+    if (prev && next.startsWith(prev)) {
+      const appendText = next.slice(prev.length)
+      if (appendText) term.write(toTerminalText(appendText))
+    } else {
+      term.reset()
+      term.write(toTerminalText(next))
+    }
+
+    lastRenderedRef.current = next
+    if (realtime && nearBottom) term.scrollToBottom()
+  }, [content, error, loading, open, realtime, scheduleFit])
+
+  React.useEffect(() => {
+    if (!open) {
+      disposeTerminal()
+      setTerminalHost(null)
+    }
+  }, [disposeTerminal, open])
+
+  React.useEffect(() => {
+    return () => {
+      disposeTerminal()
+    }
+  }, [disposeTerminal])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-270">
+      <DialogContent
+        className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-270"
+        onEscapeKeyDown={(event) => event.preventDefault()}
+      >
         <div className="flex items-start justify-between border-b bg-muted/15">
           <DialogHeader className="px-6 py-4">
             <DialogTitle>{title}</DialogTitle>
@@ -71,20 +182,14 @@ export function LogViewerDialog({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-hidden p-6">
-          <div className="h-full overflow-hidden rounded-md border bg-black">
+          <div className="relative h-full overflow-hidden rounded-md border bg-black">
+              <div ref={setTerminalHost} className="h-full w-full" />
             {loading ? (
-              <div className="p-4 text-sm text-zinc-300">日志加载中...</div>
-            ) : error ? (
-              <div className="p-4 text-sm text-red-400">{error}</div>
-            ) : (
-              <MonacoEditor
-                language="plaintext"
-                theme="vs-dark"
-                value={content || "(无日志输出)"}
-                height="100%"
-                options={LOG_EDITOR_OPTIONS}
-              />
-            )}
+              <div className="absolute inset-0 bg-black/60 p-4 text-sm text-zinc-300">日志加载中...</div>
+            ) : null}
+            {error ? (
+              <div className="absolute inset-0 bg-black/60 p-4 text-sm text-red-400">{error}</div>
+            ) : null}
           </div>
         </div>
       </DialogContent>
