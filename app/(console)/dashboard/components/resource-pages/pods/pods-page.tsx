@@ -53,6 +53,7 @@ export function PodsPageClient() {
   const [logsError, setLogsError] = React.useState<string | null>(null)
   const [logsTarget, setLogsTarget] = React.useState<Pick<PodRow, "name" | "namespace"> | null>(null)
   const [realtimeLogs, setRealtimeLogs] = React.useState(false)
+  const [logsDownloading, setLogsDownloading] = React.useState(false)
   const logsAbortRef = React.useRef<AbortController | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PodRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -165,19 +166,30 @@ export function PodsPageClient() {
   }, [])
 
   const handleDownloadLogs = React.useCallback(() => {
-    if (!logsContent) return
-    const fileNameBase = logsTarget?.name?.trim() || "container-logs"
-    const safeBase = fileNameBase.replace(/[\\/:*?"<>|]/g, "_")
-    const blob = new Blob([logsContent], { type: "text/plain;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `${safeBase}.txt`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  }, [logsContent, logsTarget?.name])
+    if (!logsTarget || logsDownloading) return
+    setLogsDownloading(true)
+    void fetchNamespacedPodLogs(logsTarget.namespace, logsTarget.name, { tailLines: 2000 })
+      .then(({ text }) => {
+        const fileNameBase = logsTarget.name.trim() || "container-logs"
+        const safeBase = fileNameBase.replace(/[\\/:*?"<>|]/g, "_")
+        const blob = new Blob([text || "(无日志输出)"], { type: "text/plain;charset=utf-8" })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        link.download = `${safeBase}.txt`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "下载日志失败"
+        setLogsError(message)
+      })
+      .finally(() => {
+        setLogsDownloading(false)
+      })
+  }, [logsDownloading, logsTarget])
 
   const requestDelete = React.useCallback((row: PodRow) => {
     setPendingDeleteRow(row)
@@ -453,7 +465,7 @@ export function PodsPageClient() {
         error={logsError}
         content={logsContent}
         onDownload={handleDownloadLogs}
-        downloadDisabled={!logsContent}
+        downloadDisabled={!logsTarget || logsDownloading}
       />
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}

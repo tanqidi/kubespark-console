@@ -3,7 +3,13 @@
 import * as React from "react"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
-import { IconDownload } from "@tabler/icons-react"
+import {
+  IconArrowsMaximize,
+  IconArrowsMinimize,
+  IconDownload,
+  IconPlayerPause,
+  IconPlayerPlay,
+} from "@tabler/icons-react"
 import "@xterm/xterm/css/xterm.css"
 
 import {
@@ -14,7 +20,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 
 const LOG_TERMINAL_THEME = {
   background: "#0b1220",
@@ -204,22 +209,34 @@ export function LogViewerDialog({
               <IconDownload />
               <span className="sr-only">下载日志</span>
             </Button>
-            <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-              <span className="text-sm font-medium">全屏</span>
-              <Switch
-                checked={fullscreen}
-                onCheckedChange={setFullscreen}
-                aria-label="全屏"
-              />
-            </div>
-            <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-              <span className="text-sm font-medium">实时日志</span>
-              <Switch
-                checked={realtime}
-                onCheckedChange={onRealtimeChange}
-                aria-label="实时日志"
-              />
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={`rounded-full transition-colors ${
+                fullscreen ? "border-black bg-black text-white hover:bg-black hover:text-white" : ""
+              }`}
+              onClick={() => setFullscreen((prev) => !prev)}
+              aria-label={fullscreen ? "退出全屏" : "全屏"}
+              title={fullscreen ? "退出全屏" : "全屏"}
+            >
+              {fullscreen ? <IconArrowsMinimize /> : <IconArrowsMaximize />}
+              <span className="sr-only">{fullscreen ? "退出全屏" : "全屏"}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={`rounded-full transition-colors ${
+                realtime ? "border-black bg-black text-white hover:bg-black hover:text-white" : ""
+              }`}
+              onClick={() => onRealtimeChange(!realtime)}
+              aria-label={realtime ? "停止实时日志" : "开启实时日志"}
+              title={realtime ? "停止实时日志" : "开启实时日志"}
+            >
+              {realtime ? <IconPlayerPause /> : <IconPlayerPlay />}
+              <span className="sr-only">{realtime ? "停止实时日志" : "开启实时日志"}</span>
+            </Button>
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-hidden p-6">
