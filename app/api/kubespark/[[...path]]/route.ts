@@ -42,11 +42,14 @@ async function proxyUpstream(req: NextRequest, method: string, context: RouteCon
       body: method === "GET" || method === "HEAD" ? undefined : await req.arrayBuffer(),
     });
 
-    const arrayBuffer = await res.arrayBuffer();
     const responseHeaders = new Headers();
     const contentType = res.headers.get("content-type");
+    const cacheControl = res.headers.get("cache-control");
     if (contentType) responseHeaders.set("content-type", contentType);
-    return new NextResponse(arrayBuffer, {
+    if (cacheControl) responseHeaders.set("cache-control", cacheControl);
+
+    // Stream upstream response body directly so follow/log endpoints can flush in real time.
+    return new NextResponse(res.body, {
       status: res.status,
       headers: responseHeaders,
     });
