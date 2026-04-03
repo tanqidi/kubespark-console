@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconEye, IconFileText, IconPencil, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconFileText, IconPencil, IconTerminal2, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { CreatePodDialog } from "@/app/(console)/dashboard/components/resource-pages/pods/create-pod-dialog"
@@ -11,6 +11,7 @@ import {
   renderNameDescriptionCell,
 } from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
+  buildPodExecWsEndpoint,
   buildPodLogsEndpoint,
   deletePod,
   createPod,
@@ -24,6 +25,7 @@ import { fetchTextStream } from "@/app/lib/kubespark/common"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { LogViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/log-viewer-dialog"
+import { TerminalViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/terminal-viewer-dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -54,6 +56,10 @@ export function PodsPageClient() {
   const [logsTarget, setLogsTarget] = React.useState<Pick<PodRow, "name" | "namespace"> | null>(null)
   const [realtimeLogs, setRealtimeLogs] = React.useState(false)
   const [logsDownloading, setLogsDownloading] = React.useState(false)
+  const [terminalOpen, setTerminalOpen] = React.useState(false)
+  const [terminalTitle, setTerminalTitle] = React.useState("查看终端")
+  const [terminalSubtitle, setTerminalSubtitle] = React.useState("连接 Kubernetes Pod 的终端会话。")
+  const [terminalWsUrl, setTerminalWsUrl] = React.useState<string | null>(null)
   const logsAbortRef = React.useRef<AbortController | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PodRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -91,6 +97,22 @@ export function PodsPageClient() {
     setLogsSubtitle(`查看 Kubernetes Pod（${row.namespace}/${row.name}）的日志内容。`)
     setLogsTarget({ name: row.name, namespace: row.namespace })
     setLogsContent("")
+  }, [])
+
+  const handleOpenTerminal = React.useCallback((row: PodRow) => {
+    const token =
+      (typeof window !== "undefined"
+        ? localStorage.getItem("kubespark_token") || sessionStorage.getItem("kubespark_token")
+        : "") || ""
+    const wsUrl = buildPodExecWsEndpoint(row.namespace, row.name, {
+      tty: true,
+      command: ["/bin/sh"],
+      token,
+    })
+    setTerminalTitle("查看终端")
+    setTerminalSubtitle(`连接 Kubernetes Pod（${row.namespace}/${row.name}）的终端会话。`)
+    setTerminalWsUrl(wsUrl)
+    setTerminalOpen(true)
   }, [])
 
   React.useEffect(() => {
@@ -279,6 +301,17 @@ export function PodsPageClient() {
               handleViewLogs(row)
             },
           },
+          {
+            label: (
+              <>
+                <IconTerminal2 className="size-4" />
+                {"终端"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleOpenTerminal(row)
+            },
+          },
           /*{
             label: (
               <>
@@ -305,7 +338,7 @@ export function PodsPageClient() {
           },
         ],
       }),
-    [handleEdit, handleViewLogs, handleViewYaml, requestDelete]
+    [handleEdit, handleOpenTerminal, handleViewLogs, handleViewYaml, requestDelete]
   )
 
   const refreshRows = React.useCallback(async () => {
@@ -466,6 +499,16 @@ export function PodsPageClient() {
         content={logsContent}
         onDownload={handleDownloadLogs}
         downloadDisabled={!logsTarget || logsDownloading}
+      />
+      <TerminalViewerDialog
+        open={terminalOpen}
+        onOpenChange={(open) => {
+          setTerminalOpen(open)
+          if (!open) setTerminalWsUrl(null)
+        }}
+        title={terminalTitle}
+        subtitle={terminalSubtitle}
+        wsUrl={terminalWsUrl}
       />
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}

@@ -1,4 +1,5 @@
 import {
+  API_PROXY_BASE,
   buildResourceCollectionEndpoint,
   buildResourceItemEndpoint,
   fetchJsonDeduped,
@@ -93,6 +94,59 @@ export function buildPodLogsEndpoint(
   }
 
   return `${basePath}/log${params.toString() ? `?${params.toString()}` : ""}`
+}
+
+export function buildPodExecWsEndpoint(
+  namespace: string,
+  name: string,
+  options?: {
+    container?: string
+    command?: string[]
+    tty?: boolean
+    token?: string
+  }
+): string {
+  const params = new URLSearchParams()
+  params.set("namespace", namespace)
+  if (options?.container?.trim()) params.set("container", options.container.trim())
+  if (typeof options?.tty === "boolean") params.set("tty", String(options.tty))
+  if (options?.token?.trim()) params.set("token", options.token.trim())
+  if (Array.isArray(options?.command)) {
+    options.command
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .forEach((item) => params.append("command", item))
+  }
+
+  const routePath = `/kapis/v1alpha1/resources/core/v1/pods/${encodeURIComponent(name)}/exec`
+  const explicitBase = process.env.NEXT_PUBLIC_KUBESPARK_WS_BASE?.trim()
+  if (explicitBase) {
+    const normalized = explicitBase.endsWith("/") ? explicitBase.slice(0, -1) : explicitBase
+    return `${normalized}${routePath}?${params.toString()}`
+  }
+
+  if (typeof window !== "undefined") {
+    if (/^https?:\/\//.test(API_PROXY_BASE)) {
+      try {
+        const parsed = new URL(API_PROXY_BASE)
+        const protocol = parsed.protocol === "https:" ? "wss" : "ws"
+        return `${protocol}://${parsed.host}${routePath}?${params.toString()}`
+      } catch {
+        // fallback below
+      }
+    }
+
+    // Dev fallback: frontend usually on :3000, backend on :8080.
+    if (window.location.port === "3000") {
+      const protocol = window.location.protocol === "https:" ? "wss" : "ws"
+      return `${protocol}://${window.location.hostname}:8080${routePath}?${params.toString()}`
+    }
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws"
+    return `${protocol}://${window.location.host}${routePath}?${params.toString()}`
+  }
+
+  return `ws://localhost:8080${routePath}?${params.toString()}`
 }
 
 export type CreatePodInput = BaseCreateInput & {
