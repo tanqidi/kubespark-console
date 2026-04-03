@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconFileText, IconPencil, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { CreatePodDialog } from "@/app/(console)/dashboard/components/resource-pages/pods/create-pod-dialog"
@@ -13,6 +13,7 @@ import {
 import {
   deletePod,
   createPod,
+  fetchNamespacedPodLogs,
   fetchNamespacedPodYaml,
   fetchPodResourceRows,
   updatePod,
@@ -23,6 +24,13 @@ import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resour
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
 type PodRow = PodResourceRow
@@ -41,6 +49,11 @@ export function PodsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [logsOpen, setLogsOpen] = React.useState(false)
+  const [logsTitle, setLogsTitle] = React.useState("查看日志")
+  const [logsContent, setLogsContent] = React.useState("")
+  const [logsLoading, setLogsLoading] = React.useState(false)
+  const [logsError, setLogsError] = React.useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PodRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -68,6 +81,30 @@ export function PodsPageClient() {
       })
       .finally(() => {
         setYamlLoading(false)
+      })
+  }, [])
+
+  const handleViewLogs = React.useCallback((row: PodRow) => {
+    setLogsOpen(true)
+    setLogsTitle(`容器日志 · ${row.namespace}/${row.name}`)
+    setLogsError(null)
+    setLogsLoading(true)
+    setLogsContent("")
+
+    void fetchNamespacedPodLogs(row.namespace, row.name, { tailLines: 500 })
+      .then(({ text }) => {
+        setLogsContent(text || "(无日志输出)")
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载日志失败"
+        setLogsError(message)
+        console.error("[Pods] view logs request failed", {
+          pod: { name: row.name, namespace: row.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setLogsLoading(false)
       })
   }, [])
 
@@ -151,6 +188,17 @@ export function PodsPageClient() {
           {
             label: (
               <>
+                <IconFileText className="size-4" />
+                {"日志"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewLogs(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconPencil className="size-4" />
                 {"编辑"}
               </>
@@ -174,7 +222,7 @@ export function PodsPageClient() {
           },
         ],
       }),
-    [handleEdit, handleViewYaml, requestDelete]
+    [handleEdit, handleViewLogs, handleViewYaml, requestDelete]
   )
 
   const refreshRows = React.useCallback(async () => {
@@ -317,6 +365,25 @@ export function PodsPageClient() {
         loading={yamlLoading}
         error={yamlError}
       />
+      <Dialog open={logsOpen} onOpenChange={setLogsOpen}>
+        <DialogContent className="sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{logsTitle}</DialogTitle>
+            <DialogDescription>展示 Pod 最近日志输出。</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[65vh] overflow-auto rounded-md border bg-black p-4">
+            {logsLoading ? (
+              <p className="text-sm text-zinc-300">日志加载中...</p>
+            ) : logsError ? (
+              <p className="text-sm text-red-400">{logsError}</p>
+            ) : (
+              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-5 text-zinc-100">
+                {logsContent || "(无日志输出)"}
+              </pre>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
         onOpenChange={(open) => {

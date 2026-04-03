@@ -2,6 +2,7 @@ import {
   buildResourceCollectionEndpoint,
   buildResourceItemEndpoint,
   fetchJsonDeduped,
+  fetchText,
   deleteResource,
   fetchResourceByName,
   fetchResourceCollection,
@@ -66,6 +67,11 @@ type RawPod = {
 export type PodYamlResult = {
   requestUrl: string
   payload: unknown
+  text: string
+}
+
+export type PodLogsResult = {
+  requestUrl: string
   text: string
 }
 
@@ -376,6 +382,26 @@ export async function fetchNamespacedPodYaml(namespace: string, name: string): P
     payload,
     text: podPayloadToEditorText(payload),
   }
+}
+
+export async function fetchNamespacedPodLogs(
+  namespace: string,
+  name: string,
+  options?: { container?: string; tailLines?: number }
+): Promise<PodLogsResult> {
+  const itemUrl = buildResourceItemEndpoint("core", "v1", "pods", name, namespace)
+  const [basePath, queryString = ""] = itemUrl.split("?")
+  const params = new URLSearchParams(queryString)
+
+  if (options?.container?.trim()) params.set("container", options.container.trim())
+  if (typeof options?.tailLines === "number" && Number.isFinite(options.tailLines) && options.tailLines > 0) {
+    params.set("tailLines", String(Math.floor(options.tailLines)))
+  }
+
+  const requestUrl = `${basePath}/log${params.toString() ? `?${params.toString()}` : ""}`
+  const text = await fetchText(requestUrl)
+
+  return { requestUrl, text }
 }
 
 export async function deletePod(namespace: string, name: string): Promise<void> {
