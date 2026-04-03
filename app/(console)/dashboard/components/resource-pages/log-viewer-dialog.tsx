@@ -103,9 +103,7 @@ export function LogViewerDialog({
 
     fitAddon.fit()
     const t1 = window.setTimeout(() => fitAddonRef.current?.fit(), 50)
-    const t2 = window.setTimeout(() => fitAddonRef.current?.fit(), 150)
-    const t3 = window.setTimeout(() => fitAddonRef.current?.fit(), 300)
-    fitTimerRefs.current.push(t1, t2, t3)
+    fitTimerRefs.current.push(t1)
     window.requestAnimationFrame(() => fitAddonRef.current?.fit())
   }, [])
 
@@ -183,10 +181,11 @@ export function LogViewerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        overlayClassName="!animate-none !transition-none !duration-0 data-[state=closed]:!animate-none data-[state=open]:!animate-none"
         className={
           fullscreen
-            ? "flex h-screen min-h-screen max-h-screen w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:max-w-none"
-            : "flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-270"
+            ? "flex h-screen min-h-screen max-h-screen w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 !animate-none !transition-none !duration-0 data-[state=closed]:!animate-none data-[state=open]:!animate-none data-[state=closed]:!zoom-out-100 data-[state=open]:!zoom-in-100 sm:max-w-none"
+            : "flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[90vw] max-w-[1280px] flex-col gap-0 overflow-hidden p-0 !animate-none !transition-none !duration-0 data-[state=closed]:!animate-none data-[state=open]:!animate-none data-[state=closed]:!zoom-out-100 data-[state=open]:!zoom-in-100 sm:max-w-[1280px]"
         }
         onEscapeKeyDown={(event) => event.preventDefault()}
       >
