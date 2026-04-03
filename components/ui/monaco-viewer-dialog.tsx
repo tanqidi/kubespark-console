@@ -96,24 +96,28 @@ export function MonacoViewerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          "h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex flex-col sm:max-w-270",
+          "flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-270",
           className
         )}
       >
-        <DialogHeader>
-          <DialogTitle className={title ? undefined : "sr-only"}>
-            {resolvedTitle}
-          </DialogTitle>
-          {resolvedSubtitle ? <DialogDescription>{resolvedSubtitle}</DialogDescription> : null}
-        </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <MonacoEditor
-            language={language}
-            theme={theme}
-            value={value}
-            height="100%"
-            options={{ ...defaultOptions, ...(editorOptions ?? {}) }}
-          />
+        <div className="flex items-start justify-between border-b bg-muted/15">
+          <DialogHeader className="px-6 py-4">
+            <DialogTitle className={title ? undefined : "sr-only"}>
+              {resolvedTitle}
+            </DialogTitle>
+            {resolvedSubtitle ? <DialogDescription>{resolvedSubtitle}</DialogDescription> : null}
+          </DialogHeader>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden p-6">
+          <div className="h-full overflow-hidden rounded-lg border border-slate-700/60 bg-slate-950/95 shadow-inner">
+            <MonacoEditor
+              language={language}
+              theme={theme}
+              value={value}
+              height="100%"
+              options={{ ...defaultOptions, ...(editorOptions ?? {}) }}
+            />
+          </div>
         </div>
       </DialogContent>
     </Dialog>
