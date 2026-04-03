@@ -437,22 +437,24 @@ export function PodsPageClient() {
           }
         }}
       >
-        <DialogContent className="h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex flex-col sm:max-w-270">
-          <div className="flex items-start justify-between gap-4">
-            <DialogHeader>
+        <DialogContent className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-270">
+          <div className="flex items-start justify-between border-b bg-muted/15">
+            <DialogHeader className="px-6 py-4">
               <DialogTitle>{logsTitle}</DialogTitle>
               <DialogDescription>展示 Pod 最近日志输出。</DialogDescription>
             </DialogHeader>
-            <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-              <span className="text-sm font-medium">实时日志</span>
-              <Switch
-                checked={realtimeLogs}
-                onCheckedChange={setRealtimeLogs}
-                aria-label="实时日志"
-              />
+            <div className="h-full flex items-center me-20">
+              <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                <span className="text-sm font-medium">实时日志</span>
+                <Switch
+                  checked={realtimeLogs}
+                  onCheckedChange={setRealtimeLogs}
+                  aria-label="实时日志"
+                />
+              </div>
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden p-6">
             <div className="h-full overflow-auto rounded-md border bg-black p-4">
               {logsLoading ? (
                 <p className="text-sm text-zinc-300">日志加载中...</p>
