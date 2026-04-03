@@ -22,12 +22,17 @@ function buildWsTarget(reqUrl) {
 }
 
 app.prepare().then(() => {
+  const handleUpgrade = app.getUpgradeHandler()
   const server = http.createServer((req, res) => handle(req, res))
   const wss = new WebSocketServer({ noServer: true })
 
   server.on("upgrade", (req, socket, head) => {
-    if (!req.url || !req.url.startsWith("/api/kubespark-ws/")) {
+    if (!req.url) {
       socket.destroy()
+      return
+    }
+    if (!req.url.startsWith("/api/kubespark-ws/")) {
+      handleUpgrade(req, socket, head)
       return
     }
 
