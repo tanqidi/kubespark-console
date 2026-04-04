@@ -11,7 +11,7 @@ spec:
     matchLabels:
       app: kubespark-console
   template:
-    metadata:
+    metadata: 
       labels:
         app: kubespark-console
     spec:
