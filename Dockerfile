@@ -5,6 +5,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
+FROM node:20-bookworm-slim AS prod-deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 ENV NODE_ENV=production
@@ -20,14 +25,14 @@ ENV PORT=3000
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/server.js ./custom-server.js
-COPY --from=deps /app/node_modules/ws ./node_modules/ws
 
 USER nextjs
 EXPOSE 3000
 
 CMD ["node", "custom-server.js", "--prod"]
-
