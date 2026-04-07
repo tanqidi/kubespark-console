@@ -53,12 +53,16 @@ export function NavUser({
     avatar: string
   }
 }) {
+  const resolveTerminalSubtitle = React.useCallback(
+    (target: string) => `连接 Kubernetes Pod（${target}）的终端会话。`,
+    []
+  )
   const { isMobile } = useSidebar()
   const router = useRouter()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false)
   const [terminalOpen, setTerminalOpen] = React.useState(false)
   const [terminalWsUrl, setTerminalWsUrl] = React.useState<string | null>(null)
-  const [terminalSubtitle, setTerminalSubtitle] = React.useState("用于直接控制 kubectl 的命令会话。")
+  const [terminalSubtitle, setTerminalSubtitle] = React.useState("连接 Kubernetes Pod（-）的终端会话。")
   const [terminalEmptyMessage, setTerminalEmptyMessage] = React.useState("终端连接地址不可用。")
   const [openingTerminal, setOpeningTerminal] = React.useState(false)
 
@@ -81,26 +85,26 @@ export function NavUser({
       )
 
       if (!preferred) {
-        throw new Error("未找到运行中的 Pod：kubespark/kubespark-terminal-*。请检查 kubespark/kubespark-terminal 部署是否正常。")
+        throw new Error("未找到运行中的 Pod：kubespark/kubespark-terminal-*, 请检查 kubespark/kubespark-terminal 部署是否正常。")
       }
 
       const wsUrl = buildPodExecWsEndpoint(preferred.namespace, preferred.name, {
         command: ["/bin/sh"],
       })
-      setTerminalSubtitle(`用于直接控制 kubectl 的命令会话（${preferred.namespace}/${preferred.name}）。`)
+      setTerminalSubtitle(resolveTerminalSubtitle(`${preferred.namespace}/${preferred.name}`))
       setTerminalEmptyMessage("终端连接地址不可用。")
       setTerminalWsUrl(wsUrl)
       setTerminalOpen(true)
     } catch (error) {
       const message = error instanceof Error ? error.message : "打开终端失败"
-      setTerminalSubtitle("用于直接控制 kubectl 的命令会话。")
+      setTerminalSubtitle(resolveTerminalSubtitle("-"))
       setTerminalEmptyMessage(message)
       setTerminalWsUrl(null)
       setTerminalOpen(true)
     } finally {
       setOpeningTerminal(false)
     }
-  }, [openingTerminal])
+  }, [openingTerminal, resolveTerminalSubtitle])
 
   return (
     <SidebarMenu>
