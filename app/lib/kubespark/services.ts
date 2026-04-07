@@ -21,7 +21,7 @@ export type ServicePortProtocol =
 export type ServicePortInput = {
   protocol: ServicePortProtocol
   name?: string
-  targetPort: number
+  targetPort: number | string
   servicePort: number
 }
 

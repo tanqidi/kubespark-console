@@ -224,7 +224,7 @@ function resolveProtocolFromYaml(value: unknown): PortItem["protocol"] {
   return PORT_PROTOCOL_SET.has(next) ? (next as PortItem["protocol"]) : "TCP"
 }
 
-function normalizePortInput(value: string): string {
+function normalizeNumericPortInput(value: string): string {
   const digits = value.replace(/\D+/g, "")
   if (!digits) return ""
 
@@ -233,6 +233,17 @@ function normalizePortInput(value: string): string {
   if (parsed > 65535) return "65535"
   if (parsed < 0) return "0"
   return String(parsed)
+}
+
+function normalizeTargetPortInput(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ""
+  if (/^\d+$/.test(trimmed)) return normalizeNumericPortInput(trimmed)
+  return trimmed
+}
+
+function isNumericPortText(value: string): boolean {
+  return /^\d+$/.test(value.trim())
 }
 
 const AUTO_PROTOCOL_PREFIX_SET = new Set([
@@ -307,12 +318,16 @@ function buildServiceManifest(snapshot: ServiceDialogSnapshot): JsonObject {
 
       const parsedServicePort = Number(servicePort)
       const parsedTargetPort = Number(targetPort)
+      const targetPortValue =
+        /^\d+$/.test(targetPort) && Number.isFinite(parsedTargetPort)
+          ? parsedTargetPort
+          : targetPort
 
       return {
         protocol: item.protocol,
         ...(name ? { name } : {}),
         ...(Number.isFinite(parsedServicePort) && servicePort ? { port: parsedServicePort } : {}),
-        ...(Number.isFinite(parsedTargetPort) && targetPort ? { targetPort: parsedTargetPort } : {}),
+        ...(targetPort ? { targetPort: targetPortValue } : {}),
       }
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
@@ -481,12 +496,15 @@ function validatePortItems(targetPorts: PortItem[]): {
     if (!hasServicePort) fieldError.servicePort = "请输入服务端口"
 
     if (hasTargetPort) {
-      if (!/^\d+$/.test(item.targetPort)) {
-        fieldError.targetPort = "容器端口格式无效"
-      } else {
+      if (/^\d+$/.test(item.targetPort)) {
         const targetPortNumber = Number(item.targetPort)
         if (targetPortNumber < 0 || targetPortNumber > 65535) {
           fieldError.targetPort = "容器端口超出范围（0-65535）"
+        }
+      } else {
+        const targetPortName = item.targetPort.toLowerCase()
+        if (!/^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$/.test(targetPortName)) {
+          fieldError.targetPort = "容器端口需为数字或端口名称（如 tcp-80）"
         }
       }
     }
@@ -1028,7 +1046,9 @@ export function CreateServiceDialog({
         ports: normalizedPorts.map((item) => ({
           protocol: item.protocol,
           name: item.name,
-          targetPort: Number(item.targetPort),
+          targetPort: /^\d+$/.test(item.targetPort)
+            ? Number(item.targetPort)
+            : item.targetPort,
           servicePort: Number(item.servicePort),
         })),
       }
@@ -1225,9 +1245,12 @@ export function CreateServiceDialog({
 
           if (field === "targetPort") {
             const nextTargetPort = value
+            const nextTargetPortIsNumeric = isNumericPortText(nextTargetPort)
+            const wasSyncedWithTargetPort = item.servicePort.trim() === item.targetPort.trim()
             const shouldSyncServicePort =
-              !item.servicePort.trim() || item.servicePort.trim() === item.targetPort.trim()
-            const nextServicePort = shouldSyncServicePort ? value : item.servicePort
+              (!nextTargetPort.trim() && wasSyncedWithTargetPort) ||
+              (nextTargetPortIsNumeric && (!item.servicePort.trim() || wasSyncedWithTargetPort))
+            const nextServicePort = shouldSyncServicePort ? nextTargetPort : item.servicePort
             const fallbackPortBefore = item.targetPort.trim() || item.servicePort.trim()
             const fallbackPortAfter = nextTargetPort.trim() || nextServicePort.trim()
             const autoNameBefore = buildAutoPortName(item.protocol, fallbackPortBefore)
@@ -1240,7 +1263,10 @@ export function CreateServiceDialog({
               (Boolean(autoNameBefore) && currentName === autoNameBefore)
 
             const nextName = shouldAutoRename
-              ? autoNameAfter ?? `${resolveProtocolNamePrefix(item.protocol)}-`
+              ? autoNameAfter ??
+                (!nextTargetPort.trim() && !nextServicePort.trim()
+                  ? `${resolveProtocolNamePrefix(item.protocol)}-`
+                  : item.name || `${resolveProtocolNamePrefix(item.protocol)}-`)
               : item.name
 
             if (
@@ -1312,7 +1338,9 @@ export function CreateServiceDialog({
         const rowError = { ...current[id] }
         delete rowError[field]
         if (field === "targetPort") {
-          delete rowError.servicePort
+          if (isNumericPortText(value)) {
+            delete rowError.servicePort
+          }
         }
         if (Object.keys(rowError).length === 0) {
           const next = { ...current }
@@ -1726,12 +1754,9 @@ export function CreateServiceDialog({
                                       updatePortItem(
                                         item.id,
                                         "targetPort",
-                                        normalizePortInput(event.target.value)
+                                        normalizeTargetPortInput(event.target.value)
                                       )
                                     }
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    maxLength={5}
                                     aria-invalid={Boolean(portFieldErrors[item.id]?.targetPort)}
                                     disabled={isBusy}
                                   />
@@ -1754,7 +1779,7 @@ export function CreateServiceDialog({
                                       updatePortItem(
                                         item.id,
                                         "servicePort",
-                                        normalizePortInput(event.target.value)
+                                        normalizeNumericPortInput(event.target.value)
                                       )
                                     }
                                     inputMode="numeric"
