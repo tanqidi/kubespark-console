@@ -23,6 +23,7 @@ export type ServicePortInput = {
   name?: string
   targetPort: number | string
   servicePort: number
+  nodePort?: number
 }
 
 export type CreateServiceInput = BaseCreateInput & {
@@ -77,6 +78,7 @@ function buildServiceSpec(input: {
             ...(port.name ? { name: port.name } : {}),
             port: port.servicePort,
             targetPort: port.targetPort,
+            ...(enableNodePort && Number.isFinite(port.nodePort) ? { nodePort: port.nodePort } : {}),
           })),
         }
       : {}),

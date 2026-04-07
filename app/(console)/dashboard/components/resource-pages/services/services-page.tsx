@@ -164,6 +164,12 @@ export function ServicesPageClient() {
                 : typeof portObj.port === "string"
                   ? portObj.port
                   : ""
+            const nodePort =
+              typeof portObj.nodePort === "number"
+                ? String(portObj.nodePort)
+                : typeof portObj.nodePort === "string"
+                  ? portObj.nodePort
+                  : ""
             return {
               protocol: [
                 "TCP",
@@ -178,6 +184,7 @@ export function ServicesPageClient() {
               name: typeof portObj.name === "string" ? portObj.name : "",
               targetPort,
               servicePort,
+              nodePort,
             }
           })
           .filter((item) => item.targetPort || item.servicePort || item.name)

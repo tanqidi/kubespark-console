@@ -99,6 +99,7 @@ type PortItem = {
   name: string
   targetPort: string
   servicePort: string
+  nodePort: string
 }
 
 type ServicePortFieldErrors = Record<string, { name?: string; targetPort?: string; servicePort?: string }>
@@ -125,6 +126,7 @@ export type ServiceDialogInitialValues = {
     name: string
     targetPort: string
     servicePort: string
+    nodePort?: string
   }>
   enableNodePort: boolean
   enableSessionAffinity: boolean
@@ -205,6 +207,7 @@ function createPortItem(
     name: defaults?.name ?? `${resolveProtocolNamePrefix(protocol)}-`,
     targetPort: defaults?.targetPort ?? "",
     servicePort: defaults?.servicePort ?? "",
+    nodePort: defaults?.nodePort ?? "",
   }
 }
 
@@ -312,11 +315,13 @@ function buildServiceManifest(snapshot: ServiceDialogSnapshot): JsonObject {
       const name = item.name.trim()
       const targetPort = item.targetPort.trim()
       const servicePort = item.servicePort.trim()
+      const nodePort = item.nodePort.trim()
 
-      if (!name && !targetPort && !servicePort) return null
+      if (!name && !targetPort && !servicePort && !nodePort) return null
 
       const parsedServicePort = Number(servicePort)
       const parsedTargetPort = Number(targetPort)
+      const parsedNodePort = Number(nodePort)
       const targetPortValue =
         /^\d+$/.test(targetPort) && Number.isFinite(parsedTargetPort)
           ? parsedTargetPort
@@ -327,6 +332,9 @@ function buildServiceManifest(snapshot: ServiceDialogSnapshot): JsonObject {
         ...(name ? { name } : {}),
         ...(Number.isFinite(parsedServicePort) && servicePort ? { port: parsedServicePort } : {}),
         ...(targetPort ? { targetPort: targetPortValue } : {}),
+        ...(snapshot.enableNodePort && Number.isFinite(parsedNodePort) && nodePort
+          ? { nodePort: parsedNodePort }
+          : {}),
       }
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
@@ -408,6 +416,7 @@ function parseServiceYamlText(yamlText: string): ServiceDialogSnapshot {
     const name = asString(portObj.name).trim()
     const targetPortRaw = portObj.targetPort
     const portRaw = portObj.port
+    const nodePortRaw = portObj.nodePort
 
     const targetPort =
       typeof targetPortRaw === "number"
@@ -415,6 +424,8 @@ function parseServiceYamlText(yamlText: string): ServiceDialogSnapshot {
         : asString(targetPortRaw)
     const servicePort =
       typeof portRaw === "number" ? String(portRaw) : asString(portRaw)
+    const nodePort =
+      typeof nodePortRaw === "number" ? String(nodePortRaw) : asString(nodePortRaw)
 
     const autoName = buildAutoPortName(protocol, servicePort || targetPort) ?? ""
 
@@ -423,6 +434,7 @@ function parseServiceYamlText(yamlText: string): ServiceDialogSnapshot {
       name: name || autoName,
       targetPort,
       servicePort,
+      nodePort,
     })
   })
 
@@ -452,13 +464,14 @@ function parseServiceYamlText(yamlText: string): ServiceDialogSnapshot {
   }
 }
 
-function validatePortItems(targetPorts: PortItem[]): {
+function validatePortItems(targetPorts: PortItem[], enableNodePort = false): {
   normalizedPorts: Array<{
     id: string
     protocol: PortItem["protocol"]
     name: string
     targetPort: string
     servicePort: string
+    nodePort: string
   }>
   nextPortError: string | null
   nextPortFieldErrors: ServicePortFieldErrors
@@ -469,6 +482,7 @@ function validatePortItems(targetPorts: PortItem[]): {
     name: item.name.trim(),
     targetPort: item.targetPort.trim(),
     servicePort: item.servicePort.trim(),
+    nodePort: item.nodePort.trim(),
   }))
 
   const nextPortFieldErrors: ServicePortFieldErrors = {}
@@ -515,6 +529,17 @@ function validatePortItems(targetPorts: PortItem[]): {
         const servicePortNumber = Number(item.servicePort)
         if (servicePortNumber < 0 || servicePortNumber > 65535) {
           fieldError.servicePort = "服务端口超出范围（0-65535）"
+        }
+      }
+    }
+
+    if (enableNodePort && item.nodePort) {
+      if (!/^\d+$/.test(item.nodePort)) {
+        fieldError.servicePort = "NodePort 格式无效"
+      } else {
+        const nodePortNumber = Number(item.nodePort)
+        if (nodePortNumber <= 0 || nodePortNumber > 65535) {
+          fieldError.servicePort = "NodePort 超出范围（1-65535）"
         }
       }
     }
@@ -733,6 +758,7 @@ export function CreateServiceDialog({
           name: item.name,
           targetPort: item.targetPort,
           servicePort: item.servicePort,
+          nodePort: item.nodePort ?? "",
         })
       )
     )
@@ -935,7 +961,7 @@ export function CreateServiceDialog({
       }
     }
 
-    const { nextPortError, nextPortFieldErrors } = validatePortItems(portItems)
+    const { nextPortError, nextPortFieldErrors } = validatePortItems(portItems, enableNodePort)
 
     setSelectorError(nextSelectorError)
     setPortError(nextPortError)
@@ -946,10 +972,14 @@ export function CreateServiceDialog({
 
     setServiceCompleted(true)
     setActiveStep("advanced")
-  }, [portItems, selectorItems])
+  }, [enableNodePort, portItems, selectorItems])
 
   const validateServiceFields = React.useCallback(
-    (sourceSelectorItems?: SelectorItem[], sourcePortItems?: PortItem[]) => {
+    (
+      sourceSelectorItems?: SelectorItem[],
+      sourcePortItems?: PortItem[],
+      sourceEnableNodePort?: boolean
+    ) => {
     const targetSelectors = sourceSelectorItems ?? selectorItems
     const targetPorts = sourcePortItems ?? portItems
 
@@ -985,7 +1015,10 @@ export function CreateServiceDialog({
       }
     }
 
-    const { normalizedPorts, nextPortError, nextPortFieldErrors } = validatePortItems(targetPorts)
+    const { normalizedPorts, nextPortError, nextPortFieldErrors } = validatePortItems(
+      targetPorts,
+      sourceEnableNodePort ?? enableNodePort
+    )
 
     return {
       nextSelectorError,
@@ -994,7 +1027,7 @@ export function CreateServiceDialog({
       filledSelectors,
       normalizedPorts,
     }
-  }, [portItems, selectorItems])
+  }, [enableNodePort, portItems, selectorItems])
 
   const submitService = React.useCallback(
     async (
@@ -1006,6 +1039,7 @@ export function CreateServiceDialog({
         name: string
         targetPort: string
         servicePort: string
+        nodePort: string
       }>,
       useDraft?: ServiceDialogSnapshot
     ) => {
@@ -1045,6 +1079,9 @@ export function CreateServiceDialog({
             ? Number(item.targetPort)
             : item.targetPort,
           servicePort: Number(item.servicePort),
+          ...(source.enableNodePort && /^\d+$/.test(item.nodePort)
+            ? { nodePort: Number(item.nodePort) }
+            : {}),
         })),
       }
 
@@ -1105,7 +1142,8 @@ export function CreateServiceDialog({
       normalizedPorts,
     } = validateServiceFields(
       source.selectorItems,
-      source.portItems
+      source.portItems,
+      source.enableNodePort
     )
 
     setNameError(nextNameError)
