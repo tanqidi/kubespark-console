@@ -21,9 +21,9 @@ import { Button } from "@/components/ui/button"
 
 const DESCRIBE_TERMINAL_THEME = {
   background: "#1e1e1e",
-  foreground: "#e2e8f0",
-  cursor: "#93c5fd",
-  selectionBackground: "rgba(148,163,184,0.25)",
+  foreground: "#d4d4d4",
+  cursor: "#d4d4d4",
+  selectionBackground: "rgba(255,255,255,0.18)",
 }
 
 function toTerminalText(value: string): string {
@@ -230,3 +230,4 @@ export function DescribeViewerDialog({
     </Dialog>
   )
 }
+
