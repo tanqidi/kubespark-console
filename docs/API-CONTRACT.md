@@ -89,6 +89,14 @@
 
 说明：当前 `fetchResourceByName` 采用该方式，避免部分后端详情路径 `405`。
 
+### 6.3 Describe（原生详情）
+
+`GET /resources/{group}/{version}/{resource}/{name}/describe`
+
+- 返回类型：`text/plain`
+- 语义：后端直接返回 Kubernetes 原生 describe 输出（不做前端二次组装）
+- namespaced 资源需携带 `namespace` query 参数（如 Pod/Service/Ingress/Job 等）
+
 ## 7. 统一写操作
 
 ### 7.1 删除
@@ -168,5 +176,16 @@
 - 创建/更新聚合导出：`app/lib/kubespark/resource-create.ts`
 - 删除：`app/lib/kubespark/resource-delete.ts`
 - YAML：`app/lib/kubespark/resource-yaml.ts`
+- Describe：`app/lib/kubespark/common.ts`（`buildResourceDescribeEndpoint` / `fetchResourceDescribe`）
 - Job/CronJob：`app/lib/kubespark/jobs.ts`
 - Workload：`app/lib/kubespark/workloads.ts`
+
+## 13. 前端详情入口范围（当前）
+
+已接入详情（Describe）菜单：
+
+- Namespaces、Nodes、Pods、Services、Workloads、Jobs/CronJobs
+
+未接入详情（按产品决策暂不展示）：
+
+- ConfigMaps、Secrets、PersistentVolumes、PersistentVolumeClaims、StorageClasses、Ingresses

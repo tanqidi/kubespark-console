@@ -1,7 +1,7 @@
 # KubeSpark 控制台（React + Next.js）
 
 KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 CRUD 与 YAML 协同编辑。  
-当前已覆盖命名空间、Pod、Service、Job/CronJob、ConfigMap、Secret 等常见资源的列表管理、创建/编辑与 YAML 查看能力。
+当前已覆盖命名空间、Pod、Service、Job/CronJob 等常见资源的列表管理、创建/编辑与 YAML 查看能力；并在部分资源提供原生 `kubectl describe` 风格的“详情”查看能力。
 
 ## 界面预览
 
@@ -70,6 +70,13 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 - Pod 支持终端会话（`/bin/sh`）并通过 WebSocket 与后端 `exec` 子资源交互。
 - 前端终端连接统一走同源 `/api/kubespark-ws/*` 代理，不直接暴露后端地址。
 
+### 9. 资源详情（Describe）
+
+- 已支持“详情”（Describe）资源：
+  - Namespace、Node、Pod、Service、Workload（Deployment/StatefulSet/DaemonSet）、Job/CronJob
+- 暂不提供“详情”入口资源：
+  - ConfigMap、Secret、PersistentVolume/PersistentVolumeClaim、StorageClass、Ingress（Route）。
+
 ## Kubernetes 部署
 
 使用仓库内示例 YAML 创建 `Namespace + RBAC + Deployment + Service`。
@@ -86,6 +93,7 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 
 ```bash
 kubectl apply -f deployment/kubespark-rbac.yaml
+kubectl apply -f deployment/kubespark-terminal.yaml
 kubectl apply -f deployment/kubespark-deployment.yaml
 kubectl apply -f deployment/kubespark-console-deployment.yaml
 ```
