@@ -466,6 +466,10 @@ export function resolveContainerName(name: string, image: string, index: number,
 }
 
 export function formatStringListAsEditorText(value: unknown): string {
+  if (typeof value === "string") {
+    const text = value.trim()
+    return text.length > 0 ? text : ""
+  }
   if (!Array.isArray(value)) return ""
   const list = value
     .map((item) => (typeof item === "string" ? item.trim() : ""))

@@ -117,8 +117,8 @@ export function ResourceMetadataEditor({
     <AdvancedToggleCard
       checked={checked}
       disabled={disabled}
-      ariaLabel="添加元数据"
-      title="添加元数据"
+      ariaLabel="标签注解"
+      title="标签注解"
       description={titleText}
       onCheckedChange={(nextChecked) => {
         if (disabled) return

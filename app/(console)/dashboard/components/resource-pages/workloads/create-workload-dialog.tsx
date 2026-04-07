@@ -1288,8 +1288,8 @@ export function CreateWorkloadDialog({
                       <AdvancedToggleCard
                         checked={rollingUpdateEnabled}
                         disabled={isBusy}
-                        ariaLabel="滚动更新策略"
-                        title="滚动更新策略"
+                        ariaLabel="滚动更新"
+                        title="滚动更新"
                         description="可配置更新类型、最大不可用和最大激增。"
                         onCheckedChange={(checked) => {
                           if (isBusy) return
