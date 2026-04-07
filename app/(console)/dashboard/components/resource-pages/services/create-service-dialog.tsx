@@ -102,7 +102,7 @@ type PortItem = {
   nodePort: string
 }
 
-type ServicePortFieldErrors = Record<string, { name?: string; targetPort?: string; servicePort?: string }>
+type ServicePortFieldErrors = Record<string, { name?: string; targetPort?: string; servicePort?: string; nodePort?: string }>
 
 type CreateServiceDialogProps = {
   open: boolean
@@ -535,22 +535,24 @@ function validatePortItems(targetPorts: PortItem[], enableNodePort = false): {
 
     if (enableNodePort && item.nodePort) {
       if (!/^\d+$/.test(item.nodePort)) {
-        fieldError.servicePort = "NodePort 格式无效"
+        fieldError.nodePort = "外部端口格式无效"
       } else {
         const nodePortNumber = Number(item.nodePort)
         if (nodePortNumber <= 0 || nodePortNumber > 65535) {
-          fieldError.servicePort = "NodePort 超出范围（1-65535）"
+          fieldError.nodePort = "外部端口超出范围（1-65535）"
         }
       }
     }
 
-    if (fieldError.name || fieldError.targetPort || fieldError.servicePort) {
+    if (fieldError.name || fieldError.targetPort || fieldError.servicePort || fieldError.nodePort) {
       nextPortFieldErrors[item.id] = fieldError
       if (!nextPortError) {
         if (!hasName || !hasTargetPort || !hasServicePort) {
           nextPortError = `第 ${index + 1} 个端口需完整填写名称、容器端口和服务端口`
         } else if (fieldError.targetPort) {
           nextPortError = `第 ${index + 1} 个端口的容器端口校验失败`
+        } else if (fieldError.nodePort) {
+          nextPortError = `第 ${index + 1} 个端口的外部端口校验失败`
         } else if (fieldError.servicePort) {
           nextPortError = `第 ${index + 1} 个端口的服务端口校验失败`
         }
@@ -636,6 +638,7 @@ function resolveFirstServicePortErrorFieldId(
     if (fieldError.name) return `service-port-${item.id}-name`
     if (fieldError.targetPort) return `service-port-${item.id}-target-port`
     if (fieldError.servicePort) return `service-port-${item.id}-service-port`
+    if (fieldError.nodePort) return `service-port-${item.id}-node-port`
   }
   return null
 }
@@ -1695,8 +1698,18 @@ export function CreateServiceDialog({
                     </div>
                     <div className="mt-3 flex flex-col gap-3">
                       {portItems.length > 0 ? (
-                        portItems.map((item) => (
-                            <div key={item.id} className="grid items-start gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+                        portItems.map((item) => {
+                          const showNodePortInput =
+                            isEditMode && internalAccessMode !== "headless" && enableNodePort
+                          return (
+                            <div
+                              key={item.id}
+                              className={`grid items-start gap-3 ${
+                                showNodePortInput
+                                  ? "md:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]"
+                                  : "md:grid-cols-[1fr_1fr_1fr_1fr_auto]"
+                              }`}
+                            >
                               <Select
                                   value={item.protocol}
                                   onValueChange={(value) =>
@@ -1785,6 +1798,36 @@ export function CreateServiceDialog({
                                   </p>
                                 ) : null}
                               </div>
+                              {showNodePortInput ? (
+                                <div className="flex min-w-0 flex-col gap-1">
+                                  <InputGroup>
+                                    <InputGroupAddon>
+                                      <InputGroupText>外部端口</InputGroupText>
+                                    </InputGroupAddon>
+                                    <InputGroupInput
+                                      id={`service-port-${item.id}-node-port`}
+                                      value={item.nodePort}
+                                      onChange={(event) =>
+                                        updatePortItem(
+                                          item.id,
+                                          "nodePort",
+                                          normalizeNumericPortInput(event.target.value)
+                                        )
+                                      }
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      maxLength={5}
+                                      aria-invalid={Boolean(portFieldErrors[item.id]?.nodePort)}
+                                      disabled={isBusy}
+                                    />
+                                  </InputGroup>
+                                  {portFieldErrors[item.id]?.nodePort ? (
+                                    <p className="text-xs text-destructive">
+                                      {portFieldErrors[item.id]?.nodePort}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ) : null}
                               <Button
                                   type="button"
                                   variant="ghost"
@@ -1795,7 +1838,8 @@ export function CreateServiceDialog({
                                 删除
                               </Button>
                             </div>
-                        ))
+                          )
+                        })
                       ) : (
                         <div
                           className={`rounded-lg border border-dashed px-4 py-4 text-sm ${
