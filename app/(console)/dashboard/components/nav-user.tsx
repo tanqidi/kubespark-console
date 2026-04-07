@@ -58,6 +58,8 @@ export function NavUser({
   const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false)
   const [terminalOpen, setTerminalOpen] = React.useState(false)
   const [terminalWsUrl, setTerminalWsUrl] = React.useState<string | null>(null)
+  const [terminalSubtitle, setTerminalSubtitle] = React.useState("用于直接控制 kubectl 的命令会话。")
+  const [terminalEmptyMessage, setTerminalEmptyMessage] = React.useState("终端连接地址不可用。")
   const [openingTerminal, setOpeningTerminal] = React.useState(false)
 
   const handleLogoutConfirm = React.useCallback(() => {
@@ -74,24 +76,27 @@ export function NavUser({
       const rows = await fetchPodResourceRows(300)
       const runningRows = rows.filter((item) => item.status.toLowerCase() === "running")
 
-      const preferred =
-        runningRows.find((item) => item.namespace === "kubespark" && item.name.startsWith("kubespark")) ??
-        runningRows.find((item) => item.name.startsWith("kubespark")) ??
-        runningRows[0] ??
-        rows[0]
+      const preferred = runningRows.find(
+        (item) => item.namespace === "kubespark" && item.name.startsWith("kubespark-terminal-")
+      )
 
       if (!preferred) {
-        throw new Error("未找到可用 Pod，请先创建并运行 Pod 后重试。")
+        throw new Error("未找到运行中的 Pod：kubespark/kubespark-terminal-*。请检查 kubespark/kubespark-terminal 部署是否正常。")
       }
 
       const wsUrl = buildPodExecWsEndpoint(preferred.namespace, preferred.name, {
         command: ["/bin/sh"],
       })
+      setTerminalSubtitle(`用于直接控制 kubectl 的命令会话（${preferred.namespace}/${preferred.name}）。`)
+      setTerminalEmptyMessage("终端连接地址不可用。")
       setTerminalWsUrl(wsUrl)
       setTerminalOpen(true)
     } catch (error) {
       const message = error instanceof Error ? error.message : "打开终端失败"
-      window.alert(message)
+      setTerminalSubtitle("用于直接控制 kubectl 的命令会话。")
+      setTerminalEmptyMessage(message)
+      setTerminalWsUrl(null)
+      setTerminalOpen(true)
     } finally {
       setOpeningTerminal(false)
     }
@@ -189,9 +194,10 @@ export function NavUser({
             setTerminalOpen(open)
             if (!open) setTerminalWsUrl(null)
           }}
-          title="终端"
-          subtitle="用于直接控制 kubectl 的命令会话。"
+          title="超级终端"
+          subtitle={terminalSubtitle}
           wsUrl={terminalWsUrl}
+          emptyMessage={terminalEmptyMessage}
         />
       </SidebarMenuItem>
     </SidebarMenu>

@@ -34,6 +34,7 @@ type TerminalViewerDialogProps = {
   title: string
   subtitle?: string
   wsUrl: string | null
+  emptyMessage?: string
 }
 
 export function TerminalViewerDialog({
@@ -42,6 +43,7 @@ export function TerminalViewerDialog({
   title,
   subtitle = "连接 Kubernetes Pod 终端会话。",
   wsUrl,
+  emptyMessage = "终端连接地址不可用。",
 }: TerminalViewerDialogProps) {
   const [terminalHost, setTerminalHost] = React.useState<HTMLDivElement | null>(null)
   const [fullscreen, setFullscreen] = React.useState(false)
@@ -118,12 +120,16 @@ export function TerminalViewerDialog({
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
     setTerminalReady(true)
-    terminal.writeln("\x1b[1;36m正在连接终端...\x1b[0m")
+    if (wsUrl) {
+      terminal.writeln("\x1b[1;36m正在连接终端...\x1b[0m")
+    } else {
+      terminal.writeln(`\x1b[1;33m${emptyMessage}\x1b[0m`)
+    }
 
     return () => {
       disposeInput.dispose()
     }
-  }, [open, sendSocketMessage, terminalHost])
+  }, [emptyMessage, open, sendSocketMessage, terminalHost, wsUrl])
 
   React.useEffect(() => {
     if (!open || !terminalRef.current || !terminalHost) return
@@ -242,6 +248,7 @@ export function TerminalViewerDialog({
             : "flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[90vw] max-w-[1280px] flex-col gap-0 overflow-hidden p-0 !animate-none !transition-none !duration-0 data-[state=closed]:!animate-none data-[state=open]:!animate-none sm:max-w-[1280px]"
         }
         onEscapeKeyDown={(event) => event.preventDefault()}
+        onPointerDownOutside={(event) => event.preventDefault()}
       >
         <div className="flex items-start justify-between border-b bg-muted/15">
           <DialogHeader className="px-6 py-4">
