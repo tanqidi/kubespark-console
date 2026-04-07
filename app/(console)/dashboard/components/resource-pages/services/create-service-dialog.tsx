@@ -15,7 +15,6 @@ import { parse, stringify } from "yaml"
 import { checkServiceExists, createService, updateService } from "@/app/lib/kubespark/services"
 import { createRuntimeId } from "@/app/lib/kubespark/id"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
-import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {
   ResourceMetadataEditor,
   hasUserProvidedMetadata,
@@ -659,8 +658,6 @@ export function CreateServiceDialog({
   const [yamlMode, setYamlMode] = React.useState(false)
   const [yamlText, setYamlText] = React.useState("")
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [pendingDeleteSelectorId, setPendingDeleteSelectorId] = React.useState<string | null>(null)
-  const [pendingDeletePortId, setPendingDeletePortId] = React.useState<string | null>(null)
   const [selectorAddPromptOpen, setSelectorAddPromptOpen] = React.useState(false)
   const [selectorAddPromptShown, setSelectorAddPromptShown] = React.useState(false)
   const initializedEditKeyRef = React.useRef<string | null>(null)
@@ -701,8 +698,6 @@ export function CreateServiceDialog({
       setYamlMode(false)
       setYamlText("")
       setYamlError(null)
-      setPendingDeleteSelectorId(null)
-      setPendingDeletePortId(null)
       setSelectorAddPromptOpen(false)
       setSelectorAddPromptShown(false)
       initializedEditKeyRef.current = null
@@ -1387,49 +1382,6 @@ export function CreateServiceDialog({
     [portError, stepError]
   )
 
-  const requestRemoveSelectorItem = React.useCallback(
-    (id: string) => {
-      const current = selectorItems.find((item) => item.id === id)
-      if (!current) return
-      const isEmpty = !current.key.trim() && !current.value.trim()
-      if (isEmpty) {
-        removeSelectorItem(id)
-        return
-      }
-      setPendingDeleteSelectorId(id)
-    },
-    [removeSelectorItem, selectorItems]
-  )
-
-  const requestRemovePortItem = React.useCallback(
-    (id: string) => {
-      const current = portItems.find((item) => item.id === id)
-      if (!current) return
-      const isEmpty =
-        !current.name.trim() &&
-        !current.targetPort.trim() &&
-        !current.servicePort.trim()
-      if (isEmpty) {
-        removePortItem(id)
-        return
-      }
-      setPendingDeletePortId(id)
-    },
-    [portItems, removePortItem]
-  )
-
-  const handleConfirmDeleteSelectorItem = React.useCallback(() => {
-    if (!pendingDeleteSelectorId) return
-    removeSelectorItem(pendingDeleteSelectorId)
-    setPendingDeleteSelectorId(null)
-  }, [pendingDeleteSelectorId, removeSelectorItem])
-
-  const handleConfirmDeletePortItem = React.useCallback(() => {
-    if (!pendingDeletePortId) return
-    removePortItem(pendingDeletePortId)
-    setPendingDeletePortId(null)
-  }, [pendingDeletePortId, removePortItem])
-
   return (
     <Dialog
       open={open}
@@ -1667,7 +1619,7 @@ export function CreateServiceDialog({
                                 <Button
                                     type="button"
                                     variant="ghost"
-                                    onClick={() => requestRemoveSelectorItem(item.id)}
+                                    onClick={() => removeSelectorItem(item.id)}
                                     disabled={isBusy}
                                 >
                                   <IconTrash data-icon="inline-start" />
@@ -1699,7 +1651,7 @@ export function CreateServiceDialog({
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-1">
                         <FieldLabel>端口</FieldLabel>
-                        <FieldDescription className="mt-0">配置服务端口与容器端口映射，支持 TCP、UDP、SCTP 协议。</FieldDescription>
+                        <FieldDescription className="mt-0">配置服务端口与容器端口映射，容器端口建议使用纯数字以联动。</FieldDescription>
                       </div>
                       <div className="hidden h-9 shrink-0 md:block" aria-hidden />
                     </div>
@@ -1798,7 +1750,7 @@ export function CreateServiceDialog({
                               <Button
                                   type="button"
                                   variant="ghost"
-                                  onClick={() => requestRemovePortItem(item.id)}
+                                  onClick={() => removePortItem(item.id)}
                                   disabled={isBusy}
                               >
                                 <IconTrash data-icon="inline-start" />
@@ -1972,32 +1924,6 @@ export function CreateServiceDialog({
               </DialogFooter>
           )}
         </div>
-
-        <DeleteConfirmDialog
-          open={Boolean(pendingDeleteSelectorId)}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen && !isBusy) {
-              setPendingDeleteSelectorId(null)
-            }
-          }}
-          title="删除工作负载选择器"
-          description="确定删除该工作负载选择器吗？"
-          deleting={isBusy}
-          onConfirm={handleConfirmDeleteSelectorItem}
-        />
-
-        <DeleteConfirmDialog
-          open={Boolean(pendingDeletePortId)}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen && !isBusy) {
-              setPendingDeletePortId(null)
-            }
-          }}
-          title="删除端口项"
-          description="确定删除该端口项吗？"
-          deleting={isBusy}
-          onConfirm={handleConfirmDeletePortItem}
-        />
 
         <WorkloadPickerDialog
           open={workloadPickerOpen}
