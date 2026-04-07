@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconEye, IconFileText, IconTerminal2, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconFileText, IconInfoCircle, IconTerminal2, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { CreatePodDialog } from "@/app/(console)/dashboard/components/resource-pages/pods/create-pod-dialog"
@@ -323,7 +323,7 @@ export function PodsPageClient() {
           {
             label: (
               <>
-                <IconFileText className="size-4" />
+                <IconInfoCircle className="size-4" />
                 {"详情"}
               </>
             ),

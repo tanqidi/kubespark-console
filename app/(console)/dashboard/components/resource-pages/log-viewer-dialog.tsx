@@ -92,10 +92,10 @@ export function LogViewerDialog({
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
-    const initial = latestContentRef.current || "(无日志输出)"
-    terminal.write(toTerminalText(initial))
+    const initial = loading || Boolean(error) ? "" : (latestContentRef.current || "(无日志输出)")
+    if (initial) terminal.write(toTerminalText(initial))
     lastRenderedRef.current = initial
-  }, [terminalHost])
+  }, [error, loading, terminalHost])
 
   const scheduleFit = React.useCallback(() => {
     const fitAddon = fitAddonRef.current
@@ -242,10 +242,10 @@ export function LogViewerDialog({
           <div className="relative h-full overflow-hidden rounded-lg border border-slate-700/60 bg-slate-950/95 shadow-inner">
               <div ref={setTerminalHost} className="h-full w-full px-2 py-2" />
             {loading ? (
-              <div className="absolute inset-0 bg-black/60 p-4 text-sm text-zinc-300">日志加载中...</div>
+              <div className="absolute inset-0 bg-slate-950/95 p-4 text-sm text-zinc-300">日志加载中...</div>
             ) : null}
             {error ? (
-              <div className="absolute inset-0 bg-black/60 p-4 text-sm text-red-400">{error}</div>
+              <div className="absolute inset-0 bg-slate-950/95 p-4 text-sm text-red-400">{error}</div>
             ) : null}
           </div>
         </div>
