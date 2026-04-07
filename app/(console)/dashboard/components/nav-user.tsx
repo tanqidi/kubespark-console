@@ -5,10 +5,12 @@ import {
   IconDotsVertical,
   IconLogout,
   IconNotification,
+  IconTerminal2,
   IconUserCircle,
 } from "@tabler/icons-react"
 import { useRouter } from "next/navigation"
 
+import { buildPodExecWsEndpoint, fetchPodResourceRows } from "@/app/lib/kubespark/pods"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +42,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { logout } from "@/app/lib/kubespark/auth"
+import { TerminalViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/terminal-viewer-dialog"
 
 export function NavUser({
   user,
@@ -53,12 +56,46 @@ export function NavUser({
   const { isMobile } = useSidebar()
   const router = useRouter()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false)
+  const [terminalOpen, setTerminalOpen] = React.useState(false)
+  const [terminalWsUrl, setTerminalWsUrl] = React.useState<string | null>(null)
+  const [openingTerminal, setOpeningTerminal] = React.useState(false)
 
   const handleLogoutConfirm = React.useCallback(() => {
     logout()
     setLogoutConfirmOpen(false)
     router.replace("/login")
   }, [router])
+
+  const handleOpenTerminal = React.useCallback(async () => {
+    if (openingTerminal) return
+
+    setOpeningTerminal(true)
+    try {
+      const rows = await fetchPodResourceRows(300)
+      const runningRows = rows.filter((item) => item.status.toLowerCase() === "running")
+
+      const preferred =
+        runningRows.find((item) => item.namespace === "kubespark" && item.name.startsWith("kubespark")) ??
+        runningRows.find((item) => item.name.startsWith("kubespark")) ??
+        runningRows[0] ??
+        rows[0]
+
+      if (!preferred) {
+        throw new Error("未找到可用 Pod，请先创建并运行 Pod 后重试。")
+      }
+
+      const wsUrl = buildPodExecWsEndpoint(preferred.namespace, preferred.name, {
+        command: ["/bin/sh"],
+      })
+      setTerminalWsUrl(wsUrl)
+      setTerminalOpen(true)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "打开终端失败"
+      window.alert(message)
+    } finally {
+      setOpeningTerminal(false)
+    }
+  }, [openingTerminal])
 
   return (
     <SidebarMenu>
@@ -116,6 +153,10 @@ export function NavUser({
                 <IconNotification />
                 通知
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void handleOpenTerminal()} disabled={openingTerminal}>
+                <IconTerminal2 />
+                终端
+              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
@@ -142,6 +183,16 @@ export function NavUser({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <TerminalViewerDialog
+          open={terminalOpen}
+          onOpenChange={(open) => {
+            setTerminalOpen(open)
+            if (!open) setTerminalWsUrl(null)
+          }}
+          title="终端"
+          subtitle="用于直接控制 kubectl 的命令会话。"
+          wsUrl={terminalWsUrl}
+        />
       </SidebarMenuItem>
     </SidebarMenu>
   )
