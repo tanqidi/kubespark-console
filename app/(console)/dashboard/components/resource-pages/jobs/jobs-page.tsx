@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconDotsVertical, IconEye, IconPencil, IconTrash } from "@tabler/icons-react"
+import { IconDotsVertical, IconEye, IconInfoCircle, IconPencil, IconTrash } from "@tabler/icons-react"
 import type { ColumnDef } from "@tanstack/react-table"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
@@ -15,7 +15,7 @@ import {
   renderNameDescriptionCell,
   type ColumnConfig,
 } from "@/app/(console)/dashboard/components/table/columns-factory"
-import { fetchResourceByName } from "@/app/lib/kubespark/common"
+import { fetchResourceByName, fetchResourceDescribe } from "@/app/lib/kubespark/common"
 import { createJob, updateJob } from "@/app/lib/kubespark/jobs"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { fetchJobRows, type JobResourceRow } from "@/app/lib/kubespark/resource-rows"
@@ -24,6 +24,7 @@ import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
+import { DescribeViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/describe-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -492,6 +493,11 @@ export function JobsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [describeOpen, setDescribeOpen] = React.useState(false)
+  const [describeContent, setDescribeContent] = React.useState("")
+  const [describeLoading, setDescribeLoading] = React.useState(false)
+  const [describeError, setDescribeError] = React.useState<string | null>(null)
+  const [describeSubtitle, setDescribeSubtitle] = React.useState("查看 Kubernetes 任务的详情内容。")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<JobRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -532,6 +538,27 @@ export function JobsPageClient() {
       })
       .finally(() => {
         setYamlLoading(false)
+      })
+  }, [])
+
+  const handleViewDescribe = React.useCallback((row: JobRow) => {
+    const resource = JOB_RESOURCE_BY_KIND[row.kind]
+    setDescribeOpen(true)
+    setDescribeError(null)
+    setDescribeLoading(true)
+    setDescribeContent("")
+    setDescribeSubtitle(`查看 Kubernetes ${row.kind}（${row.namespace}/${row.name}）的详情内容。`)
+
+    void fetchResourceDescribe("batch", "v1", resource, row.name, row.namespace)
+      .then(({ text }) => {
+        setDescribeContent(text || "(无详情输出)")
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载详情失败"
+        setDescribeError(message)
+      })
+      .finally(() => {
+        setDescribeLoading(false)
       })
   }, [])
 
@@ -619,6 +646,10 @@ export function JobsPageClient() {
                   <IconEye className="size-4" />
                   {"\u67e5\u770b YAML"}
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleViewDescribe(current)}>
+                  <IconInfoCircle className="size-4" />
+                  详情
+                </DropdownMenuItem>
                 {current.kind === "CronJob" ? (
                   <DropdownMenuItem onSelect={() => handleEdit(current)}>
                     <IconPencil className="size-4" />
@@ -641,7 +672,7 @@ export function JobsPageClient() {
     }
 
     return [...baseColumns, actionColumn]
-  }, [handleEdit, handleViewYaml, requestDelete])
+  }, [handleEdit, handleViewDescribe, handleViewYaml, requestDelete])
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
     if (!silent) {
@@ -787,6 +818,15 @@ export function JobsPageClient() {
         namespaceOptions={createNamespaceOptions}
         initialValues={editInitialValues}
         onSubmit={handleEditSubmit}
+      />
+      <DescribeViewerDialog
+        title="查看详情"
+        subtitle={describeSubtitle}
+        open={describeOpen}
+        onOpenChange={setDescribeOpen}
+        content={describeContent}
+        loading={describeLoading}
+        error={describeError}
       />
       <MonacoViewerDialog
         title="查看YAML"

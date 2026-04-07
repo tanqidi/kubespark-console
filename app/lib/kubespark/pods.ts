@@ -1,7 +1,9 @@
 import {
   buildResourceCollectionEndpoint,
+  buildResourceDescribeEndpoint,
   buildResourceItemEndpoint,
   fetchJsonDeduped,
+  fetchResourceDescribe,
   fetchText,
   deleteResource,
   fetchResourceByName,
@@ -101,9 +103,7 @@ export function buildPodLogsEndpoint(
 }
 
 export function buildPodDescribeEndpoint(namespace: string, name: string): string {
-  const itemUrl = buildResourceItemEndpoint("core", "v1", "pods", name, namespace)
-  const [basePath, queryString = ""] = itemUrl.split("?")
-  return `${basePath}/describe${queryString ? `?${queryString}` : ""}`
+  return buildResourceDescribeEndpoint("core", "v1", "pods", name, namespace)
 }
 
 export function buildPodExecWsEndpoint(
@@ -138,12 +138,7 @@ export async function fetchNamespacedPodDescribe(
   namespace: string,
   name: string
 ): Promise<PodDescribeResult> {
-  const requestUrl = buildPodDescribeEndpoint(namespace, name)
-  const text = await fetchText(requestUrl)
-  return {
-    requestUrl,
-    text,
-  }
+  return fetchResourceDescribe("core", "v1", "pods", name, namespace)
 }
 
 export type CreatePodInput = BaseCreateInput & {

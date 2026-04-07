@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
-import { IconEye, IconPencil, IconSettings2, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconInfoCircle, IconPencil, IconSettings2, IconTrash } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import { parse, stringify } from "yaml"
 
@@ -31,7 +31,7 @@ import {
   type NamespaceRow,
   updateNamespace,
 } from "@/app/lib/kubespark/projects"
-import { fetchResourceByName } from "@/app/lib/kubespark/common"
+import { fetchResourceByName, fetchResourceDescribe } from "@/app/lib/kubespark/common"
 import {
   Dialog,
   DialogClose,
@@ -49,6 +49,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
+import { DescribeViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/describe-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -213,6 +214,11 @@ export function ProjectsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [describeOpen, setDescribeOpen] = React.useState(false)
+  const [describeContent, setDescribeContent] = React.useState("")
+  const [describeLoading, setDescribeLoading] = React.useState(false)
+  const [describeError, setDescribeError] = React.useState<string | null>(null)
+  const [describeSubtitle, setDescribeSubtitle] = React.useState("查看 Kubernetes Namespace 的详情内容。")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<NamespaceRow | null>(null)
   const [editingRow, setEditingRow] = React.useState<NamespaceRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -259,6 +265,26 @@ export function ProjectsPageClient() {
       })
       .finally(() => {
         setYamlLoading(false)
+      })
+  }, [])
+
+  const handleViewDescribe = React.useCallback((row: NamespaceRow) => {
+    setDescribeOpen(true)
+    setDescribeError(null)
+    setDescribeLoading(true)
+    setDescribeContent("")
+    setDescribeSubtitle(`查看 Kubernetes Namespace（${row.name}）的详情内容。`)
+
+    void fetchResourceDescribe("core", "v1", "namespaces", row.name)
+      .then(({ text }) => {
+        setDescribeContent(text || "(无详情输出)")
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载详情失败"
+        setDescribeError(message)
+      })
+      .finally(() => {
+        setDescribeLoading(false)
       })
   }, [])
 
@@ -465,6 +491,17 @@ export function ProjectsPageClient() {
           {
             label: (
               <>
+                <IconInfoCircle className="size-4" />
+                {"详情"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewDescribe(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconPencil className="size-4" />
                 {"编辑"}
               </>
@@ -488,7 +525,7 @@ export function ProjectsPageClient() {
           },
         ],
       }),
-    [handleViewYaml, requestDelete, requestEdit]
+    [handleViewDescribe, handleViewYaml, requestDelete, requestEdit]
   )
 
   React.useEffect(() => {
@@ -807,6 +844,15 @@ export function ProjectsPageClient() {
         </DialogContent>
       </Dialog>
 
+      <DescribeViewerDialog
+        title="查看详情"
+        subtitle={describeSubtitle}
+        open={describeOpen}
+        onOpenChange={setDescribeOpen}
+        content={describeContent}
+        loading={describeLoading}
+        error={describeError}
+      />
       <MonacoViewerDialog
         title="查看YAML"
         open={yamlOpen}

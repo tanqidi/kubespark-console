@@ -47,6 +47,11 @@ export type ResourceByNameResult<T> = {
   payload: T;
 };
 
+export type ResourceDescribeResult = {
+  requestUrl: string;
+  text: string;
+};
+
 export function buildResourceCollectionEndpoint(
   group: string,
   version: string,
@@ -93,6 +98,18 @@ export function buildResourceItemEndpoint(
   return queryString ? `${base}?${queryString}` : base;
 }
 
+export function buildResourceDescribeEndpoint(
+  group: string,
+  version: string,
+  resource: string,
+  name: string,
+  namespace?: string,
+): string {
+  const itemUrl = buildResourceItemEndpoint(group, version, resource, name, namespace);
+  const [basePath, queryString = ""] = itemUrl.split("?");
+  return `${basePath}/describe${queryString ? `?${queryString}` : ""}`;
+}
+
 function readMetadataName(value: unknown): string | undefined {
   const metadata = asObject(asObject(value).metadata);
   const name = metadata.name;
@@ -121,6 +138,21 @@ export async function fetchResourceByName<T = unknown>(
   return {
     requestUrl,
     payload: matched,
+  };
+}
+
+export async function fetchResourceDescribe(
+  group: string,
+  version: string,
+  resource: string,
+  name: string,
+  namespace?: string,
+): Promise<ResourceDescribeResult> {
+  const requestUrl = buildResourceDescribeEndpoint(group, version, resource, name, namespace);
+  const text = await fetchText(requestUrl);
+  return {
+    requestUrl,
+    text,
   };
 }
 
