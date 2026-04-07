@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
-import { IconArrowsMaximize, IconArrowsMinimize } from "@tabler/icons-react"
+import { IconArrowsMaximize, IconArrowsMinimize, IconDownload } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import { parse } from "yaml"
 
@@ -30,6 +30,7 @@ type MonacoViewerDialogProps = {
   theme?: EditorProps["theme"]
   loading?: boolean
   error?: string | null
+  downloadFileName?: string
   className?: string
   editorOptions?: EditorProps["options"]
 }
@@ -66,6 +67,23 @@ function deriveYamlSubtitle(yamlText: string): string {
   }
 }
 
+function deriveYamlDownloadFileName(yamlText: string): string {
+  const text = yamlText.trim()
+  if (!text) return "resource.yaml"
+
+  try {
+    const root = asObject(parse(text))
+    const metadata = asObject(root.metadata)
+    const name = asString(metadata.name).trim()
+    if (!name) return "resource.yaml"
+
+    const safe = name.replace(/[\\/:*?"<>|]/g, "_")
+    return `${safe || "resource"}.yaml`
+  } catch {
+    return "resource.yaml"
+  }
+}
+
 const defaultOptions: EditorProps["options"] = {
   // automaticLayout: true,
   // fontSize: 13,
@@ -85,6 +103,7 @@ export function MonacoViewerDialog({
   language = "yaml",
   theme = "vs-dark",
   error = null,
+  downloadFileName,
   className,
   editorOptions,
 }: MonacoViewerDialogProps) {
@@ -99,6 +118,28 @@ export function MonacoViewerDialog({
   React.useEffect(() => {
     if (!open) setFullscreen(false)
   }, [open])
+
+  const canDownload = value.trim().length > 0
+
+  const handleDownload = React.useCallback(() => {
+    if (!canDownload) return
+    const inferredName = deriveYamlDownloadFileName(value)
+    const preferredName = downloadFileName?.trim() || inferredName
+    const safeName = preferredName.replace(/[\\/:*?"<>|]/g, "_") || "resource.yaml"
+    const finalName = safeName.endsWith(".yaml") || safeName.endsWith(".yml")
+      ? safeName
+      : `${safeName}.yaml`
+
+    const blob = new Blob([value], { type: "text/yaml;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = finalName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }, [canDownload, downloadFileName, value])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -120,6 +161,19 @@ export function MonacoViewerDialog({
             {resolvedSubtitle ? <DialogDescription>{resolvedSubtitle}</DialogDescription> : null}
           </DialogHeader>
           <div className="h-full flex items-center gap-3 me-20">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-full"
+              onClick={handleDownload}
+              disabled={!canDownload}
+              aria-label="下载YAML"
+              title="下载YAML"
+            >
+              <IconDownload />
+              <span className="sr-only">下载YAML</span>
+            </Button>
             <Button
               type="button"
               variant="outline"
