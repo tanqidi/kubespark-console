@@ -160,8 +160,13 @@ export function WorkloadPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[84vh] w-[min(92vw,1200px)] flex-col overflow-hidden p-0 sm:max-w-5xl">
-        <DialogHeader className="border-b bg-muted/15 px-6 py-4">
+      <DialogContent
+        onInteractOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        overlayClassName="!bg-transparent !backdrop-blur-none"
+        className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+      >
+        <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
           <DialogTitle>指定工作负载</DialogTitle>
           <DialogDescription>点击列表行即可选择并回填标签选择器。</DialogDescription>
         </DialogHeader>
@@ -203,12 +208,11 @@ export function WorkloadPickerDialog({
             <Table>
               <TableHeader className="bg-muted/60">
                 <TableRow>
-                  <TableHead>名称</TableHead>
+                  <TableHead className="pl-7">名称</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>命名空间</TableHead>
                   <TableHead>期望</TableHead>
                   <TableHead>就绪</TableHead>
-                  <TableHead>更新时间</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -229,7 +233,7 @@ export function WorkloadPickerDialog({
                         }}
                       >
                         <TableCell>
-                          <div className="min-w-0">
+                          <div className="min-w-0 pl-5">
                             <div className="truncate font-medium">{row.name}</div>
                             <div className="truncate text-sm text-muted-foreground">
                               {row.description || "-"}
