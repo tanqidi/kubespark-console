@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconEye, IconFileText, IconPencil, IconTerminal2, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconFileText, IconTerminal2, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { CreatePodDialog } from "@/app/(console)/dashboard/components/resource-pages/pods/create-pod-dialog"
@@ -12,9 +12,11 @@ import {
 } from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
   buildPodExecWsEndpoint,
+  buildPodDescribeEndpoint,
   buildPodLogsEndpoint,
   deletePod,
   createPod,
+  fetchNamespacedPodDescribe,
   fetchNamespacedPodYaml,
   fetchNamespacedPodLogs,
   fetchPodResourceRows,
@@ -24,6 +26,7 @@ import {
 import { fetchTextStream } from "@/app/lib/kubespark/common"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { DescribeViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/describe-viewer-dialog"
 import { LogViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/log-viewer-dialog"
 import { TerminalViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/terminal-viewer-dialog"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
@@ -53,6 +56,11 @@ export function PodsPageClient() {
   const [logsContent, setLogsContent] = React.useState("")
   const [logsLoading, setLogsLoading] = React.useState(false)
   const [logsError, setLogsError] = React.useState<string | null>(null)
+  const [describeOpen, setDescribeOpen] = React.useState(false)
+  const [describeContent, setDescribeContent] = React.useState("")
+  const [describeLoading, setDescribeLoading] = React.useState(false)
+  const [describeError, setDescribeError] = React.useState<string | null>(null)
+  const [describeTarget, setDescribeTarget] = React.useState<Pick<PodRow, "name" | "namespace"> | null>(null)
   const [logsTarget, setLogsTarget] = React.useState<Pick<PodRow, "name" | "namespace"> | null>(null)
   const [realtimeLogs, setRealtimeLogs] = React.useState(false)
   const [logsDownloading, setLogsDownloading] = React.useState(false)
@@ -107,6 +115,35 @@ export function PodsPageClient() {
     setTerminalSubtitle(`连接 Kubernetes Pod（${row.namespace}/${row.name}）的终端会话。`)
     setTerminalWsUrl(wsUrl)
     setTerminalOpen(true)
+  }, [])
+
+  const handleViewDescribe = React.useCallback((row: PodRow) => {
+    setDescribeOpen(true)
+    setDescribeError(null)
+    setDescribeLoading(true)
+    setDescribeContent("")
+    setDescribeTarget({ name: row.name, namespace: row.namespace })
+
+    void fetchNamespacedPodDescribe(row.namespace, row.name)
+      .then(({ requestUrl, text }) => {
+        setDescribeContent(text || "(无详情输出)")
+        console.log("[Pods] view describe response", {
+          pod: { name: row.name, namespace: row.namespace },
+          requestUrl,
+        })
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载详情失败"
+        setDescribeError(message)
+        console.error("[Pods] view describe request failed", {
+          pod: { name: row.name, namespace: row.namespace },
+          requestUrl: buildPodDescribeEndpoint(row.namespace, row.name),
+          error: e,
+        })
+      })
+      .finally(() => {
+        setDescribeLoading(false)
+      })
   }, [])
 
   React.useEffect(() => {
@@ -211,18 +248,6 @@ export function PodsPageClient() {
     setPendingDeleteRow(row)
   }, [])
 
-  const handleEdit = React.useCallback((row: PodRow) => {
-    void fetchNamespacedPodYaml(row.namespace, row.name)
-      .then(({ text }) => {
-        setEditInitialYamlText(text)
-        setEditDialogOpen(true)
-      })
-      .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载容器组详情失败"
-        setError(message)
-      })
-  }, [])
-
   const handleConfirmDelete = React.useCallback(() => {
     if (!pendingDeleteRow || deleting) return
     setDeleting(true)
@@ -298,6 +323,17 @@ export function PodsPageClient() {
           {
             label: (
               <>
+                <IconFileText className="size-4" />
+                {"详情"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewDescribe(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconTerminal2 className="size-4" />
                 {"终端"}
               </>
@@ -332,7 +368,7 @@ export function PodsPageClient() {
           },
         ],
       }),
-    [handleEdit, handleOpenTerminal, handleViewLogs, handleViewYaml, requestDelete]
+    [handleOpenTerminal, handleViewDescribe, handleViewLogs, handleViewYaml, requestDelete]
   )
 
   const refreshRows = React.useCallback(async () => {
@@ -474,6 +510,18 @@ export function PodsPageClient() {
         language="yaml"
         loading={yamlLoading}
         error={yamlError}
+      />
+      <DescribeViewerDialog
+        title="查看详情"
+        subtitle={describeTarget ? `查看 Kubernetes Pod（${describeTarget.namespace}/${describeTarget.name}）的详情内容。` : "查看 Kubernetes Pod 的详情内容。"}
+        open={describeOpen}
+        onOpenChange={(open) => {
+          setDescribeOpen(open)
+          if (!open) setDescribeTarget(null)
+        }}
+        content={describeContent}
+        loading={describeLoading}
+        error={describeError}
       />
       <LogViewerDialog
         open={logsOpen}

@@ -75,6 +75,11 @@ export type PodLogsResult = {
   text: string
 }
 
+export type PodDescribeResult = {
+  requestUrl: string
+  text: string
+}
+
 export function buildPodLogsEndpoint(
   namespace: string,
   name: string,
@@ -93,6 +98,12 @@ export function buildPodLogsEndpoint(
   }
 
   return `${basePath}/log${params.toString() ? `?${params.toString()}` : ""}`
+}
+
+export function buildPodDescribeEndpoint(namespace: string, name: string): string {
+  const itemUrl = buildResourceItemEndpoint("core", "v1", "pods", name, namespace)
+  const [basePath, queryString = ""] = itemUrl.split("?")
+  return `${basePath}/describe${queryString ? `?${queryString}` : ""}`
 }
 
 export function buildPodExecWsEndpoint(
@@ -121,6 +132,18 @@ export function buildPodExecWsEndpoint(
     return `${protocol}://${window.location.host}/api/kubespark-ws${routePath}?${params.toString()}`
   }
   return `ws://localhost:3000/api/kubespark-ws${routePath}?${params.toString()}`
+}
+
+export async function fetchNamespacedPodDescribe(
+  namespace: string,
+  name: string
+): Promise<PodDescribeResult> {
+  const requestUrl = buildPodDescribeEndpoint(namespace, name)
+  const text = await fetchText(requestUrl)
+  return {
+    requestUrl,
+    text,
+  }
 }
 
 export type CreatePodInput = BaseCreateInput & {
