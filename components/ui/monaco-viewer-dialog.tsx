@@ -84,6 +84,7 @@ export function MonacoViewerDialog({
   value,
   language = "yaml",
   theme = "vs-dark",
+  error = null,
   className,
   editorOptions,
 }: MonacoViewerDialogProps) {
@@ -142,8 +143,12 @@ export function MonacoViewerDialog({
               theme={theme}
               value={value}
               height="100%"
+              loading={null}
               options={{ ...defaultOptions, ...(editorOptions ?? {}) }}
             />
+            {error ? (
+              <div className="absolute inset-0 bg-[#1e1e1e] p-4 text-sm text-red-400">{error}</div>
+            ) : null}
           </div>
         </div>
       </DialogContent>

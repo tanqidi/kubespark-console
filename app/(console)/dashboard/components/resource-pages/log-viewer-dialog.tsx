@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 
 const LOG_TERMINAL_THEME = {
-  background: "#0b1220",
+  background: "#1e1e1e",
   foreground: "#e2e8f0",
   cursor: "#93c5fd",
   selectionBackground: "rgba(148,163,184,0.25)",
@@ -239,13 +239,10 @@ export function LogViewerDialog({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-hidden p-6">
-          <div className="relative h-full overflow-hidden rounded-lg border border-slate-700/60 bg-slate-950/95 shadow-inner">
+          <div className="relative h-full overflow-hidden rounded-lg border border-slate-700/60 bg-[#1e1e1e] shadow-inner">
               <div ref={setTerminalHost} className="h-full w-full px-2 py-2" />
-            {loading ? (
-              <div className="absolute inset-0 bg-slate-950/95 p-4 text-sm text-zinc-300">日志加载中...</div>
-            ) : null}
             {error ? (
-              <div className="absolute inset-0 bg-slate-950/95 p-4 text-sm text-red-400">{error}</div>
+              <div className="absolute inset-0 bg-[#1e1e1e] p-4 text-sm text-red-400">{error}</div>
             ) : null}
           </div>
         </div>
