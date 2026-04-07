@@ -4,7 +4,7 @@ metadata:
   name: kubespark-terminal
   namespace: kubespark
   annotations:
-    description: 超级终端
+    description: 集群终端
 spec:
   selector:
     matchLabels:

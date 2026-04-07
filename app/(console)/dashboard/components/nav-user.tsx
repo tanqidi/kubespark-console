@@ -198,7 +198,7 @@ export function NavUser({
             setTerminalOpen(open)
             if (!open) setTerminalWsUrl(null)
           }}
-          title="超级终端"
+          title="集群终端"
           subtitle={terminalSubtitle}
           wsUrl={terminalWsUrl}
           emptyMessage={terminalEmptyMessage}

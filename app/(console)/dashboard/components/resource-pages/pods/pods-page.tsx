@@ -66,7 +66,7 @@ export function PodsPageClient() {
   const [realtimeLogs, setRealtimeLogs] = React.useState(false)
   const [logsDownloading, setLogsDownloading] = React.useState(false)
   const [terminalOpen, setTerminalOpen] = React.useState(false)
-  const [terminalTitle, setTerminalTitle] = React.useState("查看终端")
+  const [terminalTitle, setTerminalTitle] = React.useState("容器终端")
   const [terminalSubtitle, setTerminalSubtitle] = React.useState("连接 Kubernetes Pod 的终端会话。")
   const [terminalWsUrl, setTerminalWsUrl] = React.useState<string | null>(null)
   const logsAbortRef = React.useRef<AbortController | null>(null)
@@ -113,7 +113,7 @@ export function PodsPageClient() {
     const wsUrl = buildPodExecWsEndpoint(row.namespace, row.name, {
       command: ["/bin/sh"],
     })
-    setTerminalTitle("查看终端")
+    setTerminalTitle("容器终端")
     setTerminalSubtitle(`连接 Kubernetes Pod（${row.namespace}/${row.name}）的终端会话。`)
     setTerminalWsUrl(wsUrl)
     setTerminalOpen(true)
