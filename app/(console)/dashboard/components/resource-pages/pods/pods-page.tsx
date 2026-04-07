@@ -50,6 +50,7 @@ export function PodsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Pod 的 YAML 内容。")
   const [logsOpen, setLogsOpen] = React.useState(false)
   const [logsTitle, setLogsTitle] = React.useState("查看日志")
   const [logsSubtitle, setLogsSubtitle] = React.useState("查看 Kubernetes Pod 的日志内容。")
@@ -77,6 +78,7 @@ export function PodsPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
+    setYamlSubtitle(`查看 Kubernetes Pod（${row.namespace}/${row.name}）的 YAML 内容。`)
 
     void fetchNamespacedPodYaml(row.namespace, row.name)
       .then(({ payload, text }) => {
@@ -504,6 +506,7 @@ export function PodsPageClient() {
       />
       <MonacoViewerDialog
         title="查看YAML"
+        subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
         value={yamlContent}

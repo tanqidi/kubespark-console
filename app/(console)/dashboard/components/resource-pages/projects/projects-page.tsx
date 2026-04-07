@@ -214,6 +214,7 @@ export function ProjectsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Namespace 的 YAML 内容。")
   const [describeOpen, setDescribeOpen] = React.useState(false)
   const [describeContent, setDescribeContent] = React.useState("")
   const [describeLoading, setDescribeLoading] = React.useState(false)
@@ -246,6 +247,7 @@ export function ProjectsPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
+    setYamlSubtitle(`查看 Kubernetes Namespace（${row.name}）的 YAML 内容。`)
 
     void fetchNamespaceYaml(row.name)
       .then(({ payload, text }) => {
@@ -855,6 +857,7 @@ export function ProjectsPageClient() {
       />
       <MonacoViewerDialog
         title="查看YAML"
+        subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
         value={yamlContent}

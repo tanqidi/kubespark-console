@@ -71,6 +71,7 @@ export function ServicesPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Service 的 YAML 内容。")
   const [describeOpen, setDescribeOpen] = React.useState(false)
   const [describeContent, setDescribeContent] = React.useState("")
   const [describeLoading, setDescribeLoading] = React.useState(false)
@@ -84,6 +85,7 @@ export function ServicesPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
+    setYamlSubtitle(`查看 Kubernetes Service（${row.namespace}/${row.name}）的 YAML 内容。`)
 
     void fetchNamespacedResourceYaml("services", row.namespace, row.name, {
       documentType: "service",
@@ -458,6 +460,7 @@ export function ServicesPageClient() {
       />
       <MonacoViewerDialog
         title="查看YAML"
+        subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
         value={yamlContent}

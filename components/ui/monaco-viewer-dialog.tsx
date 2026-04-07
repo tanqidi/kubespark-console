@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
+import { IconArrowsMaximize, IconArrowsMinimize } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import { parse } from "yaml"
 
@@ -13,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -85,6 +87,7 @@ export function MonacoViewerDialog({
   className,
   editorOptions,
 }: MonacoViewerDialogProps) {
+  const [fullscreen, setFullscreen] = React.useState(false)
   const resolvedTitle = title?.trim() || "Resource details"
   const resolvedSubtitle = React.useMemo(() => {
     const custom = subtitle?.trim()
@@ -92,13 +95,21 @@ export function MonacoViewerDialog({
     return deriveYamlSubtitle(value)
   }, [subtitle, value])
 
+  React.useEffect(() => {
+    if (!open) setFullscreen(false)
+  }, [open])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        overlayClassName="!animate-none !transition-none !duration-0 data-[state=closed]:!animate-none data-[state=open]:!animate-none"
         className={cn(
-          "flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-270",
+          fullscreen
+            ? "flex h-screen min-h-screen max-h-screen w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 !animate-none !transition-none !duration-0 data-[state=closed]:!animate-none data-[state=open]:!animate-none data-[state=closed]:!zoom-out-100 data-[state=open]:!zoom-in-100 sm:max-w-none"
+            : "flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[90vw] max-w-[1280px] flex-col gap-0 overflow-hidden p-0 !animate-none !transition-none !duration-0 data-[state=closed]:!animate-none data-[state=open]:!animate-none data-[state=closed]:!zoom-out-100 data-[state=open]:!zoom-in-100 sm:max-w-[1280px]",
           className
         )}
+        onEscapeKeyDown={(event) => event.preventDefault()}
       >
         <div className="flex items-start justify-between border-b bg-muted/15">
           <DialogHeader className="px-6 py-4">
@@ -107,9 +118,25 @@ export function MonacoViewerDialog({
             </DialogTitle>
             {resolvedSubtitle ? <DialogDescription>{resolvedSubtitle}</DialogDescription> : null}
           </DialogHeader>
+          <div className="h-full flex items-center gap-3 me-20">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={`rounded-full transition-colors ${
+                fullscreen ? "border-black bg-black text-white hover:bg-black hover:text-white" : ""
+              }`}
+              onClick={() => setFullscreen((prev) => !prev)}
+              aria-label={fullscreen ? "退出全屏" : "全屏"}
+              title={fullscreen ? "退出全屏" : "全屏"}
+            >
+              {fullscreen ? <IconArrowsMinimize /> : <IconArrowsMaximize />}
+              <span className="sr-only">{fullscreen ? "退出全屏" : "全屏"}</span>
+            </Button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-hidden p-6">
-          <div className="h-full overflow-hidden rounded-lg border border-slate-700/60 bg-slate-950/95 shadow-inner">
+          <div className="relative h-full overflow-hidden rounded-lg border border-slate-700/60 bg-[#1e1e1e] shadow-inner">
             <MonacoEditor
               language={language}
               theme={theme}

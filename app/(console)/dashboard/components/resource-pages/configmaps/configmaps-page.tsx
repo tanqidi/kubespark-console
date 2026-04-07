@@ -68,6 +68,7 @@ export function ConfigMapsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes ConfigMap 的 YAML 内容。")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<ConfigMapRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
@@ -80,6 +81,7 @@ export function ConfigMapsPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
+    setYamlSubtitle(`查看 Kubernetes ConfigMap（${row.namespace}/${row.name}）的 YAML 内容。`)
 
     void fetchNamespacedResourceYaml("configmaps", row.namespace, row.name, {
       documentType: "configmap",
@@ -390,6 +392,7 @@ export function ConfigMapsPageClient() {
       />
       <MonacoViewerDialog
         title="查看YAML"
+        subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
         value={yamlContent}

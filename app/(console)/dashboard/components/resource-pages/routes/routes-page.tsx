@@ -427,6 +427,7 @@ export function RoutesPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Ingress 的 YAML 内容。")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<RouteRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -1193,6 +1194,7 @@ export function RoutesPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
+    setYamlSubtitle(`查看 Kubernetes Ingress（${row.namespace}/${row.name}）的 YAML 内容。`)
 
     void fetchNamespacedResourceYaml("ingresses", row.namespace, row.name, {
       documentType: "ingress",
@@ -2128,7 +2130,7 @@ export function RoutesPageClient() {
         </DialogContent>
       </Dialog>
 
-      <MonacoViewerDialog title="查看YAML" open={yamlOpen} onOpenChange={setYamlOpen} value={yamlContent} language="yaml" loading={yamlLoading} error={yamlError} />
+      <MonacoViewerDialog title="查看YAML" subtitle={yamlSubtitle} open={yamlOpen} onOpenChange={setYamlOpen} value={yamlContent} language="yaml" loading={yamlLoading} error={yamlError} />
       <DeleteConfirmDialog
         open={pendingDeleteRuleHostKey !== null}
         onOpenChange={(open) => {

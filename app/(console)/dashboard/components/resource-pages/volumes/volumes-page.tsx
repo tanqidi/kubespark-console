@@ -335,6 +335,7 @@ export function VolumesPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Volume 的 YAML 内容。")
   const [pendingDeletePvcRow, setPendingDeletePvcRow] = React.useState<PersistentVolumeClaimRow | null>(null)
   const [pendingDeletePvRow, setPendingDeletePvRow] = React.useState<PersistentVolumeRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -371,6 +372,7 @@ export function VolumesPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
+    setYamlSubtitle(`查看 Kubernetes PersistentVolumeClaim（${row.namespace}/${row.name}）的 YAML 内容。`)
 
     void fetchNamespacedResourceYaml("persistentvolumeclaims", row.namespace, row.name, {
       documentType: "persistentvolumeclaim",
@@ -400,6 +402,7 @@ export function VolumesPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
+    setYamlSubtitle(`查看 Kubernetes PersistentVolume（${row.name}）的 YAML 内容。`)
 
     void fetchNamespacedResourceYaml("persistentvolumes", "", row.name, {
       group: "core",
@@ -1353,6 +1356,7 @@ export function VolumesPageClient() {
 
       <MonacoViewerDialog
         title="查看YAML"
+        subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
         value={yamlContent}

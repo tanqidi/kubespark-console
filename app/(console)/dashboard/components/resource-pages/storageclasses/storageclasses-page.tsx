@@ -48,6 +48,7 @@ export function StorageClassesPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes StorageClass 的 YAML 内容。")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<StorageClassRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -56,6 +57,7 @@ export function StorageClassesPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
+    setYamlSubtitle(`查看 Kubernetes StorageClass（${row.name}）的 YAML 内容。`)
 
     void fetchNamespacedResourceYaml("storageclasses", "", row.name, {
       group: "storage.k8s.io",
@@ -217,6 +219,7 @@ export function StorageClassesPageClient() {
     <>
       <MonacoViewerDialog
         title="查看YAML"
+        subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
         value={yamlContent}
