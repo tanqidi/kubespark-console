@@ -4,7 +4,6 @@ import {
   IconBraces,
   IconDatabase,
   IconInfoCircle,
-  IconLayoutDashboard,
   IconNetwork,
   IconRoute,
   IconServer,
@@ -48,6 +47,7 @@ export const kubesparkSidebarMenu: SidebarMenuItem[] = [
       { title: "保密字典", labelKey: "secrets", path: "/secrets" },
     ],
   },
+  { title: "自定义资源", labelKey: "customresources", path: "/customresources", icon: IconAdjustments },
   {
     title: "存储",
     labelKey: "storage",

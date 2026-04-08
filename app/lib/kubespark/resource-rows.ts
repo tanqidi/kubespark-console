@@ -618,3 +618,56 @@ export async function fetchVolumeRows(limit = 300): Promise<VolumeRowsResult> {
 
   return { persistentVolumes, persistentVolumeClaims }
 }
+
+export type CustomResourceDefinitionRow = {
+  id: string
+  name: string
+  description: string
+  group: string
+  scope: string
+  kind: string
+  versions: string
+  age: string
+  updatedAt: string
+}
+
+export async function fetchCustomResourceDefinitionRows(
+  limit = 300
+): Promise<CustomResourceDefinitionRow[]> {
+  const { items } = await fetchResourceCollection("apiextensions.k8s.io", "v1", "customresourcedefinitions")
+
+  return items.slice(0, limit).map((item, index) => {
+    const resource = asObject(item)
+    const metadata = asObject(resource.metadata)
+    const spec = asObject(resource.spec)
+    const names = asObject(spec.names)
+    const versionList = Array.isArray(spec.versions) ? spec.versions : []
+    const versions = versionList
+      .map((version) => {
+        const versionObj = asObject(version)
+        const versionName = asString(versionObj.name, "")
+        if (!versionName) return null
+        const isServed = versionObj.served === true
+        const isStorage = versionObj.storage === true
+        if (isServed && isStorage) return `${versionName}(served,storage)`
+        if (isServed) return `${versionName}(served)`
+        if (isStorage) return `${versionName}(storage)`
+        return versionName
+      })
+      .filter((value): value is string => Boolean(value))
+
+    const name = asString(metadata.name, "customresourcedefinition")
+
+    return {
+      id: asString(metadata.uid, `${name}-${index}`),
+      name: asString(metadata.name),
+      description: readDescription(resource),
+      group: asString(spec.group),
+      scope: asString(spec.scope),
+      kind: asString(names.kind),
+      versions: versions.length > 0 ? versions.join(", ") : "-",
+      age: formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined),
+      updatedAt: resolveUpdatedAt(resource),
+    }
+  })
+}

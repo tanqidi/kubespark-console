@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 
 import {
   ConfigMapsPageClient,
+  CustomResourcesPageClient,
   JobsPageClient,
   NodesPageClient,
   PodsPageClient,
@@ -29,6 +30,7 @@ const sectionRenderers = {
   routes: RoutesPageClient,
   configmaps: ConfigMapsPageClient,
   secrets: SecretsPageClient,
+  customresources: CustomResourcesPageClient,
   volumes: VolumesPageClient,
   storageclasses: StorageClassesPageClient,
 } as const
@@ -43,6 +45,7 @@ const sectionLabels: Record<keyof typeof sectionRenderers, string> = {
   routes: "\u5e94\u7528\u8def\u7531",
   configmaps: "\u914d\u7f6e\u5b57\u5178",
   secrets: "\u4fdd\u5bc6\u5b57\u5178",
+  customresources: "\u81ea\u5b9a\u4e49\u8d44\u6e90",
   volumes: "\u5b58\u50a8\u5377",
   storageclasses: "\u5b58\u50a8\u7c7b",
 }
