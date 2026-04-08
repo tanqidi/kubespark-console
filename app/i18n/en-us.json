@@ -652,6 +652,7 @@
     "overview": "Overview",
     "nodes": "Nodes",
     "projects": "Projects",
+    "pipelines": "Pipelines",
     "workloadsGroup": "Workloads",
     "config": "Configuration",
     "configmaps": "ConfigMaps",

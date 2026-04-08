@@ -652,6 +652,7 @@
     "overview": "概览",
     "nodes": "节点",
     "projects": "项目",
+    "pipelines": "流水线",
     "workloadsGroup": "工作负载",
     "config": "配置",
     "configmaps": "配置字典",

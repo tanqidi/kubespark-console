@@ -11,4 +11,5 @@ export { VolumesPageClient } from "./volumes/volumes-page"
 export { StorageClassesPageClient } from "./storageclasses/storageclasses-page"
 export { NodesPageClient } from "./nodes/nodes-page"
 export { ProjectsPageClient } from "./projects/projects-page"
+export { PipelinesPageClient } from "./pipelines/pipelines-page"
 

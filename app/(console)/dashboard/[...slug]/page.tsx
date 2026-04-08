@@ -5,6 +5,7 @@ import {
   CustomResourcesPageClient,
   JobsPageClient,
   NodesPageClient,
+  PipelinesPageClient,
   PodsPageClient,
   ProjectsPageClient,
   RoutesPageClient,
@@ -24,6 +25,7 @@ import {
 const sectionRenderers = {
   nodes: NodesPageClient,
   projects: ProjectsPageClient,
+  pipelines: PipelinesPageClient,
   workloads: WorkloadsPageClient,
   jobs: JobsPageClient,
   pods: PodsPageClient,
@@ -40,6 +42,7 @@ const sectionRenderers = {
 const sectionLabels: Record<keyof typeof sectionRenderers, string> = {
   nodes: "\u8282\u70b9",
   projects: "\u9879\u76ee",
+  pipelines: "\u6d41\u6c34\u7ebf",
   workloads: "\u5de5\u4f5c\u8d1f\u8f7d",
   jobs: "\u4efb\u52a1",
   pods: "\u5bb9\u5668\u7ec4",
