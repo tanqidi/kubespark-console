@@ -27,13 +27,16 @@ function ComboboxTrigger({
   return (
     <ComboboxPrimitive.Trigger
       data-slot="combobox-trigger"
-      className={cn("[&_svg:not([class*='size-'])]:size-4", className)}
+      className={cn(
+        "transition-none duration-0 [&_svg:not([class*='size-'])]:size-4 [&_svg]:transition-none [&_svg]:duration-0 [&_svg]:animate-none",
+        className
+      )}
       {...props}
     >
       {children}
       <ChevronDownIcon
         data-slot="combobox-trigger-icon"
-        className="pointer-events-none size-4 text-muted-foreground"
+        className="pointer-events-none size-4 text-muted-foreground transition-none duration-0 animate-none"
       />
     </ComboboxPrimitive.Trigger>
   )
@@ -64,7 +67,7 @@ function ComboboxInput({
   showClear?: boolean
 }) {
   return (
-    <InputGroup className={cn("w-auto", className)}>
+    <InputGroup className={cn("w-auto transition-none duration-0", className)}>
       <ComboboxPrimitive.Input
         render={<InputGroupInput disabled={disabled} />}
         {...props}
@@ -76,7 +79,7 @@ function ComboboxInput({
             variant="ghost"
             asChild
             data-slot="input-group-button"
-            className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent"
+            className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent transition-none duration-0 animate-none"
             disabled={disabled}
           >
             <ComboboxTrigger />
