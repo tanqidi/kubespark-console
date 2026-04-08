@@ -30,13 +30,6 @@ spec:
               value: "123456"
             - name: KUBESPARK_JWT_SECRET
               value: "change-this-to-a-strong-random-secret"
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service

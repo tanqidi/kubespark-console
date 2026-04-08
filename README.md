@@ -86,16 +86,16 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 示例文件（按顺序应用）：
 
 - `deployment/kubespark-rbac.yaml`（Namespace + ServiceAccount + ClusterRoleBinding）
-- `deployment/kubespark-deployment.yaml`（后端 kubespark Deployment + Service）
-- `deployment/kubespark-console-deployment.yaml`（前端 console Deployment + Service）
+- `deployment/kubespark.yaml`（后端 kubespark Deployment + Service）
+- `deployment/kubespark-console.yaml`（前端 console Deployment + Service）
 
 应用：
 
 ```bash
 kubectl apply -f deployment/kubespark-rbac.yaml
 kubectl apply -f deployment/kubespark-terminal.yaml
-kubectl apply -f deployment/kubespark-deployment.yaml
-kubectl apply -f deployment/kubespark-console-deployment.yaml
+kubectl apply -f deployment/kubespark.yaml
+kubectl apply -f deployment/kubespark-console.yaml
 ```
 
 ### 2) dev 标签镜像更新说明（重要）

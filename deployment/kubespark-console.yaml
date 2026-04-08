@@ -11,7 +11,7 @@ spec:
     matchLabels:
       app: kubespark-console
   template:
-    metadata: 
+    metadata:
       labels:
         app: kubespark-console
     spec:
@@ -29,13 +29,6 @@ spec:
               value: "3000"
             - name: KUBESPARK_API_BASE
               value: "http://kubespark:8080"
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
