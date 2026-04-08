@@ -875,10 +875,10 @@ export function buildPodSpecFromContainers(
         )
       const env = item.env
         .map((entry) => {
-          const name =
-            entry.source === "custom"
-              ? entry.name.trim()
-              : entry.sourceKey.trim() || entry.name.trim()
+            const name =
+              entry.source === "custom"
+                ? entry.name.trim()
+                : entry.name.trim() || entry.sourceKey.trim()
           if (!name) return null
           if (entry.source === "configMap") {
             const sourceName = entry.sourceResource.trim()

@@ -1269,8 +1269,13 @@ export function CreateContainerDialog({
                                           value={item.sourceKey}
                                           onValueChange={(value) => {
                                             onUpdateEnv(item.id, "sourceKey", value)
-                                            // 选择资源中的键后，同步写入环境变量名
-                                            onUpdateEnv(item.id, "name", value)
+                                            // 仅在名称为空，或仍保持“跟随旧 key”时，自动带入新 key。
+                                            // 若用户手动改过名称，则保留用户输入。
+                                            const currentName = item.name.trim()
+                                            const previousKey = item.sourceKey.trim()
+                                            if (!currentName || currentName === previousKey) {
+                                              onUpdateEnv(item.id, "name", value)
+                                            }
                                           }}
                                           disabled={isBusy || !item.sourceResource}
                                         >
