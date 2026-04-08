@@ -1,11 +1,12 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 
 import { TerminalSessionPanel } from "@/app/(console)/dashboard/components/resource-pages/terminal-session-panel"
 
-export default function TerminalStandalonePage() {
+function TerminalStandaloneContent() {
   const searchParams = useSearchParams()
 
   const [sessionValues, setSessionValues] = React.useState<{
@@ -116,5 +117,13 @@ export default function TerminalStandalonePage() {
         />
       </section>
     </main>
+  )
+}
+
+export default function TerminalStandalonePage() {
+  return (
+    <Suspense fallback={<main className="h-screen min-h-screen w-screen bg-background" />}>
+      <TerminalStandaloneContent />
+    </Suspense>
   )
 }
