@@ -817,29 +817,58 @@ export function createContainerDraftFromInitial(
 ): ContainerDraft {
   const env = (Array.isArray(value.env) ? value.env : [])
     .map((item) => {
-      const name = asString(item.name)
-      const valueFrom = asObject(item.valueFrom)
+      const entry = asObject(item)
+      const name = asString(entry.name)
+      const directSource = asString(entry.source).trim()
+      const directSourceResource = asString(entry.sourceResource).trim()
+      const directSourceKey = asString(entry.sourceKey).trim()
+      const directValue = asString(entry.value)
+
+      if ((directSource === "configMap" || directSource === "secret") && directSourceResource) {
+        const resolvedSourceKey = directSourceKey || name.trim()
+        if (resolvedSourceKey) {
+          return createContainerEnvDraft({
+            source: directSource,
+            name: name.trim() || resolvedSourceKey,
+            sourceResource: directSourceResource,
+            sourceKey: resolvedSourceKey,
+          })
+        }
+      }
+      if (directSource === "custom") {
+        if (!name.trim()) return null
+        return createContainerEnvDraft({
+          source: "custom",
+          name,
+          value: directValue,
+        })
+      }
+
+      const valueFrom = asObject(entry.valueFrom)
       const configMapKeyRef = asObject(valueFrom.configMapKeyRef)
       const secretKeyRef = asObject(valueFrom.secretKeyRef)
       const configMapName = asString(configMapKeyRef.name).trim()
       const configMapKey = asString(configMapKeyRef.key).trim()
       const secretName = asString(secretKeyRef.name).trim()
       const secretKey = asString(secretKeyRef.key).trim()
+      const fallbackKey = name.trim()
+      const resolvedConfigMapKey = configMapKey || fallbackKey
+      const resolvedSecretKey = secretKey || fallbackKey
 
-      if (configMapName && configMapKey) {
+      if (configMapName && resolvedConfigMapKey) {
         return createContainerEnvDraft({
           source: "configMap",
-          name: name.trim() || configMapKey,
+          name: name.trim() || resolvedConfigMapKey,
           sourceResource: configMapName,
-          sourceKey: configMapKey,
+          sourceKey: resolvedConfigMapKey,
         })
       }
-      if (secretName && secretKey) {
+      if (secretName && resolvedSecretKey) {
         return createContainerEnvDraft({
           source: "secret",
-          name: name.trim() || secretKey,
+          name: name.trim() || resolvedSecretKey,
           sourceResource: secretName,
-          sourceKey: secretKey,
+          sourceKey: resolvedSecretKey,
         })
       }
 
@@ -847,7 +876,7 @@ export function createContainerDraftFromInitial(
       return createContainerEnvDraft({
         source: "custom",
         name,
-        value: asString(item.value),
+        value: directValue,
       })
     })
     .filter((item): item is NonNullable<ReturnType<typeof createContainerEnvDraft>> => Boolean(item))
@@ -1255,26 +1284,29 @@ export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDial
             const configMapKeyRef = asObject(valueFrom.configMapKeyRef)
             const secretKeyRef = asObject(valueFrom.secretKeyRef)
             const configMapName = asString(configMapKeyRef.name).trim()
-            const configMapKey = asString(configMapKeyRef.key).trim()
-            const secretName = asString(secretKeyRef.name).trim()
-            const secretKey = asString(secretKeyRef.key).trim()
+          const configMapKey = asString(configMapKeyRef.key).trim()
+          const secretName = asString(secretKeyRef.name).trim()
+          const secretKey = asString(secretKeyRef.key).trim()
+          const fallbackKey = name.trim()
+          const resolvedConfigMapKey = configMapKey || fallbackKey
+          const resolvedSecretKey = secretKey || fallbackKey
 
-            if (configMapName && configMapKey) {
-              return createContainerEnvDraft({
-                source: "configMap",
-                name: name.trim() || configMapKey,
-                sourceResource: configMapName,
-                sourceKey: configMapKey,
-              })
-            }
-            if (secretName && secretKey) {
-              return createContainerEnvDraft({
-                source: "secret",
-                name: name.trim() || secretKey,
-                sourceResource: secretName,
-                sourceKey: secretKey,
-              })
-            }
+          if (configMapName && resolvedConfigMapKey) {
+            return createContainerEnvDraft({
+              source: "configMap",
+              name: name.trim() || resolvedConfigMapKey,
+              sourceResource: configMapName,
+              sourceKey: resolvedConfigMapKey,
+            })
+          }
+          if (secretName && resolvedSecretKey) {
+            return createContainerEnvDraft({
+              source: "secret",
+              name: name.trim() || resolvedSecretKey,
+              sourceResource: secretName,
+              sourceKey: resolvedSecretKey,
+            })
+          }
             if (!name.trim()) return null
             return createContainerEnvDraft({
               source: "custom",

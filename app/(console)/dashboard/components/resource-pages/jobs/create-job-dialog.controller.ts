@@ -811,7 +811,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
                 if (entry.source === "configMap") {
                   const sourceName = entry.sourceResource.trim()
-                  const sourceKey = entry.sourceKey.trim()
+                  const sourceKey = entry.sourceKey.trim() || name
                   if (!sourceName || !sourceKey) return null
                   return {
                     name,
@@ -826,7 +826,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
                 if (entry.source === "secret") {
                   const sourceName = entry.sourceResource.trim()
-                  const sourceKey = entry.sourceKey.trim()
+                  const sourceKey = entry.sourceKey.trim() || name
                   if (!sourceName || !sourceKey) return null
                   return {
                     name,
