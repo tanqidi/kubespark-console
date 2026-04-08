@@ -656,6 +656,7 @@
     "config": "配置",
     "configmaps": "配置字典",
     "secrets": "保密字典",
+    "serviceaccounts": "服务账号",
     "customresources": "自定义资源",
     "storage": "存储",
     "storageclasses": "存储类",

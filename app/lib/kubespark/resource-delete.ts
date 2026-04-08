@@ -52,6 +52,10 @@ export async function deleteSecret(namespace: string, name: string): Promise<voi
   return deleteResource("core", "v1", "secrets", name, namespace)
 }
 
+export async function deleteServiceAccount(namespace: string, name: string): Promise<void> {
+  return deleteResource("core", "v1", "serviceaccounts", name, namespace)
+}
+
 export async function deletePersistentVolumeClaim(namespace: string, name: string): Promise<void> {
   return deleteResource("core", "v1", "persistentvolumeclaims", name, namespace)
 }

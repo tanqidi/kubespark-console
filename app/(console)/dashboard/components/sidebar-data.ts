@@ -45,6 +45,7 @@ export const kubesparkSidebarMenu: SidebarMenuItem[] = [
     children: [
       { title: "配置字典", labelKey: "configmaps", path: "/configmaps" },
       { title: "保密字典", labelKey: "secrets", path: "/secrets" },
+      { title: "服务账号", labelKey: "serviceaccounts", path: "/serviceaccounts" },
     ],
   },
   { title: "自定义资源", labelKey: "customresources", path: "/customresources", icon: IconAdjustments },

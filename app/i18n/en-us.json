@@ -656,6 +656,7 @@
     "config": "Configuration",
     "configmaps": "ConfigMaps",
     "secrets": "Secrets",
+    "serviceaccounts": "Service Accounts",
     "customresources": "Custom Resources",
     "storage": "Storage",
     "storageclasses": "StorageClasses",

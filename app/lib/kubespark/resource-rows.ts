@@ -177,6 +177,46 @@ export async function fetchSecretRows(limit = 300): Promise<SecretResourceRow[]>
   })
 }
 
+export type ServiceAccountResourceRow = {
+  id: string
+  name: string
+  description: string
+  namespace: string
+  secrets: number
+  imagePullSecrets: number
+  automountToken: string
+  age: string
+  updatedAt: string
+}
+
+function formatAutomountToken(value: unknown): string {
+  if (typeof value !== "boolean") return "-"
+  return value ? "Yes" : "No"
+}
+
+export async function fetchServiceAccountRows(limit = 300): Promise<ServiceAccountResourceRow[]> {
+  const { items } = await fetchResourceCollection("core", "v1", "serviceaccounts")
+  return items.slice(0, limit).map((item, index) => {
+    const resource = asObject(item)
+    const metadata = asObject(resource.metadata)
+    const secrets = Array.isArray(resource.secrets) ? resource.secrets : []
+    const imagePullSecrets = Array.isArray(resource.imagePullSecrets) ? resource.imagePullSecrets : []
+    const name = asString(metadata.name, "serviceaccount")
+
+    return {
+      id: asString(metadata.uid, `${name}-${index}`),
+      name: asString(metadata.name),
+      description: readDescription(resource),
+      namespace: asString(metadata.namespace, "default"),
+      secrets: secrets.length,
+      imagePullSecrets: imagePullSecrets.length,
+      automountToken: formatAutomountToken(resource.automountServiceAccountToken),
+      age: formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined),
+      updatedAt: resolveUpdatedAt(resource),
+    }
+  })
+}
+
 export type RouteResourceRow = {
   id: string
   name: string
