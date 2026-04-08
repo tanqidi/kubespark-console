@@ -16,6 +16,7 @@ import {
 import { fetchResourceDescribe } from "@/app/lib/kubespark/common"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
 import { DescribeViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/describe-viewer-dialog"
+import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
@@ -41,7 +42,8 @@ export function CustomResourcesPageClient() {
   const [rows, setRows] = React.useState<CustomResourceRow[]>([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = React.useState("")
+  const [groupQuery, setGroupQuery] = React.useState("")
+  const [nameQuery, setNameQuery] = React.useState("")
   const [yamlOpen, setYamlOpen] = React.useState(false)
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
@@ -163,6 +165,14 @@ export function CustomResourcesPageClient() {
     }
   }, [])
 
+  const groupOptions = React.useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => row.group)))
+        .sort((a, b) => a.localeCompare(b))
+        .map((group) => ({ id: group, name: group })),
+    [rows]
+  )
+
   if (error) {
     return (
       <div className="px-4 lg:px-6">
@@ -174,10 +184,12 @@ export function CustomResourcesPageClient() {
     )
   }
 
-  const query = searchQuery.trim().toLowerCase()
+  const groupFilter = groupQuery.trim().toLowerCase()
+  const nameFilter = nameQuery.trim().toLowerCase()
   const filteredRows = rows.filter((row) => {
-    if (!query) return true
-    return row.name.toLowerCase().includes(query) || row.group.toLowerCase().includes(query)
+    if (groupFilter && row.group.toLowerCase() !== groupFilter) return false
+    if (nameFilter && !row.name.toLowerCase().includes(nameFilter)) return false
+    return true
   })
 
   return (
@@ -205,12 +217,22 @@ export function CustomResourcesPageClient() {
         data={filteredRows}
         columns={columns}
         toolbarEnd={
-          <Input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={"名称 / 分组"}
-            className="h-9 w-40"
-          />
+          <>
+            <FilterCombobox
+              options={groupOptions}
+              value={groupQuery}
+              onValueChange={setGroupQuery}
+              placeholder={"分组"}
+              emptyText={"未找到分组"}
+              className="w-40"
+            />
+            <Input
+              value={nameQuery}
+              onChange={(event) => setNameQuery(event.target.value)}
+              placeholder={"名称"}
+              className="h-9 w-40"
+            />
+          </>
         }
       />
     </>
