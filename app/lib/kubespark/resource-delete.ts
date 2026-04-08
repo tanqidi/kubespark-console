@@ -63,3 +63,7 @@ export async function deleteStorageClass(name: string): Promise<void> {
 export async function deletePersistentVolume(name: string): Promise<void> {
   return deleteResource("core", "v1", "persistentvolumes", name)
 }
+
+export async function deleteCustomResourceDefinition(name: string): Promise<void> {
+  return deleteResource("apiextensions.k8s.io", "v1", "customresourcedefinitions", name)
+}
