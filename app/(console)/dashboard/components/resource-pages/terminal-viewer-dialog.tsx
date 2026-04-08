@@ -3,7 +3,11 @@
 import * as React from "react"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
-import { IconArrowsMaximize, IconArrowsMinimize } from "@tabler/icons-react"
+import {
+  IconArrowsMaximize,
+  IconArrowsMinimize,
+  IconExternalLink,
+} from "@tabler/icons-react"
 import "@xterm/xterm/css/xterm.css"
 
 import {
@@ -35,6 +39,60 @@ type TerminalViewerDialogProps = {
   subtitle?: string
   wsUrl: string | null
   emptyMessage?: string
+}
+
+function openTerminalStandalone(params: {
+  title: string
+  subtitle: string
+  wsUrl: string | null
+  emptyMessage: string
+}) {
+  const sessionKey =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `terminal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+  const screenWidth = window.screen.availWidth || window.outerWidth || 1440
+  const screenHeight = window.screen.availHeight || window.outerHeight || 900
+  const width = Math.max(900, Math.min(1280, Math.floor(screenWidth * 0.72)))
+  const height = Math.max(620, Math.min(860, Math.floor(screenHeight * 0.78)))
+  const left = Math.max(0, Math.floor((screenWidth - width) / 2))
+  const top = Math.max(0, Math.floor((screenHeight - height) / 2))
+  const popupFeatures = [
+    "popup=yes",
+    `width=${width}`,
+    `height=${height}`,
+    `left=${left}`,
+    `top=${top}`,
+    "resizable=yes",
+    "scrollbars=yes",
+  ].join(",")
+
+  const popupWindow = window.open("", `_kubespark_terminal_${sessionKey}`, popupFeatures)
+  if (!popupWindow) return
+
+  const payload = {
+    title: params.title,
+    subtitle: params.subtitle,
+    emptyMessage: params.emptyMessage,
+    wsUrl: params.wsUrl,
+  }
+
+  try {
+    window.localStorage.setItem(`kubespark-terminal-session:${sessionKey}`, JSON.stringify(payload))
+  } catch {
+    const fallbackParams = new URLSearchParams()
+    if (params.title) fallbackParams.set("title", params.title)
+    if (params.subtitle) fallbackParams.set("subtitle", params.subtitle)
+    if (params.emptyMessage) fallbackParams.set("emptyMessage", params.emptyMessage)
+    if (params.wsUrl) fallbackParams.set("wsUrl", params.wsUrl)
+    popupWindow.location.href = `/terminal${fallbackParams.toString() ? `?${fallbackParams.toString()}` : ""}`
+    popupWindow.focus()
+    return
+  }
+
+  popupWindow.location.href = `/terminal?session=${encodeURIComponent(sessionKey)}`
+  popupWindow.focus()
 }
 
 export function TerminalViewerDialog({
@@ -238,6 +296,15 @@ export function TerminalViewerDialog({
     }
   }, [disposeTerminal])
 
+  const handleOpenInNewWindow = React.useCallback(() => {
+    openTerminalStandalone({
+      title,
+      subtitle,
+      wsUrl,
+      emptyMessage,
+    })
+  }, [emptyMessage, subtitle, title, wsUrl])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -256,6 +323,18 @@ export function TerminalViewerDialog({
             <DialogDescription>{subtitle}</DialogDescription>
           </DialogHeader>
           <div className="me-20 flex h-full items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-full"
+              onClick={handleOpenInNewWindow}
+              aria-label="新窗口打开"
+              title="新窗口打开"
+            >
+              <IconExternalLink className="size-4" />
+              <span className="sr-only">新窗口打开</span>
+            </Button>
             <Button
               type="button"
               variant="outline"

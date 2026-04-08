@@ -107,16 +107,12 @@ export default function TerminalStandalonePage() {
 
   return (
     <main className="flex h-screen min-h-screen w-screen flex-col bg-background">
-      <header className="border-b bg-muted/15 px-6 py-4">
-        <h1 className="text-xl font-semibold">{title}</h1>
-        <p className="text-muted-foreground mt-1">{subtitle}</p>
-      </header>
-      <section className="min-h-0 flex-1 p-6">
+      <section className="min-h-0 flex-1">
         <TerminalSessionPanel
           active
           wsUrl={wsUrl}
           emptyMessage={emptyMessage}
-          className="relative h-full overflow-hidden rounded-lg border border-slate-700/60 bg-[#1e1e1e] shadow-inner"
+          className="relative h-full overflow-hidden bg-[#1e1e1e] shadow-inner"
         />
       </section>
     </main>
