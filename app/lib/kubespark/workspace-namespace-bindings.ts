@@ -77,6 +77,21 @@ export async function fetchWorkspaceNamespaceBindingByNamespace(
   }
 }
 
+export async function fetchWorkspaceNamespaceBindings(limit = 500): Promise<WorkspaceNamespaceBinding[]> {
+  const { items } = await fetchResourceCollection<RawWorkspaceNamespaceBinding>(
+    WORKSPACE_NAMESPACE_BINDING_GVR.group,
+    WORKSPACE_NAMESPACE_BINDING_GVR.version,
+    WORKSPACE_NAMESPACE_BINDING_GVR.resource
+  )
+
+  return items.slice(0, limit).map((item, index) => ({
+    name: asString(item.metadata?.name, `binding-${index}`),
+    workspaceName: asString(item.spec?.workspaceRef?.name),
+    namespaceName: asString(item.spec?.namespaceRef?.name),
+    resourceVersion: asString(item.metadata?.resourceVersion),
+  }))
+}
+
 export async function createWorkspaceNamespaceBinding(
   input: CreateWorkspaceNamespaceBindingInput
 ): Promise<void> {
@@ -109,4 +124,3 @@ export async function createWorkspaceNamespaceBinding(
     }),
   })
 }
-
