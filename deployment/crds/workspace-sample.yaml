@@ -1,0 +1,24 @@
+apiVersion: tanqidi.com/v1alpha1
+kind: Workspace
+metadata:
+  name: platform-dev
+  labels:
+    app.tanqidi.com/part-of: console
+    tanqidi.com/tier: dev
+  annotations:
+    description: 企业空间（开发环境）
+spec:
+  owner: admin@tanqidi.com
+
+---
+apiVersion: tanqidi.com/v1alpha1
+kind: Workspace
+metadata:
+  name: platform-prod
+  labels:
+    app.tanqidi.com/part-of: console
+    tanqidi.com/tier: prod
+  annotations:
+    description: 企业空间（生产环境）
+spec:
+  owner: sre@tanqidi.com

@@ -1,0 +1,2 @@
+https://docs.drone.io/extensions/configuration/?utm_source=chatgpt.com
+https://github.com/drone/drone-go

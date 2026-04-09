@@ -28,6 +28,7 @@ export const kubesparkSidebarMenu: SidebarMenuItem[] = [
   { title: "节点", labelKey: "nodes", path: "/nodes", icon: IconServer },
   { title: "项目", labelKey: "projects", path: "/projects", icon: IconBox },
   { title: "流水线", labelKey: "pipelines", path: "/pipelines", icon: IconGitBranch },
+  { title: "企业空间", labelKey: "workspaces", path: "/workspaces", icon: IconBox },
   {
     title: "应用负载",
     labelKey: "workloadsGroup",

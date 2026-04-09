@@ -15,6 +15,7 @@ import {
   StorageClassesPageClient,
   VolumesPageClient,
   WorkloadsPageClient,
+  WorkspacesPageClient,
 } from "@/app/(console)/dashboard/components/resource-pages"
 import { ResourceDetailPage } from "@/app/(console)/dashboard/components/resource-pages/resource-detail-page"
 import {
@@ -26,6 +27,7 @@ const sectionRenderers = {
   nodes: NodesPageClient,
   projects: ProjectsPageClient,
   pipelines: PipelinesPageClient,
+  workspaces: WorkspacesPageClient,
   workloads: WorkloadsPageClient,
   jobs: JobsPageClient,
   pods: PodsPageClient,
@@ -43,6 +45,7 @@ const sectionLabels: Record<keyof typeof sectionRenderers, string> = {
   nodes: "\u8282\u70b9",
   projects: "\u9879\u76ee",
   pipelines: "\u6d41\u6c34\u7ebf",
+  workspaces: "\u4f01\u4e1a\u7a7a\u95f4",
   workloads: "\u5de5\u4f5c\u8d1f\u8f7d",
   jobs: "\u4efb\u52a1",
   pods: "\u5bb9\u5668\u7ec4",

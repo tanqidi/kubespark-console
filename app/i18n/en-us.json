@@ -653,6 +653,7 @@
     "nodes": "Nodes",
     "projects": "Projects",
     "pipelines": "Pipelines",
+    "workspaces": "Enterprise Workspaces",
     "workloadsGroup": "Workloads",
     "config": "Configuration",
     "configmaps": "ConfigMaps",
