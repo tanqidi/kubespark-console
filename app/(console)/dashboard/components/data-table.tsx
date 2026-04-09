@@ -54,6 +54,7 @@ type DataTableProps<TData> = {
   toolbarEnd?: React.ReactNode
   onCreate?: () => void
   onDeleteSelectedRows?: (rows: TData[]) => void | Promise<void>
+  showColumnCustomizer?: boolean
 }
 
 function DraggableRow<TData>({
@@ -111,6 +112,7 @@ export function DataTable<TData extends Record<string, unknown>>({
   toolbarEnd,
   onCreate,
   onDeleteSelectedRows,
+  showColumnCustomizer = true,
 }: DataTableProps<TData>) {
   const router = useRouter()
   const [data, setData] = React.useState(() => initialData)
@@ -225,6 +227,7 @@ export function DataTable<TData extends Record<string, unknown>>({
         endContent={toolbarEnd}
         onCreate={onCreate}
         onDeleteSelected={onDeleteSelectedRows ? handleDeleteSelected : undefined}
+        showColumnCustomizer={showColumnCustomizer}
       />
       <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">

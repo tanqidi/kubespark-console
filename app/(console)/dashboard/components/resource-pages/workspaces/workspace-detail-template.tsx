@@ -162,6 +162,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
       toolbarStart={tabs}
       enableRowNavigation={false}
       getRowHref={() => null}
+      showColumnCustomizer={false}
     />
   )
 }

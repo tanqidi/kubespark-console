@@ -30,12 +30,14 @@ export function TableToolbar<TData>({
   endContent,
   onCreate,
   onDeleteSelected,
+  showColumnCustomizer = true,
 }: {
   table: Table<TData>
   startContent?: React.ReactNode
   endContent?: React.ReactNode
   onCreate?: () => void
   onDeleteSelected?: () => void
+  showColumnCustomizer?: boolean
 }) {
   const selectedCount = table.getFilteredSelectedRowModel().rows.length
   const showDelete = selectedCount > 0 && Boolean(onDeleteSelected)
@@ -68,40 +70,42 @@ export function TableToolbar<TData>({
             </div>
           ) : null}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="transition-none">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">自定义列</span>
-                <span className="lg:hidden">自定义列</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuGroup>
-                {table
-                  .getAllColumns()
-                  .filter(
-                    (column) =>
-                      typeof column.accessorFn !== "undefined" &&
-                      column.getCanHide()
-                  )
-                  .map((column) => {
-                    const label = resolveColumnLabel(column)
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                      >
-                        {label}
-                      </DropdownMenuCheckboxItem>
+          {showColumnCustomizer ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="transition-none">
+                  <IconLayoutColumns />
+                  <span className="hidden lg:inline">自定义列</span>
+                  <span className="lg:hidden">自定义列</span>
+                  <IconChevronDown />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuGroup>
+                  {table
+                    .getAllColumns()
+                    .filter(
+                      (column) =>
+                        typeof column.accessorFn !== "undefined" &&
+                        column.getCanHide()
                     )
-                  })}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    .map((column) => {
+                      const label = resolveColumnLabel(column)
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={column.id}
+                          className="capitalize"
+                          checked={column.getIsVisible()}
+                          onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                        >
+                          {label}
+                        </DropdownMenuCheckboxItem>
+                      )
+                    })}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
 
           {onCreate ? (
             <Button
