@@ -762,6 +762,8 @@ export function WorkspacesPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
+        enableRowNavigation
+        getRowHref={(row) => `/dashboard/workspaces/${encodeURIComponent(row.name)}`}
         onCreate={openCreateDialog}
         onDeleteSelectedRows={handleDeleteSelectedRows}
         toolbarEnd={

@@ -433,6 +433,7 @@ export function WorkloadsPageClient() {
         data={filteredRows}
         columns={columns}
         onCreate={() => setCreateDialogOpen(true)}
+        enableRowNavigation
         getRowHref={(row) =>
           `/dashboard/workloads/${encodeURIComponent(row.namespace)}/${encodeURIComponent(row.name)}?kind=${encodeURIComponent(row.kind)}`
         }

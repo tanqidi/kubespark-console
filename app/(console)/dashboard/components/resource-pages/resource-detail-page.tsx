@@ -26,7 +26,7 @@ export function ResourceDetailPage({
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-4 py-4 md:py-6">
-      <div className="grid gap-4 px-4 lg:px-6">
+      <div className="grid gap-4">
         <div className="flex min-h-full flex-col gap-4">
           {detailContent ?? rightSlot ?? defaultRightSlot}
         </div>

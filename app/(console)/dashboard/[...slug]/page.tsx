@@ -22,6 +22,7 @@ import {
   WorkloadDetailTemplate,
   type WorkloadDetailKind,
 } from "@/app/(console)/dashboard/components/resource-pages/workloads/workload-detail-templates"
+import { WorkspaceDetailTemplate } from "@/app/(console)/dashboard/components/resource-pages/workspaces/workspace-detail-template"
 
 const sectionRenderers = {
   nodes: NodesPageClient,
@@ -98,6 +99,17 @@ export default async function DashboardSectionPage({
               backHref="/dashboard/workloads"
             />
           }
+        />
+      )
+    }
+
+    if (key === "workspaces") {
+      return (
+        <ResourceDetailPage
+          sectionTitle={sectionLabels.workspaces}
+          name={resourceName}
+          backHref="/dashboard/workspaces"
+          detailContent={<WorkspaceDetailTemplate name={resourceName} />}
         />
       )
     }
