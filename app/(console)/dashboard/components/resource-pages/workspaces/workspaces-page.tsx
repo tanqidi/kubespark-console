@@ -74,7 +74,6 @@ const workspaceColumns: ColumnConfig<WorkspaceRow>[] = [
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
   { key: "owner", label: "负责人" },
-  { key: "status", label: "状态", render: "badge" },
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]
