@@ -1,4 +1,9 @@
-import { buildResourceCollectionEndpoint, fetchJsonDeduped, fetchResourceCollection } from "./common"
+import {
+  buildResourceCollectionEndpoint,
+  deleteResource,
+  fetchJsonDeduped,
+  fetchResourceCollection,
+} from "./common"
 
 type RawWorkspaceNamespaceBinding = {
   metadata?: {
@@ -123,4 +128,25 @@ export async function createWorkspaceNamespaceBinding(
       },
     }),
   })
+}
+
+export async function deleteWorkspaceNamespaceBindingsByNamespace(namespaceName: string): Promise<void> {
+  const targetNamespace = normalizeDnsLabel(namespaceName, "项目")
+  const bindings = await fetchWorkspaceNamespaceBindings(1000)
+  const targets = bindings.filter(
+    (binding) => binding.namespaceName.trim().toLowerCase() === targetNamespace
+  )
+
+  if (targets.length === 0) return
+
+  await Promise.all(
+    targets.map((binding) =>
+      deleteResource(
+        WORKSPACE_NAMESPACE_BINDING_GVR.group,
+        WORKSPACE_NAMESPACE_BINDING_GVR.version,
+        WORKSPACE_NAMESPACE_BINDING_GVR.resource,
+        binding.name
+      )
+    )
+  )
 }

@@ -65,6 +65,7 @@ type WorkspaceDetailRow = {
   name?: string
   description?: string
   status?: string
+  workspace?: string
   labels?: string
   annotations?: string
   age?: string
@@ -86,6 +87,7 @@ const projectColumns: ColumnConfig<WorkspaceDetailRow>[] = [
     enableHiding: false,
   },
   { key: "status", label: "状态", render: "status" },
+  { key: "workspace", label: "企业空间" },
   { key: "labels", label: "标签", align: "right" },
   { key: "annotations", label: "注解", align: "right" },
   { key: "age", label: "运行时间" },
@@ -258,6 +260,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
         name: project.name,
         description: project.description || "-",
         status: project.status,
+        workspace: next.name || "-",
         labels: String(project.labels),
         annotations: String(project.annotations),
         age: project.age,

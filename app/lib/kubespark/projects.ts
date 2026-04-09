@@ -8,6 +8,7 @@ import {
 } from "./common"
 import { buildResourceDocument } from "./resource-document"
 import { formatAge, resolveUpdatedAt } from "./utils"
+import { deleteWorkspaceNamespaceBindingsByNamespace } from "./workspace-namespace-bindings"
 
 export type NamespaceRow = {
   id: string
@@ -206,5 +207,6 @@ export async function fetchNamespaceYaml(name: string): Promise<NamespaceYamlRes
 }
 
 export async function deleteNamespace(name: string): Promise<void> {
-  return deleteResource("core", "v1", "namespaces", name)
+  await deleteResource("core", "v1", "namespaces", name)
+  await deleteWorkspaceNamespaceBindingsByNamespace(name)
 }
