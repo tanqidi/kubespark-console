@@ -13,6 +13,7 @@ export type NamespaceRow = {
   id: string
   name: string
   description: string
+  workspace: string
   status: string
   labels: number
   annotations: number
@@ -74,11 +75,13 @@ export async function fetchNamespaces(): Promise<NamespaceRow[]> {
     const md = item.metadata || {}
     const annotations = md.annotations || {}
     const description = (annotations["description"] || "").trim()
+    const workspace = (annotations["tanqidi.com/workspace"] || "").trim()
 
     return {
       id: md.uid || md.name || Math.random().toString(36).slice(2),
       name: md.name || "-",
       description,
+      workspace: workspace || "-",
       status: item.status?.phase || "Unknown",
       labels: Object.keys(md.labels || {}).length,
       annotations: Object.keys(annotations).length,

@@ -34,6 +34,7 @@ import {
 import { fetchWorkspaceRows } from "@/app/lib/kubespark/workspaces"
 import {
   createWorkspaceNamespaceBinding,
+  fetchWorkspaceNamespaceBindings,
   fetchWorkspaceNamespaceBindingByNamespace,
 } from "@/app/lib/kubespark/workspace-namespace-bindings"
 import { fetchResourceByName, fetchResourceDescribe } from "@/app/lib/kubespark/common"
@@ -84,6 +85,7 @@ const projectColumns: ColumnConfig<NamespaceRow>[] = [
     enableHiding: false,
   },
   { key: "status", label: "状态", render: "status" },
+  { key: "workspace", label: "企业空间" },
   { key: "labels", label: "标签", align: "right" },
   { key: "annotations", label: "注解", align: "right" },
   { key: "age", label: "运行时间" },
@@ -121,6 +123,8 @@ function isNameRelatedCreateError(error: unknown): boolean {
 const PROJECT_NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字和连字符（-），必须以小写字母开头并以小写字母或数字结尾，最长 63 个字符。"
 const PROJECT_WORKSPACE_ANNOTATION = "tanqidi.com/workspace"
+const PROJECT_WORKSPACE_REQUIRED_MESSAGE = "请选择企业空间"
+const PROJECT_WORKSPACE_INVALID_MESSAGE = "企业空间无效，请从下拉列表中选择"
 
 function validateProjectName(name: string): string | null {
   if (!name) return "请输入项目名称"
@@ -129,6 +133,22 @@ function validateProjectName(name: string): string | null {
     return PROJECT_NAME_RULE_MESSAGE
   }
   return null
+}
+
+function ensureWorkspaceAnnotationEntries(
+  entries: MetadataEntry[],
+  workspace: string
+): MetadataEntry[] {
+  const workspaceValue = workspace.trim()
+  const withoutWorkspace = entries.filter((entry) => entry.key !== PROJECT_WORKSPACE_ANNOTATION)
+  if (!workspaceValue) return withoutWorkspace
+  return [
+    ...withoutWorkspace,
+    {
+      key: PROJECT_WORKSPACE_ANNOTATION,
+      value: workspaceValue,
+    },
+  ]
 }
 
 function buildProjectYamlText(params: {
@@ -235,6 +255,8 @@ export function ProjectsPageClient() {
   const [createDescription, setCreateDescription] = React.useState("")
   const [createWorkspace, setCreateWorkspace] = React.useState("")
   const [workspaceOptions, setWorkspaceOptions] = React.useState<FilterComboboxOption[]>([])
+  const [createWorkspaceInvalid, setCreateWorkspaceInvalid] = React.useState(false)
+  const [createWorkspaceError, setCreateWorkspaceError] = React.useState<string | null>(null)
   const [workspaceBindingExists, setWorkspaceBindingExists] = React.useState(false)
   const [metadataEnabled, setMetadataEnabled] = React.useState(false)
   const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
@@ -251,11 +273,30 @@ export function ProjectsPageClient() {
   const dialogDescription = isEditMode
     ? "编辑项目描述信息。"
     : "创建项目以对资源进行分组并控制不同用户的权限。"
+  const mergeRowsWithWorkspaceBindings = React.useCallback(
+    async (namespaceRows: NamespaceRow[]): Promise<NamespaceRow[]> => {
+      const bindings = await fetchWorkspaceNamespaceBindings(1000)
+      const namespaceToWorkspace = new Map<string, string>()
+      for (const binding of bindings) {
+        const namespaceName = binding.namespaceName.trim()
+        const workspaceName = binding.workspaceName.trim()
+        if (!namespaceName || !workspaceName) continue
+        namespaceToWorkspace.set(namespaceName, workspaceName)
+      }
+      return namespaceRows.map((row) => ({
+        ...row,
+        workspace: namespaceToWorkspace.get(row.name) ?? row.workspace,
+      }))
+    },
+    []
+  )
   const resetCreateDialogState = React.useCallback(() => {
     setEditingRow(null)
     setCreateName("")
     setCreateDescription("")
     setCreateWorkspace("")
+    setCreateWorkspaceInvalid(false)
+    setCreateWorkspaceError(null)
     setWorkspaceBindingExists(false)
     setMetadataEnabled(false)
     setLabelEntries([{ key: "", value: "" }])
@@ -380,6 +421,8 @@ export function ProjectsPageClient() {
         setCreateName(row.name)
         setCreateDescription(row.description ?? "")
         setCreateWorkspace(initialWorkspace)
+        setCreateWorkspaceInvalid(false)
+        setCreateWorkspaceError(null)
         setWorkspaceBindingExists(Boolean(bindingWorkspace))
         setLabelEntries(initialLabels)
         setAnnotationEntries(initialAnnotations)
@@ -449,12 +492,16 @@ export function ProjectsPageClient() {
             typeof nextAnnotations[PROJECT_WORKSPACE_ANNOTATION] === "string"
               ? nextAnnotations[PROJECT_WORKSPACE_ANNOTATION].trim()
               : ""
+          if (!nextWorkspace) {
+            nextWorkspace = createWorkspace.trim()
+          }
           if (!isEditMode) setCreateName(nextName)
           setCreateDescription(nextDescription)
           setCreateWorkspace(nextWorkspace)
           setLabelEntries(parsed.labels)
-          setAnnotationEntries(parsed.annotations)
-          setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
+          const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
+          setAnnotationEntries(protectedAnnotations)
+          setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, protectedAnnotations))
           setCreateYamlError(null)
         } catch (error) {
           setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
@@ -472,8 +519,29 @@ export function ProjectsPageClient() {
 
       setCreateNameInvalid(false)
       setCreateNameError(null)
+      if (!workspaceBindingExists) {
+        const selectedWorkspace = nextWorkspace.trim()
+        if (!selectedWorkspace) {
+          setCreateWorkspaceInvalid(true)
+          setCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+          if (createYamlMode) setCreateYamlError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+          return
+        }
+        const existsInOptions = workspaceOptions.some((option) => option.id === selectedWorkspace)
+        if (!existsInOptions) {
+          setCreateWorkspaceInvalid(true)
+          setCreateWorkspaceError(PROJECT_WORKSPACE_INVALID_MESSAGE)
+          if (createYamlMode) setCreateYamlError(PROJECT_WORKSPACE_INVALID_MESSAGE)
+          return
+        }
+      }
+      setCreateWorkspaceInvalid(false)
+      setCreateWorkspaceError(null)
       setCreateYamlError(null)
       setCreating(true)
+      if (!nextWorkspace) {
+        nextWorkspace = createWorkspace.trim()
+      }
       if (nextWorkspace) nextAnnotations[PROJECT_WORKSPACE_ANNOTATION] = nextWorkspace
       else delete nextAnnotations[PROJECT_WORKSPACE_ANNOTATION]
 
@@ -502,9 +570,10 @@ export function ProjectsPageClient() {
       }
 
       void request()
-        .then(async () => {
+      .then(async () => {
           setCreateDialogOpen(false)
-          const items = await fetchNamespaces()
+          const namespaceRows = await fetchNamespaces()
+          const items = await mergeRowsWithWorkspaceBindings(namespaceRows)
           setRows(items)
           setError(null)
         })
@@ -532,7 +601,9 @@ export function ProjectsPageClient() {
       editingRow,
       isEditMode,
       labelEntries,
+      workspaceOptions,
       workspaceBindingExists,
+      mergeRowsWithWorkspaceBindings,
     ]
   )
 
@@ -601,7 +672,8 @@ export function ProjectsPageClient() {
         setError(null)
       }
       try {
-        const items = await fetchNamespaces()
+        const namespaceRows = await fetchNamespaces()
+        const items = await mergeRowsWithWorkspaceBindings(namespaceRows)
         if (cancelled) return
         setRows(items)
         setError(null)
@@ -641,7 +713,7 @@ export function ProjectsPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [])
+  }, [mergeRowsWithWorkspaceBindings])
 
   // if (loading) return <ResourceLoadingState /> // kept for potential future use
   if (error) {
@@ -724,12 +796,14 @@ export function ProjectsPageClient() {
                           setCreateName(parsed.name)
                         }
                         setCreateDescription(parsed.description)
-                        setCreateWorkspace(
+                        const parsedWorkspace =
                           parsed.annotations.find((entry) => entry.key === PROJECT_WORKSPACE_ANNOTATION)?.value ?? ""
-                        )
+                        const nextWorkspace = parsedWorkspace.trim() || createWorkspace.trim()
+                        setCreateWorkspace(nextWorkspace)
                         setLabelEntries(parsed.labels)
-                        setAnnotationEntries(parsed.annotations)
-                        setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
+                        const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
+                        setAnnotationEntries(protectedAnnotations)
+                        setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, protectedAnnotations))
                         setCreateYamlError(null)
                         setCreateYamlMode(false)
                       } catch (error) {
@@ -838,17 +912,27 @@ export function ProjectsPageClient() {
                         <FilterCombobox
                           options={workspaceOptions}
                           value={createWorkspace}
-                          onValueChange={setCreateWorkspace}
+                          onValueChange={(value) => {
+                            setCreateWorkspace(value)
+                            setAnnotationEntries((prev) => ensureWorkspaceAnnotationEntries(prev, value))
+                            if (createWorkspaceInvalid) setCreateWorkspaceInvalid(false)
+                            if (createWorkspaceError) setCreateWorkspaceError(null)
+                          }}
                           placeholder="请选择企业空间"
                           emptyText="暂无企业空间"
                           className="h-10"
+                          ariaInvalid={createWorkspaceInvalid}
                           disabled={creating || (isEditMode && workspaceBindingExists)}
                         />
-                        <FieldDescription>
-                          {isEditMode && workspaceBindingExists
-                            ? "已存在项目与企业空间绑定关系，如需调整请先删除对应 binding。"
-                            : `可选，保存到注解 ${PROJECT_WORKSPACE_ANNOTATION}。`}
-                        </FieldDescription>
+                        {createWorkspaceError ? (
+                          <FieldError>{createWorkspaceError}</FieldError>
+                        ) : (
+                          <FieldDescription>
+                            {isEditMode && workspaceBindingExists
+                              ? "已存在项目与企业空间绑定关系，如需调整请先删除对应 binding。"
+                              : `必选，保存到注解 ${PROJECT_WORKSPACE_ANNOTATION}。`}
+                          </FieldDescription>
+                        )}
                       </Field>
                     </div>
 
@@ -888,7 +972,10 @@ export function ProjectsPageClient() {
                         labels={labelEntries}
                         setLabels={setLabelEntries}
                         annotations={annotationEntries}
-                        setAnnotations={setAnnotationEntries}
+                        setAnnotations={(next) => {
+                          const resolved = typeof next === "function" ? next(annotationEntries) : next
+                          setAnnotationEntries(ensureWorkspaceAnnotationEntries(resolved, createWorkspace))
+                        }}
                         description={createDescription}
                         setDescription={setCreateDescription}
                         disabled={creating}
@@ -915,11 +1002,33 @@ export function ProjectsPageClient() {
               ) : createStep === "basic" ? (
                 <>
                   <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={creating}>
-                      取消
-                    </Button>
-                  </DialogClose>
-                  <Button type="button" disabled={creating} onClick={() => setCreateStep("advanced")}>
+                  <Button type="button" variant="outline" disabled={creating}>
+                    取消
+                  </Button>
+                </DialogClose>
+                  <Button
+                    type="button"
+                    disabled={creating}
+                    onClick={() => {
+                      if (!workspaceBindingExists) {
+                        const selectedWorkspace = createWorkspace.trim()
+                        if (!selectedWorkspace) {
+                          setCreateWorkspaceInvalid(true)
+                          setCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+                          return
+                        }
+                        const existsInOptions = workspaceOptions.some((option) => option.id === selectedWorkspace)
+                        if (!existsInOptions) {
+                          setCreateWorkspaceInvalid(true)
+                          setCreateWorkspaceError(PROJECT_WORKSPACE_INVALID_MESSAGE)
+                          return
+                        }
+                      }
+                      setCreateWorkspaceInvalid(false)
+                      setCreateWorkspaceError(null)
+                      setCreateStep("advanced")
+                    }}
+                  >
                     下一步
                   </Button>
                 </>
