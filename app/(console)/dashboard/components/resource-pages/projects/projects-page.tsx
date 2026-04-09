@@ -32,6 +32,10 @@ import {
   updateNamespace,
 } from "@/app/lib/kubespark/projects"
 import { fetchWorkspaceRows } from "@/app/lib/kubespark/workspaces"
+import {
+  createWorkspaceNamespaceBinding,
+  fetchWorkspaceNamespaceBindingByNamespace,
+} from "@/app/lib/kubespark/workspace-namespace-bindings"
 import { fetchResourceByName, fetchResourceDescribe } from "@/app/lib/kubespark/common"
 import {
   Dialog,
@@ -231,6 +235,7 @@ export function ProjectsPageClient() {
   const [createDescription, setCreateDescription] = React.useState("")
   const [createWorkspace, setCreateWorkspace] = React.useState("")
   const [workspaceOptions, setWorkspaceOptions] = React.useState<FilterComboboxOption[]>([])
+  const [workspaceBindingExists, setWorkspaceBindingExists] = React.useState(false)
   const [metadataEnabled, setMetadataEnabled] = React.useState(false)
   const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
   const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
@@ -300,8 +305,11 @@ export function ProjectsPageClient() {
   }, [])
 
   const requestEdit = React.useCallback((row: NamespaceRow) => {
-    void fetchResourceByName<unknown>("core", "v1", "namespaces", row.name)
-      .then(({ payload }) => {
+    void Promise.all([
+      fetchResourceByName<unknown>("core", "v1", "namespaces", row.name),
+      fetchWorkspaceNamespaceBindingByNamespace(row.name),
+    ])
+      .then(([{ payload }, binding]) => {
         const resource =
           typeof payload === "object" && payload !== null && !Array.isArray(payload)
             ? (payload as Record<string, unknown>)
@@ -334,12 +342,15 @@ export function ProjectsPageClient() {
             Object.entries(annotations).filter(([, value]) => typeof value === "string")
           ) as Record<string, string>
         )
-        const initialWorkspace = (annotations[PROJECT_WORKSPACE_ANNOTATION] as string | undefined) ?? ""
+        const annotationWorkspace = (annotations[PROJECT_WORKSPACE_ANNOTATION] as string | undefined) ?? ""
+        const bindingWorkspace = binding?.workspaceName ?? ""
+        const initialWorkspace = bindingWorkspace || annotationWorkspace
 
         setEditingRow(row)
         setCreateName(row.name)
         setCreateDescription(row.description ?? "")
         setCreateWorkspace(initialWorkspace)
+        setWorkspaceBindingExists(Boolean(bindingWorkspace))
         setLabelEntries(initialLabels)
         setAnnotationEntries(initialAnnotations)
         setMetadataEnabled(hasUserProvidedMetadata(initialLabels, initialAnnotations))
@@ -442,17 +453,32 @@ export function ProjectsPageClient() {
         labels: nextLabels,
         annotations: nextAnnotations,
       }
-      const request = isEditMode
-        ? updateNamespace(requestPayload)
-        : createNamespace(requestPayload)
+      const request = async () => {
+        if (isEditMode) {
+          await updateNamespace(requestPayload)
+        } else {
+          await createNamespace(requestPayload)
+        }
 
-      void request
+        if (isEditMode && !workspaceBindingExists && nextWorkspace) {
+          const namespaceName = (editingRow?.name ?? nextName).trim()
+          if (namespaceName) {
+            await createWorkspaceNamespaceBinding({
+              namespaceName,
+              workspaceName: nextWorkspace,
+            })
+          }
+        }
+      }
+
+      void request()
         .then(async () => {
           setCreateDialogOpen(false)
           setEditingRow(null)
           setCreateName("")
           setCreateDescription("")
           setCreateWorkspace("")
+          setWorkspaceBindingExists(false)
           setMetadataEnabled(false)
           setLabelEntries([{ key: "", value: "" }])
           setAnnotationEntries([{ key: "", value: "" }])
@@ -488,6 +514,7 @@ export function ProjectsPageClient() {
       editingRow,
       isEditMode,
       labelEntries,
+      workspaceBindingExists,
     ]
   )
 
@@ -637,6 +664,7 @@ export function ProjectsPageClient() {
             setCreateName("")
             setCreateDescription("")
             setCreateWorkspace("")
+            setWorkspaceBindingExists(false)
             setMetadataEnabled(false)
             setLabelEntries([{ key: "", value: "" }])
             setAnnotationEntries([{ key: "", value: "" }])
@@ -812,9 +840,13 @@ export function ProjectsPageClient() {
                           placeholder="请选择企业空间"
                           emptyText="暂无企业空间"
                           className="h-10"
-                          disabled={creating}
+                          disabled={creating || (isEditMode && workspaceBindingExists)}
                         />
-                        <FieldDescription>可选，保存到注解 {PROJECT_WORKSPACE_ANNOTATION}。</FieldDescription>
+                        <FieldDescription>
+                          {isEditMode && workspaceBindingExists
+                            ? "已存在项目与企业空间绑定关系，如需调整请先删除对应 binding。"
+                            : `可选，保存到注解 ${PROJECT_WORKSPACE_ANNOTATION}。`}
+                        </FieldDescription>
                       </Field>
                     </div>
 
@@ -945,6 +977,7 @@ export function ProjectsPageClient() {
           setCreateName("")
           setCreateDescription("")
           setCreateWorkspace("")
+          setWorkspaceBindingExists(false)
           setMetadataEnabled(false)
           setLabelEntries([{ key: "", value: "" }])
           setAnnotationEntries([{ key: "", value: "" }])
