@@ -163,6 +163,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
       enableRowNavigation={false}
       getRowHref={() => null}
       showColumnCustomizer={false}
+      onCreate={() => void 0}
     />
   )
 }

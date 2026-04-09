@@ -31,6 +31,7 @@ import {
   type NamespaceRow,
   updateNamespace,
 } from "@/app/lib/kubespark/projects"
+import { fetchWorkspaceRows } from "@/app/lib/kubespark/workspaces"
 import { fetchResourceByName, fetchResourceDescribe } from "@/app/lib/kubespark/common"
 import {
   Dialog,
@@ -55,6 +56,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
+import { FilterCombobox, type FilterComboboxOption } from "@/components/ui/filter-combobox"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -114,6 +116,7 @@ function isNameRelatedCreateError(error: unknown): boolean {
 
 const PROJECT_NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字和连字符（-），必须以小写字母开头并以小写字母或数字结尾，最长 63 个字符。"
+const PROJECT_WORKSPACE_ANNOTATION = "tanqidi.com/workspace"
 
 function validateProjectName(name: string): string | null {
   if (!name) return "请输入项目名称"
@@ -226,6 +229,8 @@ export function ProjectsPageClient() {
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [createName, setCreateName] = React.useState("")
   const [createDescription, setCreateDescription] = React.useState("")
+  const [createWorkspace, setCreateWorkspace] = React.useState("")
+  const [workspaceOptions, setWorkspaceOptions] = React.useState<FilterComboboxOption[]>([])
   const [metadataEnabled, setMetadataEnabled] = React.useState(false)
   const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
   const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
@@ -329,10 +334,12 @@ export function ProjectsPageClient() {
             Object.entries(annotations).filter(([, value]) => typeof value === "string")
           ) as Record<string, string>
         )
+        const initialWorkspace = (annotations[PROJECT_WORKSPACE_ANNOTATION] as string | undefined) ?? ""
 
         setEditingRow(row)
         setCreateName(row.name)
         setCreateDescription(row.description ?? "")
+        setCreateWorkspace(initialWorkspace)
         setLabelEntries(initialLabels)
         setAnnotationEntries(initialAnnotations)
         setMetadataEnabled(hasUserProvidedMetadata(initialLabels, initialAnnotations))
@@ -388,6 +395,7 @@ export function ProjectsPageClient() {
       let nextDescription = createDescription.trim()
       let nextLabels = metadataEntriesToRecord(labelEntries)
       let nextAnnotations = metadataEntriesToRecord(annotationEntries)
+      let nextWorkspace = createWorkspace.trim()
 
       if (createYamlMode) {
         try {
@@ -396,8 +404,13 @@ export function ProjectsPageClient() {
           nextDescription = parsed.description.trim()
           nextLabels = metadataEntriesToRecord(parsed.labels)
           nextAnnotations = metadataEntriesToRecord(parsed.annotations)
+          nextWorkspace =
+            typeof nextAnnotations[PROJECT_WORKSPACE_ANNOTATION] === "string"
+              ? nextAnnotations[PROJECT_WORKSPACE_ANNOTATION].trim()
+              : ""
           if (!isEditMode) setCreateName(nextName)
           setCreateDescription(nextDescription)
+          setCreateWorkspace(nextWorkspace)
           setLabelEntries(parsed.labels)
           setAnnotationEntries(parsed.annotations)
           setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
@@ -420,6 +433,8 @@ export function ProjectsPageClient() {
       setCreateNameError(null)
       setCreateYamlError(null)
       setCreating(true)
+      if (nextWorkspace) nextAnnotations[PROJECT_WORKSPACE_ANNOTATION] = nextWorkspace
+      else delete nextAnnotations[PROJECT_WORKSPACE_ANNOTATION]
 
       const requestPayload: CreateNamespaceInput = {
         name: nextName,
@@ -437,6 +452,7 @@ export function ProjectsPageClient() {
           setEditingRow(null)
           setCreateName("")
           setCreateDescription("")
+          setCreateWorkspace("")
           setMetadataEnabled(false)
           setLabelEntries([{ key: "", value: "" }])
           setAnnotationEntries([{ key: "", value: "" }])
@@ -465,6 +481,7 @@ export function ProjectsPageClient() {
       annotationEntries,
       createDescription,
       createName,
+      createWorkspace,
       createYamlMode,
       createYamlText,
       creating,
@@ -557,6 +574,20 @@ export function ProjectsPageClient() {
     }
 
     void loadRows(false)
+    void fetchWorkspaceRows(500)
+      .then((items) => {
+        if (cancelled) return
+        setWorkspaceOptions(
+          items.map((item) => ({
+            id: item.name,
+            name: item.name,
+          }))
+        )
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        console.error("[Projects] load workspace options failed", e)
+      })
     const timer = window.setInterval(() => {
       void loadRows(true)
     }, 3000)
@@ -605,6 +636,7 @@ export function ProjectsPageClient() {
             setEditingRow(null)
             setCreateName("")
             setCreateDescription("")
+            setCreateWorkspace("")
             setMetadataEnabled(false)
             setLabelEntries([{ key: "", value: "" }])
             setAnnotationEntries([{ key: "", value: "" }])
@@ -636,12 +668,19 @@ export function ProjectsPageClient() {
                     onCheckedChange={(checked) => {
                       if (creating) return
                       if (checked) {
+                        const annotationsForYaml = metadataEntriesToRecord(annotationEntries)
+                        const workspaceValue = createWorkspace.trim()
+                        if (workspaceValue) {
+                          annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION] = workspaceValue
+                        } else {
+                          delete annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION]
+                        }
                         setCreateYamlText(
                           buildProjectYamlText({
                             name: editingRow?.name ?? createName,
                             description: createDescription,
                             labels: labelEntries,
-                            annotations: annotationEntries,
+                            annotations: metadataRecordToEntries(annotationsForYaml),
                           })
                         )
                         setCreateYamlError(null)
@@ -655,6 +694,9 @@ export function ProjectsPageClient() {
                           setCreateName(parsed.name)
                         }
                         setCreateDescription(parsed.description)
+                        setCreateWorkspace(
+                          parsed.annotations.find((entry) => entry.key === PROJECT_WORKSPACE_ANNOTATION)?.value ?? ""
+                        )
                         setLabelEntries(parsed.labels)
                         setAnnotationEntries(parsed.annotations)
                         setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
@@ -736,29 +778,45 @@ export function ProjectsPageClient() {
                     </p>
                   </div>
                   <FieldGroup className="flex flex-col gap-4">
-                    <Field data-invalid={createNameInvalid}>
-                      <FieldLabel htmlFor="project-create-name">名称</FieldLabel>
-                      <Input
-                        id="project-create-name"
-                        name="name"
-                        value={editingRow?.name ?? createName}
-                        onChange={(event) => {
-                          if (isEditMode) return
-                          setCreateName(event.target.value)
-                          if (createNameInvalid) setCreateNameInvalid(false)
-                          if (createNameError) setCreateNameError(null)
-                        }}
-                        placeholder="请输入项目名称"
-                        autoComplete="off"
-                        aria-invalid={createNameInvalid}
-                        disabled={creating || isEditMode}
-                      />
-                      {createNameError ? (
-                        <FieldError>{createNameError}</FieldError>
-                      ) : (
-                        <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
-                      )}
-                    </Field>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <Field data-invalid={createNameInvalid}>
+                        <FieldLabel htmlFor="project-create-name">名称</FieldLabel>
+                        <Input
+                          id="project-create-name"
+                          name="name"
+                          value={editingRow?.name ?? createName}
+                          onChange={(event) => {
+                            if (isEditMode) return
+                            setCreateName(event.target.value)
+                            if (createNameInvalid) setCreateNameInvalid(false)
+                            if (createNameError) setCreateNameError(null)
+                          }}
+                          placeholder="请输入项目名称"
+                          autoComplete="off"
+                          aria-invalid={createNameInvalid}
+                          disabled={creating || isEditMode}
+                        />
+                        {createNameError ? (
+                          <FieldError>{createNameError}</FieldError>
+                        ) : (
+                          <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
+                        )}
+                      </Field>
+
+                      <Field>
+                        <FieldLabel htmlFor="project-create-workspace">企业空间</FieldLabel>
+                        <FilterCombobox
+                          options={workspaceOptions}
+                          value={createWorkspace}
+                          onValueChange={setCreateWorkspace}
+                          placeholder="请选择企业空间"
+                          emptyText="暂无企业空间"
+                          className="h-10"
+                          disabled={creating}
+                        />
+                        <FieldDescription>可选，保存到注解 {PROJECT_WORKSPACE_ANNOTATION}。</FieldDescription>
+                      </Field>
+                    </div>
 
                     <Field>
                       <FieldLabel htmlFor="project-create-description">
@@ -886,6 +944,7 @@ export function ProjectsPageClient() {
           setEditingRow(null)
           setCreateName("")
           setCreateDescription("")
+          setCreateWorkspace("")
           setMetadataEnabled(false)
           setLabelEntries([{ key: "", value: "" }])
           setAnnotationEntries([{ key: "", value: "" }])
