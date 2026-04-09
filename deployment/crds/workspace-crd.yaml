@@ -2,6 +2,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: workspaces.tanqidi.com
+  annotations:
+    description: 企业空间资源
 spec:
   group: tanqidi.com
   scope: Cluster
