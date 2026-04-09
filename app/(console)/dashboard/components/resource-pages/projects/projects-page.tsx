@@ -251,6 +251,22 @@ export function ProjectsPageClient() {
   const dialogDescription = isEditMode
     ? "编辑项目描述信息。"
     : "创建项目以对资源进行分组并控制不同用户的权限。"
+  const resetCreateDialogState = React.useCallback(() => {
+    setEditingRow(null)
+    setCreateName("")
+    setCreateDescription("")
+    setCreateWorkspace("")
+    setWorkspaceBindingExists(false)
+    setMetadataEnabled(false)
+    setLabelEntries([{ key: "", value: "" }])
+    setAnnotationEntries([{ key: "", value: "" }])
+    setCreateNameInvalid(false)
+    setCreateNameError(null)
+    setCreateYamlMode(false)
+    setCreateYamlText("")
+    setCreateYamlError(null)
+    setCreateStep("basic")
+  }, [])
 
   const handleViewYaml = React.useCallback((row: NamespaceRow) => {
     setYamlOpen(true)
@@ -310,6 +326,20 @@ export function ProjectsPageClient() {
       fetchWorkspaceNamespaceBindingByNamespace(row.name),
     ])
       .then(([{ payload }, binding]) => {
+        setEditingRow(null)
+        setCreateName("")
+        setCreateDescription("")
+        setCreateWorkspace("")
+        setWorkspaceBindingExists(false)
+        setMetadataEnabled(false)
+        setLabelEntries([{ key: "", value: "" }])
+        setAnnotationEntries([{ key: "", value: "" }])
+        setCreateNameInvalid(false)
+        setCreateNameError(null)
+        setCreateYamlMode(false)
+        setCreateYamlText("")
+        setCreateYamlError(null)
+        setCreateStep("basic")
         const resource =
           typeof payload === "object" && payload !== null && !Array.isArray(payload)
             ? (payload as Record<string, unknown>)
@@ -474,18 +504,6 @@ export function ProjectsPageClient() {
       void request()
         .then(async () => {
           setCreateDialogOpen(false)
-          setEditingRow(null)
-          setCreateName("")
-          setCreateDescription("")
-          setCreateWorkspace("")
-          setWorkspaceBindingExists(false)
-          setMetadataEnabled(false)
-          setLabelEntries([{ key: "", value: "" }])
-          setAnnotationEntries([{ key: "", value: "" }])
-          setCreateYamlMode(false)
-          setCreateYamlText("")
-          setCreateYamlError(null)
-          setCreateStep("basic")
           const items = await fetchNamespaces()
           setRows(items)
           setError(null)
@@ -659,22 +677,6 @@ export function ProjectsPageClient() {
         onOpenChange={(open) => {
           if (!open && creating) return
           setCreateDialogOpen(open)
-          if (!open) {
-            setEditingRow(null)
-            setCreateName("")
-            setCreateDescription("")
-            setCreateWorkspace("")
-            setWorkspaceBindingExists(false)
-            setMetadataEnabled(false)
-            setLabelEntries([{ key: "", value: "" }])
-            setAnnotationEntries([{ key: "", value: "" }])
-            setCreateNameInvalid(false)
-            setCreateNameError(null)
-            setCreateYamlMode(false)
-            setCreateYamlText("")
-            setCreateYamlError(null)
-            setCreateStep("basic")
-          }
         }}
       >
         <DialogContent
@@ -973,20 +975,7 @@ export function ProjectsPageClient() {
         data={filteredRows}
         columns={columns}
         onCreate={() => {
-          setEditingRow(null)
-          setCreateName("")
-          setCreateDescription("")
-          setCreateWorkspace("")
-          setWorkspaceBindingExists(false)
-          setMetadataEnabled(false)
-          setLabelEntries([{ key: "", value: "" }])
-          setAnnotationEntries([{ key: "", value: "" }])
-          setCreateNameInvalid(false)
-          setCreateNameError(null)
-          setCreateYamlMode(false)
-          setCreateYamlText("")
-          setCreateYamlError(null)
-          setCreateStep("basic")
+          resetCreateDialogState()
           setCreateDialogOpen(true)
         }}
         toolbarEnd={projectFilters}
