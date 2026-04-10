@@ -31,6 +31,14 @@ import {
   type NamespaceRow,
   updateNamespace,
 } from "@/app/lib/kubespark/projects"
+import {
+  createPipelineProject,
+  deletePipelineProject,
+  fetchPipelineProjectDetail,
+  fetchPipelineProjectRows,
+  type PipelineProjectRow,
+  updatePipelineProject,
+} from "@/app/lib/kubespark/pipeline-projects"
 import { fetchWorkspaceRows } from "@/app/lib/kubespark/workspaces"
 import {
   createWorkspaceNamespaceBinding,
@@ -62,6 +70,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { FilterCombobox, type FilterComboboxOption } from "@/components/ui/filter-combobox"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -86,8 +95,18 @@ const projectColumns: ColumnConfig<NamespaceRow>[] = [
   },
   { key: "status", label: "状态", render: "status" },
   { key: "workspace", label: "企业空间" },
-  { key: "labels", label: "标签", align: "right" },
-  { key: "annotations", label: "注解", align: "right" },
+  { key: "age", label: "运行时间" },
+  { key: "updatedAt", label: "更新时间" },
+]
+
+const pipelineProjectColumns: ColumnConfig<PipelineProjectRow>[] = [
+  {
+    key: "name",
+    label: "名称",
+    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    enableHiding: false,
+  },
+  { key: "workspace", label: "企业空间" },
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]
@@ -244,9 +263,111 @@ function parseProjectYamlText(yamlText: string): {
   }
 }
 
+function buildPipelineProjectYamlText(params: {
+  name: string
+  description: string
+  workspaceName: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
+}): string {
+  const labels = metadataEntriesToRecord(params.labels)
+  const annotations = metadataEntriesToRecord(params.annotations)
+  if (params.description.trim()) annotations.description = params.description.trim()
+  else delete annotations.description
+
+  return stringify(
+    {
+      apiVersion: "tanqidi.com/v1alpha1",
+      kind: "PipelineProject",
+      metadata: {
+        ...(params.name.trim() ? { name: params.name.trim() } : {}),
+        ...(Object.keys(labels).length > 0 ? { labels } : {}),
+        ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
+      },
+      spec: {
+        workspaceRef: {
+          name: params.workspaceName.trim(),
+        },
+        ...(params.description.trim() ? { description: params.description.trim() } : {}),
+      },
+    },
+    { indent: 2, lineWidth: 0, sortMapEntries: false }
+  )
+}
+
+function parsePipelineProjectYamlText(yamlText: string): {
+  name: string
+  description: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
+  workspaceName: string
+} {
+  const normalized = yamlText.trim()
+  if (!normalized) throw new Error("请输入 YAML 内容")
+  const parsed = parse(normalized)
+  const root =
+    typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null
+  if (!root) throw new Error("YAML 内容格式无效")
+  const kind = typeof root.kind === "string" ? root.kind.trim() : ""
+  if (kind && kind !== "PipelineProject") throw new Error("YAML 资源类型必须是 PipelineProject")
+
+  const metadata =
+    typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
+      ? (root.metadata as Record<string, unknown>)
+      : {}
+  const spec =
+    typeof root.spec === "object" && root.spec !== null && !Array.isArray(root.spec)
+      ? (root.spec as Record<string, unknown>)
+      : {}
+  const workspaceRef =
+    typeof spec.workspaceRef === "object" && spec.workspaceRef !== null && !Array.isArray(spec.workspaceRef)
+      ? (spec.workspaceRef as Record<string, unknown>)
+      : {}
+
+  const annotations =
+    typeof metadata.annotations === "object" &&
+    metadata.annotations !== null &&
+    !Array.isArray(metadata.annotations)
+      ? (metadata.annotations as Record<string, unknown>)
+      : {}
+  const labels =
+    typeof metadata.labels === "object" &&
+    metadata.labels !== null &&
+    !Array.isArray(metadata.labels)
+      ? (metadata.labels as Record<string, unknown>)
+      : {}
+
+  return {
+    name: typeof metadata.name === "string" ? metadata.name : "",
+    description:
+      typeof spec.description === "string"
+        ? spec.description
+        : typeof annotations.description === "string"
+          ? annotations.description
+          : "",
+    workspaceName: typeof workspaceRef.name === "string" ? workspaceRef.name : "",
+    labels: metadataRecordToEntries(
+      Object.fromEntries(Object.entries(labels).filter(([, value]) => typeof value === "string")) as Record<
+        string,
+        string
+      >
+    ),
+    annotations: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(annotations).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
+  }
+}
+
 export function ProjectsPageClient() {
   type ProjectDialogStep = "basic" | "advanced"
+  type ProjectTab = "projects" | "pipelineProjects"
   const [rows, setRows] = React.useState<NamespaceRow[]>([])
+  const [pipelineRows, setPipelineRows] = React.useState<PipelineProjectRow[]>([])
+  const [activeTab, setActiveTab] = React.useState<ProjectTab>("projects")
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [nameQuery, setNameQuery] = React.useState("")
@@ -262,9 +383,35 @@ export function ProjectsPageClient() {
   const [describeError, setDescribeError] = React.useState<string | null>(null)
   const [describeSubtitle, setDescribeSubtitle] = React.useState("查看 Kubernetes Namespace 的详情内容。")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<NamespaceRow | null>(null)
+  const [pendingPipelineDeleteRow, setPendingPipelineDeleteRow] = React.useState<PipelineProjectRow | null>(null)
   const [editingRow, setEditingRow] = React.useState<NamespaceRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+  const [pipelineDeleting, setPipelineDeleting] = React.useState(false)
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
+  const [pipelineProjectCreateOpen, setPipelineProjectCreateOpen] = React.useState(false)
+  const [pipelineProjectCreateName, setPipelineProjectCreateName] = React.useState("")
+  const [pipelineProjectCreateDescription, setPipelineProjectCreateDescription] = React.useState("")
+  const [pipelineProjectCreateWorkspace, setPipelineProjectCreateWorkspace] = React.useState("")
+  const [pipelineProjectCreateWorkspaceInvalid, setPipelineProjectCreateWorkspaceInvalid] = React.useState(false)
+  const [pipelineProjectCreateWorkspaceError, setPipelineProjectCreateWorkspaceError] = React.useState<string | null>(
+    null
+  )
+  const [pipelineProjectCreateMetadataEnabled, setPipelineProjectCreateMetadataEnabled] = React.useState(false)
+  const [pipelineProjectCreateLabelEntries, setPipelineProjectCreateLabelEntries] = React.useState<MetadataEntry[]>([
+    { key: "", value: "" },
+  ])
+  const [pipelineProjectCreateAnnotationEntries, setPipelineProjectCreateAnnotationEntries] = React.useState<
+    MetadataEntry[]
+  >([{ key: "", value: "" }])
+  const [pipelineProjectCreateNameInvalid, setPipelineProjectCreateNameInvalid] = React.useState(false)
+  const [pipelineProjectCreateNameError, setPipelineProjectCreateNameError] = React.useState<string | null>(null)
+  const [pipelineProjectCreateYamlMode, setPipelineProjectCreateYamlMode] = React.useState(false)
+  const [pipelineProjectCreateYamlText, setPipelineProjectCreateYamlText] = React.useState("")
+  const [pipelineProjectCreateYamlError, setPipelineProjectCreateYamlError] = React.useState<string | null>(null)
+  const [pipelineProjectCreating, setPipelineProjectCreating] = React.useState(false)
+  const [pipelineProjectCreateStep, setPipelineProjectCreateStep] = React.useState<ProjectDialogStep>("basic")
+  const [pipelineProjectDialogMode, setPipelineProjectDialogMode] = React.useState<"create" | "edit">("create")
+  const [pipelineProjectEditingName, setPipelineProjectEditingName] = React.useState<string | null>(null)
   const [createName, setCreateName] = React.useState("")
   const [createDescription, setCreateDescription] = React.useState("")
   const [createWorkspace, setCreateWorkspace] = React.useState("")
@@ -321,6 +468,24 @@ export function ProjectsPageClient() {
     setCreateYamlText("")
     setCreateYamlError(null)
     setCreateStep("basic")
+  }, [])
+  const resetPipelineDialogState = React.useCallback(() => {
+    setPipelineProjectDialogMode("create")
+    setPipelineProjectEditingName(null)
+    setPipelineProjectCreateName("")
+    setPipelineProjectCreateDescription("")
+    setPipelineProjectCreateWorkspace("")
+    setPipelineProjectCreateWorkspaceInvalid(false)
+    setPipelineProjectCreateWorkspaceError(null)
+    setPipelineProjectCreateMetadataEnabled(false)
+    setPipelineProjectCreateLabelEntries([{ key: "", value: "" }])
+    setPipelineProjectCreateAnnotationEntries([{ key: "", value: "" }])
+    setPipelineProjectCreateNameInvalid(false)
+    setPipelineProjectCreateNameError(null)
+    setPipelineProjectCreateYamlMode(false)
+    setPipelineProjectCreateYamlText("")
+    setPipelineProjectCreateYamlError(null)
+    setPipelineProjectCreateStep("basic")
   }, [])
 
   const handleViewYaml = React.useCallback((row: NamespaceRow) => {
@@ -484,6 +649,222 @@ export function ProjectsPageClient() {
       console.error("[Projects] bulk delete request failed", e)
     })
   }, [])
+  const handlePipelineDeleteSelectedRows = React.useCallback((selectedRows: PipelineProjectRow[]) => {
+    if (selectedRows.length === 0) return
+    const names = selectedRows
+      .map((row) => row.name.trim())
+      .filter((name) => name.length > 0 && name !== "-")
+    if (names.length === 0) return
+    void Promise.all(names.map((name) => deletePipelineProject(name)))
+      .then(async () => {
+        const items = await fetchPipelineProjectRows()
+        setPipelineRows(items)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "删除失败"
+        setError(message)
+        console.error("[Projects] bulk delete pipeline project failed", e)
+      })
+  }, [])
+  const openPipelineProjectCreateDialog = React.useCallback(() => {
+    resetPipelineDialogState()
+    setPipelineProjectDialogMode("create")
+    setPipelineProjectEditingName(null)
+    setPipelineProjectCreateOpen(true)
+  }, [resetPipelineDialogState])
+  const openPipelineProjectEditDialog = React.useCallback(
+    (row: PipelineProjectRow) => {
+      const pipelineProjectName = row.name.trim()
+      if (!pipelineProjectName || pipelineProjectName === "-") return
+      void fetchPipelineProjectDetail(pipelineProjectName)
+        .then((detail) => {
+          resetPipelineDialogState()
+          setPipelineProjectDialogMode("edit")
+          setPipelineProjectEditingName(detail.name)
+          setPipelineProjectCreateName(detail.name)
+          setPipelineProjectCreateDescription(detail.description)
+          setPipelineProjectCreateWorkspace(detail.workspace || "")
+          const nextLabels = metadataRecordToEntries(detail.labels)
+          const nextAnnotations = ensureWorkspaceAnnotationEntries(
+            metadataRecordToEntries(detail.annotations),
+            detail.workspace || ""
+          )
+          setPipelineProjectCreateLabelEntries(nextLabels)
+          setPipelineProjectCreateAnnotationEntries(nextAnnotations)
+          setPipelineProjectCreateMetadataEnabled(
+            hasUserProvidedMetadata(nextLabels, nextAnnotations)
+          )
+          setPipelineProjectCreateNameInvalid(false)
+          setPipelineProjectCreateNameError(null)
+          setPipelineProjectCreateWorkspaceInvalid(false)
+          setPipelineProjectCreateWorkspaceError(null)
+          setPipelineProjectCreateYamlError(null)
+          setPipelineProjectCreateOpen(true)
+        })
+        .catch((e: unknown) =>
+          setError(e instanceof Error ? e.message : "加载流水线项目详情失败")
+        )
+    },
+    [resetPipelineDialogState]
+  )
+  const handlePipelineProjectCreateSubmit = React.useCallback(() => {
+    if (pipelineProjectCreating) return
+    const isPipelineProjectEditMode = pipelineProjectDialogMode === "edit"
+    const allPipelineProjectNames = pipelineRows.map((row) => row.name.trim())
+
+    let nextName = pipelineProjectCreateName.trim()
+    let nextDescription = pipelineProjectCreateDescription.trim()
+    let nextLabels = metadataEntriesToRecord(pipelineProjectCreateLabelEntries)
+    let nextAnnotations = metadataEntriesToRecord(pipelineProjectCreateAnnotationEntries)
+    let nextWorkspace = pipelineProjectCreateWorkspace.trim()
+
+    if (pipelineProjectCreateYamlMode) {
+      try {
+        const parsed = parsePipelineProjectYamlText(pipelineProjectCreateYamlText)
+        nextName = parsed.name.trim()
+        nextDescription = parsed.description.trim()
+        nextLabels = metadataEntriesToRecord(parsed.labels)
+        nextAnnotations = metadataEntriesToRecord(parsed.annotations)
+        nextWorkspace = parsed.workspaceName.trim() || pipelineProjectCreateWorkspace.trim()
+        setPipelineProjectCreateName(nextName)
+        setPipelineProjectCreateDescription(nextDescription)
+        setPipelineProjectCreateWorkspace(nextWorkspace)
+        setPipelineProjectCreateLabelEntries(parsed.labels)
+        const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
+        setPipelineProjectCreateAnnotationEntries(protectedAnnotations)
+        setPipelineProjectCreateMetadataEnabled(
+          hasUserProvidedMetadata(parsed.labels, protectedAnnotations)
+        )
+        setPipelineProjectCreateYamlError(null)
+      } catch (error) {
+        setPipelineProjectCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+        return
+      }
+    }
+
+    const validationMessage = validateProjectName(nextName)
+    if (validationMessage) {
+      setPipelineProjectCreateNameInvalid(true)
+      setPipelineProjectCreateNameError(validationMessage)
+      if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(validationMessage)
+      return
+    }
+
+    const nameExists = allPipelineProjectNames.includes(nextName)
+    if (!isPipelineProjectEditMode && nameExists) {
+      const duplicatedNameMessage = "流水线项目名称已存在，请更换后重试"
+      setPipelineProjectCreateNameInvalid(true)
+      setPipelineProjectCreateNameError(duplicatedNameMessage)
+      if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(duplicatedNameMessage)
+      return
+    }
+
+    if (isPipelineProjectEditMode && pipelineProjectEditingName && nextName !== pipelineProjectEditingName) {
+      const lockedNameError = "编辑模式不允许修改名称"
+      setPipelineProjectCreateNameInvalid(true)
+      setPipelineProjectCreateNameError(lockedNameError)
+      if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(lockedNameError)
+      return
+    }
+    if (isPipelineProjectEditMode && pipelineProjectEditingName) {
+      const originWorkspace =
+        pipelineRows.find((row) => row.name.trim() === pipelineProjectEditingName)?.workspace.trim() || ""
+      if (originWorkspace && nextWorkspace !== originWorkspace) {
+        const lockedWorkspaceError = "当前在编辑模式操作，企业空间固定，不可修改。"
+        setPipelineProjectCreateWorkspaceInvalid(true)
+        setPipelineProjectCreateWorkspaceError(lockedWorkspaceError)
+        if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(lockedWorkspaceError)
+        return
+      }
+    }
+
+    if (!nextWorkspace) {
+      setPipelineProjectCreateWorkspaceInvalid(true)
+      setPipelineProjectCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+      if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+      return
+    }
+
+    setPipelineProjectCreateNameInvalid(false)
+    setPipelineProjectCreateNameError(null)
+    setPipelineProjectCreateWorkspaceInvalid(false)
+    setPipelineProjectCreateWorkspaceError(null)
+    setPipelineProjectCreateYamlError(null)
+    setPipelineProjectCreating(true)
+    nextAnnotations = {
+      ...nextAnnotations,
+      [PROJECT_WORKSPACE_ANNOTATION]: nextWorkspace,
+    }
+
+    const request = isPipelineProjectEditMode
+      ? updatePipelineProject({
+          name: pipelineProjectEditingName || nextName,
+          workspaceName: nextWorkspace,
+          description: nextDescription,
+          labels: nextLabels,
+          annotations: nextAnnotations,
+        })
+      : createPipelineProject({
+          name: nextName,
+          workspaceName: nextWorkspace,
+          description: nextDescription,
+          labels: nextLabels,
+          annotations: nextAnnotations,
+        })
+
+    void request
+      .then(async () => {
+        setPipelineProjectCreateOpen(false)
+        resetPipelineDialogState()
+        const items = await fetchPipelineProjectRows()
+        setPipelineRows(items)
+        setError(null)
+      })
+      .catch((e: unknown) => {
+        const message = resolveCreateProjectErrorMessage(e)
+        const isNameError = isNameRelatedCreateError(e)
+        setPipelineProjectCreateNameInvalid(isNameError)
+        setPipelineProjectCreateNameError(isNameError ? message : null)
+        if (pipelineProjectCreateYamlMode) {
+          setPipelineProjectCreateYamlError(message)
+        }
+      })
+      .finally(() => {
+        setPipelineProjectCreating(false)
+      })
+  }, [
+    pipelineProjectCreateAnnotationEntries,
+    pipelineProjectCreateDescription,
+    pipelineProjectCreateLabelEntries,
+    pipelineProjectCreateName,
+    pipelineProjectCreateWorkspace,
+    pipelineProjectCreateYamlMode,
+    pipelineProjectCreateYamlText,
+    pipelineProjectCreating,
+    pipelineProjectDialogMode,
+    pipelineProjectEditingName,
+    pipelineRows,
+    resetPipelineDialogState,
+  ])
+  const handleConfirmPipelineDelete = React.useCallback(() => {
+    if (!pendingPipelineDeleteRow || pipelineDeleting) return
+    const name = pendingPipelineDeleteRow.name.trim()
+    if (!name || name === "-") return
+    setPipelineDeleting(true)
+    void deletePipelineProject(name)
+      .then(async () => {
+        setPendingPipelineDeleteRow(null)
+        const items = await fetchPipelineProjectRows()
+        setPipelineRows(items)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "删除失败"
+        setError(message)
+      })
+      .finally(() => {
+        setPipelineDeleting(false)
+      })
+  }, [pendingPipelineDeleteRow, pipelineDeleting])
 
   const handleCreateSubmit = React.useCallback(
     () => {
@@ -621,7 +1002,7 @@ export function ProjectsPageClient() {
     ]
   )
 
-  const columns = React.useMemo(
+  const projectTableColumns = React.useMemo(
     () =>
       createColumns<NamespaceRow>({
         columns: projectColumns,
@@ -677,6 +1058,40 @@ export function ProjectsPageClient() {
     [handleViewDescribe, handleViewYaml, requestDelete, requestEdit]
   )
 
+  const pipelineTableColumns = React.useMemo(
+    () =>
+      createColumns<PipelineProjectRow>({
+        columns: pipelineProjectColumns,
+        actionItems: [
+          {
+            label: (
+              <>
+                <IconPencil className="size-4" />
+                {"编辑"}
+              </>
+            ),
+            onSelect: (row) => {
+              openPipelineProjectEditDialog(row)
+            },
+          },
+          {
+            label: (
+              <>
+                <IconTrash className="size-4" />
+                {"删除"}
+              </>
+            ),
+            variant: "destructive",
+            withSeparator: true,
+            onSelect: (row) => {
+              setPendingPipelineDeleteRow(row)
+            },
+          },
+        ],
+      }),
+    [openPipelineProjectEditDialog]
+  )
+
   React.useEffect(() => {
     let cancelled = false
 
@@ -686,15 +1101,20 @@ export function ProjectsPageClient() {
         setError(null)
       }
       try {
-        const namespaceRows = await fetchNamespaces()
+        const [namespaceRows, pipelineProjectItems] = await Promise.all([
+          fetchNamespaces(),
+          fetchPipelineProjectRows(),
+        ])
         const items = await mergeRowsWithWorkspaceBindings(namespaceRows)
         if (cancelled) return
         setRows(items)
+        setPipelineRows(pipelineProjectItems)
         setError(null)
       } catch (e: unknown) {
         if (cancelled) return
         if (!silent) {
           setRows([])
+          setPipelineRows([])
           setError(e instanceof Error ? e.message : "API request failed")
         } else {
           console.error("[Projects] polling refresh failed", e)
@@ -731,20 +1151,27 @@ export function ProjectsPageClient() {
 
   const query = nameQuery.trim().toLowerCase()
   const selectedWorkspace = workspaceQuery.trim()
+  const activeRows = activeTab === "projects" ? rows : pipelineRows
   const workspaceFilterOptions = React.useMemo(
     () =>
       Array.from(
         new Set(
-          rows
+          activeRows
             .map((row) => row.workspace.trim())
             .filter((workspace) => workspace.length > 0 && workspace !== "-")
         )
       )
         .sort((a, b) => a.localeCompare(b, "zh-CN"))
         .map((workspace) => ({ id: workspace, name: workspace })),
-    [rows]
+    [activeRows]
   )
-  const filteredRows = rows.filter((row) => {
+  const filteredProjectRows = rows.filter((row) => {
+    const matchesWorkspace =
+      !selectedWorkspace || row.workspace.trim().toLowerCase() === selectedWorkspace.toLowerCase()
+    const matchesName = !query || row.name.toLowerCase().includes(query)
+    return matchesWorkspace && matchesName
+  })
+  const filteredPipelineRows = pipelineRows.filter((row) => {
     const matchesWorkspace =
       !selectedWorkspace || row.workspace.trim().toLowerCase() === selectedWorkspace.toLowerCase()
     const matchesName = !query || row.name.toLowerCase().includes(query)
@@ -781,6 +1208,16 @@ export function ProjectsPageClient() {
       />
     </>
   )
+
+  const projectTabs = (
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ProjectTab)} className="w-fit">
+      <TabsList>
+        <TabsTrigger value="projects">项目</TabsTrigger>
+        <TabsTrigger value="pipelineProjects">流水线项目</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  )
+  const isPipelineProjectEditMode = pipelineProjectDialogMode === "edit"
 
   return (
     <>
@@ -1146,16 +1583,392 @@ export function ProjectsPageClient() {
         deleting={deleting}
         onConfirm={handleConfirmDelete}
       />
-      <DataTable
-        data={filteredRows}
-        columns={columns}
-        onCreate={() => {
-          resetCreateDialogState()
-          setCreateDialogOpen(true)
+      <DeleteConfirmDialog
+        open={Boolean(pendingPipelineDeleteRow)}
+        onOpenChange={(open) => {
+          if (!open && !pipelineDeleting) setPendingPipelineDeleteRow(null)
         }}
-        toolbarEnd={projectFilters}
-        onDeleteSelectedRows={handleDeleteSelectedRows}
+        title="删除流水线项目"
+        description={
+          pendingPipelineDeleteRow
+            ? `确定删除流水线项目 ${pendingPipelineDeleteRow.name} 吗？`
+            : ""
+        }
+        deleting={pipelineDeleting}
+        onConfirm={handleConfirmPipelineDelete}
       />
+      <Dialog
+        open={pipelineProjectCreateOpen}
+        onOpenChange={(open) => {
+          if (!open && pipelineProjectCreating) return
+          setPipelineProjectCreateOpen(open)
+          if (!open) resetPipelineDialogState()
+        }}
+      >
+        <DialogContent
+          className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+          onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+        >
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex items-start justify-between border-b bg-muted/15">
+              <DialogHeader className="px-6 py-4">
+                <DialogTitle>{isPipelineProjectEditMode ? "编辑流水线项目" : "创建流水线项目"}</DialogTitle>
+                <DialogDescription>
+                  {isPipelineProjectEditMode ? "编辑流水线项目并更新描述信息。" : "创建流水线项目并归属到指定企业空间。"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="h-full flex items-center me-20">
+                <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                  <span className="text-sm font-medium">编辑 YAML</span>
+                  <Switch
+                    checked={pipelineProjectCreateYamlMode}
+                    onCheckedChange={(checked) => {
+                      if (pipelineProjectCreating) return
+                      if (checked) {
+                        const annotationsForYaml = metadataEntriesToRecord(pipelineProjectCreateAnnotationEntries)
+                        const workspaceValue = pipelineProjectCreateWorkspace.trim()
+                        if (workspaceValue) {
+                          annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION] = workspaceValue
+                        } else {
+                          delete annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION]
+                        }
+                        setPipelineProjectCreateYamlText(
+                          buildPipelineProjectYamlText({
+                            name: pipelineProjectCreateName,
+                            description: pipelineProjectCreateDescription,
+                            workspaceName: pipelineProjectCreateWorkspace,
+                            labels: pipelineProjectCreateLabelEntries,
+                            annotations: metadataRecordToEntries(annotationsForYaml),
+                          })
+                        )
+                        setPipelineProjectCreateYamlError(null)
+                        setPipelineProjectCreateYamlMode(true)
+                        return
+                      }
+
+                      try {
+                        const parsed = parsePipelineProjectYamlText(pipelineProjectCreateYamlText)
+                        setPipelineProjectCreateName(parsed.name)
+                        setPipelineProjectCreateDescription(parsed.description)
+                        const nextWorkspace = parsed.workspaceName.trim() || pipelineProjectCreateWorkspace.trim()
+                        setPipelineProjectCreateWorkspace(nextWorkspace)
+                        setPipelineProjectCreateLabelEntries(parsed.labels)
+                        const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
+                        setPipelineProjectCreateAnnotationEntries(protectedAnnotations)
+                        setPipelineProjectCreateMetadataEnabled(
+                          hasUserProvidedMetadata(parsed.labels, protectedAnnotations)
+                        )
+                        setPipelineProjectCreateYamlError(null)
+                        setPipelineProjectCreateYamlMode(false)
+                      } catch (error) {
+                        setPipelineProjectCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+                      }
+                    }}
+                    disabled={pipelineProjectCreating}
+                    aria-label="编辑 YAML"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {!pipelineProjectCreateYamlMode ? (
+              <StepHeaderNav
+                items={[
+                  {
+                    id: "basic",
+                    title: "基本信息",
+                    status: pipelineProjectCreateStep === "basic" ? "当前" : "已设置",
+                    active: pipelineProjectCreateStep === "basic",
+                    icon: <IconSettings2 className="size-4" />,
+                    disabled: pipelineProjectCreating,
+                    onClick: () => {
+                      if (pipelineProjectCreating) return
+                      setPipelineProjectCreateStep("basic")
+                    },
+                  },
+                  {
+                    id: "advanced",
+                    title: "高级设置",
+                    status:
+                      pipelineProjectCreateStep === "advanced"
+                        ? "当前"
+                        : hasUserProvidedMetadata(
+                            pipelineProjectCreateLabelEntries,
+                            pipelineProjectCreateAnnotationEntries
+                          )
+                          ? "已设置"
+                          : "未设置",
+                    active: pipelineProjectCreateStep === "advanced",
+                    icon: <IconSettings2 className="size-4" />,
+                    disabled: pipelineProjectCreating,
+                    onClick: () => {
+                      if (pipelineProjectCreating) return
+                      setPipelineProjectCreateStep("advanced")
+                    },
+                  },
+                ]}
+              />
+            ) : null}
+
+            <div
+              className={
+                pipelineProjectCreateYamlMode ? "min-h-0 flex-1 p-6" : "min-h-0 flex-1 overflow-y-auto"
+              }
+            >
+              {pipelineProjectCreateYamlMode ? (
+                <div className="flex h-full min-h-0 flex-col">
+                  <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border">
+                    <MonacoEditor
+                      language="yaml"
+                      theme="vs-dark"
+                      value={pipelineProjectCreateYamlText}
+                      onChange={(value) => {
+                        setPipelineProjectCreateYamlText(value ?? "")
+                        if (pipelineProjectCreateYamlError) setPipelineProjectCreateYamlError(null)
+                        if (pipelineProjectCreateNameInvalid) setPipelineProjectCreateNameInvalid(false)
+                        if (pipelineProjectCreateNameError) setPipelineProjectCreateNameError(null)
+                      }}
+                      options={MONACO_OPTIONS}
+                      height="100%"
+                    />
+                  </div>
+                  {pipelineProjectCreateYamlError ? (
+                    <FieldError className="mt-3">{pipelineProjectCreateYamlError}</FieldError>
+                  ) : null}
+                </div>
+              ) : pipelineProjectCreateStep === "basic" ? (
+                <div className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">基本信息</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">填写流水线项目名称与描述信息。</p>
+                  </div>
+                  <FieldGroup className="flex flex-col gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <Field data-invalid={pipelineProjectCreateNameInvalid}>
+                        <FieldLabel htmlFor="project-pipeline-project-create-name">名称</FieldLabel>
+                        <Input
+                          id="project-pipeline-project-create-name"
+                          value={pipelineProjectCreateName}
+                          onChange={(event) => {
+                            setPipelineProjectCreateName(event.target.value)
+                            if (pipelineProjectCreateNameInvalid) setPipelineProjectCreateNameInvalid(false)
+                            if (pipelineProjectCreateNameError) setPipelineProjectCreateNameError(null)
+                          }}
+                          placeholder="请输入流水线项目名称"
+                          autoComplete="off"
+                          aria-invalid={pipelineProjectCreateNameInvalid}
+                          disabled={pipelineProjectCreating || isPipelineProjectEditMode}
+                        />
+                        {pipelineProjectCreateNameError ? (
+                          <FieldError>{pipelineProjectCreateNameError}</FieldError>
+                        ) : (
+                          <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
+                        )}
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="project-pipeline-project-create-workspace">企业空间</FieldLabel>
+                        <FilterCombobox
+                          options={workspaceOptions}
+                          value={pipelineProjectCreateWorkspace}
+                          onValueChange={(value) => {
+                            setPipelineProjectCreateWorkspace(value)
+                            setPipelineProjectCreateAnnotationEntries((prev) => {
+                              const ensured = ensureWorkspaceAnnotationEntries(prev, value)
+                              return areMetadataEntriesEqual(prev, ensured) ? prev : ensured
+                            })
+                            if (pipelineProjectCreateWorkspaceInvalid) setPipelineProjectCreateWorkspaceInvalid(false)
+                            if (pipelineProjectCreateWorkspaceError) setPipelineProjectCreateWorkspaceError(null)
+                          }}
+                          placeholder="请选择企业空间"
+                          emptyText="暂无企业空间"
+                          className="h-10"
+                          ariaInvalid={pipelineProjectCreateWorkspaceInvalid}
+                          disabled={pipelineProjectCreating || isPipelineProjectEditMode}
+                        />
+                        {pipelineProjectCreateWorkspaceError ? (
+                          <FieldError>{pipelineProjectCreateWorkspaceError}</FieldError>
+                        ) : (
+                          <FieldDescription>
+                            {isPipelineProjectEditMode
+                              ? `当前在编辑模式操作，企业空间固定为 ${pipelineProjectCreateWorkspace || "-"}。`
+                              : "必选，用于归属企业空间。"}
+                          </FieldDescription>
+                        )}
+                      </Field>
+                    </div>
+                    <Field>
+                      <FieldLabel htmlFor="project-pipeline-project-create-description">描述</FieldLabel>
+                      <Textarea
+                        id="project-pipeline-project-create-description"
+                        value={pipelineProjectCreateDescription}
+                        onChange={(event) => setPipelineProjectCreateDescription(event.target.value)}
+                        placeholder="请输入描述"
+                        maxLength={256}
+                        className="min-h-28"
+                        disabled={pipelineProjectCreating}
+                      />
+                      <FieldDescription>描述将写入资源注解 description，最长 256 个字符。</FieldDescription>
+                    </Field>
+                  </FieldGroup>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">高级设置</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">补充标签与注解信息，便于检索、分类和后续治理。</p>
+                  </div>
+                  <FieldGroup className="flex flex-col gap-4">
+                    <Field>
+                      <ResourceMetadataEditor
+                        checked={pipelineProjectCreateMetadataEnabled}
+                        onCheckedChange={setPipelineProjectCreateMetadataEnabled}
+                        labels={pipelineProjectCreateLabelEntries}
+                        setLabels={setPipelineProjectCreateLabelEntries}
+                        annotations={pipelineProjectCreateAnnotationEntries}
+                        setAnnotations={(next) => {
+                          setPipelineProjectCreateAnnotationEntries((prev) => {
+                            const resolved = typeof next === "function" ? next(prev) : next
+                            const ensured = ensureWorkspaceAnnotationEntries(
+                              resolved,
+                              pipelineProjectCreateWorkspace
+                            )
+                            return areMetadataEntriesEqual(prev, ensured) ? prev : ensured
+                          })
+                        }}
+                        description={pipelineProjectCreateDescription}
+                        setDescription={setPipelineProjectCreateDescription}
+                        disabled={pipelineProjectCreating}
+                        titleText="统一管理流水线项目的标签与注解信息。"
+                      />
+                    </Field>
+                  </FieldGroup>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="border-t bg-background px-6 py-5">
+              {pipelineProjectCreateYamlMode ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={pipelineProjectCreating}
+                    onClick={() => setPipelineProjectCreateOpen(false)}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handlePipelineProjectCreateSubmit}
+                    disabled={pipelineProjectCreating}
+                  >
+                    {pipelineProjectCreating
+                      ? isPipelineProjectEditMode
+                        ? "保存中..."
+                        : "创建中..."
+                      : isPipelineProjectEditMode
+                        ? "保存"
+                        : "创建"}
+                  </Button>
+                </>
+              ) : pipelineProjectCreateStep === "basic" ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={pipelineProjectCreating}
+                    onClick={() => setPipelineProjectCreateOpen(false)}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={pipelineProjectCreating}
+                    onClick={() => {
+                      const nextName = pipelineProjectCreateName.trim()
+                      const validationMessage = validateProjectName(nextName)
+                      if (validationMessage) {
+                        setPipelineProjectCreateNameInvalid(true)
+                        setPipelineProjectCreateNameError(validationMessage)
+                        return
+                      }
+
+                      const allPipelineProjectNames = pipelineRows.map((row) => row.name.trim())
+                      const nameExists = allPipelineProjectNames.includes(nextName)
+                      if (!isPipelineProjectEditMode && nameExists) {
+                        setPipelineProjectCreateNameInvalid(true)
+                        setPipelineProjectCreateNameError("流水线项目名称已存在，请更换后重试")
+                        return
+                      }
+
+                      setPipelineProjectCreateNameInvalid(false)
+                      setPipelineProjectCreateNameError(null)
+                      const selectedWorkspace = pipelineProjectCreateWorkspace.trim()
+                      if (!selectedWorkspace) {
+                        setPipelineProjectCreateWorkspaceInvalid(true)
+                        setPipelineProjectCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+                        return
+                      }
+                      setPipelineProjectCreateWorkspaceInvalid(false)
+                      setPipelineProjectCreateWorkspaceError(null)
+                      setPipelineProjectCreateStep("advanced")
+                    }}
+                  >
+                    下一步
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={pipelineProjectCreating}
+                    onClick={() => setPipelineProjectCreateStep("basic")}
+                  >
+                    上一步
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handlePipelineProjectCreateSubmit}
+                    disabled={pipelineProjectCreating}
+                  >
+                    {pipelineProjectCreating
+                      ? isPipelineProjectEditMode
+                        ? "保存中..."
+                        : "创建中..."
+                      : isPipelineProjectEditMode
+                        ? "保存"
+                        : "创建"}
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {activeTab === "projects" ? (
+        <DataTable
+          data={filteredProjectRows}
+          columns={projectTableColumns}
+          onCreate={() => {
+            resetCreateDialogState()
+            setCreateDialogOpen(true)
+          }}
+          toolbarStart={projectTabs}
+          toolbarEnd={projectFilters}
+          onDeleteSelectedRows={handleDeleteSelectedRows}
+        />
+      ) : (
+        <DataTable
+          data={filteredPipelineRows}
+          columns={pipelineTableColumns}
+          onCreate={openPipelineProjectCreateDialog}
+          toolbarStart={projectTabs}
+          toolbarEnd={projectFilters}
+          onDeleteSelectedRows={handlePipelineDeleteSelectedRows}
+        />
+      )}
     </>
   )
 }
