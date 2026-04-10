@@ -170,8 +170,8 @@ const projectColumns: ColumnConfig<WorkspaceDetailRow>[] = [
   },
   { key: "status", label: "状态", render: "status" },
   { key: "workspace", label: "企业空间" },
-  { key: "labels", label: "标签", align: "right" },
-  { key: "annotations", label: "注解", align: "right" },
+  { key: "labels", label: "标签"},
+  { key: "annotations", label: "注解"},
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]
@@ -191,7 +191,7 @@ const pipelineProjectColumns: ColumnConfig<WorkspaceDetailRow>[] = [
 const roleColumns: ColumnConfig<WorkspaceDetailRow>[] = [
   { key: "role", label: "角色", enableHiding: false },
   { key: "scope", label: "作用域" },
-  { key: "bindings", label: "绑定数", align: "right" },
+  { key: "bindings", label: "绑定数"},
 ]
 
 const memberColumns: ColumnConfig<WorkspaceDetailRow>[] = [

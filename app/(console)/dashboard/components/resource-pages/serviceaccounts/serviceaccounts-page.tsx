@@ -32,9 +32,9 @@ const serviceAccountColumns: ColumnConfig<ServiceAccountRow>[] = [
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
   { key: "namespace", label: "命名空间" },
-  { key: "secrets", label: "Secrets", align: "right" },
-  { key: "imagePullSecrets", label: "拉取凭据", align: "right" },
-  { key: "automountToken", label: "自动挂载令牌" },
+  // { key: "secrets", label: "Secrets"},
+  // { key: "imagePullSecrets", label: "拉取凭据"},
+  // { key: "automountToken", label: "自动挂载令牌" },
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]

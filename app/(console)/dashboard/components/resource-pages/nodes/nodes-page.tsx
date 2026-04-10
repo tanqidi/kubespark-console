@@ -62,9 +62,9 @@ export function NodesPageClient() {
     },
     { key: "status", label: "状态", render: "status" },
     { key: "role", label: "角色" },
-    // { key: "cpuUsage", label: "CPU 使用率", align: "right" },
-    // { key: "memoryUsage", label: "内存使用率", align: "right" },
-    { key: "pods", label: "容器组", align: "right" },
+    // { key: "cpuUsage", label: "CPU 使用率"},
+    // { key: "memoryUsage", label: "内存使用率"},
+    { key: "pods", label: "容器组"},
     { key: "updatedAt", label: "更新时间" },
   ],
     actionItems: [

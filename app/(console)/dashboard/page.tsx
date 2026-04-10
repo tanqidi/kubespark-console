@@ -18,8 +18,8 @@ const columns = createColumns<Row>({
     },
     { key: "type", label: "Section Type", render: "badge" },
     { key: "status", label: "Status", render: "status" },
-    { key: "target", label: "Target", render: "input", align: "right" },
-    { key: "limit", label: "Limit", render: "input", align: "right" },
+    { key: "target", label: "Target", render: "input"},
+    { key: "limit", label: "Limit", render: "input"},
     { key: "reviewer", label: "Reviewer" },
   ],
 })

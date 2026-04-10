@@ -49,8 +49,8 @@ const jobColumns: ColumnConfig<JobRow>[] = [
   },
   { key: "status", label: "状态", render: "status" as const },
   { key: "namespace", label: "命名空间" },
-  { key: "duration", label: "时长", align: "right" as const },
-  { key: "retry", label: "重试", align: "right" as const },
+  { key: "duration", label: "时长" },
+  { key: "retry", label: "重试" },
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]

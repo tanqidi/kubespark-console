@@ -42,8 +42,8 @@ const workloadColumns: ColumnConfig<WorkloadRow>[] = [
   },
   { key: "status", label: "状态", render: "status" as const },
   { key: "namespace", label: "命名空间" },
-  { key: "desired", label: "期望", align: "right" as const },
-  { key: "ready", label: "就绪", align: "right" as const },
+  // { key: "desired", label: "期望" },
+  // { key: "ready", label: "就绪" },
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]
