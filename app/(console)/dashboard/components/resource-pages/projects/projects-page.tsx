@@ -141,14 +141,27 @@ function ensureWorkspaceAnnotationEntries(
 ): MetadataEntry[] {
   const workspaceValue = workspace.trim()
   const withoutWorkspace = entries.filter((entry) => entry.key !== PROJECT_WORKSPACE_ANNOTATION)
-  if (!workspaceValue) return withoutWorkspace
+  const nonEmptyEntries = withoutWorkspace.filter(
+    (entry) => entry.key.trim().length > 0 || entry.value.trim().length > 0
+  )
+  if (!workspaceValue) {
+    return nonEmptyEntries.length > 0 ? nonEmptyEntries : [{ key: "", value: "" }]
+  }
   return [
-    ...withoutWorkspace,
+    ...nonEmptyEntries,
     {
       key: PROJECT_WORKSPACE_ANNOTATION,
       value: workspaceValue,
     },
   ]
+}
+
+function areMetadataEntriesEqual(a: MetadataEntry[], b: MetadataEntry[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i]?.key !== b[i]?.key || a[i]?.value !== b[i]?.value) return false
+  }
+  return true
 }
 
 function buildProjectYamlText(params: {
@@ -914,7 +927,10 @@ export function ProjectsPageClient() {
                           value={createWorkspace}
                           onValueChange={(value) => {
                             setCreateWorkspace(value)
-                            setAnnotationEntries((prev) => ensureWorkspaceAnnotationEntries(prev, value))
+                            setAnnotationEntries((prev) => {
+                              const ensured = ensureWorkspaceAnnotationEntries(prev, value)
+                              return areMetadataEntriesEqual(prev, ensured) ? prev : ensured
+                            })
                             if (createWorkspaceInvalid) setCreateWorkspaceInvalid(false)
                             if (createWorkspaceError) setCreateWorkspaceError(null)
                           }}
@@ -973,8 +989,11 @@ export function ProjectsPageClient() {
                         setLabels={setLabelEntries}
                         annotations={annotationEntries}
                         setAnnotations={(next) => {
-                          const resolved = typeof next === "function" ? next(annotationEntries) : next
-                          setAnnotationEntries(ensureWorkspaceAnnotationEntries(resolved, createWorkspace))
+                          setAnnotationEntries((prev) => {
+                            const resolved = typeof next === "function" ? next(prev) : next
+                            const ensured = ensureWorkspaceAnnotationEntries(resolved, createWorkspace)
+                            return areMetadataEntriesEqual(prev, ensured) ? prev : ensured
+                          })
                         }}
                         description={createDescription}
                         setDescription={setCreateDescription}
@@ -1010,6 +1029,26 @@ export function ProjectsPageClient() {
                     type="button"
                     disabled={creating}
                     onClick={() => {
+                      const nextName = (editingRow?.name ?? createName).trim()
+                      const nameValidationMessage = validateProjectName(nextName)
+                      if (nameValidationMessage) {
+                        setCreateNameInvalid(true)
+                        setCreateNameError(nameValidationMessage)
+                        return
+                      }
+
+                      if (!isEditMode) {
+                        const nameExists = rows.some((row) => row.name === nextName)
+                        if (nameExists) {
+                          setCreateNameInvalid(true)
+                          setCreateNameError("项目名称已存在，请更换后重试")
+                          return
+                        }
+                      }
+
+                      setCreateNameInvalid(false)
+                      setCreateNameError(null)
+
                       if (!workspaceBindingExists) {
                         const selectedWorkspace = createWorkspace.trim()
                         if (!selectedWorkspace) {

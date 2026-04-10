@@ -103,9 +103,16 @@ function validateProjectName(name: string): string | null {
 function ensureWorkspaceAnnotationEntries(entries: MetadataEntry[], workspace: string): MetadataEntry[] {
   const workspaceValue = workspace.trim()
   const withoutWorkspace = entries.filter((entry) => entry.key !== PROJECT_WORKSPACE_ANNOTATION)
-  if (!workspaceValue) return withoutWorkspace
+  const nonEmptyEntries = withoutWorkspace.filter(
+    (entry) => entry.key.trim().length > 0 || entry.value.trim().length > 0
+  )
+
+  if (!workspaceValue) {
+    return nonEmptyEntries.length > 0 ? nonEmptyEntries : [{ key: "", value: "" }]
+  }
+
   return [
-    ...withoutWorkspace,
+    ...nonEmptyEntries,
     {
       key: PROJECT_WORKSPACE_ANNOTATION,
       value: workspaceValue,
@@ -262,6 +269,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
   const [error, setError] = React.useState<string | null>(null)
   const [detail, setDetail] = React.useState<WorkspaceDetail | null>(null)
   const [projectRows, setProjectRows] = React.useState<WorkspaceDetailRow[]>([])
+  const [allProjectNames, setAllProjectNames] = React.useState<string[]>([])
 
   const [yamlOpen, setYamlOpen] = React.useState(false)
   const [yamlContent, setYamlContent] = React.useState("")
@@ -362,6 +370,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
 
     return {
       detail: next,
+      allProjectNames: projects.map((project) => project.name),
       projectRows: filteredProjects.map((project) => ({
         id: `project-${project.id}`,
         name: project.name,
@@ -384,6 +393,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
       .then((next) => {
         if (cancelled) return
         setDetail(next.detail)
+        setAllProjectNames(next.allProjectNames)
         setProjectRows(next.projectRows)
       })
       .catch((e: unknown) => {
@@ -415,6 +425,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
   const refreshProjectRows = React.useCallback(async () => {
     const next = await loadData(name)
     setDetail(next.detail)
+    setAllProjectNames(next.allProjectNames)
     setProjectRows(next.projectRows)
   }, [loadData, name])
 
@@ -509,8 +520,6 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
         setCreateNameError(isNameError ? message : null)
         if (createYamlMode) {
           setCreateYamlError(message)
-        } else if (!isNameError) {
-          setCreateWorkspaceError(message)
         }
       })
       .finally(() => {
@@ -1057,7 +1066,35 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
                   <Button
                     type="button"
                     disabled={creating}
-                    onClick={() => setCreateStep("advanced")}
+                    onClick={() => {
+                      const nextName = createName.trim()
+                      const validationMessage = validateProjectName(nextName)
+                      if (validationMessage) {
+                        setCreateNameInvalid(true)
+                        setCreateNameError(validationMessage)
+                        return
+                      }
+
+                      const nameExists = allProjectNames.includes(nextName)
+                      if (nameExists) {
+                        setCreateNameInvalid(true)
+                        setCreateNameError("项目名称已存在，请更换后重试")
+                        return
+                      }
+
+                      setCreateNameInvalid(false)
+                      setCreateNameError(null)
+
+                      const selectedWorkspace = currentWorkspaceName.trim()
+                      if (!selectedWorkspace) {
+                        setCreateWorkspaceInvalid(true)
+                        setCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+                        return
+                      }
+                      setCreateWorkspaceInvalid(false)
+                      setCreateWorkspaceError(null)
+                      setCreateStep("advanced")
+                    }}
                   >
                     下一步
                   </Button>
