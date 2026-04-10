@@ -170,8 +170,8 @@ const projectColumns: ColumnConfig<WorkspaceDetailRow>[] = [
   },
   { key: "status", label: "状态", render: "status" },
   { key: "workspace", label: "企业空间" },
-  { key: "labels", label: "标签"},
-  { key: "annotations", label: "注解"},
+  // { key: "labels", label: "标签"},
+  // { key: "annotations", label: "注解"},
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]
