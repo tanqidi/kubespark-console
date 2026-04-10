@@ -154,7 +154,7 @@ export function WorkloadPickerDialog({
       value={nameQuery}
       onChange={(event) => setNameQuery(event.target.value)}
       placeholder="名称"
-      className="h-9 w-52"
+      className="h-9 w-40"
       disabled={isBusy}
     />
   )
@@ -172,7 +172,7 @@ export function WorkloadPickerDialog({
           <DialogDescription>点击列表行即可选择并回填标签选择器。</DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto py-1">
           <DataTable
             data={loading ? [] : filteredRows}
             columns={columns}
@@ -183,7 +183,7 @@ export function WorkloadPickerDialog({
             }}
             toolbarStart={toolbarStart}
             toolbarEnd={toolbarEnd}
-            showColumnCustomizer
+            showColumnCustomizer={false}
           />
           {loading ? (
             <p className="mt-3 text-sm text-muted-foreground">加载中...</p>
