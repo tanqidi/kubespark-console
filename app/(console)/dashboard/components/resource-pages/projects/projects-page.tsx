@@ -60,7 +60,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import {Input} from "@/components/ui/input"
+import { Input } from "@/components/ui/input"
 import { FilterCombobox, type FilterComboboxOption } from "@/components/ui/filter-combobox"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -250,6 +250,7 @@ export function ProjectsPageClient() {
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [nameQuery, setNameQuery] = React.useState("")
+  const [workspaceQuery, setWorkspaceQuery] = React.useState("")
   const [yamlOpen, setYamlOpen] = React.useState(false)
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
@@ -728,6 +729,28 @@ export function ProjectsPageClient() {
     }
   }, [mergeRowsWithWorkspaceBindings])
 
+  const query = nameQuery.trim().toLowerCase()
+  const selectedWorkspace = workspaceQuery.trim()
+  const workspaceFilterOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          rows
+            .map((row) => row.workspace.trim())
+            .filter((workspace) => workspace.length > 0 && workspace !== "-")
+        )
+      )
+        .sort((a, b) => a.localeCompare(b, "zh-CN"))
+        .map((workspace) => ({ id: workspace, name: workspace })),
+    [rows]
+  )
+  const filteredRows = rows.filter((row) => {
+    const matchesWorkspace =
+      !selectedWorkspace || row.workspace.trim().toLowerCase() === selectedWorkspace.toLowerCase()
+    const matchesName = !query || row.name.toLowerCase().includes(query)
+    return matchesWorkspace && matchesName
+  })
+
   // if (loading) return <ResourceLoadingState /> // kept for potential future use
   if (error) {
     return (
@@ -740,19 +763,23 @@ export function ProjectsPageClient() {
     )
   }
 
-  const query = nameQuery.trim().toLowerCase()
-  const filteredRows = rows.filter((row) => {
-    if (!query) return true
-    return row.name.toLowerCase().includes(query)
-  })
-
   const projectFilters = (
-    <Input
-      value={nameQuery}
-      onChange={(event) => setNameQuery(event.target.value)}
-      placeholder="名称"
-      className="h-9 w-40"
-    />
+    <>
+      <FilterCombobox
+        options={workspaceFilterOptions}
+        value={workspaceQuery}
+        onValueChange={setWorkspaceQuery}
+        placeholder="企业空间"
+        emptyText="暂无企业空间"
+        className="w-40"
+      />
+      <Input
+        value={nameQuery}
+        onChange={(event) => setNameQuery(event.target.value)}
+        placeholder="名称"
+        className="h-9 w-40"
+      />
+    </>
   )
 
   return (
