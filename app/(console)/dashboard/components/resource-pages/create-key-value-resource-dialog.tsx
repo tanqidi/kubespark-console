@@ -49,7 +49,6 @@ import {
   ItemTitle,
 } from "@/components/ui/item"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { ProjectNamespaceField } from "@/app/(console)/dashboard/components/resource-pages/project-namespace-field"
@@ -1229,16 +1228,23 @@ export function CreateKeyValueResourceDialog({
                               <FieldLabel htmlFor={`${editingItem.id}-value`}>
                                 {valueLabel}
                               </FieldLabel>
-                              <Textarea
-                                id={`${editingItem.id}-value`}
-                                value={editingItem.value}
-                                onChange={(event) =>
-                                  updateItem(editingItem.id, "value", event.target.value)
-                                }
-                                placeholder={isSecret ? "请输入密文内容" : "请输入配置内容"}
-                                className="min-h-40 flex-1"
-                                disabled={creating}
-                              />
+                              <div className="min-h-40 flex-1 overflow-hidden rounded-lg border border-slate-700/60 bg-[#1e1e1e] shadow-inner">
+                                <MonacoEditor
+                                  language={isSecret ? "plaintext" : "yaml"}
+                                  theme="vs-dark"
+                                  value={editingItem.value}
+                                  onChange={(value) => {
+                                    updateItem(editingItem.id, "value", value ?? "")
+                                  }}
+                                  options={MONACO_OPTIONS}
+                                  height="100%"
+                                  loading={
+                                    <div className="flex h-full items-center justify-center text-sm text-slate-300">
+                                      编辑器加载中...
+                                    </div>
+                                  }
+                                />
+                              </div>
                             </Field>
                           </FieldGroup>
                           {submitError ? <FieldError>{submitError}</FieldError> : null}
