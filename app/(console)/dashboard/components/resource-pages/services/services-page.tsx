@@ -34,7 +34,7 @@ type ServiceRow = ServiceResourceRow
 const serviceColumns: ColumnConfig<ServiceRow>[] = [
   {
     key: "name",
-    label: "\u540d\u79f0",
+    label: "名称",
     enableHiding: false,
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
@@ -52,7 +52,7 @@ const serviceColumns: ColumnConfig<ServiceRow>[] = [
       renderNameDescriptionCell(row.externalAccess, row.externalAccessType),
   },
   { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
+  { key: "updatedAt", label: "更新时间" },
 ]
 
 export function ServicesPageClient() {
@@ -288,7 +288,7 @@ export function ServicesPageClient() {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"\u67e5\u770b YAML"}
+                {"查看 YAML"}
               </>
             ),
             onSelect: (row) => {
@@ -321,7 +321,7 @@ export function ServicesPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"\u5220\u9664"}
+                {"删除"}
               </>
             ),
             variant: "destructive",
@@ -396,7 +396,7 @@ export function ServicesPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
+          <AlertTitle>{"加载失败"}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -424,7 +424,7 @@ export function ServicesPageClient() {
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"\u540d\u79f0"}
+        placeholder={"名称"}
         className="h-9 w-40"
       />
     </>

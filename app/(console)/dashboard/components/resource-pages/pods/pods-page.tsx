@@ -288,23 +288,23 @@ export function PodsPageClient() {
         columns: [
           {
             key: "name",
-            label: "\u540d\u79f0",
+            label: "名称",
             enableHiding: false,
             cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
           },
-          { key: "status", label: "\u72b6\u6001", render: "status" },
+          { key: "status", label: "状态", render: "status" },
           { key: "namespace", label: "命名空间" },
-          { key: "node", label: "\u8282\u70b9" },
+          { key: "node", label: "节点" },
           { key: "ip", label: "IP" },
-          { key: "age", label: "\u8fd0\u884c\u65f6\u95f4" },
-          { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
+          { key: "age", label: "运行时间" },
+          { key: "updatedAt", label: "更新时间" },
         ],
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"\u67e5\u770b YAML"}
+                {"查看 YAML"}
               </>
             ),
             onSelect: (row) => {
@@ -359,7 +359,7 @@ export function PodsPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"\u5220\u9664"}
+                {"删除"}
               </>
             ),
             variant: "destructive",
@@ -445,7 +445,7 @@ export function PodsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
+          <AlertTitle>{"加载失败"}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -473,7 +473,7 @@ export function PodsPageClient() {
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"\u540d\u79f0"}
+        placeholder={"名称"}
         className="h-9 w-40"
       />
     </>

@@ -43,21 +43,21 @@ const sectionRenderers = {
 } as const
 
 const sectionLabels: Record<keyof typeof sectionRenderers, string> = {
-  nodes: "\u8282\u70b9",
-  projects: "\u9879\u76ee",
-  pipelines: "\u6d41\u6c34\u7ebf",
-  workspaces: "\u4f01\u4e1a\u7a7a\u95f4",
-  workloads: "\u5de5\u4f5c\u8d1f\u8f7d",
-  jobs: "\u4efb\u52a1",
-  pods: "\u5bb9\u5668\u7ec4",
-  services: "\u670d\u52a1",
-  routes: "\u5e94\u7528\u8def\u7531",
-  configmaps: "\u914d\u7f6e\u5b57\u5178",
-  secrets: "\u4fdd\u5bc6\u5b57\u5178",
-  serviceaccounts: "\u670d\u52a1\u8d26\u53f7",
-  customresources: "\u81ea\u5b9a\u4e49\u8d44\u6e90",
-  volumes: "\u5b58\u50a8\u5377",
-  storageclasses: "\u5b58\u50a8\u7c7b",
+  nodes: "节点",
+  projects: "项目",
+  pipelines: "流水线",
+  workspaces: "企业空间",
+  workloads: "工作负载",
+  jobs: "任务",
+  pods: "容器组",
+  services: "服务",
+  routes: "应用路由",
+  configmaps: "配置字典",
+  secrets: "保密字典",
+  serviceaccounts: "服务账号",
+  customresources: "自定义资源",
+  volumes: "存储卷",
+  storageclasses: "存储类",
 }
 
 export default async function DashboardSectionPage({

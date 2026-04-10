@@ -51,7 +51,7 @@ export function NodesPageClient() {
     columns: [
     {
       key: "name",
-      label: "\u540d\u79f0",
+      label: "名称",
       enableHiding: false,
       cell: (_, row) => (
         <div className="min-w-0">
@@ -60,12 +60,12 @@ export function NodesPageClient() {
         </div>
       ),
     },
-    { key: "status", label: "\u72b6\u6001", render: "status" },
-    { key: "role", label: "\u89d2\u8272" },
-    // { key: "cpuUsage", label: "CPU \u4f7f\u7528\u7387", align: "right" },
-    // { key: "memoryUsage", label: "\u5185\u5b58\u4f7f\u7528\u7387", align: "right" },
-    { key: "pods", label: "\u5bb9\u5668\u7ec4", align: "right" },
-    { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
+    { key: "status", label: "状态", render: "status" },
+    { key: "role", label: "角色" },
+    // { key: "cpuUsage", label: "CPU 使用率", align: "right" },
+    // { key: "memoryUsage", label: "内存使用率", align: "right" },
+    { key: "pods", label: "容器组", align: "right" },
+    { key: "updatedAt", label: "更新时间" },
   ],
     actionItems: [
       {
@@ -123,7 +123,7 @@ export function NodesPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
+          <AlertTitle>{"加载失败"}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -140,7 +140,7 @@ export function NodesPageClient() {
     <Input
       value={nameQuery}
       onChange={(event) => setNameQuery(event.target.value)}
-      placeholder={"\u540d\u79f0"}
+      placeholder={"名称"}
       className="h-9 w-40"
     />
   )

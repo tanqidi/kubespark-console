@@ -43,16 +43,16 @@ type JobRow = JobResourceRow
 const jobColumns: ColumnConfig<JobRow>[] = [
   {
     key: "name",
-    label: "\u540d\u79f0",
+    label: "名称",
     enableHiding: false,
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
-  { key: "status", label: "\u72b6\u6001", render: "status" as const },
+  { key: "status", label: "状态", render: "status" as const },
   { key: "namespace", label: "命名空间" },
-  { key: "duration", label: "\u65f6\u957f", align: "right" as const },
-  { key: "retry", label: "\u91cd\u8bd5", align: "right" as const },
-  { key: "age", label: "\u8fd0\u884c\u65f6\u95f4" },
-  { key: "updatedAt", label: "\u66f4\u65b0\u65f6\u95f4" },
+  { key: "duration", label: "时长", align: "right" as const },
+  { key: "retry", label: "重试", align: "right" as const },
+  { key: "age", label: "运行时间" },
+  { key: "updatedAt", label: "更新时间" },
 ]
 
 const JOB_RESOURCE_BY_KIND: Record<JobRow["kind"], string> = {
@@ -646,7 +646,7 @@ export function JobsPageClient() {
               <DropdownMenuGroup>
                 <DropdownMenuItem onSelect={() => handleViewYaml(current)}>
                   <IconEye className="size-4" />
-                  {"\u67e5\u770b YAML"}
+                  {"查看 YAML"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => handleViewDescribe(current)}>
                   <IconInfoCircle className="size-4" />
@@ -664,7 +664,7 @@ export function JobsPageClient() {
                   onSelect={() => requestDelete(current)}
                 >
                   <IconTrash className="size-4" />
-                  {"\u5220\u9664"}
+                  {"删除"}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -754,7 +754,7 @@ export function JobsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"\u52a0\u8f7d\u5931\u8d25"}</AlertTitle>
+          <AlertTitle>{"加载失败"}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -773,8 +773,8 @@ export function JobsPageClient() {
   const jobTabs = (
     <Tabs value={jobType} onValueChange={(value) => setJobType(value as JobRow["kind"])} className="w-fit">
       <TabsList>
-        <TabsTrigger value="Job">{"\u4efb\u52a1"}</TabsTrigger>
-        <TabsTrigger value="CronJob">{"\u5b9a\u65f6\u4efb\u52a1"}</TabsTrigger>
+        <TabsTrigger value="Job">{"任务"}</TabsTrigger>
+        <TabsTrigger value="CronJob">{"定时任务"}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -792,7 +792,7 @@ export function JobsPageClient() {
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"\u540d\u79f0"}
+        placeholder={"名称"}
         className="h-9 w-40"
       />
     </>
