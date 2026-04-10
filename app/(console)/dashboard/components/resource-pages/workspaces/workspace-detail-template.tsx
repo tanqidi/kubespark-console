@@ -184,9 +184,8 @@ const pipelineProjectColumns: ColumnConfig<WorkspaceDetailRow>[] = [
     enableHiding: false,
   },
   { key: "workspace", label: "企业空间" },
-  { key: "repository", label: "Git 地址" },
-  { key: "branch", label: "分支" },
-  { key: "lastRun", label: "最近构建" },
+  { key: "age", label: "运行时间" },
+  { key: "updatedAt", label: "更新时间" },
 ]
 
 const roleColumns: ColumnConfig<WorkspaceDetailRow>[] = [
@@ -549,9 +548,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
         name: item.name,
         description: item.description,
         workspace: item.workspace,
-        repository: "-",
-        branch: "-",
-        lastRun: "-",
+        age: item.age,
         updatedAt: item.updatedAt,
       })),
     }
