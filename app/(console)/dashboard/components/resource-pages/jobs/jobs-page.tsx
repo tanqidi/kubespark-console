@@ -48,7 +48,7 @@ const jobColumns: ColumnConfig<JobRow>[] = [
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
   { key: "status", label: "\u72b6\u6001", render: "status" as const },
-  { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
+  { key: "namespace", label: "命名空间" },
   { key: "duration", label: "\u65f6\u957f", align: "right" as const },
   { key: "retry", label: "\u91cd\u8bd5", align: "right" as const },
   { key: "age", label: "\u8fd0\u884c\u65f6\u95f4" },
@@ -785,8 +785,8 @@ export function JobsPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"\u540d\u79f0\u7a7a\u95f4"}
-        emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
+        placeholder={"命名空间"}
+        emptyText={"未找到命名空间"}
         className="w-40"
       />
       <Input

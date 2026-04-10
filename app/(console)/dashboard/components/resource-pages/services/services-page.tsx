@@ -38,7 +38,7 @@ const serviceColumns: ColumnConfig<ServiceRow>[] = [
     enableHiding: false,
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
-  { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
+  { key: "namespace", label: "命名空间" },
   {
     key: "internalAccess",
     label: "内部访问",
@@ -417,8 +417,8 @@ export function ServicesPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"\u540d\u79f0\u7a7a\u95f4"}
-        emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
+        placeholder={"命名空间"}
+        emptyText={"未找到命名空间"}
         className="w-40"
       />
       <Input

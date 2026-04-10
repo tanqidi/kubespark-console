@@ -41,7 +41,7 @@ const workloadColumns: ColumnConfig<WorkloadRow>[] = [
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
   { key: "status", label: "\u72b6\u6001", render: "status" as const },
-  { key: "namespace", label: "\u540d\u79f0\u7a7a\u95f4" },
+  { key: "namespace", label: "命名空间" },
   { key: "desired", label: "\u671f\u671b", align: "right" as const },
   { key: "ready", label: "\u5c31\u7eea", align: "right" as const },
   { key: "age", label: "\u8fd0\u884c\u65f6\u95f4" },
@@ -360,8 +360,8 @@ export function WorkloadsPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"\u540d\u79f0\u7a7a\u95f4"}
-        emptyText={"\u672a\u627e\u5230\u540d\u79f0\u7a7a\u95f4"}
+        placeholder={"命名空间"}
+        emptyText={"未找到命名空间"}
         className="w-40"
       />
       <Input

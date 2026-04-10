@@ -472,7 +472,7 @@
       "title": "节点"
     },
     "projects": {
-      "subtitle": "名称空间列表",
+      "subtitle": "命名空间列表",
       "filters": {
         "namePlaceholder": "过滤项目/命名空间"
       },
