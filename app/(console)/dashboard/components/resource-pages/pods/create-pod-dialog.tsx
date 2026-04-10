@@ -1240,7 +1240,7 @@ export function CreatePodDialog({
                             id="create-pod-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="例如：volume-data"
+                            placeholder="volume-data"
                             autoComplete="off"
                             aria-invalid={(storageSaveAttempted && isPersistentVolumeIdEmpty) || hasDuplicateStorageSelection}
                           />
@@ -1295,7 +1295,7 @@ export function CreatePodDialog({
                             id="create-pod-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="例如：test3"
+                            placeholder="test3"
                             autoComplete="off"
                             aria-invalid={(storageSaveAttempted && isHostPathVolumeIdEmpty) || hasDuplicateStorageSelection}
                           />
@@ -1311,7 +1311,7 @@ export function CreatePodDialog({
                             id="create-pod-storage-volume-name"
                             value={storageVolumeDraft.volumeName}
                             onChange={(event) => updateStorageVolumeDraft("volumeName", event.target.value)}
-                            placeholder="例如：/test3"
+                            placeholder="/test3"
                             autoComplete="off"
                             aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                           />
@@ -1331,7 +1331,7 @@ export function CreatePodDialog({
                             updateStorageVolumeDraft("volumeName", value)
                             updateStorageVolumeDraft("volumeId", value)
                           }}
-                          placeholder="例如：test2"
+                          placeholder="test2"
                           autoComplete="off"
                           aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                         />
@@ -1374,7 +1374,7 @@ export function CreatePodDialog({
                               id={`create-pod-storage-path-${index}`}
                               value={item.mountPath}
                               onChange={(event) => updateStorageVolumeMount(item.containerName, "mountPath", event.target.value)}
-                              placeholder="例如：/etc/config"
+                              placeholder="/etc/config"
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1459,7 +1459,7 @@ export function CreatePodDialog({
                               id={`create-pod-config-path-${index}`}
                               value={item.mountPath}
                               onChange={(event) => updateConfigMountDraftMount(item.containerName, "mountPath", event.target.value)}
-                              placeholder="例如：/etc/config"
+                              placeholder="/etc/config"
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1749,4 +1749,3 @@ export function CreatePodDialog({
     </Dialog>
   )
 }
-

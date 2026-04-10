@@ -1201,7 +1201,7 @@ export function CreateKeyValueResourceDialog({
                                 onChange={(event) =>
                                   updateItem(editingItem.id, "key", event.target.value)
                                 }
-                                placeholder="例如：application.yaml"
+                                placeholder="application.yaml"
                                 aria-invalid={Boolean(editingKeyError)}
                                 disabled={creating}
                               />
@@ -1374,3 +1374,4 @@ export function CreateKeyValueResourceDialog({
     </Dialog>
   )
 }
+

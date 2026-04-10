@@ -807,7 +807,7 @@ export function CreateWorkloadDialog({
                         onChange={(event) => setBackoffLimit(normalizeIntegerInput(event.target.value))}
                         inputMode="numeric"
                         autoComplete="off"
-                        placeholder="例如：3"
+                        placeholder="3"
                         disabled={isBusy}
                       />
                       <FieldDescription>
@@ -868,7 +868,7 @@ export function CreateWorkloadDialog({
                             id="create-job-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="例如：volume-data"
+                            placeholder="volume-data"
                             autoComplete="off"
                             aria-invalid={
                               (storageSaveAttempted && isPersistentVolumeIdEmpty) ||
@@ -944,7 +944,7 @@ export function CreateWorkloadDialog({
                             id="create-job-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="例如：test3"
+                            placeholder="test3"
                             autoComplete="off"
                             aria-invalid={
                               (storageSaveAttempted && isHostPathVolumeIdEmpty) ||
@@ -967,7 +967,7 @@ export function CreateWorkloadDialog({
                             id="create-job-storage-volume-name"
                             value={storageVolumeDraft.volumeName}
                             onChange={(event) => updateStorageVolumeDraft("volumeName", event.target.value)}
-                            placeholder="例如：/test3"
+                            placeholder="/test3"
                             autoComplete="off"
                             aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                           />
@@ -989,7 +989,7 @@ export function CreateWorkloadDialog({
                             updateStorageVolumeDraft("volumeName", value)
                             updateStorageVolumeDraft("volumeId", value)
                           }}
-                          placeholder="例如：test2"
+                          placeholder="test2"
                           autoComplete="off"
                           aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                         />
@@ -1045,7 +1045,7 @@ export function CreateWorkloadDialog({
                               onChange={(event) =>
                                 updateStorageVolumeMount(item.containerName, "mountPath", event.target.value)
                               }
-                              placeholder="例如：/etc/config"
+                              placeholder="/etc/config"
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1173,7 +1173,7 @@ export function CreateWorkloadDialog({
                               onChange={(event) =>
                                 updateConfigMountDraftMount(item.containerName, "mountPath", event.target.value)
                               }
-                              placeholder="例如：/etc/config"
+                              placeholder="/etc/config"
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1646,3 +1646,4 @@ export function CreateWorkloadDialog({
     </Dialog>
   )
 }
+

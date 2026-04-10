@@ -273,7 +273,7 @@ export function CreateContainerDialog({
                       id={`${container.id}-image`}
                       value={container.image}
                       onChange={(event) => onChange("image", event.target.value)}
-                      placeholder="例如：nginx:1.27"
+                      placeholder="nginx:1.27"
                       aria-invalid={Boolean(imageError)}
                       autoComplete="off"
                       disabled={isBusy}
@@ -291,7 +291,7 @@ export function CreateContainerDialog({
                       id={`${container.id}-name`}
                       value={container.name}
                       onChange={(event) => onChange("name", event.target.value)}
-                      placeholder="例如：worker"
+                      placeholder="worker"
                       autoComplete="off"
                       disabled={isBusy}
                     />
@@ -597,7 +597,7 @@ export function CreateContainerDialog({
                                   id={`${container.id}-startup-command`}
                                   value={container.command}
                                   onChange={(event) => onChange("command", event.target.value)}
-                                  placeholder="例如：/bin/sh"
+                                  placeholder="/bin/sh"
                                   className="min-h-20"
                                   disabled={isBusy}
                                 />
@@ -610,7 +610,7 @@ export function CreateContainerDialog({
                                   id={`${container.id}-startup-args`}
                                   value={container.args}
                                   onChange={(event) => onChange("args", event.target.value)}
-                                  placeholder="例如：-c,while true; do echo hello; sleep 10;done"
+                                  placeholder="-c,while true; do echo hello; sleep 10;done"
                                   className="min-h-20"
                                   disabled={isBusy}
                                 />
@@ -1618,4 +1618,3 @@ export function CreateContainerDialog({
     </Dialog>
   )
 }
-

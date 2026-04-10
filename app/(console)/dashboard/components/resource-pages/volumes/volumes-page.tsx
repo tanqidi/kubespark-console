@@ -1276,7 +1276,7 @@ export function VolumesPageClient() {
                             if (createStorageError) setCreateStorageError(null)
                           }}
                           inputMode="decimal"
-                          placeholder="例如：10"
+                          placeholder="10"
                           autoComplete="off"
                           aria-invalid={Boolean(createStorageError)}
                           disabled={creating}
@@ -1410,3 +1410,4 @@ export function VolumesPageClient() {
     </>
   )
 }
+

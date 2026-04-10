@@ -755,7 +755,7 @@ export function CreateJobDialog({
                           if (scheduleError) setScheduleError(null)
                           if (submitError) setSubmitError(null)
                         }}
-                        placeholder="例如：0 0 1 * *（每月）"
+                        placeholder="0 0 1 * *（每月）"
                         autoComplete="off"
                         aria-invalid={Boolean(scheduleError)}
                         disabled={isBusy}
@@ -804,7 +804,7 @@ export function CreateJobDialog({
                       onChange={(event) => setBackoffLimit(normalizeIntegerInput(event.target.value))}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder="例如：6"
+                      placeholder="6"
                       disabled={isBusy}
                     />
                     <FieldDescription>
@@ -820,7 +820,7 @@ export function CreateJobDialog({
                       onChange={(event) => setCompletions(normalizeIntegerInput(event.target.value))}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder="例如：1"
+                      placeholder="1"
                       disabled={isBusy}
                     />
                     <FieldDescription>
@@ -836,7 +836,7 @@ export function CreateJobDialog({
                       onChange={(event) => setParallelism(normalizeIntegerInput(event.target.value))}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder="例如：1"
+                      placeholder="1"
                       disabled={isBusy}
                     />
                     <FieldDescription>同一时刻允许并发运行的容器组数量。</FieldDescription>
@@ -852,7 +852,7 @@ export function CreateJobDialog({
                       }
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder="例如：3600"
+                      placeholder="3600"
                       disabled={isBusy}
                     />
                     <FieldDescription>
@@ -946,7 +946,7 @@ export function CreateJobDialog({
                             id="create-job-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="例如：volume-data"
+                            placeholder="volume-data"
                             autoComplete="off"
                             aria-invalid={
                               (storageSaveAttempted && isPersistentVolumeIdEmpty) ||
@@ -1022,7 +1022,7 @@ export function CreateJobDialog({
                             id="create-job-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="例如：test3"
+                            placeholder="test3"
                             autoComplete="off"
                             aria-invalid={
                               (storageSaveAttempted && isHostPathVolumeIdEmpty) ||
@@ -1045,7 +1045,7 @@ export function CreateJobDialog({
                             id="create-job-storage-volume-name"
                             value={storageVolumeDraft.volumeName}
                             onChange={(event) => updateStorageVolumeDraft("volumeName", event.target.value)}
-                            placeholder="例如：/test3"
+                            placeholder="/test3"
                             autoComplete="off"
                             aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                           />
@@ -1067,7 +1067,7 @@ export function CreateJobDialog({
                             updateStorageVolumeDraft("volumeName", value)
                             updateStorageVolumeDraft("volumeId", value)
                           }}
-                          placeholder="例如：test2"
+                          placeholder="test2"
                           autoComplete="off"
                           aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                         />
@@ -1123,7 +1123,7 @@ export function CreateJobDialog({
                               onChange={(event) =>
                                 updateStorageVolumeMount(item.containerName, "mountPath", event.target.value)
                               }
-                              placeholder="例如：/etc/config"
+                              placeholder="/etc/config"
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1248,7 +1248,7 @@ export function CreateJobDialog({
                               onChange={(event) =>
                                 updateConfigMountDraftMount(item.containerName, "mountPath", event.target.value)
                               }
-                              placeholder="例如：/etc/config"
+                              placeholder="/etc/config"
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1556,4 +1556,3 @@ export function CreateJobDialog({
     </Dialog>
   )
 }
-
