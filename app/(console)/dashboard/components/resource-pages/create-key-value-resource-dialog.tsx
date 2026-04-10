@@ -355,7 +355,8 @@ export function CreateKeyValueResourceDialog({
     : isSecret
       ? "使用 Kubernetes Secret 创建保密数据，数据项将通过 stringData 写入。"
       : "使用 Kubernetes ConfigMap 创建配置数据，数据项将以键值对形式写入。"
-  const valueLabel = isSecret ? "密文内容" : "值"
+  // const valueLabel = isSecret ? "密文内容" : "值"
+  const valueLabel = "值"
   const filledItems = React.useMemo(
     () => items.filter((item) => item.key.trim() || item.value.trim()),
     [items]
@@ -974,7 +975,15 @@ export function CreateKeyValueResourceDialog({
             />
           ) : null}
 
-          <div className={yamlMode ? "min-h-0 flex-1 px-6 py-6" : "min-h-0 flex-1 overflow-y-auto px-6 py-6"}>
+          <div
+            className={
+              yamlMode
+                ? "min-h-0 flex-1 px-6 py-6"
+                : isEditingDataView
+                  ? "min-h-0 flex-1 px-6 py-6"
+                  : "min-h-0 flex-1 overflow-y-auto px-6 py-6"
+            }
+          >
             {yamlMode ? (
               <div className="flex h-full min-h-0 flex-col">
                 <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border">
@@ -1103,7 +1112,7 @@ export function CreateKeyValueResourceDialog({
                 </FieldGroup>
               </div>
             ) : activeTab === "data" ? (
-              <div className="">
+              <div className={isEditingDataView ? "flex h-full min-h-0 flex-col" : ""}>
                 {dataViewMode === "list" ? (
                   <>
                     <div className="flex items-start justify-between gap-4">
@@ -1190,9 +1199,9 @@ export function CreateKeyValueResourceDialog({
                 ) : (
                   <>
                     {editingItem ? (
-                      <div>
-                        <div className="flex flex-col gap-5 pb-4">
-                          <FieldGroup className="flex flex-col gap-5">
+                      <div className="flex min-h-0 flex-1 flex-col">
+                        <div className="flex min-h-0 flex-1 flex-col gap-5 pb-4">
+                          <FieldGroup className="flex min-h-0 flex-1 flex-col gap-5">
                             <Field data-invalid={Boolean(editingKeyError)}>
                               <FieldLabel htmlFor={`${editingItem.id}-key`}>键</FieldLabel>
                               <Input
@@ -1205,18 +1214,18 @@ export function CreateKeyValueResourceDialog({
                                 aria-invalid={Boolean(editingKeyError)}
                                 disabled={creating}
                               />
-                              {editingKeyError ? (
+                              {/*{editingKeyError ? (
                                 <FieldError>{editingKeyError}</FieldError>
                               ) : (
                                 <FieldDescription>
                                   支持字母、数字、点、短横线和下划线。
                                 </FieldDescription>
-                              )}
+                              )}*/}
                             </Field>
 
-                            <Separator />
+                            {/*<Separator />*/}
 
-                            <Field>
+                            <Field className="min-h-0 flex-1">
                               <FieldLabel htmlFor={`${editingItem.id}-value`}>
                                 {valueLabel}
                               </FieldLabel>
@@ -1227,7 +1236,7 @@ export function CreateKeyValueResourceDialog({
                                   updateItem(editingItem.id, "value", event.target.value)
                                 }
                                 placeholder={isSecret ? "请输入密文内容" : "请输入配置内容"}
-                                className="h-54"
+                                className="min-h-40 flex-1"
                                 disabled={creating}
                               />
                             </Field>
