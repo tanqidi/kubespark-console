@@ -1056,23 +1056,26 @@ export function CreateWorkloadDialog({
                   </FieldGroup>
                 ) : isEditingConfigMountView ? (
                   <FieldGroup className="flex flex-col gap-6">
-                    <Field>
-                      <FieldLabel>挂载来源类型</FieldLabel>
-                      <Tabs
-                        value={configMountDraft.sourceKind}
-                        onValueChange={(value) => {
-                          if (value === "configMap" || value === "secret") {
-                            updateConfigMountDraft("sourceKind", value)
-                            updateConfigMountDraft("sourceName", "")
-                          }
-                        }}
-                      >
-                        <TabsList className="grid w-full max-w-xl grid-cols-2">
-                          <TabsTrigger value="configMap">配置字典</TabsTrigger>
-                          <TabsTrigger value="secret">保密字典</TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                    </Field>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <Field>
+                        <FieldLabel>挂载来源类型</FieldLabel>
+                        <Tabs
+                          value={configMountDraft.sourceKind}
+                          onValueChange={(value) => {
+                            if (value === "configMap" || value === "secret") {
+                              updateConfigMountDraft("sourceKind", value)
+                              updateConfigMountDraft("sourceName", "")
+                            }
+                          }}
+                        >
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="configMap">配置字典</TabsTrigger>
+                            <TabsTrigger value="secret">保密字典</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                      </Field>
+                      <div aria-hidden className="hidden md:block" />
+                    </div>
 
                     <Field>
                       <FieldLabel htmlFor="create-job-config-mount-name">
