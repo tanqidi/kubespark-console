@@ -837,25 +837,28 @@ export function CreateWorkloadDialog({
                 </div>
                 {isEditingStorageView ? (
                   <FieldGroup className="flex flex-col gap-6">
-                    <Field>
-                      <FieldLabel>卷类型</FieldLabel>
-                      <Tabs
-                        value={storageVolumeDraft.volumeKind}
-                        onValueChange={(value) => {
-                          if (value === "persistent" || value === "ephemeral" || value === "hostPath") {
-                            updateStorageVolumeDraft("volumeKind", value)
-                            updateStorageVolumeDraft("volumeId", "")
-                            updateStorageVolumeDraft("volumeName", "")
-                          }
-                        }}
-                      >
-                        <TabsList className="grid w-full max-w-xl grid-cols-3">
-                          <TabsTrigger value="persistent">持久卷</TabsTrigger>
-                          <TabsTrigger value="ephemeral">临时卷</TabsTrigger>
-                          <TabsTrigger value="hostPath">HostPath 卷</TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                    </Field>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <Field>
+                        <FieldLabel>卷类型</FieldLabel>
+                        <Tabs
+                          value={storageVolumeDraft.volumeKind}
+                          onValueChange={(value) => {
+                            if (value === "persistent" || value === "ephemeral" || value === "hostPath") {
+                              updateStorageVolumeDraft("volumeKind", value)
+                              updateStorageVolumeDraft("volumeId", "")
+                              updateStorageVolumeDraft("volumeName", "")
+                            }
+                          }}
+                        >
+                          <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="persistent">持久卷</TabsTrigger>
+                            <TabsTrigger value="ephemeral">临时卷</TabsTrigger>
+                            <TabsTrigger value="hostPath">HostPath 卷</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                      </Field>
+                      <div aria-hidden className="hidden md:block" />
+                    </div>
 
                     {storageVolumeDraft.volumeKind === "persistent" ? (
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
