@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconEye, IconInfoCircle, IconPencil, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconInfoCircle, IconPencil, IconSettings2, IconTrash } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import type { EditorProps } from "@monaco-editor/react"
 import { parse, stringify } from "yaml"
@@ -23,9 +23,19 @@ import {
   type ColumnConfig,
 } from "@/app/(console)/dashboard/components/table/columns-factory"
 import { fetchResourceByName, fetchResourceDescribe } from "@/app/lib/kubespark/common"
-import { deleteNamespace, fetchNamespaceYaml, fetchNamespaces, updateNamespace } from "@/app/lib/kubespark/projects"
+import {
+  createNamespace,
+  deleteNamespace,
+  fetchNamespaceYaml,
+  fetchNamespaces,
+  updateNamespace,
+  type CreateNamespaceInput,
+} from "@/app/lib/kubespark/projects"
 import { fetchWorkspaceDetail, fetchWorkspaceRows, type WorkspaceDetail } from "@/app/lib/kubespark/workspaces"
-import { fetchWorkspaceNamespaceBindings } from "@/app/lib/kubespark/workspace-namespace-bindings"
+import {
+  createWorkspaceNamespaceBinding,
+  fetchWorkspaceNamespaceBindings,
+} from "@/app/lib/kubespark/workspace-namespace-bindings"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -53,6 +63,63 @@ const MONACO_OPTIONS: EditorProps["options"] = {
 const PROJECT_NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字和连字符（-），必须以小写字母开头并以小写字母或数字结尾，最长 63 个字符。"
 const PROJECT_WORKSPACE_ANNOTATION = "tanqidi.com/workspace"
+const PROJECT_WORKSPACE_REQUIRED_MESSAGE = "请选择企业空间"
+
+function resolveCreateProjectErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : ""
+  const text = raw.toLowerCase()
+
+  if (text.includes("already exists")) {
+    return "项目名称已存在，请更换后重试"
+  }
+
+  if (text.includes("状态码 409") || text.includes("status 409")) {
+    return "项目名称已存在，请更换后重试"
+  }
+
+  if (raw) return raw
+  return "创建项目失败，请稍后重试"
+}
+
+function isNameRelatedCreateError(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : ""
+  const text = raw.toLowerCase()
+  return (
+    text.includes("already exists") ||
+    text.includes("状态码 409") ||
+    text.includes("status 409") ||
+    text.includes("metadata.name") ||
+    text.includes("名称")
+  )
+}
+
+function validateProjectName(name: string): string | null {
+  if (!name) return "请输入项目名称"
+  if (name.length > 63) return PROJECT_NAME_RULE_MESSAGE
+  if (!/^[a-z](?:[-a-z0-9]*[a-z0-9])?$/.test(name)) return PROJECT_NAME_RULE_MESSAGE
+  return null
+}
+
+function ensureWorkspaceAnnotationEntries(entries: MetadataEntry[], workspace: string): MetadataEntry[] {
+  const workspaceValue = workspace.trim()
+  const withoutWorkspace = entries.filter((entry) => entry.key !== PROJECT_WORKSPACE_ANNOTATION)
+  if (!workspaceValue) return withoutWorkspace
+  return [
+    ...withoutWorkspace,
+    {
+      key: PROJECT_WORKSPACE_ANNOTATION,
+      value: workspaceValue,
+    },
+  ]
+}
+
+function areMetadataEntriesEqual(a: MetadataEntry[], b: MetadataEntry[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i]?.key !== b[i]?.key || a[i]?.value !== b[i]?.value) return false
+  }
+  return true
+}
 
 type WorkspaceDetailTemplateProps = {
   name: string
@@ -151,6 +218,8 @@ function parseProjectYamlText(yamlText: string): {
       ? (parsed as Record<string, unknown>)
       : null
   if (!root) throw new Error("YAML 内容格式无效")
+  const kind = typeof root.kind === "string" ? root.kind.trim() : ""
+  if (kind && kind !== "Namespace") throw new Error("YAML 资源类型必须是 Namespace")
 
   const metadata =
     typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
@@ -188,6 +257,7 @@ function parseProjectYamlText(yamlText: string): {
 }
 
 export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) {
+  const currentWorkspaceName = name.trim()
   const [activeTab, setActiveTab] = React.useState<DetailTab>("projects")
   const [error, setError] = React.useState<string | null>(null)
   const [detail, setDetail] = React.useState<WorkspaceDetail | null>(null)
@@ -209,6 +279,25 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
   const [deleting, setDeleting] = React.useState(false)
 
   type ProjectDialogStep = "basic" | "advanced"
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [createName, setCreateName] = React.useState("")
+  const [createDescription, setCreateDescription] = React.useState("")
+  const [createWorkspace, setCreateWorkspace] = React.useState("")
+  const [createWorkspaceInvalid, setCreateWorkspaceInvalid] = React.useState(false)
+  const [createWorkspaceError, setCreateWorkspaceError] = React.useState<string | null>(null)
+  const [createMetadataEnabled, setCreateMetadataEnabled] = React.useState(false)
+  const [createLabelEntries, setCreateLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
+  const [createAnnotationEntries, setCreateAnnotationEntries] = React.useState<MetadataEntry[]>([
+    { key: "", value: "" },
+  ])
+  const [createNameInvalid, setCreateNameInvalid] = React.useState(false)
+  const [createNameError, setCreateNameError] = React.useState<string | null>(null)
+  const [createYamlMode, setCreateYamlMode] = React.useState(false)
+  const [createYamlText, setCreateYamlText] = React.useState("")
+  const [createYamlError, setCreateYamlError] = React.useState<string | null>(null)
+  const [creating, setCreating] = React.useState(false)
+  const [createStep, setCreateStep] = React.useState<ProjectDialogStep>("basic")
+
   const [editOpen, setEditOpen] = React.useState(false)
   const [editingRow, setEditingRow] = React.useState<WorkspaceDetailRow | null>(null)
   const [editName, setEditName] = React.useState("")
@@ -224,6 +313,24 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
   const [editYamlError, setEditYamlError] = React.useState<string | null>(null)
   const [editStep, setEditStep] = React.useState<ProjectDialogStep>("basic")
   const [savingEdit, setSavingEdit] = React.useState(false)
+  const resetCreateDialogState = React.useCallback(() => {
+    setCreateName("")
+    setCreateDescription("")
+    setCreateWorkspace(currentWorkspaceName)
+    setCreateWorkspaceInvalid(false)
+    setCreateWorkspaceError(null)
+    setCreateMetadataEnabled(false)
+    setCreateLabelEntries([{ key: "", value: "" }])
+    setCreateAnnotationEntries(
+      ensureWorkspaceAnnotationEntries([{ key: "", value: "" }], currentWorkspaceName)
+    )
+    setCreateNameInvalid(false)
+    setCreateNameError(null)
+    setCreateYamlMode(false)
+    setCreateYamlText("")
+    setCreateYamlError(null)
+    setCreateStep("basic")
+  }, [currentWorkspaceName])
   const resetEditDialogState = React.useCallback(() => {
     setEditingRow(null)
     setEditName("")
@@ -310,6 +417,117 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
     setDetail(next.detail)
     setProjectRows(next.projectRows)
   }, [loadData, name])
+
+  const openCreateDialog = React.useCallback(() => {
+    resetCreateDialogState()
+    setCreateOpen(true)
+  }, [resetCreateDialogState])
+
+  const handleCreateSubmit = React.useCallback(() => {
+    if (creating) return
+
+    let nextName = createName.trim()
+    let nextDescription = createDescription.trim()
+    let nextLabels = metadataEntriesToRecord(createLabelEntries)
+    let nextAnnotations = metadataEntriesToRecord(createAnnotationEntries)
+    const nextWorkspace = currentWorkspaceName
+
+    if (createYamlMode) {
+      try {
+        const parsed = parseProjectYamlText(createYamlText)
+        nextName = parsed.name.trim()
+        nextDescription = parsed.description.trim()
+        nextLabels = metadataEntriesToRecord(parsed.labels)
+        nextAnnotations = metadataEntriesToRecord(parsed.annotations)
+        setCreateName(nextName)
+        setCreateDescription(nextDescription)
+        setCreateWorkspace(currentWorkspaceName)
+        setCreateLabelEntries(parsed.labels)
+        const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, currentWorkspaceName)
+        setCreateAnnotationEntries(protectedAnnotations)
+        setCreateMetadataEnabled(hasUserProvidedMetadata(parsed.labels, protectedAnnotations))
+        setCreateYamlError(null)
+      } catch (error) {
+        setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+        return
+      }
+    }
+
+    const validationMessage = validateProjectName(nextName)
+    if (validationMessage) {
+      setCreateNameInvalid(true)
+      setCreateNameError(validationMessage)
+      if (createYamlMode) setCreateYamlError(validationMessage)
+      return
+    }
+
+    const selectedWorkspace = nextWorkspace.trim()
+    if (!selectedWorkspace) {
+      setCreateWorkspaceInvalid(true)
+      setCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+      if (createYamlMode) setCreateYamlError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+      return
+    }
+
+    setCreateNameInvalid(false)
+    setCreateNameError(null)
+    setCreateWorkspaceInvalid(false)
+    setCreateWorkspaceError(null)
+    setCreateYamlError(null)
+    setCreating(true)
+    nextAnnotations = {
+      ...nextAnnotations,
+      [PROJECT_WORKSPACE_ANNOTATION]: selectedWorkspace,
+    }
+
+    const requestPayload: CreateNamespaceInput = {
+      name: nextName,
+      description: nextDescription,
+      labels: nextLabels,
+      annotations: nextAnnotations,
+    }
+
+    const request = async () => {
+      await createNamespace(requestPayload)
+      await createWorkspaceNamespaceBinding({
+        namespaceName: nextName,
+        workspaceName: selectedWorkspace,
+      })
+    }
+
+    void request()
+      .then(async () => {
+        setCreateOpen(false)
+        resetCreateDialogState()
+        await refreshProjectRows()
+        setError(null)
+      })
+      .catch((e: unknown) => {
+        const message = resolveCreateProjectErrorMessage(e)
+        const isNameError = isNameRelatedCreateError(e)
+        setCreateNameInvalid(isNameError)
+        setCreateNameError(isNameError ? message : null)
+        if (createYamlMode) {
+          setCreateYamlError(message)
+        } else if (!isNameError) {
+          setCreateWorkspaceError(message)
+        }
+      })
+      .finally(() => {
+        setCreating(false)
+      })
+  }, [
+    createAnnotationEntries,
+    createDescription,
+    createLabelEntries,
+    createName,
+    createYamlMode,
+    createYamlText,
+    creating,
+    currentWorkspaceName,
+    refreshProjectRows,
+    resetCreateDialogState,
+  ])
 
   if (error) return <div className="text-sm text-destructive">{error}</div>
   if (!detail) return null
@@ -584,9 +802,280 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
         enableRowNavigation={false}
         getRowHref={() => null}
         showColumnCustomizer={false}
-        onCreate={() => void 0}
+        onCreate={activeTab === "projects" ? openCreateDialog : () => void 0}
         onDeleteSelectedRows={activeTab === "projects" ? handleDeleteSelectedRows : undefined}
       />
+
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          if (!open && creating) return
+          setCreateOpen(open)
+          if (!open) resetCreateDialogState()
+        }}
+      >
+        <DialogContent
+          className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
+          onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+        >
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex items-start justify-between border-b bg-muted/15">
+              <DialogHeader className="px-6 py-4">
+                <DialogTitle>创建项目</DialogTitle>
+                <DialogDescription>创建项目以对资源进行分组并控制不同用户的权限。</DialogDescription>
+              </DialogHeader>
+              <div className="h-full flex items-center me-20">
+                <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                  <span className="text-sm font-medium">编辑 YAML</span>
+                  <Switch
+                    checked={createYamlMode}
+                    onCheckedChange={(checked) => {
+                      if (creating) return
+                      if (checked) {
+                        const annotationsForYaml = metadataEntriesToRecord(createAnnotationEntries)
+                        const workspaceValue = currentWorkspaceName
+                        if (workspaceValue) {
+                          annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION] = workspaceValue
+                        } else {
+                          delete annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION]
+                        }
+                        setCreateYamlText(
+                          buildProjectYamlText({
+                            name: createName,
+                            description: createDescription,
+                            labels: createLabelEntries,
+                            annotations: metadataRecordToEntries(annotationsForYaml),
+                          })
+                        )
+                        setCreateYamlError(null)
+                        setCreateYamlMode(true)
+                        return
+                      }
+
+                      try {
+                        const parsed = parseProjectYamlText(createYamlText)
+                        setCreateName(parsed.name)
+                        setCreateDescription(parsed.description)
+                        const parsedWorkspace =
+                          parsed.annotations.find((entry) => entry.key === PROJECT_WORKSPACE_ANNOTATION)?.value ?? ""
+                        const nextWorkspace = currentWorkspaceName || parsedWorkspace.trim()
+                        setCreateWorkspace(nextWorkspace)
+                        setCreateLabelEntries(parsed.labels)
+                        const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
+                        setCreateAnnotationEntries(protectedAnnotations)
+                        setCreateMetadataEnabled(hasUserProvidedMetadata(parsed.labels, protectedAnnotations))
+                        setCreateYamlError(null)
+                        setCreateYamlMode(false)
+                      } catch (error) {
+                        setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+                      }
+                    }}
+                    disabled={creating}
+                    aria-label="编辑 YAML"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {!createYamlMode ? (
+              <StepHeaderNav
+                items={[
+                  {
+                    id: "basic",
+                    title: "基本信息",
+                    status: createStep === "basic" ? "当前" : "已设置",
+                    active: createStep === "basic",
+                    icon: <IconSettings2 className="size-4" />,
+                    disabled: creating,
+                    onClick: () => {
+                      if (creating) return
+                      setCreateStep("basic")
+                    },
+                  },
+                  {
+                    id: "advanced",
+                    title: "高级设置",
+                    status:
+                      createStep === "advanced"
+                        ? "当前"
+                        : hasUserProvidedMetadata(createLabelEntries, createAnnotationEntries)
+                          ? "已设置"
+                          : "未设置",
+                    active: createStep === "advanced",
+                    icon: <IconSettings2 className="size-4" />,
+                    disabled: creating,
+                    onClick: () => {
+                      if (creating) return
+                      setCreateStep("advanced")
+                    },
+                  },
+                ]}
+              />
+            ) : null}
+
+            <div className={createYamlMode ? "min-h-0 flex-1 p-6" : "min-h-0 flex-1 overflow-y-auto"}>
+              {createYamlMode ? (
+                <div className="flex h-full min-h-0 flex-col">
+                  <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border">
+                    <MonacoEditor
+                      language="yaml"
+                      theme="vs-dark"
+                      value={createYamlText}
+                      onChange={(value) => {
+                        setCreateYamlText(value ?? "")
+                        if (createYamlError) setCreateYamlError(null)
+                        if (createNameInvalid) setCreateNameInvalid(false)
+                        if (createNameError) setCreateNameError(null)
+                      }}
+                      options={MONACO_OPTIONS}
+                      height="100%"
+                    />
+                  </div>
+                  {createYamlError ? <FieldError className="mt-3">{createYamlError}</FieldError> : null}
+                </div>
+              ) : createStep === "basic" ? (
+                <div className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">基本信息</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">填写项目名称与描述信息。</p>
+                  </div>
+                  <FieldGroup className="flex flex-col gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <Field data-invalid={createNameInvalid}>
+                        <FieldLabel htmlFor="workspace-project-create-name">名称</FieldLabel>
+                        <Input
+                          id="workspace-project-create-name"
+                          value={createName}
+                          onChange={(event) => {
+                            setCreateName(event.target.value)
+                            if (createNameInvalid) setCreateNameInvalid(false)
+                            if (createNameError) setCreateNameError(null)
+                          }}
+                          placeholder="请输入项目名称"
+                          autoComplete="off"
+                          aria-invalid={createNameInvalid}
+                          disabled={creating}
+                        />
+                        {createNameError ? (
+                          <FieldError>{createNameError}</FieldError>
+                        ) : (
+                          <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
+                        )}
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="workspace-project-create-workspace">企业空间</FieldLabel>
+                        <FilterCombobox
+                          options={workspaceOptions}
+                          value={createWorkspace}
+                          onValueChange={(value) => {
+                            setCreateWorkspace(value)
+                            setCreateAnnotationEntries((prev) => ensureWorkspaceAnnotationEntries(prev, value))
+                            if (createWorkspaceInvalid) setCreateWorkspaceInvalid(false)
+                            if (createWorkspaceError) setCreateWorkspaceError(null)
+                          }}
+                          placeholder="请选择企业空间"
+                          emptyText="暂无企业空间"
+                          className="h-10"
+                          ariaInvalid={createWorkspaceInvalid}
+                          disabled
+                        />
+                        {createWorkspaceError ? (
+                          <FieldError>{createWorkspaceError}</FieldError>
+                        ) : (
+                          <FieldDescription>
+                            当前在企业空间详情页创建，企业空间固定为 {currentWorkspaceName}。
+                          </FieldDescription>
+                        )}
+                      </Field>
+                    </div>
+                    <Field>
+                      <FieldLabel htmlFor="workspace-project-create-description">描述</FieldLabel>
+                      <Textarea
+                        id="workspace-project-create-description"
+                        value={createDescription}
+                        onChange={(event) => setCreateDescription(event.target.value)}
+                        placeholder="请输入描述"
+                        maxLength={256}
+                        className="min-h-28"
+                        disabled={creating}
+                      />
+                      <FieldDescription>描述将写入资源注解 description，最长 256 个字符。</FieldDescription>
+                    </Field>
+                  </FieldGroup>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">高级设置</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">补充标签与注解信息，便于检索、分类和后续治理。</p>
+                  </div>
+                  <FieldGroup className="flex flex-col gap-4">
+                    <Field>
+                      <ResourceMetadataEditor
+                        checked={createMetadataEnabled}
+                        onCheckedChange={setCreateMetadataEnabled}
+                        labels={createLabelEntries}
+                        setLabels={setCreateLabelEntries}
+                        annotations={createAnnotationEntries}
+                        setAnnotations={(next) => {
+                          setCreateAnnotationEntries((prev) => {
+                            const resolved = typeof next === "function" ? next(prev) : next
+                            const ensured = ensureWorkspaceAnnotationEntries(
+                              resolved,
+                              currentWorkspaceName
+                            )
+                            return areMetadataEntriesEqual(prev, ensured) ? prev : ensured
+                          })
+                        }}
+                        description={createDescription}
+                        setDescription={setCreateDescription}
+                        disabled={creating}
+                        titleText="统一管理项目的标签与注解信息。"
+                      />
+                    </Field>
+                  </FieldGroup>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="border-t bg-background px-6 py-5">
+              {createYamlMode ? (
+                <>
+                  <Button type="button" variant="outline" disabled={creating} onClick={() => setCreateOpen(false)}>
+                    取消
+                  </Button>
+                  <Button type="button" onClick={handleCreateSubmit} disabled={creating}>
+                    {creating ? "创建中..." : "创建"}
+                  </Button>
+                </>
+              ) : createStep === "basic" ? (
+                <>
+                  <Button type="button" variant="outline" disabled={creating} onClick={() => setCreateOpen(false)}>
+                    取消
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={creating}
+                    onClick={() => setCreateStep("advanced")}
+                  >
+                    下一步
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button type="button" variant="outline" disabled={creating} onClick={() => setCreateStep("basic")}>
+                    上一步
+                  </Button>
+                  <Button type="button" onClick={handleCreateSubmit} disabled={creating}>
+                    {creating ? "创建中..." : "创建"}
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <DescribeViewerDialog
         title="查看详情"
