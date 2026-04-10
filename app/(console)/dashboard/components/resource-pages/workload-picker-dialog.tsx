@@ -211,8 +211,8 @@ export function WorkloadPickerDialog({
                   <TableHead className="pl-7">名称</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>命名空间</TableHead>
-                  <TableHead>期望</TableHead>
-                  <TableHead>就绪</TableHead>
+                  {/*<TableHead>期望</TableHead>*/}
+                  {/*<TableHead>就绪</TableHead>*/}
                   <TableHead>运行时间</TableHead>
                   <TableHead>更新时间</TableHead>
                 </TableRow>
@@ -244,8 +244,8 @@ export function WorkloadPickerDialog({
                         </TableCell>
                         <TableCell>{row.status}</TableCell>
                         <TableCell>{row.namespace}</TableCell>
-                        <TableCell>{row.desired}</TableCell>
-                        <TableCell>{row.ready}</TableCell>
+                        {/*<TableCell>{row.desired}</TableCell>*/}
+                        {/*<TableCell>{row.ready}</TableCell>*/}
                         <TableCell>{row.age}</TableCell>
                         <TableCell>{row.updatedAt}</TableCell>
                       </TableRow>
