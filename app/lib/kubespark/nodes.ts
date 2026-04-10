@@ -1,5 +1,6 @@
 import { fetchResourceCollection } from "./common"
 import {
+  formatAge,
   parseQuantityCpu,
   parseQuantityMemGi,
   resolveDescriptionFromAnnotations,
@@ -19,6 +20,7 @@ export type NodeRowApi = {
   cpuTotal: number
   memoryTotal: number
   podsTotal: number
+  age: string
   updatedAt: string
 }
 
@@ -32,6 +34,7 @@ export type NodeResourceRow = {
   cpuUsage: string
   memoryUsage: string
   pods: string
+  age: string
   updatedAt: string
 }
 
@@ -109,6 +112,7 @@ export async function fetchNodes(): Promise<NodeRowApi[]> {
       cpuTotal: parseQuantityCpu(status.capacity?.cpu),
       memoryTotal: parseQuantityMemGi(status.capacity?.memory),
       podsTotal: Number(status.allocatable?.pods || 0),
+      age: formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined),
       updatedAt: resolveUpdatedAt(item),
     }
   })
@@ -145,6 +149,7 @@ export async function fetchNodeResourceRows(): Promise<NodeResourceRow[]> {
       cpuUsage: formatCpuUsage(0, node.cpuTotal),
       memoryUsage: formatMemUsage(0, node.memoryTotal),
       pods: node.podsTotal ? `${usedPods}/${node.podsTotal}` : `${usedPods}/-`,
+      age: node.age,
       updatedAt: node.updatedAt,
     }
   })

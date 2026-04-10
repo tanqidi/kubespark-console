@@ -65,6 +65,7 @@ export function NodesPageClient() {
     // { key: "cpuUsage", label: "CPU 使用率"},
     // { key: "memoryUsage", label: "内存使用率"},
     { key: "pods", label: "容器组"},
+    { key: "age", label: "运行时间" },
     { key: "updatedAt", label: "更新时间" },
   ],
     actionItems: [
