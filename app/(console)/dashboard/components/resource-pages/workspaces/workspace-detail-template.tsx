@@ -1186,8 +1186,8 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
       <TabsList>
         <TabsTrigger value="projects">项目</TabsTrigger>
         <TabsTrigger value="pipelineProjects">流水线项目</TabsTrigger>
-        <TabsTrigger value="roles">角色</TabsTrigger>
-        <TabsTrigger value="members">企业空间成员</TabsTrigger>
+        {/* <TabsTrigger value="roles">角色</TabsTrigger> */}
+        {/* <TabsTrigger value="members">企业空间成员</TabsTrigger> */}
       </TabsList>
     </Tabs>
   )

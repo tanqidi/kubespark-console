@@ -213,12 +213,14 @@ export function WorkloadPickerDialog({
                   <TableHead>命名空间</TableHead>
                   <TableHead>期望</TableHead>
                   <TableHead>就绪</TableHead>
+                  <TableHead>运行时间</TableHead>
+                  <TableHead>更新时间</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       加载中...
                     </TableCell>
                   </TableRow>
@@ -244,13 +246,14 @@ export function WorkloadPickerDialog({
                         <TableCell>{row.namespace}</TableCell>
                         <TableCell>{row.desired}</TableCell>
                         <TableCell>{row.ready}</TableCell>
+                        <TableCell>{row.age}</TableCell>
                         <TableCell>{row.updatedAt}</TableCell>
                       </TableRow>
                     )
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       暂无可选工作负载
                     </TableCell>
                   </TableRow>

@@ -515,6 +515,37 @@ export function ProjectsPageClient() {
         setYamlLoading(false)
       })
   }, [])
+  const handleViewPipelineYaml = React.useCallback((row: PipelineProjectRow) => {
+    const pipelineProjectName = row.name.trim()
+    if (!pipelineProjectName || pipelineProjectName === "-") return
+    setYamlOpen(true)
+    setYamlError(null)
+    setYamlLoading(true)
+    setYamlContent("")
+    setYamlSubtitle(`查看 PipelineProject（${pipelineProjectName}）的 YAML 内容。`)
+
+    void fetchResourceByName<Record<string, unknown>>(
+      "tanqidi.com",
+      "v1alpha1",
+      "pipelineprojects",
+      pipelineProjectName
+    )
+      .then(({ payload }) => {
+        const text = stringify(payload, {
+          indent: 2,
+          lineWidth: 0,
+          sortMapEntries: false,
+        })
+        setYamlContent(text)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        setYamlError(message)
+      })
+      .finally(() => {
+        setYamlLoading(false)
+      })
+  }, [])
 
   const handleViewDescribe = React.useCallback((row: NamespaceRow) => {
     setDescribeOpen(true)
@@ -1066,6 +1097,17 @@ export function ProjectsPageClient() {
           {
             label: (
               <>
+                <IconEye className="size-4" />
+                {"查看 YAML"}
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewPipelineYaml(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconPencil className="size-4" />
                 {"编辑"}
               </>
@@ -1089,7 +1131,7 @@ export function ProjectsPageClient() {
           },
         ],
       }),
-    [openPipelineProjectEditDialog]
+    [handleViewPipelineYaml, openPipelineProjectEditDialog]
   )
 
   React.useEffect(() => {
