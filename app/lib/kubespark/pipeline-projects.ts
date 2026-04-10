@@ -1,6 +1,9 @@
 import {
   buildResourceCollectionEndpoint,
+  buildResourceItemEndpoint,
+  deleteResource,
   fetchJsonDeduped,
+  fetchResourceByName,
   fetchResourceCollection,
 } from "./common"
 import { formatAge, resolveUpdatedAt } from "./utils"
@@ -40,6 +43,16 @@ export type CreatePipelineProjectInput = {
   description?: string
   labels?: Record<string, string>
   annotations?: Record<string, string>
+}
+
+export type UpdatePipelineProjectInput = CreatePipelineProjectInput
+
+export type PipelineProjectDetail = {
+  name: string
+  workspace: string
+  description: string
+  labels: Record<string, string>
+  annotations: Record<string, string>
 }
 
 const PIPELINE_PROJECT_GVR = {
@@ -139,4 +152,77 @@ export async function createPipelineProject(input: CreatePipelineProjectInput): 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
   })
+}
+
+export async function fetchPipelineProjectDetail(name: string): Promise<PipelineProjectDetail> {
+  const normalizedName = normalizePipelineProjectName(name)
+  const { payload } = await fetchResourceByName<RawPipelineProject>(
+    PIPELINE_PROJECT_GVR.group,
+    PIPELINE_PROJECT_GVR.version,
+    PIPELINE_PROJECT_GVR.resource,
+    normalizedName
+  )
+
+  const metadata = payload.metadata ?? {}
+  const spec = payload.spec ?? {}
+  const workspace = (spec.workspaceRef?.name ?? "").trim()
+  const description = (spec.description ?? metadata.annotations?.description ?? "").trim()
+  const labels = normalizeStringRecord(metadata.labels)
+  const annotations = normalizeStringRecord(metadata.annotations)
+
+  return {
+    name: metadata.name || normalizedName,
+    workspace: workspace || "",
+    description: description || "",
+    labels,
+    annotations,
+  }
+}
+
+export async function updatePipelineProject(input: UpdatePipelineProjectInput): Promise<void> {
+  const name = normalizePipelineProjectName(input.name)
+  const workspaceName = normalizeWorkspaceName(input.workspaceName)
+  const description = input.description?.trim() ?? ""
+  const labels = normalizeStringRecord(input.labels)
+  const annotations = normalizeStringRecord(input.annotations)
+  if (description) annotations.description = description
+  else delete annotations.description
+
+  const requestBody = {
+    apiVersion: "tanqidi.com/v1alpha1",
+    kind: "PipelineProject",
+    metadata: {
+      name,
+      ...(Object.keys(labels).length > 0 ? { labels } : {}),
+      ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
+    },
+    spec: {
+      workspaceRef: {
+        name: workspaceName,
+      },
+      ...(description ? { description } : {}),
+    },
+  }
+
+  const url = buildResourceItemEndpoint(
+    PIPELINE_PROJECT_GVR.group,
+    PIPELINE_PROJECT_GVR.version,
+    PIPELINE_PROJECT_GVR.resource,
+    name
+  )
+  await fetchJsonDeduped<unknown>(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  })
+}
+
+export async function deletePipelineProject(name: string): Promise<void> {
+  const normalizedName = normalizePipelineProjectName(name)
+  await deleteResource(
+    PIPELINE_PROJECT_GVR.group,
+    PIPELINE_PROJECT_GVR.version,
+    PIPELINE_PROJECT_GVR.resource,
+    normalizedName
+  )
 }

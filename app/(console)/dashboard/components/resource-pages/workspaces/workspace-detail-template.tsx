@@ -38,7 +38,10 @@ import {
 } from "@/app/lib/kubespark/workspace-namespace-bindings"
 import {
   createPipelineProject,
+  deletePipelineProject,
+  fetchPipelineProjectDetail,
   fetchPipelineProjectRows,
+  updatePipelineProject,
 } from "@/app/lib/kubespark/pipeline-projects"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Button } from "@/components/ui/button"
@@ -137,6 +140,7 @@ type WorkspaceDetailTemplateProps = {
 }
 
 type DetailTab = "projects" | "pipelineProjects" | "roles" | "members"
+type PendingDeleteTarget = "project" | "pipelineProject"
 
 type WorkspaceDetailRow = {
   id: string
@@ -173,7 +177,13 @@ const projectColumns: ColumnConfig<WorkspaceDetailRow>[] = [
 ]
 
 const pipelineProjectColumns: ColumnConfig<WorkspaceDetailRow>[] = [
-  { key: "name", label: "名称", enableHiding: false },
+  {
+    key: "name",
+    label: "名称",
+    cell: (_value, row) => renderNameDescriptionCell(row.name ?? "-", row.description),
+    enableHiding: false,
+  },
+  { key: "workspace", label: "企业空间" },
   { key: "repository", label: "Git 地址" },
   { key: "branch", label: "分支" },
   { key: "lastRun", label: "最近构建" },
@@ -389,6 +399,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
   const [describeSubtitle, setDescribeSubtitle] = React.useState("查看 Kubernetes Namespace 的详情内容。")
 
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<WorkspaceDetailRow | null>(null)
+  const [pendingDeleteTarget, setPendingDeleteTarget] = React.useState<PendingDeleteTarget | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
   type ProjectDialogStep = "basic" | "advanced"
@@ -431,6 +442,8 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
   const [pipelineProjectCreateYamlError, setPipelineProjectCreateYamlError] = React.useState<string | null>(null)
   const [pipelineProjectCreating, setPipelineProjectCreating] = React.useState(false)
   const [pipelineProjectCreateStep, setPipelineProjectCreateStep] = React.useState<ProjectDialogStep>("basic")
+  const [pipelineProjectDialogMode, setPipelineProjectDialogMode] = React.useState<"create" | "edit">("create")
+  const [pipelineProjectEditingName, setPipelineProjectEditingName] = React.useState<string | null>(null)
 
   const [editOpen, setEditOpen] = React.useState(false)
   const [editingRow, setEditingRow] = React.useState<WorkspaceDetailRow | null>(null)
@@ -467,6 +480,8 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
   }, [currentWorkspaceName])
 
   const resetPipelineProjectCreateDialogState = React.useCallback(() => {
+    setPipelineProjectDialogMode("create")
+    setPipelineProjectEditingName(null)
     setPipelineProjectCreateName("")
     setPipelineProjectCreateDescription("")
     setPipelineProjectCreateWorkspace(currentWorkspaceName)
@@ -533,6 +548,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
         id: `pipeline-project-${item.id}`,
         name: item.name,
         description: item.description,
+        workspace: item.workspace,
         repository: "-",
         branch: "-",
         lastRun: "-",
@@ -596,8 +612,47 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
 
   const openPipelineProjectCreateDialog = React.useCallback(() => {
     resetPipelineProjectCreateDialogState()
+    setPipelineProjectDialogMode("create")
+    setPipelineProjectEditingName(null)
     setPipelineProjectCreateOpen(true)
   }, [resetPipelineProjectCreateDialogState])
+
+  const openPipelineProjectEditDialog = React.useCallback(
+    (row: WorkspaceDetailRow) => {
+      const pipelineProjectName = row.name?.trim()
+      if (!pipelineProjectName) return
+
+      void fetchPipelineProjectDetail(pipelineProjectName)
+        .then((detail) => {
+          resetPipelineProjectCreateDialogState()
+          setPipelineProjectDialogMode("edit")
+          setPipelineProjectEditingName(detail.name)
+          setPipelineProjectCreateName(detail.name)
+          setPipelineProjectCreateDescription(detail.description)
+          setPipelineProjectCreateWorkspace(detail.workspace || currentWorkspaceName)
+          const nextLabels = metadataRecordToEntries(detail.labels)
+          const nextAnnotations = ensureWorkspaceAnnotationEntries(
+            metadataRecordToEntries(detail.annotations),
+            detail.workspace || currentWorkspaceName
+          )
+          setPipelineProjectCreateLabelEntries(nextLabels)
+          setPipelineProjectCreateAnnotationEntries(nextAnnotations)
+          setPipelineProjectCreateMetadataEnabled(
+            hasUserProvidedMetadata(nextLabels, nextAnnotations)
+          )
+          setPipelineProjectCreateNameInvalid(false)
+          setPipelineProjectCreateNameError(null)
+          setPipelineProjectCreateWorkspaceInvalid(false)
+          setPipelineProjectCreateWorkspaceError(null)
+          setPipelineProjectCreateYamlError(null)
+          setPipelineProjectCreateOpen(true)
+        })
+        .catch((e: unknown) =>
+          setError(e instanceof Error ? e.message : "加载流水线项目详情失败")
+        )
+    },
+    [currentWorkspaceName, resetPipelineProjectCreateDialogState]
+  )
 
   const handleCreateSubmit = React.useCallback(() => {
     if (creating) return
@@ -705,6 +760,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
 
   const handlePipelineProjectCreateSubmit = React.useCallback(() => {
     if (pipelineProjectCreating) return
+    const isPipelineProjectEditMode = pipelineProjectDialogMode === "edit"
 
     let nextName = pipelineProjectCreateName.trim()
     let nextDescription = pipelineProjectCreateDescription.trim()
@@ -744,11 +800,23 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
     }
 
     const nameExists = allPipelineProjectNames.includes(nextName)
-    if (nameExists) {
+    if (!isPipelineProjectEditMode && nameExists) {
       const duplicatedNameMessage = "流水线项目名称已存在，请更换后重试"
       setPipelineProjectCreateNameInvalid(true)
       setPipelineProjectCreateNameError(duplicatedNameMessage)
       if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(duplicatedNameMessage)
+      return
+    }
+
+    if (
+      isPipelineProjectEditMode &&
+      pipelineProjectEditingName &&
+      nextName !== pipelineProjectEditingName
+    ) {
+      const lockedNameError = "编辑模式不允许修改名称"
+      setPipelineProjectCreateNameInvalid(true)
+      setPipelineProjectCreateNameError(lockedNameError)
+      if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(lockedNameError)
       return
     }
 
@@ -771,13 +839,23 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
       [PROJECT_WORKSPACE_ANNOTATION]: selectedWorkspace,
     }
 
-    void createPipelineProject({
-      name: nextName,
-      workspaceName: selectedWorkspace,
-      description: nextDescription,
-      labels: nextLabels,
-      annotations: nextAnnotations,
-    })
+    const request = isPipelineProjectEditMode
+      ? updatePipelineProject({
+          name: pipelineProjectEditingName || nextName,
+          workspaceName: selectedWorkspace,
+          description: nextDescription,
+          labels: nextLabels,
+          annotations: nextAnnotations,
+        })
+      : createPipelineProject({
+          name: nextName,
+          workspaceName: selectedWorkspace,
+          description: nextDescription,
+          labels: nextLabels,
+          annotations: nextAnnotations,
+        })
+
+    void request
       .then(async () => {
         setPipelineProjectCreateOpen(false)
         resetPipelineProjectCreateDialogState()
@@ -799,6 +877,8 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
   }, [
     allPipelineProjectNames,
     currentWorkspaceName,
+    pipelineProjectDialogMode,
+    pipelineProjectEditingName,
     pipelineProjectCreateAnnotationEntries,
     pipelineProjectCreateDescription,
     pipelineProjectCreateLabelEntries,
@@ -952,12 +1032,18 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
   }
 
   const handleConfirmDelete = () => {
-    const namespaceName = pendingDeleteRow?.name?.trim()
-    if (!namespaceName || deleting) return
+    const resourceName = pendingDeleteRow?.name?.trim()
+    if (!resourceName || deleting || !pendingDeleteTarget) return
     setDeleting(true)
-    void deleteNamespace(namespaceName)
+    const request =
+      pendingDeleteTarget === "pipelineProject"
+        ? deletePipelineProject(resourceName)
+        : deleteNamespace(resourceName)
+
+    void request
       .then(async () => {
         setPendingDeleteRow(null)
+        setPendingDeleteTarget(null)
         await refreshProjectRows()
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "删除失败"))
@@ -971,6 +1057,20 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
         .map((row) => row.name?.trim())
         .filter((v): v is string => Boolean(v))
         .map((namespaceName) => deleteNamespace(namespaceName))
+    )
+      .then(async () => {
+        await refreshProjectRows()
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "批量删除失败"))
+  }
+
+  const handlePipelineProjectDeleteSelectedRows = (selectedRows: WorkspaceDetailRow[]) => {
+    if (selectedRows.length === 0) return
+    void Promise.all(
+      selectedRows
+        .map((row) => row.name?.trim())
+        .filter((v): v is string => Boolean(v))
+        .map((pipelineProjectName) => deletePipelineProject(pipelineProjectName))
     )
       .then(async () => {
         await refreshProjectRows()
@@ -1026,9 +1126,38 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
               ),
               variant: "destructive",
               withSeparator: true,
-              onSelect: (row) => setPendingDeleteRow(row),
+              onSelect: (row) => {
+                setPendingDeleteRow(row)
+                setPendingDeleteTarget("project")
+              },
             },
           ]
+        : activeTab === "pipelineProjects"
+          ? [
+              {
+                label: (
+                  <>
+                    <IconPencil className="size-4" />
+                    {"编辑"}
+                  </>
+                ),
+                onSelect: (row) => openPipelineProjectEditDialog(row),
+              },
+              {
+                label: (
+                  <>
+                    <IconTrash className="size-4" />
+                    {"删除"}
+                  </>
+                ),
+                variant: "destructive",
+                withSeparator: true,
+                onSelect: (row) => {
+                  setPendingDeleteRow(row)
+                  setPendingDeleteTarget("pipelineProject")
+                },
+              },
+            ]
         : [],
   })
 
@@ -1066,6 +1195,12 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
     </Tabs>
   )
 
+  const isPipelineProjectEditMode = pipelineProjectDialogMode === "edit"
+  const pipelineProjectDialogTitle = isPipelineProjectEditMode ? "编辑流水线项目" : "创建流水线项目"
+  const pipelineProjectDialogDescription = isPipelineProjectEditMode
+    ? "编辑流水线项目并更新描述信息。"
+    : "创建流水线项目并归属到当前企业空间。"
+
   return (
     <>
       <DataTable
@@ -1082,7 +1217,13 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
               ? openPipelineProjectCreateDialog
               : () => void 0
         }
-        onDeleteSelectedRows={activeTab === "projects" ? handleDeleteSelectedRows : undefined}
+        onDeleteSelectedRows={
+          activeTab === "projects"
+            ? handleDeleteSelectedRows
+            : activeTab === "pipelineProjects"
+              ? handlePipelineProjectDeleteSelectedRows
+              : undefined
+        }
       />
 
       <Dialog
@@ -1101,8 +1242,8 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
-                <DialogTitle>创建流水线项目</DialogTitle>
-                <DialogDescription>创建流水线项目并归属到当前企业空间。</DialogDescription>
+                <DialogTitle>{pipelineProjectDialogTitle}</DialogTitle>
+                <DialogDescription>{pipelineProjectDialogDescription}</DialogDescription>
               </DialogHeader>
               <div className="h-full flex items-center me-20">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
@@ -1244,7 +1385,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
                           placeholder="请输入流水线项目名称"
                           autoComplete="off"
                           aria-invalid={pipelineProjectCreateNameInvalid}
-                          disabled={pipelineProjectCreating}
+                          disabled={pipelineProjectCreating || isPipelineProjectEditMode}
                         />
                         {pipelineProjectCreateNameError ? (
                           <FieldError>{pipelineProjectCreateNameError}</FieldError>
@@ -1276,7 +1417,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
                           <FieldError>{pipelineProjectCreateWorkspaceError}</FieldError>
                         ) : (
                           <FieldDescription>
-                            当前在企业空间详情页创建，企业空间固定为 {currentWorkspaceName}。
+                            当前在企业空间详情页操作，企业空间固定为 {currentWorkspaceName}。
                           </FieldDescription>
                         )}
                       </Field>
@@ -1344,7 +1485,13 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
                     onClick={handlePipelineProjectCreateSubmit}
                     disabled={pipelineProjectCreating}
                   >
-                    {pipelineProjectCreating ? "创建中..." : "创建"}
+                    {pipelineProjectCreating
+                      ? isPipelineProjectEditMode
+                        ? "保存中..."
+                        : "创建中..."
+                      : isPipelineProjectEditMode
+                        ? "保存"
+                        : "创建"}
                   </Button>
                 </>
               ) : pipelineProjectCreateStep === "basic" ? (
@@ -1370,7 +1517,7 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
                       }
 
                       const nameExists = allPipelineProjectNames.includes(nextName)
-                      if (nameExists) {
+                      if (!isPipelineProjectEditMode && nameExists) {
                         setPipelineProjectCreateNameInvalid(true)
                         setPipelineProjectCreateNameError("流水线项目名称已存在，请更换后重试")
                         return
@@ -1408,7 +1555,13 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
                     onClick={handlePipelineProjectCreateSubmit}
                     disabled={pipelineProjectCreating}
                   >
-                    {pipelineProjectCreating ? "创建中..." : "创建"}
+                    {pipelineProjectCreating
+                      ? isPipelineProjectEditMode
+                        ? "保存中..."
+                        : "创建中..."
+                      : isPipelineProjectEditMode
+                        ? "保存"
+                        : "创建"}
                   </Button>
                 </>
               )}
@@ -1740,10 +1893,19 @@ export function WorkspaceDetailTemplate({ name }: WorkspaceDetailTemplateProps) 
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
         onOpenChange={(open) => {
-          if (!open && !deleting) setPendingDeleteRow(null)
+          if (!open && !deleting) {
+            setPendingDeleteRow(null)
+            setPendingDeleteTarget(null)
+          }
         }}
-        title="删除项目"
-        description={pendingDeleteRow?.name ? `确定删除项目 ${pendingDeleteRow.name} 吗？` : ""}
+        title={pendingDeleteTarget === "pipelineProject" ? "删除流水线项目" : "删除项目"}
+        description={
+          pendingDeleteRow?.name
+            ? pendingDeleteTarget === "pipelineProject"
+              ? `确定删除流水线项目 ${pendingDeleteRow.name} 吗？`
+              : `确定删除项目 ${pendingDeleteRow.name} 吗？`
+            : ""
+        }
         deleting={deleting}
         onConfirm={handleConfirmDelete}
       />
