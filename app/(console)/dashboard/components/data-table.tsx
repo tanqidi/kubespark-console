@@ -49,6 +49,7 @@ type DataTableProps<TData> = {
   columns: ColumnDef<TData>[]
   getRowId?: (row: TData, index: number) => string
   getRowHref?: (row: TData) => string | null | undefined
+  onRowClick?: (row: TData) => void
   enableRowNavigation?: boolean
   toolbarStart?: React.ReactNode
   toolbarEnd?: React.ReactNode
@@ -62,14 +63,26 @@ function DraggableRow<TData>({
   href,
   primaryColumnId,
   onNavigate,
+  onRowClick,
 }: {
   row: Row<TData>
   href: string | null
   primaryColumnId: string | null
   onNavigate: (href: string) => void
+  onRowClick?: (row: TData) => void
 }) {
+  const clickable = Boolean(onRowClick)
   return (
-    <TableRow data-state={row.getIsSelected() && "selected"}>
+    <TableRow
+      data-state={row.getIsSelected() && "selected"}
+      className={clickable ? "cursor-pointer hover:bg-accent/50" : undefined}
+      onClick={(event) => {
+        if (!onRowClick) return
+        const target = event.target as HTMLElement
+        if (target.closest("button, input, a, [role='checkbox']")) return
+        onRowClick(row.original)
+      }}
+    >
       {row.getVisibleCells().map((cell) => {
         const content = flexRender(cell.column.columnDef.cell, cell.getContext())
         const isPrimaryClickableCell =
@@ -107,6 +120,7 @@ export function DataTable<TData extends Record<string, unknown>>({
   columns,
   getRowId,
   getRowHref,
+  onRowClick,
   enableRowNavigation = false,
   toolbarStart,
   toolbarEnd,
@@ -259,6 +273,7 @@ export function DataTable<TData extends Record<string, unknown>>({
                     href={resolveRowHref(row.original)}
                     primaryColumnId={primaryColumnId}
                     onNavigate={handleNavigate}
+                    onRowClick={onRowClick}
                   />
                 ))
               ) : (

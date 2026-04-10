@@ -1,13 +1,13 @@
 "use client"
 
 import * as React from "react"
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsLeft,
-  IconChevronsRight,
-} from "@tabler/icons-react"
 
+import { DataTable } from "@/app/(console)/dashboard/components/data-table"
+import {
+  createColumns,
+  renderNameDescriptionCell,
+  type ColumnConfig,
+} from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
   fetchWorkloadRows,
   type WorkloadKind,
@@ -18,28 +18,14 @@ import {
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type PickedWorkload = {
@@ -57,6 +43,19 @@ type WorkloadPickerDialogProps = {
   onPick: (value: PickedWorkload) => void
 }
 
+const workloadColumns: ColumnConfig<WorkloadResourceRow>[] = [
+  {
+    key: "name",
+    label: "名称",
+    enableHiding: false,
+    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+  },
+  { key: "status", label: "状态", render: "status" },
+  { key: "namespace", label: "命名空间" },
+  { key: "age", label: "运行时间" },
+  { key: "updatedAt", label: "更新时间" },
+]
+
 export function WorkloadPickerDialog({
   open,
   onOpenChange,
@@ -68,10 +67,6 @@ export function WorkloadPickerDialog({
   const [error, setError] = React.useState<string | null>(null)
   const [kindFilter, setKindFilter] = React.useState<WorkloadKind>("Deployment")
   const [nameQuery, setNameQuery] = React.useState("")
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 10,
-  })
 
   React.useEffect(() => {
     if (!open) return
@@ -105,10 +100,6 @@ export function WorkloadPickerDialog({
       setKindFilter("Deployment")
       setNameQuery("")
       setError(null)
-      setPagination({
-        pageIndex: 0,
-        pageSize: 10,
-      })
     }
   }, [open])
 
@@ -121,26 +112,6 @@ export function WorkloadPickerDialog({
       return true
     })
   }, [kindFilter, nameQuery, namespace, rows])
-
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / pagination.pageSize))
-  const maxPageIndex = pageCount - 1
-  const pageIndex = Math.min(pagination.pageIndex, maxPageIndex)
-  const pageRows = React.useMemo(
-    () =>
-      filteredRows.slice(
-        pageIndex * pagination.pageSize,
-        pageIndex * pagination.pageSize + pagination.pageSize
-      ),
-    [filteredRows, pageIndex, pagination.pageSize]
-  )
-
-  React.useEffect(() => {
-    setPagination((current) => {
-      const nextMaxIndex = Math.max(0, Math.ceil(filteredRows.length / current.pageSize) - 1)
-      if (current.pageIndex <= nextMaxIndex) return current
-      return { ...current, pageIndex: nextMaxIndex }
-    })
-  }, [filteredRows.length])
 
   const handlePick = React.useCallback(
     (row: WorkloadResourceRow) => {
@@ -156,7 +127,37 @@ export function WorkloadPickerDialog({
     [onOpenChange, onPick]
   )
 
+  const columns = React.useMemo(
+    () =>
+      createColumns<WorkloadResourceRow>({
+        columns: workloadColumns,
+        includeSelect: true,
+        includeActions: false,
+      }),
+    []
+  )
+
   const isBusy = loading
+
+  const toolbarStart = (
+    <Tabs value={kindFilter} onValueChange={(value) => setKindFilter(value as WorkloadKind)} className="w-fit">
+      <TabsList>
+        <TabsTrigger value="Deployment">部署</TabsTrigger>
+        <TabsTrigger value="StatefulSet">有状态副本集</TabsTrigger>
+        <TabsTrigger value="DaemonSet">守护进程集</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  )
+
+  const toolbarEnd = (
+    <Input
+      value={nameQuery}
+      onChange={(event) => setNameQuery(event.target.value)}
+      placeholder="名称"
+      className="h-9 w-52"
+      disabled={isBusy}
+    />
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -171,198 +172,35 @@ export function WorkloadPickerDialog({
           <DialogDescription>点击列表行即可选择并回填标签选择器。</DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center justify-between gap-2 px-6 py-4">
-          <Tabs
-            value={kindFilter}
-            onValueChange={(value) => {
-              setKindFilter(value as WorkloadKind)
-              setPagination((current) =>
-                current.pageIndex === 0 ? current : { ...current, pageIndex: 0 }
-              )
+        <div className="min-h-0 flex-1 overflow-auto">
+          <DataTable
+            data={loading ? [] : filteredRows}
+            columns={columns}
+            getRowId={(row) => row.id}
+            onRowClick={(row) => {
+              if (isBusy) return
+              handlePick(row)
             }}
-            className="w-fit"
-          >
-            <TabsList>
-              <TabsTrigger value="Deployment">部署</TabsTrigger>
-              <TabsTrigger value="StatefulSet">有状态副本集</TabsTrigger>
-              <TabsTrigger value="DaemonSet">守护进程集</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <Input
-            value={nameQuery}
-            onChange={(event) => {
-              setNameQuery(event.target.value)
-              setPagination((current) =>
-                current.pageIndex === 0 ? current : { ...current, pageIndex: 0 }
-              )
-            }}
-            placeholder="名称"
-            className="h-9 w-52"
-            disabled={isBusy}
+            toolbarStart={toolbarStart}
+            toolbarEnd={toolbarEnd}
+            showColumnCustomizer
           />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-auto px-6 pb-4">
-          <div className="overflow-hidden rounded-lg border">
-            <Table>
-              <TableHeader className="bg-muted/60">
-                <TableRow>
-                  <TableHead className="pl-7">名称</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>命名空间</TableHead>
-                  {/*<TableHead>期望</TableHead>*/}
-                  {/*<TableHead>就绪</TableHead>*/}
-                  <TableHead>运行时间</TableHead>
-                  <TableHead>更新时间</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                      加载中...
-                    </TableCell>
-                  </TableRow>
-                ) : pageRows.length > 0 ? (
-                  pageRows.map((row) => {
-                    return (
-                      <TableRow
-                        key={row.id}
-                        className="cursor-pointer hover:bg-accent/50"
-                        onClick={() => {
-                          if (!isBusy) handlePick(row)
-                        }}
-                      >
-                        <TableCell>
-                          <div className="min-w-0 pl-5">
-                            <div className="truncate font-medium">{row.name}</div>
-                            <div className="truncate text-sm text-muted-foreground">
-                              {row.description || "-"}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{row.status}</TableCell>
-                        <TableCell>{row.namespace}</TableCell>
-                        {/*<TableCell>{row.desired}</TableCell>*/}
-                        {/*<TableCell>{row.ready}</TableCell>*/}
-                        <TableCell>{row.age}</TableCell>
-                        <TableCell>{row.updatedAt}</TableCell>
-                      </TableRow>
-                    )
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                      暂无可选工作负载
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          {loading ? (
+            <p className="mt-3 text-sm text-muted-foreground">加载中...</p>
+          ) : null}
 
           {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
         </div>
 
-        <div className="flex items-center justify-between border-t px-6 py-4">
-          <div className="text-sm text-muted-foreground">
-            共 {filteredRows.length} 条
+        <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
+          <div className="flex w-full items-center justify-start gap-3">
+            <DialogClose asChild>
+              <Button type="button" variant="outline" disabled={isBusy}>
+                取消
+              </Button>
+            </DialogClose>
           </div>
-          <div className="flex items-center gap-3">
-            <Select
-              value={`${pagination.pageSize}`}
-              onValueChange={(value) =>
-                setPagination({
-                  pageIndex: 0,
-                  pageSize: Number(value),
-                })
-              }
-              disabled={isBusy}
-            >
-              <SelectTrigger size="sm" className="w-24">
-                <SelectValue placeholder={pagination.pageSize} />
-              </SelectTrigger>
-              <SelectContent side="top">
-                <SelectGroup>
-                  {[10, 20, 30].map((size) => (
-                    <SelectItem key={size} value={`${size}`}>
-                      {size}/页
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-
-            <div className="text-sm">
-              第 {pageIndex + 1} 页，共 {pageCount}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() =>
-                  setPagination((current) =>
-                    current.pageIndex === 0 ? current : { ...current, pageIndex: 0 }
-                  )
-                }
-                disabled={isBusy || pageIndex === 0}
-              >
-                <IconChevronsLeft />
-                <span className="sr-only">第一页</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() =>
-                  setPagination((current) => ({
-                    ...current,
-                    pageIndex: Math.max(0, current.pageIndex - 1),
-                  }))
-                }
-                disabled={isBusy || pageIndex === 0}
-              >
-                <IconChevronLeft />
-                <span className="sr-only">上一页</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() =>
-                  setPagination((current) => ({
-                    ...current,
-                    pageIndex: Math.min(pageCount - 1, current.pageIndex + 1),
-                  }))
-                }
-                disabled={isBusy || pageIndex >= pageCount - 1}
-              >
-                <IconChevronRight />
-                <span className="sr-only">下一页</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() =>
-                  setPagination((current) => {
-                    const nextPageIndex = pageCount - 1
-                    return current.pageIndex === nextPageIndex
-                      ? current
-                      : { ...current, pageIndex: nextPageIndex }
-                  })
-                }
-                disabled={isBusy || pageIndex >= pageCount - 1}
-              >
-                <IconChevronsRight />
-                <span className="sr-only">最后一页</span>
-              </Button>
-            </div>
-          </div>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

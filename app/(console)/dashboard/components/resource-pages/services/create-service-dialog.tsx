@@ -1946,7 +1946,7 @@ export function CreateServiceDialog({
             {stepError ? <FieldError className="mt-4">{stepError}</FieldError> : null}
           </div>
 
-          {yamlMode ? (
+          {workloadPickerOpen ? null : yamlMode ? (
               <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
                 <div className="flex w-full items-center justify-between gap-3">
                   <DialogClose asChild>
