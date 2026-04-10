@@ -3,7 +3,7 @@ kind: CustomResourceDefinition
 metadata:
   name: pipelines.tanqidi.com
   annotations:
-    description: 流水线项目资源
+    description: 流水线资源
 spec:
   group: tanqidi.com
   scope: Cluster
@@ -28,7 +28,7 @@ spec:
             spec:
               type: object
               properties:
-                workspaceRef:
+                pipelineProjectRef:
                   type: object
                   properties:
                     name:
@@ -60,5 +60,5 @@ spec:
                   required:
                     - url
               required:
-                - workspaceRef
+                - pipelineProjectRef
                 - source
