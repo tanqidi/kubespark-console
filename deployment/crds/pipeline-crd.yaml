@@ -28,6 +28,15 @@ spec:
             spec:
               type: object
               properties:
+                workspaceRef:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      minLength: 1
+                      maxLength: 63
+                  required:
+                    - name
                 pipelineProjectRef:
                   type: object
                   properties:
@@ -37,28 +46,5 @@ spec:
                       maxLength: 63
                   required:
                     - name
-                source:
-                  type: object
-                  properties:
-                    url:
-                      type: string
-                      minLength: 1
-                      maxLength: 2048
-                    branch:
-                      type: string
-                      minLength: 1
-                      maxLength: 255
-                    authSecretRef:
-                      type: object
-                      properties:
-                        name:
-                          type: string
-                          minLength: 1
-                          maxLength: 253
-                      required:
-                        - name
-                  required:
-                    - url
               required:
                 - pipelineProjectRef
-                - source

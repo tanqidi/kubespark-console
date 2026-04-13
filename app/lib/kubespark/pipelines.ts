@@ -1,3 +1,5 @@
+import { stringify } from "yaml"
+
 import {
   buildResourceCollectionEndpoint,
   buildResourceItemEndpoint,
@@ -14,18 +16,11 @@ type RawPipeline = {
     name?: string
     labels?: Record<string, string>
     annotations?: Record<string, string>
+    resourceVersion?: string
     creationTimestamp?: string
     managedFields?: Array<{ time?: string }>
   }
-  spec?: {
-    description?: string
-    workspaceRef?: {
-      name?: string
-    }
-    pipelineProjectRef?: {
-      name?: string
-    }
-  }
+  spec?: Record<string, unknown>
 }
 
 export type PipelineRow = {
@@ -65,6 +60,11 @@ const PIPELINE_GVR = {
   resource: "pipelines",
 } as const
 
+type PipelineSpec = {
+  workspaceRef?: { name: string }
+  pipelineProjectRef?: { name: string }
+} & Record<string, unknown>
+
 function normalizePipelineName(name: string): string {
   const value = name.trim().toLowerCase()
   const isValid = /^[a-z](?:[-a-z0-9]*[a-z0-9])?$/.test(value) && value.length <= 63
@@ -94,8 +94,67 @@ function normalizeStringRecord(record?: Record<string, string>): Record<string, 
   ) as Record<string, string>
 }
 
-function resolvePipelineProjectName(spec?: RawPipeline["spec"]): string {
-  return (spec?.pipelineProjectRef?.name ?? "").trim()
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function extractDescription(item: RawPipeline): string {
+  const metadata = item.metadata ?? {}
+  const annotationDescription = readString(metadata.annotations?.description)
+  if (annotationDescription) return annotationDescription
+  const spec = asRecord(item.spec)
+  const specDescription = readString(spec.description)
+  return specDescription
+}
+
+function extractWorkspace(item: RawPipeline): string {
+  const spec = asRecord(item.spec)
+  const workspaceRef = asRecord(spec.workspaceRef)
+  return readString(workspaceRef.name)
+}
+
+function extractPipelineProjectName(item: RawPipeline): string {
+  const spec = asRecord(item.spec)
+  const pipelineProjectRef = asRecord(spec.pipelineProjectRef)
+  return readString(pipelineProjectRef.name)
+}
+
+function buildSpec(input: CreatePipelineInput, existingSpec?: Record<string, unknown>): PipelineSpec {
+  const workspaceName = normalizeOptionalDnsLabel(input.workspaceName)
+  const pipelineProjectName = normalizeOptionalDnsLabel(input.pipelineProjectName)
+  const base = existingSpec ? asRecord(existingSpec) : {}
+  delete base.description
+
+  return {
+    ...base,
+    ...(workspaceName ? { workspaceRef: { name: workspaceName } } : {}),
+    ...(pipelineProjectName ? { pipelineProjectRef: { name: pipelineProjectName } } : {}),
+  }
+}
+
+function buildAnnotations(input: CreatePipelineInput): Record<string, string> {
+  const annotations = normalizeStringRecord(input.annotations)
+  const description = input.description?.trim() ?? ""
+  if (description) annotations.description = description
+  else delete annotations.description
+  return annotations
+}
+
+async function fetchPipelineRawByName(name: string): Promise<RawPipeline> {
+  const normalizedName = normalizePipelineName(name)
+  const { payload } = await fetchResourceByName<RawPipeline>(
+    PIPELINE_GVR.group,
+    PIPELINE_GVR.version,
+    PIPELINE_GVR.resource,
+    normalizedName
+  )
+  return payload
 }
 
 export async function fetchPipelineRows(pipelineProjectName?: string): Promise<PipelineRow[]> {
@@ -109,9 +168,8 @@ export async function fetchPipelineRows(pipelineProjectName?: string): Promise<P
   return items
     .map((item, index) => {
       const metadata = item.metadata ?? {}
-      const spec = item.spec ?? {}
-      const workspace = (spec.workspaceRef?.name ?? "").trim()
-      const description = (spec.description ?? metadata.annotations?.description ?? "").trim()
+      const workspace = extractWorkspace(item)
+      const description = extractDescription(item)
 
       return {
         id: metadata.uid || metadata.name || `pipeline-${index}`,
@@ -126,32 +184,21 @@ export async function fetchPipelineRows(pipelineProjectName?: string): Promise<P
     })
     .filter((row, index) => {
       if (!expectedProject) return true
-      const item = items[index]
-      const project = resolvePipelineProjectName(item?.spec)
-      return project === expectedProject
+      return extractPipelineProjectName(items[index] ?? {}) === expectedProject
     })
 }
 
 export async function fetchPipelineDetail(name: string): Promise<PipelineDetail> {
   const normalizedName = normalizePipelineName(name)
-  const { payload } = await fetchResourceByName<RawPipeline>(
-    PIPELINE_GVR.group,
-    PIPELINE_GVR.version,
-    PIPELINE_GVR.resource,
-    normalizedName
-  )
+  const payload = await fetchPipelineRawByName(normalizedName)
 
   const metadata = payload.metadata ?? {}
-  const spec = payload.spec ?? {}
-  const workspace = (spec.workspaceRef?.name ?? "").trim()
-  const pipelineProjectName = resolvePipelineProjectName(spec)
-  const description = (spec.description ?? metadata.annotations?.description ?? "").trim()
 
   return {
     name: metadata.name || normalizedName,
-    workspace,
-    pipelineProjectName,
-    description,
+    workspace: extractWorkspace(payload),
+    pipelineProjectName: extractPipelineProjectName(payload),
+    description: extractDescription(payload),
     labels: normalizeStringRecord(metadata.labels),
     annotations: normalizeStringRecord(metadata.annotations),
   }
@@ -159,13 +206,8 @@ export async function fetchPipelineDetail(name: string): Promise<PipelineDetail>
 
 export async function createPipeline(input: CreatePipelineInput): Promise<void> {
   const name = normalizePipelineName(input.name)
-  const workspaceName = normalizeOptionalDnsLabel(input.workspaceName)
-  const pipelineProjectName = normalizeOptionalDnsLabel(input.pipelineProjectName)
-  const description = input.description?.trim() ?? ""
   const labels = normalizeStringRecord(input.labels)
-  const annotations = normalizeStringRecord(input.annotations)
-  if (description) annotations.description = description
-  else delete annotations.description
+  const annotations = buildAnnotations(input)
 
   const requestBody = {
     apiVersion: "tanqidi.com/v1alpha1",
@@ -175,23 +217,7 @@ export async function createPipeline(input: CreatePipelineInput): Promise<void> 
       ...(Object.keys(labels).length > 0 ? { labels } : {}),
       ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
     },
-    spec: {
-      ...(description ? { description } : {}),
-      ...(workspaceName
-        ? {
-            workspaceRef: {
-              name: workspaceName,
-            },
-          }
-        : {}),
-      ...(pipelineProjectName
-        ? {
-            pipelineProjectRef: {
-              name: pipelineProjectName,
-            },
-          }
-        : {}),
-    },
+    spec: buildSpec(input),
   }
 
   const url = buildResourceCollectionEndpoint(
@@ -208,39 +234,21 @@ export async function createPipeline(input: CreatePipelineInput): Promise<void> 
 
 export async function updatePipeline(input: UpdatePipelineInput): Promise<void> {
   const name = normalizePipelineName(input.name)
-  const workspaceName = normalizeOptionalDnsLabel(input.workspaceName)
-  const pipelineProjectName = normalizeOptionalDnsLabel(input.pipelineProjectName)
-  const description = input.description?.trim() ?? ""
   const labels = normalizeStringRecord(input.labels)
-  const annotations = normalizeStringRecord(input.annotations)
-  if (description) annotations.description = description
-  else delete annotations.description
+  const annotations = buildAnnotations(input)
 
+  const existing = await fetchPipelineRawByName(name)
+  const resourceVersion = readString(existing.metadata?.resourceVersion)
   const requestBody = {
     apiVersion: "tanqidi.com/v1alpha1",
     kind: "Pipeline",
     metadata: {
       name,
+      ...(resourceVersion ? { resourceVersion } : {}),
       ...(Object.keys(labels).length > 0 ? { labels } : {}),
       ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
     },
-    spec: {
-      ...(description ? { description } : {}),
-      ...(workspaceName
-        ? {
-            workspaceRef: {
-              name: workspaceName,
-            },
-          }
-        : {}),
-      ...(pipelineProjectName
-        ? {
-            pipelineProjectRef: {
-              name: pipelineProjectName,
-            },
-          }
-        : {}),
-    },
+    spec: buildSpec(input, asRecord(existing.spec)),
   }
 
   const url = buildResourceItemEndpoint(
@@ -257,13 +265,7 @@ export async function updatePipeline(input: UpdatePipelineInput): Promise<void> 
 }
 
 export async function fetchPipelineYaml(name: string): Promise<string> {
-  const normalizedName = normalizePipelineName(name)
-  const { payload } = await fetchResourceByName<Record<string, unknown>>(
-    PIPELINE_GVR.group,
-    PIPELINE_GVR.version,
-    PIPELINE_GVR.resource,
-    normalizedName
-  )
+  const payload = await fetchPipelineRawByName(name)
   return stringify(payload, {
     indent: 2,
     lineWidth: 0,

@@ -71,14 +71,11 @@
 核心字段：
 
 - `spec.pipelineProjectRef.name`（必填）
-- `spec.source.url`（必填）
-- `spec.source.branch`（可选）
-- `spec.source.authSecretRef.name`（可选）
+- `spec.workspaceRef.name`（可选）
 
 说明：
 
 - Pipeline 与 PipelineProject 的归属关系通过 `pipelineProjectRef` 统一建模。
-- 认证信息建议使用 Secret 引用，不直接明文存储凭据。
 
 ## 3. 关联关系约定
 

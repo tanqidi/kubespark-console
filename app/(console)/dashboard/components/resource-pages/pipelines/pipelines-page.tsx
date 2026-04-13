@@ -114,7 +114,6 @@ function buildPipelineYamlText(params: {
         ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
       },
       spec: {
-        ...(params.description.trim() ? { description: params.description.trim() } : {}),
         ...(params.workspaceName?.trim()
           ? {
               workspaceRef: {
@@ -193,12 +192,7 @@ function parsePipelineYamlText(yamlText: string): {
 
   return {
     name: typeof metadata.name === "string" ? metadata.name : "",
-    description:
-      typeof spec.description === "string"
-        ? spec.description
-        : typeof annotations.description === "string"
-          ? annotations.description
-          : "",
+    description: typeof annotations.description === "string" ? annotations.description : "",
     labels: metadataRecordToEntries(
       Object.fromEntries(
         Object.entries(labels).filter(([, value]) => typeof value === "string")
@@ -209,7 +203,8 @@ function parsePipelineYamlText(yamlText: string): {
         Object.entries(annotations).filter(([, value]) => typeof value === "string")
       ) as Record<string, string>
     ),
-    workspaceName: typeof workspaceRef.name === "string" ? workspaceRef.name : "",
+    workspaceName:
+      typeof workspaceRef.name === "string" ? workspaceRef.name : "",
     pipelineProjectName:
       typeof pipelineProjectRef.name === "string" ? pipelineProjectRef.name : "",
   }
