@@ -418,3 +418,13 @@ export async function fetchPipelineRunRows(pipelineName: string): Promise<Pipeli
     })
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
+
+export async function deletePipelineRun(name: string): Promise<void> {
+	const normalizedName = normalizePipelineName(name)
+	await deleteResource(
+		PIPELINE_RUN_GVR.group,
+		PIPELINE_RUN_GVR.version,
+		PIPELINE_RUN_GVR.resource,
+		normalizedName
+	)
+}

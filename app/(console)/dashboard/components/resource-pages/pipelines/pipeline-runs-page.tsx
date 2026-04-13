@@ -1,9 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { IconPlayerPlay } from "@tabler/icons-react"
+import { IconPlayerPlay, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import {
   createColumns,
   renderNameDescriptionCell,
@@ -11,6 +12,7 @@ import {
 } from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
   createPipelineRun,
+  deletePipelineRun,
   fetchPipelineRunRows,
   type PipelineRunRow,
 } from "@/app/lib/kubespark/pipelines"
@@ -57,6 +59,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [runNamespace, setRunNamespace] = React.useState("")
   const [runRepo, setRunRepo] = React.useState(normalizedPipelineName)
   const [runError, setRunError] = React.useState<string | null>(null)
+  const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PipelineRunRow | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
 
   const loadRows = React.useCallback(
     async (silent: boolean) => {
@@ -139,10 +143,69 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
               window.open(row.buildLink, "_blank", "noopener,noreferrer")
             },
           },
+          {
+            label: (
+              <>
+                <IconTrash className="size-4" />
+                删除
+              </>
+            ),
+            variant: "destructive",
+            withSeparator: true,
+            onSelect: (row) => {
+              setPendingDeleteRow(row)
+            },
+          },
         ],
       }),
     []
   )
+
+  const handleDeleteSelectedRows = React.useCallback(
+    (selectedRows: PipelineRunRow[]) => {
+      if (selectedRows.length === 0 || deleting) return
+
+      const names = selectedRows
+        .map((row) => row.name.trim())
+        .filter((name) => name.length > 0 && name !== "-")
+      if (names.length === 0) return
+
+      setDeleting(true)
+      setError(null)
+      void Promise.all(names.map((name) => deletePipelineRun(name)))
+        .then(() => {
+          void loadRows(false)
+        })
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : "删除运行记录失败")
+        })
+        .finally(() => {
+          setDeleting(false)
+        })
+    },
+    [deleting, loadRows]
+  )
+
+  const handleConfirmDelete = React.useCallback(() => {
+    if (!pendingDeleteRow || deleting) return
+
+    const targetName = pendingDeleteRow.name.trim()
+    if (!targetName || targetName === "-") return
+
+    setDeleting(true)
+    setError(null)
+    void deletePipelineRun(targetName)
+      .then(() => {
+        setPendingDeleteRow(null)
+        void loadRows(false)
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "删除运行记录失败")
+      })
+      .finally(() => {
+        setDeleting(false)
+      })
+  }, [deleting, loadRows, pendingDeleteRow])
 
   const query = nameQuery.trim().toLowerCase()
   const filteredRows = rows.filter((row) => {
@@ -240,9 +303,20 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           </div>
         </DialogContent>
       </Dialog>
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeleteRow)}
+        title="删除运行记录"
+        description={pendingDeleteRow ? `确定删除运行记录 ${pendingDeleteRow.name} 吗？` : ""}
+        deleting={deleting}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDeleteRow(null)
+        }}
+        onConfirm={handleConfirmDelete}
+      />
       <DataTable
         data={filteredRows}
         columns={columns}
+        onDeleteSelectedRows={handleDeleteSelectedRows}
         toolbarEnd={
           <div className="flex items-center gap-2">
             <Input
