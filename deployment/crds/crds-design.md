@@ -85,9 +85,9 @@
 
 - 业务引用字段命名为 `xxxRef`。
 - 第一阶段只要求 `name`：
-  - `workspaceRef.name`
-  - `pipelineProjectRef.name`
-  - `namespaceRef.name`
+    - `workspaceRef.name`
+    - `pipelineProjectRef.name`
+    - `namespaceRef.name`
 
 示例：
 
@@ -130,10 +130,10 @@ spec:
 1. CRD 采用复数资源名（Kubernetes 约定）：`workspaces`、`pipelineprojects`、`pipelines`。
 2. Binding 类资源名称建议包含两端语义：`workspacenamespacebindings`。
 3. 资源实例命名建议稳定、可读，例如：
-   - `workspace`: `tanqidi`
-   - `binding`: `tanqidi-default`
-   - `pipelineProject`: `tanqidi-backend`
-   - `pipeline`: `tanqidi-backend-build`
+    - `workspace`: `tanqidi`
+    - `binding`: `tanqidi-default`
+    - `pipelineProject`: `tanqidi-backend`
+    - `pipeline`: `tanqidi-backend-build`
 
 ## 7. 后续扩展建议
 
