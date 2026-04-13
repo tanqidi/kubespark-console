@@ -66,16 +66,18 @@
 - Kind: `Pipeline`
 - GVR: `tanqidi.com/v1alpha1/pipelines`
 - Scope: `Cluster`
-- 作用：流水线定义，并显式归属到 PipelineProject。
+- 作用：流水线定义，并显式归属到 PipelineProject/Workspace。
 
 核心字段：
 
 - `spec.pipelineProjectRef.name`（必填）
 - `spec.workspaceRef.name`（可选）
+- 描述：`metadata.annotations.description`（与其他模块保持一致）
 
 说明：
 
 - Pipeline 与 PipelineProject 的归属关系通过 `pipelineProjectRef` 统一建模。
+- 当前设计不包含 `spec.source.* / spec.repo / spec.branch` 等字段。
 
 ## 3. 关联关系约定
 
@@ -136,6 +138,5 @@ spec:
 ## 7. 后续扩展建议
 
 1. 增加 `WorkspaceMemberBinding`，承载成员与角色绑定。
-2. 给 Pipeline 增加 `trigger`、`runnerRef`、`retentionPolicy`。
-3. 增加 `status.conditions` 规范，统一前端状态展示。
+2. 增加 `status.conditions` 规范，统一前端状态展示。
 
