@@ -18,7 +18,7 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 ### 1. 统一资源管理工作台
 
 - 覆盖 Namespace、Pod、Service、ConfigMap、Secret、Job、CronJob、Ingress、PV/PVC、StorageClass 等常见资源。
-- 提供统一列表体验：分页、筛选、轮询刷新、行级操作、批量删除。
+- 提供统一列表体验：分页、筛选、可配置自动刷新、行级操作、批量删除。
 - 内置查看 YAML 与删除确认弹窗，满足日常运维闭环。
 
 ### 2. 表单 + YAML 双模式协同
@@ -124,6 +124,11 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### 自动刷新配置
+
+- 默认：关闭自动刷新（不启用定时轮询）。
+- 开启方式：配置 `NEXT_PUBLIC_AUTO_REFRESH_SECONDS` 为正整数秒数（例如 `5`）。
 
 ### WebSocket 代理说明
 

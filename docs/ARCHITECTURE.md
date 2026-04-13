@@ -8,7 +8,7 @@
 
 - 统一通过 GVR 接口访问资源
 - 提供一致的 CRUD 与 YAML 交互体验
-- 通过轮询机制让页面状态与集群状态逐步一致
+- 通过可配置自动刷新机制让页面状态与集群状态逐步一致
 
 ## 2. 分层架构
 
@@ -101,7 +101,7 @@ app/
 3. 创建/编辑：
 - Job/CronJob：结构化表单 -> `jobs.ts` 组装资源体 -> `POST/PUT`
 - Workload：表单构建 manifest -> `workloads.ts` 提交 payload  
-4. 删除：统一确认弹窗 -> `resource-delete.ts` -> 轮询刷新
+4. 删除：统一确认弹窗 -> `resource-delete.ts` -> 自动刷新（按配置）
 
 ## 7. 统一客户端细节（`common.ts`）
 
@@ -148,7 +148,7 @@ app/
 
 - `DataTable`：选择、分页、列控制、批量删除、拖拽排序
 - `TableToolbar`：正常态/选中态切换
-- 轮询：首次加载 + 每 3 秒静默刷新（失败仅日志）
+- 自动刷新：首次加载后默认不轮询；仅在配置了 `NEXT_PUBLIC_AUTO_REFRESH_SECONDS`（正整数秒）后按该间隔静默刷新（失败仅日志）
 
 ## 12. Dialog 内 Combobox 约定
 
@@ -161,6 +161,7 @@ app/
 - `KUBESPARK_API_BASE`
 - `NEXT_PUBLIC_API_PROXY_BASE`
 - `NEXT_PUBLIC_LOCALE`
+- `NEXT_PUBLIC_AUTO_REFRESH_SECONDS`
 
 ## 14. 当前边界
 
