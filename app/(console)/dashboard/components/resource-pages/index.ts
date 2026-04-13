@@ -12,5 +12,6 @@ export { StorageClassesPageClient } from "./storageclasses/storageclasses-page"
 export { NodesPageClient } from "./nodes/nodes-page"
 export { ProjectsPageClient } from "./projects/projects-page"
 export { PipelinesPageClient } from "./pipelines/pipelines-page"
+export { PipelineRunsPageClient } from "./pipelines/pipeline-runs-page"
 export { WorkspacesPageClient } from "./workspaces/workspaces-page"
 

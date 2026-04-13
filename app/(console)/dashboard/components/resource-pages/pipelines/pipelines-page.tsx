@@ -26,11 +26,9 @@ import {
   createPipeline,
   deletePipeline,
   fetchPipelineDetail,
-  fetchPipelineRunRows,
   fetchPipelineRows,
   fetchPipelineYaml,
   updatePipeline,
-  type PipelineRunRow,
   type PipelineRow,
 } from "@/app/lib/kubespark/pipelines"
 import { fetchPipelineProjectDetail } from "@/app/lib/kubespark/pipeline-projects"
@@ -49,7 +47,6 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -249,11 +246,6 @@ export function PipelinesPageClient({ pipelineProjectName }: PipelinesPageClient
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Pipeline 的 YAML 内容。")
-  const [runHistoryOpen, setRunHistoryOpen] = React.useState(false)
-  const [runHistoryRows, setRunHistoryRows] = React.useState<PipelineRunRow[]>([])
-  const [runHistoryLoading, setRunHistoryLoading] = React.useState(false)
-  const [runHistoryError, setRunHistoryError] = React.useState<string | null>(null)
-  const [runHistoryTitle, setRunHistoryTitle] = React.useState("查看运行记录")
 
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PipelineRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -516,28 +508,6 @@ export function PipelinesPageClient({ pipelineProjectName }: PipelinesPageClient
       })
   }, [])
 
-  const handleViewRunHistory = React.useCallback((row: PipelineRow) => {
-    const pipelineName = row.name.trim()
-    if (!pipelineName || pipelineName === "-") return
-
-    setRunHistoryOpen(true)
-    setRunHistoryLoading(true)
-    setRunHistoryError(null)
-    setRunHistoryRows([])
-    setRunHistoryTitle(`查看运行记录（${pipelineName}）`)
-
-    void fetchPipelineRunRows(pipelineName)
-      .then((items) => {
-        setRunHistoryRows(items)
-      })
-      .catch((e: unknown) => {
-        setRunHistoryError(e instanceof Error ? e.message : "加载运行记录失败")
-      })
-      .finally(() => {
-        setRunHistoryLoading(false)
-      })
-  }, [])
-
   const handleDeleteSelectedRows = React.useCallback(
     (selectedRows: PipelineRow[]) => {
       if (selectedRows.length === 0) return
@@ -616,12 +586,6 @@ export function PipelinesPageClient({ pipelineProjectName }: PipelinesPageClient
             },
           },
           {
-            label: "运行记录",
-            onSelect: (row) => {
-              handleViewRunHistory(row)
-            },
-          },
-          {
             label: (
               <>
                 <IconEye className="size-4" />
@@ -658,7 +622,7 @@ export function PipelinesPageClient({ pipelineProjectName }: PipelinesPageClient
           },
         ],
       }),
-    [handleRunPipeline, handleViewRunHistory, handleViewYaml, openEditDialog]
+    [handleRunPipeline, handleViewYaml, openEditDialog]
   )
 
   const query = nameQuery.trim().toLowerCase()
@@ -693,91 +657,6 @@ export function PipelinesPageClient({ pipelineProjectName }: PipelinesPageClient
         language="yaml"
         error={yamlError}
       />
-      <Dialog open={runHistoryOpen} onOpenChange={setRunHistoryOpen}>
-        <DialogContent
-          className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
-          onInteractOutside={(event) => event.preventDefault()}
-        >
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b bg-muted/15">
-              <DialogHeader className="px-6 py-4">
-                <DialogTitle>{runHistoryTitle}</DialogTitle>
-                <DialogDescription>展示 PipelineRun 历史记录与执行状态。</DialogDescription>
-              </DialogHeader>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-6">
-              {runHistoryLoading ? (
-                <div className="py-4 text-sm text-muted-foreground">加载中...</div>
-              ) : runHistoryError ? (
-                <Alert variant="destructive">
-                  <AlertTitle>加载失败</AlertTitle>
-                  <AlertDescription>{runHistoryError}</AlertDescription>
-                </Alert>
-              ) : (
-                <div className="max-h-full overflow-auto rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>名称</TableHead>
-                        <TableHead>触发方式</TableHead>
-                        <TableHead>状态</TableHead>
-                        <TableHead>构建号</TableHead>
-                        <TableHead>更新时间</TableHead>
-                        <TableHead>构建链接</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {runHistoryRows.length > 0 ? (
-                        runHistoryRows.map((run) => (
-                          <TableRow key={run.id}>
-                            <TableCell className="max-w-[240px] truncate">{run.name}</TableCell>
-                            <TableCell>{run.triggerType}</TableCell>
-                            <TableCell>{run.phase}</TableCell>
-                            <TableCell>{run.buildNumber}</TableCell>
-                            <TableCell>{run.updatedAt}</TableCell>
-                            <TableCell>
-                              {run.buildLink ? (
-                                <a
-                                  href={run.buildLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-primary underline underline-offset-2"
-                                >
-                                  打开
-                                </a>
-                              ) : (
-                                "-"
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={6} className="h-20 text-center text-muted-foreground">
-                            暂无运行记录
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-
-            <DialogFooter className="border-t bg-background px-6 py-5">
-              <div className="flex w-full items-center justify-end">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">
-                    关闭
-                  </Button>
-                </DialogClose>
-              </div>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
         title="删除流水线"
@@ -1019,6 +898,8 @@ export function PipelinesPageClient({ pipelineProjectName }: PipelinesPageClient
       <DataTable
         data={filteredRows}
         columns={columns}
+        enableRowNavigation
+        getRowHref={(row) => `/dashboard/pipelines/${encodeURIComponent(row.name)}`}
         onCreate={openCreateDialog}
         onDeleteSelectedRows={handleDeleteSelectedRows}
         toolbarEnd={

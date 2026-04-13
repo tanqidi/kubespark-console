@@ -27,6 +27,7 @@ type RawPipelineRun = {
   metadata?: {
     uid?: string
     name?: string
+    annotations?: Record<string, string>
     creationTimestamp?: string
     managedFields?: Array<{ time?: string }>
   }
@@ -57,6 +58,7 @@ export type PipelineDetail = {
 export type PipelineRunRow = {
   id: string
   name: string
+  description: string
   pipeline: string
   triggerType: string
   phase: string
@@ -182,6 +184,12 @@ function extractPipelineRunBuildNumber(item: RawPipelineRun): string {
 function extractPipelineRunBuildLink(item: RawPipelineRun): string {
   const status = asRecord(item.status)
   return readString(status.droneBuildLink)
+}
+
+function extractPipelineRunDescription(item: RawPipelineRun): string {
+  const metadata = item.metadata ?? {}
+  const value = metadata.annotations?.description
+  return typeof value === "string" ? value.trim() : ""
 }
 
 function buildSpec(input: CreatePipelineInput, existingSpec?: Record<string, unknown>): PipelineSpec {
@@ -393,10 +401,12 @@ export async function fetchPipelineRunRows(pipelineName: string): Promise<Pipeli
       const phase = extractPipelineRunPhase(item)
       const buildNumber = extractPipelineRunBuildNumber(item)
       const buildLink = extractPipelineRunBuildLink(item)
+      const description = extractPipelineRunDescription(item)
 
       return {
         id: metadata.uid || metadata.name || `pipelinerun-${index}`,
         name: metadata.name || "-",
+        description: description || "-",
         pipeline: normalizedName,
         triggerType: triggerType || "-",
         phase: phase || "-",

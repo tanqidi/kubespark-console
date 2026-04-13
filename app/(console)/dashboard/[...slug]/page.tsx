@@ -5,6 +5,7 @@ import {
   CustomResourcesPageClient,
   JobsPageClient,
   NodesPageClient,
+  PipelineRunsPageClient,
   PipelinesPageClient,
   PodsPageClient,
   ProjectsPageClient,
@@ -122,6 +123,17 @@ export default async function DashboardSectionPage({
           name={resourceName}
           backHref="/dashboard/projects"
           detailContent={<PipelineProjectDetailTemplate name={resourceName} />}
+        />
+      )
+    }
+
+    if (key === "pipelines") {
+      return (
+        <ResourceDetailPage
+          sectionTitle={sectionLabels.pipelines}
+          name={resourceName}
+          backHref="/dashboard/pipelines"
+          detailContent={<PipelineRunsPageClient pipelineName={resourceName} />}
         />
       )
     }
