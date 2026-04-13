@@ -2,17 +2,37 @@
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
-import { IconSettings2 } from "@tabler/icons-react"
+import { IconEye, IconPencil, IconSettings2, IconTrash } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import { parse, stringify } from "yaml"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
+import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import {
+  ResourceMetadataEditor,
+  hasUserProvidedMetadata,
+  metadataEntriesToRecord,
+  metadataRecordToEntries,
+  type MetadataEntry,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import {
   createColumns,
   renderNameDescriptionCell,
   type ColumnConfig,
 } from "@/app/(console)/dashboard/components/table/columns-factory"
+import {
+  createPipeline,
+  deletePipeline,
+  fetchPipelineDetail,
+  fetchPipelineRows,
+  fetchPipelineYaml,
+  updatePipeline,
+  type PipelineRow,
+} from "@/app/lib/kubespark/pipelines"
+import { fetchPipelineProjectDetail } from "@/app/lib/kubespark/pipeline-projects"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogClose,
@@ -22,9 +42,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -42,29 +62,25 @@ const MONACO_OPTIONS: EditorProps["options"] = {
   wordWrap: "on",
 }
 
-type PipelineRow = {
-  id: string
-  name: string
-  repository: string
-  branch: string
-  status: string
-  updatedAt: string
+type PipelineDialogStep = "basic" | "advanced"
+type PipelinesPageClientProps = {
+  pipelineProjectName?: string
 }
 
-type PipelineDialogStep = "basic" | "advanced"
+type PipelineDialogMode = "create" | "edit"
 
 const PIPELINE_NAME_RULE_MESSAGE =
-  "名称只能包含小写字母、数字和连字符（-），必须以小写字母开头并以小写字母或数字结尾，最长 63 个字符。"
+  "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 
 const pipelineColumns: ColumnConfig<PipelineRow>[] = [
   {
     key: "name",
     label: "名称",
     enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.repository),
+    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
-  { key: "branch", label: "分支" },
-  { key: "status", label: "状态", render: "badge" },
+  { key: "workspace", label: "企业空间" },
+  { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]
 
@@ -75,39 +91,44 @@ function validatePipelineName(name: string): string | null {
   return null
 }
 
-function validateGitUrl(url: string): string | null {
-  if (!url.trim()) return "请输入 Git 地址"
-  return null
-}
-
 function buildPipelineYamlText(params: {
   name: string
   description: string
-  gitUrl: string
-  branch: string
-  gitUsername: string
-  gitPassword: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
+  workspaceName?: string
+  pipelineProjectName?: string
 }): string {
-  const annotations: Record<string, string> = {}
+  const labels = metadataEntriesToRecord(params.labels)
+  const annotations = metadataEntriesToRecord(params.annotations)
   if (params.description.trim()) annotations.description = params.description.trim()
+  else delete annotations.description
 
   return stringify(
     {
-      apiVersion: "devops.kubespark.io/v1alpha1",
+      apiVersion: "tanqidi.com/v1alpha1",
       kind: "Pipeline",
       metadata: {
         ...(params.name.trim() ? { name: params.name.trim() } : {}),
+        ...(Object.keys(labels).length > 0 ? { labels } : {}),
         ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
       },
       spec: {
-        source: {
-          url: params.gitUrl.trim(),
-          branch: params.branch.trim() || "main",
-          auth: {
-            username: params.gitUsername.trim(),
-            password: params.gitPassword,
-          },
-        },
+        ...(params.description.trim() ? { description: params.description.trim() } : {}),
+        ...(params.workspaceName?.trim()
+          ? {
+              workspaceRef: {
+                name: params.workspaceName.trim(),
+              },
+            }
+          : {}),
+        ...(params.pipelineProjectName?.trim()
+          ? {
+              pipelineProjectRef: {
+                name: params.pipelineProjectName.trim(),
+              },
+            }
+          : {}),
       },
     },
     {
@@ -121,10 +142,10 @@ function buildPipelineYamlText(params: {
 function parsePipelineYamlText(yamlText: string): {
   name: string
   description: string
-  gitUrl: string
-  branch: string
-  gitUsername: string
-  gitPassword: string
+  labels: MetadataEntry[]
+  annotations: MetadataEntry[]
+  workspaceName: string
+  pipelineProjectName: string
 } {
   const normalized = yamlText.trim()
   if (!normalized) throw new Error("请输入 YAML 内容")
@@ -149,101 +170,237 @@ function parsePipelineYamlText(yamlText: string): {
     !Array.isArray(metadata.annotations)
       ? (metadata.annotations as Record<string, unknown>)
       : {}
+  const labels =
+    typeof metadata.labels === "object" &&
+    metadata.labels !== null &&
+    !Array.isArray(metadata.labels)
+      ? (metadata.labels as Record<string, unknown>)
+      : {}
   const spec =
     typeof root.spec === "object" && root.spec !== null && !Array.isArray(root.spec)
       ? (root.spec as Record<string, unknown>)
       : {}
-  const source =
-    typeof spec.source === "object" && spec.source !== null && !Array.isArray(spec.source)
-      ? (spec.source as Record<string, unknown>)
+  const workspaceRef =
+    typeof spec.workspaceRef === "object" && spec.workspaceRef !== null && !Array.isArray(spec.workspaceRef)
+      ? (spec.workspaceRef as Record<string, unknown>)
       : {}
-  const auth =
-    typeof source.auth === "object" && source.auth !== null && !Array.isArray(source.auth)
-      ? (source.auth as Record<string, unknown>)
+  const pipelineProjectRef =
+    typeof spec.pipelineProjectRef === "object" &&
+    spec.pipelineProjectRef !== null &&
+    !Array.isArray(spec.pipelineProjectRef)
+      ? (spec.pipelineProjectRef as Record<string, unknown>)
       : {}
 
   return {
     name: typeof metadata.name === "string" ? metadata.name : "",
-    description: typeof annotations.description === "string" ? annotations.description : "",
-    gitUrl: typeof source.url === "string" ? source.url : "",
-    branch: typeof source.branch === "string" ? source.branch : "main",
-    gitUsername: typeof auth.username === "string" ? auth.username : "",
-    gitPassword: typeof auth.password === "string" ? auth.password : "",
+    description:
+      typeof spec.description === "string"
+        ? spec.description
+        : typeof annotations.description === "string"
+          ? annotations.description
+          : "",
+    labels: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(labels).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
+    annotations: metadataRecordToEntries(
+      Object.fromEntries(
+        Object.entries(annotations).filter(([, value]) => typeof value === "string")
+      ) as Record<string, string>
+    ),
+    workspaceName: typeof workspaceRef.name === "string" ? workspaceRef.name : "",
+    pipelineProjectName:
+      typeof pipelineProjectRef.name === "string" ? pipelineProjectRef.name : "",
   }
 }
 
-export function PipelinesPageClient() {
+function resolveCreatePipelineErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : ""
+  const text = raw.toLowerCase()
+
+  if (text.includes("already exists")) return "流水线名称已存在，请更换后重试"
+  if (text.includes("状态码 409") || text.includes("status 409")) return "流水线名称已存在，请更换后重试"
+
+  return raw || "创建流水线失败，请稍后重试"
+}
+
+function isNameRelatedCreateError(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : ""
+  const text = raw.toLowerCase()
+  return (
+    text.includes("already exists") ||
+    text.includes("状态码 409") ||
+    text.includes("status 409") ||
+    text.includes("metadata.name") ||
+    text.includes("名称")
+  )
+}
+
+export function PipelinesPageClient({ pipelineProjectName }: PipelinesPageClientProps = {}) {
+  const normalizedPipelineProjectName = pipelineProjectName?.trim() ?? ""
+
   const [rows, setRows] = React.useState<PipelineRow[]>([])
   const [nameQuery, setNameQuery] = React.useState("")
+  const [, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+
+  const [yamlOpen, setYamlOpen] = React.useState(false)
+  const [yamlContent, setYamlContent] = React.useState("")
+  const [yamlLoading, setYamlLoading] = React.useState(false)
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Pipeline 的 YAML 内容。")
+
+  const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PipelineRow | null>(null)
+  const [deleting, setDeleting] = React.useState(false)
 
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [createStep, setCreateStep] = React.useState<PipelineDialogStep>("basic")
+  const [createMode, setCreateMode] = React.useState<PipelineDialogMode>("create")
+  const [editingName, setEditingName] = React.useState<string | null>(null)
   const [creating, setCreating] = React.useState(false)
 
   const [pipelineName, setPipelineName] = React.useState("")
   const [pipelineDescription, setPipelineDescription] = React.useState("")
-  const [gitUrl, setGitUrl] = React.useState("")
-  const [gitUsername, setGitUsername] = React.useState("")
-  const [gitPassword, setGitPassword] = React.useState("")
-  const [branch, setBranch] = React.useState("main")
+  const [workspaceName, setWorkspaceName] = React.useState("")
+  const [metadataEnabled, setMetadataEnabled] = React.useState(false)
+  const [labelEntries, setLabelEntries] = React.useState<MetadataEntry[]>([{ key: "", value: "" }])
+  const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([
+    { key: "", value: "" },
+  ])
 
   const [createNameInvalid, setCreateNameInvalid] = React.useState(false)
   const [createNameError, setCreateNameError] = React.useState<string | null>(null)
-  const [createGitUrlError, setCreateGitUrlError] = React.useState<string | null>(null)
   const [createYamlMode, setCreateYamlMode] = React.useState(false)
   const [createYamlText, setCreateYamlText] = React.useState("")
   const [createYamlError, setCreateYamlError] = React.useState<string | null>(null)
 
+  const loadRows = React.useCallback(
+    async (silent: boolean) => {
+      if (!silent) {
+        setLoading(true)
+        setError(null)
+      }
+      try {
+        const items = await fetchPipelineRows(normalizedPipelineProjectName || undefined)
+        setRows(items)
+        setError(null)
+      } catch (e: unknown) {
+        if (!silent) {
+          setRows([])
+          setError(e instanceof Error ? e.message : "API request failed")
+        } else {
+          console.error("[Pipelines] polling refresh failed", e)
+        }
+      } finally {
+        if (!silent) setLoading(false)
+      }
+    },
+    [normalizedPipelineProjectName]
+  )
+
+  React.useEffect(() => {
+    let cancelled = false
+
+    void (async () => {
+      if (!normalizedPipelineProjectName) return
+      try {
+        const detail = await fetchPipelineProjectDetail(normalizedPipelineProjectName)
+        if (cancelled) return
+        setWorkspaceName(detail.workspace || "")
+      } catch {
+        if (cancelled) return
+        setWorkspaceName("")
+      }
+    })()
+
+    void loadRows(false)
+    const timer = window.setInterval(() => {
+      void loadRows(true)
+    }, 3000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [loadRows, normalizedPipelineProjectName])
+
   const resetCreateState = React.useCallback(() => {
+    setCreateMode("create")
+    setEditingName(null)
     setPipelineName("")
     setPipelineDescription("")
-    setGitUrl("")
-    setGitUsername("")
-    setGitPassword("")
-    setBranch("main")
+    setMetadataEnabled(false)
+    setLabelEntries([{ key: "", value: "" }])
+    setAnnotationEntries([{ key: "", value: "" }])
     setCreateNameInvalid(false)
     setCreateNameError(null)
-    setCreateGitUrlError(null)
     setCreateYamlMode(false)
     setCreateYamlText("")
     setCreateYamlError(null)
     setCreateStep("basic")
   }, [])
 
-  const columns = React.useMemo(
-    () =>
-      createColumns<PipelineRow>({
-        columns: pipelineColumns,
-      }),
-    []
+  const openCreateDialog = React.useCallback(() => {
+    resetCreateState()
+    setCreateMode("create")
+    setCreateDialogOpen(true)
+  }, [resetCreateState])
+
+  const openEditDialog = React.useCallback(
+    (row: PipelineRow) => {
+      const targetName = row.name.trim()
+      if (!targetName || targetName === "-") return
+
+      void fetchPipelineDetail(targetName)
+        .then((detail) => {
+          resetCreateState()
+          setCreateMode("edit")
+          setEditingName(detail.name)
+          setPipelineName(detail.name)
+          setPipelineDescription(detail.description)
+          setWorkspaceName(detail.workspace || workspaceName)
+          const nextLabels = metadataRecordToEntries(detail.labels)
+          const nextAnnotations = metadataRecordToEntries(detail.annotations)
+          setLabelEntries(nextLabels)
+          setAnnotationEntries(nextAnnotations)
+          setMetadataEnabled(hasUserProvidedMetadata(nextLabels, nextAnnotations))
+          setCreateDialogOpen(true)
+        })
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : "加载流水线详情失败")
+        })
+    },
+    [resetCreateState, workspaceName]
   )
 
   const handleCreateSubmit = React.useCallback(() => {
     if (creating) return
 
+    const isEditMode = createMode === "edit"
+    const allPipelineNames = rows.map((row) => row.name.trim())
     let nextName = pipelineName.trim()
     let nextDescription = pipelineDescription.trim()
-    let nextGitUrl = gitUrl.trim()
-    let nextGitUsername = gitUsername.trim()
-    let nextGitPassword = gitPassword
-    let nextBranch = branch.trim() || "main"
+    let nextLabels = labelEntries
+    let nextAnnotations = annotationEntries
+    let nextWorkspaceName = workspaceName.trim()
+    let nextPipelineProjectName = normalizedPipelineProjectName
 
     if (createYamlMode) {
       try {
         const parsed = parsePipelineYamlText(createYamlText)
         nextName = parsed.name.trim()
         nextDescription = parsed.description.trim()
-        nextGitUrl = parsed.gitUrl.trim()
-        nextGitUsername = parsed.gitUsername.trim()
-        nextGitPassword = parsed.gitPassword
-        nextBranch = parsed.branch.trim() || "main"
+        nextLabels = parsed.labels
+        nextAnnotations = parsed.annotations
+        nextWorkspaceName = parsed.workspaceName.trim() || nextWorkspaceName
+        nextPipelineProjectName = parsed.pipelineProjectName.trim() || nextPipelineProjectName
 
         setPipelineName(nextName)
         setPipelineDescription(nextDescription)
-        setGitUrl(nextGitUrl)
-        setGitUsername(nextGitUsername)
-        setGitPassword(nextGitPassword)
-        setBranch(nextBranch)
+        setLabelEntries(nextLabels)
+        setAnnotationEntries(nextAnnotations)
+        setMetadataEnabled(hasUserProvidedMetadata(nextLabels, nextAnnotations))
         setCreateYamlError(null)
       } catch (error) {
         setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
@@ -252,46 +409,194 @@ export function PipelinesPageClient() {
     }
 
     const nameError = validatePipelineName(nextName)
-    const gitAddressError = validateGitUrl(nextGitUrl)
-
-    setCreateNameInvalid(Boolean(nameError))
-    setCreateNameError(nameError)
-    setCreateGitUrlError(gitAddressError)
-
-    if (nameError || gitAddressError) {
-      if (createYamlMode) setCreateYamlError(nameError ?? gitAddressError)
+    if (nameError) {
+      setCreateNameInvalid(true)
+      setCreateNameError(nameError)
+      if (createYamlMode) setCreateYamlError(nameError)
       return
     }
 
+    if (!isEditMode && allPipelineNames.includes(nextName)) {
+      const duplicatedNameMessage = "流水线名称已存在，请更换后重试"
+      setCreateNameInvalid(true)
+      setCreateNameError(duplicatedNameMessage)
+      if (createYamlMode) setCreateYamlError(duplicatedNameMessage)
+      return
+    }
+
+    if (isEditMode && editingName && nextName !== editingName) {
+      const lockedNameError = "编辑模式不支持修改流水线名称"
+      setCreateNameInvalid(true)
+      setCreateNameError(lockedNameError)
+      if (createYamlMode) setCreateYamlError(lockedNameError)
+      return
+    }
+
+    setCreateNameInvalid(false)
+    setCreateNameError(null)
+    setCreateYamlError(null)
     setCreating(true)
 
-    const now = new Date()
-    const timestamp = now.toISOString().replace("T", " ").slice(0, 19)
-    const row: PipelineRow = {
-      id: `pipeline-${Date.now()}`,
-      name: nextName,
-      repository: nextGitUrl,
-      branch: nextBranch,
-      status: "未执行",
-      updatedAt: timestamp,
-    }
-    setRows((prev) => [row, ...prev])
+    const targetName = isEditMode && editingName ? editingName : nextName
+    const request = isEditMode
+      ? updatePipeline({
+          name: targetName,
+          description: nextDescription,
+          labels: metadataEntriesToRecord(nextLabels),
+          annotations: metadataEntriesToRecord(nextAnnotations),
+          workspaceName: nextWorkspaceName || undefined,
+          pipelineProjectName: nextPipelineProjectName || undefined,
+        })
+      : createPipeline({
+          name: targetName,
+          description: nextDescription,
+          labels: metadataEntriesToRecord(nextLabels),
+          annotations: metadataEntriesToRecord(nextAnnotations),
+          workspaceName: nextWorkspaceName || undefined,
+          pipelineProjectName: nextPipelineProjectName || undefined,
+        })
 
-    setCreateDialogOpen(false)
-    resetCreateState()
-    setCreating(false)
+    void request
+      .then(async () => {
+        setCreateDialogOpen(false)
+        resetCreateState()
+        await loadRows(false)
+      })
+      .catch((e: unknown) => {
+        const message = resolveCreatePipelineErrorMessage(e)
+        const isNameError = isNameRelatedCreateError(e)
+        setCreateNameInvalid(isNameError)
+        setCreateNameError(isNameError ? message : null)
+        if (createYamlMode) setCreateYamlError(message)
+      })
+      .finally(() => {
+        setCreating(false)
+      })
   }, [
-    branch,
+    annotationEntries,
+    createMode,
     createYamlMode,
     createYamlText,
     creating,
-    gitPassword,
-    gitUrl,
-    gitUsername,
+    editingName,
+    labelEntries,
+    loadRows,
+    normalizedPipelineProjectName,
     pipelineDescription,
     pipelineName,
     resetCreateState,
+    rows,
+    workspaceName,
   ])
+
+  const handleViewYaml = React.useCallback((row: PipelineRow) => {
+    const pipelineName = row.name.trim()
+    if (!pipelineName || pipelineName === "-") return
+
+    setYamlOpen(true)
+    setYamlError(null)
+    setYamlLoading(true)
+    setYamlContent("")
+    setYamlSubtitle(`查看 Pipeline（${pipelineName}）的 YAML 内容。`)
+
+    void fetchPipelineYaml(pipelineName)
+      .then((text) => {
+        setYamlContent(text)
+      })
+      .catch((e: unknown) => {
+        setYamlError(e instanceof Error ? e.message : "加载 YAML 失败")
+      })
+      .finally(() => {
+        setYamlLoading(false)
+      })
+  }, [])
+
+  const handleDeleteSelectedRows = React.useCallback(
+    (selectedRows: PipelineRow[]) => {
+      if (selectedRows.length === 0) return
+      setDeleting(true)
+
+      const names = selectedRows
+        .map((row) => row.name.trim())
+        .filter((name) => name.length > 0 && name !== "-")
+
+      void Promise.all(names.map((name) => deletePipeline(name)))
+        .then(async () => {
+          await loadRows(false)
+        })
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : "删除流水线失败")
+        })
+        .finally(() => {
+          setDeleting(false)
+        })
+    },
+    [loadRows]
+  )
+
+  const handleConfirmDelete = React.useCallback(() => {
+    if (!pendingDeleteRow || deleting) return
+    const targetName = pendingDeleteRow.name.trim()
+    if (!targetName || targetName === "-") return
+
+    setDeleting(true)
+    void deletePipeline(targetName)
+      .then(async () => {
+        setPendingDeleteRow(null)
+        await loadRows(false)
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "删除流水线失败")
+      })
+      .finally(() => {
+        setDeleting(false)
+      })
+  }, [deleting, loadRows, pendingDeleteRow])
+
+  const columns = React.useMemo(
+    () =>
+      createColumns<PipelineRow>({
+        columns: pipelineColumns,
+        actionItems: [
+          {
+            label: (
+              <>
+                <IconEye className="size-4" />
+                查看 YAML
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewYaml(row)
+            },
+          },
+          {
+            label: (
+              <>
+                <IconPencil className="size-4" />
+                编辑
+              </>
+            ),
+            onSelect: (row) => {
+              openEditDialog(row)
+            },
+          },
+          {
+            label: (
+              <>
+                <IconTrash className="size-4" />
+                删除
+              </>
+            ),
+            variant: "destructive",
+            withSeparator: true,
+            onSelect: (row) => {
+              setPendingDeleteRow(row)
+            },
+          },
+        ],
+      }),
+    [handleViewYaml, openEditDialog]
+  )
 
   const query = nameQuery.trim().toLowerCase()
   const filteredRows = rows.filter((row) => {
@@ -299,8 +604,44 @@ export function PipelinesPageClient() {
     return row.name.toLowerCase().includes(query)
   })
 
+  if (error) {
+    return (
+      <div className="px-4 lg:px-6">
+        <Alert variant="destructive">
+          <AlertTitle>加载失败</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  const isEditMode = createMode === "edit"
+  const dialogTitle = isEditMode ? "编辑流水线" : "创建流水线"
+  const dialogDescription = isEditMode ? "编辑流水线并更新基础信息。" : "创建流水线并配置基础信息。"
+
   return (
     <>
+      <MonacoViewerDialog
+        open={yamlOpen}
+        onOpenChange={setYamlOpen}
+        title="查看 YAML"
+        subtitle={yamlSubtitle}
+        value={yamlLoading ? "加载中..." : yamlContent}
+        language="yaml"
+        error={yamlError}
+      />
+
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeleteRow)}
+        title="删除流水线"
+        description={pendingDeleteRow ? `确定删除流水线 ${pendingDeleteRow.name} 吗？` : ""}
+        deleting={deleting}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteRow(null)
+        }}
+        onConfirm={handleConfirmDelete}
+      />
+
       <Dialog
         open={createDialogOpen}
         onOpenChange={(open) => {
@@ -312,12 +653,13 @@ export function PipelinesPageClient() {
         <DialogContent
           className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
           onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => event.preventDefault()}
         >
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
-                <DialogTitle>创建流水线</DialogTitle>
-                <DialogDescription>创建流水线并配置 Git 仓库拉取信息。</DialogDescription>
+                <DialogTitle>{dialogTitle}</DialogTitle>
+                <DialogDescription>{dialogDescription}</DialogDescription>
               </DialogHeader>
               <div className="me-20 flex h-full items-center">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
@@ -331,10 +673,10 @@ export function PipelinesPageClient() {
                           buildPipelineYamlText({
                             name: pipelineName,
                             description: pipelineDescription,
-                            gitUrl,
-                            branch,
-                            gitUsername,
-                            gitPassword,
+                            labels: labelEntries,
+                            annotations: annotationEntries,
+                            workspaceName,
+                            pipelineProjectName: normalizedPipelineProjectName,
                           })
                         )
                         setCreateYamlError(null)
@@ -346,10 +688,10 @@ export function PipelinesPageClient() {
                         const parsed = parsePipelineYamlText(createYamlText)
                         setPipelineName(parsed.name)
                         setPipelineDescription(parsed.description)
-                        setGitUrl(parsed.gitUrl)
-                        setGitUsername(parsed.gitUsername)
-                        setGitPassword(parsed.gitPassword)
-                        setBranch(parsed.branch)
+                        setLabelEntries(parsed.labels)
+                        setAnnotationEntries(parsed.annotations)
+                        if (parsed.workspaceName.trim()) setWorkspaceName(parsed.workspaceName.trim())
+                        setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
                         setCreateYamlError(null)
                         setCreateYamlMode(false)
                       } catch (error) {
@@ -381,7 +723,12 @@ export function PipelinesPageClient() {
                   {
                     id: "advanced",
                     title: "高级设置",
-                    status: createStep === "advanced" ? "当前" : branch.trim() ? "已设置" : "未设置",
+                    status:
+                      createStep === "advanced"
+                        ? "当前"
+                        : hasUserProvidedMetadata(labelEntries, annotationEntries)
+                          ? "已设置"
+                          : "可选",
                     active: createStep === "advanced",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: creating,
@@ -407,7 +754,6 @@ export function PipelinesPageClient() {
                         if (createYamlError) setCreateYamlError(null)
                         if (createNameInvalid) setCreateNameInvalid(false)
                         if (createNameError) setCreateNameError(null)
-                        if (createGitUrlError) setCreateGitUrlError(null)
                       }}
                       options={MONACO_OPTIONS}
                       height="100%"
@@ -419,10 +765,10 @@ export function PipelinesPageClient() {
                 <div className="p-6">
                   <div className="mb-4">
                     <h3 className="text-[15px] font-semibold">基本信息</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">填写流水线名称和 Git 仓库信息。</p>
+                    <p className="mt-1 text-sm text-muted-foreground">填写流水线基础信息。</p>
                   </div>
-                  <FieldGroup className="flex flex-col gap-4">
-                    <Field data-invalid={createNameInvalid}>
+                  <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Field data-invalid={createNameInvalid} className="md:col-span-2">
                       <FieldLabel htmlFor="pipeline-create-name">名称</FieldLabel>
                       <Input
                         id="pipeline-create-name"
@@ -435,7 +781,7 @@ export function PipelinesPageClient() {
                         placeholder="请输入流水线名称"
                         autoComplete="off"
                         aria-invalid={createNameInvalid}
-                        disabled={creating}
+                        disabled={creating || isEditMode}
                       />
                       {createNameError ? (
                         <FieldError>{createNameError}</FieldError>
@@ -444,68 +790,7 @@ export function PipelinesPageClient() {
                       )}
                     </Field>
 
-                    <Field data-invalid={Boolean(createGitUrlError)}>
-                      <FieldLabel htmlFor="pipeline-create-git-url">Git 地址</FieldLabel>
-                      <Input
-                        id="pipeline-create-git-url"
-                        value={gitUrl}
-                        onChange={(event) => {
-                          setGitUrl(event.target.value)
-                          if (createGitUrlError) setCreateGitUrlError(null)
-                        }}
-                        placeholder="https://github.com/org/repo.git"
-                        autoComplete="off"
-                        aria-invalid={Boolean(createGitUrlError)}
-                        disabled={creating}
-                      />
-                      {createGitUrlError ? <FieldError>{createGitUrlError}</FieldError> : null}
-                    </Field>
-
-                    <Field>
-                      <FieldLabel htmlFor="pipeline-create-username">账号</FieldLabel>
-                      <Input
-                        id="pipeline-create-username"
-                        value={gitUsername}
-                        onChange={(event) => setGitUsername(event.target.value)}
-                        placeholder="请输入 Git 账号"
-                        autoComplete="off"
-                        disabled={creating}
-                      />
-                    </Field>
-
-                    <Field>
-                      <FieldLabel htmlFor="pipeline-create-password">密码 / Token</FieldLabel>
-                      <Input
-                        id="pipeline-create-password"
-                        type="password"
-                        value={gitPassword}
-                        onChange={(event) => setGitPassword(event.target.value)}
-                        placeholder="请输入密码或 Token"
-                        autoComplete="off"
-                        disabled={creating}
-                      />
-                    </Field>
-                  </FieldGroup>
-                </div>
-              ) : (
-                <div className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">高级设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">补充默认分支与描述信息。</p>
-                  </div>
-                  <FieldGroup className="flex flex-col gap-4">
-                    <Field>
-                      <FieldLabel htmlFor="pipeline-create-branch">分支</FieldLabel>
-                      <Input
-                        id="pipeline-create-branch"
-                        value={branch}
-                        onChange={(event) => setBranch(event.target.value)}
-                        placeholder="main"
-                        autoComplete="off"
-                        disabled={creating}
-                      />
-                    </Field>
-                    <Field>
+                    <Field className="md:col-span-2">
                       <FieldLabel htmlFor="pipeline-create-description">描述</FieldLabel>
                       <Textarea
                         id="pipeline-create-description"
@@ -516,7 +801,30 @@ export function PipelinesPageClient() {
                         className="min-h-28"
                         disabled={creating}
                       />
-                      <FieldDescription>描述仅用于界面展示，最长 256 个字符。</FieldDescription>
+                      <FieldDescription>描述将写入资源注解 description，最长 256 个字符。</FieldDescription>
+                    </Field>
+                  </FieldGroup>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">高级设置</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">补充标签注解信息。</p>
+                  </div>
+                  <FieldGroup className="flex flex-col gap-4">
+                    <Field>
+                      <ResourceMetadataEditor
+                        checked={metadataEnabled}
+                        onCheckedChange={setMetadataEnabled}
+                        labels={labelEntries}
+                        setLabels={setLabelEntries}
+                        annotations={annotationEntries}
+                        setAnnotations={setAnnotationEntries}
+                        description={pipelineDescription}
+                        setDescription={setPipelineDescription}
+                        disabled={creating}
+                        titleText="统一管理流水线的标签与注解信息。"
+                      />
                     </Field>
                   </FieldGroup>
                 </div>
@@ -525,18 +833,18 @@ export function PipelinesPageClient() {
 
             <DialogFooter className="border-t bg-background px-6 py-5">
               {createYamlMode ? (
-                <>
+                <div className="flex w-full items-center justify-between gap-3">
                   <DialogClose asChild>
                     <Button type="button" variant="outline" disabled={creating}>
                       取消
                     </Button>
                   </DialogClose>
                   <Button type="button" onClick={handleCreateSubmit} disabled={creating}>
-                    {creating ? "创建中..." : "创建"}
+                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                   </Button>
-                </>
+                </div>
               ) : createStep === "basic" ? (
-                <>
+                <div className="flex w-full items-center justify-between gap-3">
                   <DialogClose asChild>
                     <Button type="button" variant="outline" disabled={creating}>
                       取消
@@ -545,16 +853,16 @@ export function PipelinesPageClient() {
                   <Button type="button" disabled={creating} onClick={() => setCreateStep("advanced")}>
                     下一步
                   </Button>
-                </>
+                </div>
               ) : (
-                <>
+                <div className="flex w-full items-center justify-between gap-3">
                   <Button type="button" variant="outline" disabled={creating} onClick={() => setCreateStep("basic")}>
                     上一步
                   </Button>
                   <Button type="button" onClick={handleCreateSubmit} disabled={creating}>
-                    {creating ? "创建中..." : "创建"}
+                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                   </Button>
-                </>
+                </div>
               )}
             </DialogFooter>
           </div>
@@ -564,10 +872,8 @@ export function PipelinesPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
-        onCreate={() => {
-          resetCreateState()
-          setCreateDialogOpen(true)
-        }}
+        onCreate={openCreateDialog}
+        onDeleteSelectedRows={handleDeleteSelectedRows}
         toolbarEnd={
           <Input
             value={nameQuery}

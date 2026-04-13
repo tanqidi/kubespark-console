@@ -140,7 +140,7 @@ function isNameRelatedCreateError(error: unknown): boolean {
 }
 
 const PROJECT_NAME_RULE_MESSAGE =
-  "名称只能包含小写字母、数字和连字符（-），必须以小写字母开头并以小写字母或数字结尾，最长 63 个字符。"
+  "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 const PROJECT_WORKSPACE_ANNOTATION = "tanqidi.com/workspace"
 const PROJECT_WORKSPACE_REQUIRED_MESSAGE = "请选择企业空间"
 const PROJECT_WORKSPACE_INVALID_MESSAGE = "企业空间无效，请从下拉列表中选择"
@@ -2005,6 +2005,8 @@ export function ProjectsPageClient() {
         <DataTable
           data={filteredPipelineRows}
           columns={pipelineTableColumns}
+          enableRowNavigation
+          getRowHref={(row) => `/dashboard/projects/${encodeURIComponent(row.name)}`}
           onCreate={openPipelineProjectCreateDialog}
           toolbarStart={projectTabs}
           toolbarEnd={projectFilters}

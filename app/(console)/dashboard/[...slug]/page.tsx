@@ -18,6 +18,7 @@ import {
   WorkspacesPageClient,
 } from "@/app/(console)/dashboard/components/resource-pages"
 import { ResourceDetailPage } from "@/app/(console)/dashboard/components/resource-pages/resource-detail-page"
+import { PipelineProjectDetailTemplate } from "@/app/(console)/dashboard/components/resource-pages/projects/pipeline-project-detail-template"
 import {
   WorkloadDetailTemplate,
   type WorkloadDetailKind,
@@ -110,6 +111,17 @@ export default async function DashboardSectionPage({
           name={resourceName}
           backHref="/dashboard/workspaces"
           detailContent={<WorkspaceDetailTemplate name={resourceName} />}
+        />
+      )
+    }
+
+    if (key === "projects") {
+      return (
+        <ResourceDetailPage
+          sectionTitle="流水线项目"
+          name={resourceName}
+          backHref="/dashboard/projects"
+          detailContent={<PipelineProjectDetailTemplate name={resourceName} />}
         />
       )
     }

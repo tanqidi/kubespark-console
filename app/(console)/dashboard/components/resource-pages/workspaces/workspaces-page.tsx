@@ -64,7 +64,7 @@ type WorkspaceDialogStep = "basic" | "advanced"
 type WorkspaceDialogMode = "create" | "edit"
 
 const WORKSPACE_NAME_RULE_MESSAGE =
-  "名称只能包含小写字母、数字和连字符（-），必须以小写字母开头并以小写字母或数字结尾，最长 63 个字符。"
+  "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 
 const workspaceColumns: ColumnConfig<WorkspaceRow>[] = [
   {
