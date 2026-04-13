@@ -23,6 +23,17 @@ type RawPipeline = {
   spec?: Record<string, unknown>
 }
 
+type RawPipelineRun = {
+  metadata?: {
+    uid?: string
+    name?: string
+    creationTimestamp?: string
+    managedFields?: Array<{ time?: string }>
+  }
+  spec?: Record<string, unknown>
+  status?: Record<string, unknown>
+}
+
 export type PipelineRow = {
   id: string
   name: string
@@ -43,6 +54,18 @@ export type PipelineDetail = {
   annotations: Record<string, string>
 }
 
+export type PipelineRunRow = {
+  id: string
+  name: string
+  pipeline: string
+  triggerType: string
+  phase: string
+  buildNumber: string
+  buildLink: string
+  age: string
+  updatedAt: string
+}
+
 export type CreatePipelineInput = {
   name: string
   description?: string
@@ -54,10 +77,22 @@ export type CreatePipelineInput = {
 
 export type UpdatePipelineInput = CreatePipelineInput
 
+export type CreatePipelineRunInput = {
+  pipelineName: string
+  triggerType?: string
+  data?: Record<string, string>
+}
+
 const PIPELINE_GVR = {
   group: "tanqidi.com",
   version: "v1alpha1",
   resource: "pipelines",
+} as const
+
+const PIPELINE_RUN_GVR = {
+  group: "tanqidi.com",
+  version: "v1alpha1",
+  resource: "pipelineruns",
 } as const
 
 type PipelineSpec = {
@@ -123,6 +158,30 @@ function extractPipelineProjectName(item: RawPipeline): string {
   const spec = asRecord(item.spec)
   const pipelineProjectRef = asRecord(spec.pipelineProjectRef)
   return readString(pipelineProjectRef.name)
+}
+
+function extractPipelineRunTriggerType(item: RawPipelineRun): string {
+  const spec = asRecord(item.spec)
+  const trigger = asRecord(spec.trigger)
+  return readString(trigger.type)
+}
+
+function extractPipelineRunPhase(item: RawPipelineRun): string {
+  const status = asRecord(item.status)
+  return readString(status.phase)
+}
+
+function extractPipelineRunBuildNumber(item: RawPipelineRun): string {
+  const status = asRecord(item.status)
+  const value = status.droneBuildNumber
+  if (typeof value === "number" && Number.isFinite(value)) return String(Math.trunc(value))
+  if (typeof value === "string") return value.trim()
+  return ""
+}
+
+function extractPipelineRunBuildLink(item: RawPipelineRun): string {
+  const status = asRecord(item.status)
+  return readString(status.droneBuildLink)
 }
 
 function buildSpec(input: CreatePipelineInput, existingSpec?: Record<string, unknown>): PipelineSpec {
@@ -276,4 +335,76 @@ export async function fetchPipelineYaml(name: string): Promise<string> {
 export async function deletePipeline(name: string): Promise<void> {
   const normalizedName = normalizePipelineName(name)
   await deleteResource(PIPELINE_GVR.group, PIPELINE_GVR.version, PIPELINE_GVR.resource, normalizedName)
+}
+
+export async function createPipelineRun(input: CreatePipelineRunInput): Promise<void> {
+  const pipelineName = normalizePipelineName(input.pipelineName)
+  const triggerType = input.triggerType?.trim() || "manual"
+  const data = normalizeStringRecord(input.data)
+
+  const requestBody = {
+    apiVersion: "tanqidi.com/v1alpha1",
+    kind: "PipelineRun",
+    metadata: {
+      generateName: `${pipelineName}-`,
+      labels: {
+        pipeline: pipelineName,
+      },
+    },
+    spec: {
+      pipelineRef: {
+        name: pipelineName,
+      },
+      trigger: {
+        type: triggerType,
+      },
+      ...(Object.keys(data).length > 0 ? { data } : {}),
+    },
+  }
+
+  const url = buildResourceCollectionEndpoint(
+    PIPELINE_RUN_GVR.group,
+    PIPELINE_RUN_GVR.version,
+    PIPELINE_RUN_GVR.resource
+  )
+
+  await fetchJsonDeduped<unknown>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  })
+}
+
+export async function fetchPipelineRunRows(pipelineName: string): Promise<PipelineRunRow[]> {
+  const normalizedName = normalizePipelineName(pipelineName)
+  const { items } = await fetchResourceCollection<RawPipelineRun>(
+    PIPELINE_RUN_GVR.group,
+    PIPELINE_RUN_GVR.version,
+    PIPELINE_RUN_GVR.resource,
+    {
+      labelSelector: `pipeline=${normalizedName}`,
+    }
+  )
+
+  return items
+    .map((item, index) => {
+      const metadata = item.metadata ?? {}
+      const triggerType = extractPipelineRunTriggerType(item)
+      const phase = extractPipelineRunPhase(item)
+      const buildNumber = extractPipelineRunBuildNumber(item)
+      const buildLink = extractPipelineRunBuildLink(item)
+
+      return {
+        id: metadata.uid || metadata.name || `pipelinerun-${index}`,
+        name: metadata.name || "-",
+        pipeline: normalizedName,
+        triggerType: triggerType || "-",
+        phase: phase || "-",
+        buildNumber: buildNumber || "-",
+        buildLink: buildLink || "",
+        age: formatAge(metadata.creationTimestamp),
+        updatedAt: resolveUpdatedAt(item),
+      }
+    })
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }

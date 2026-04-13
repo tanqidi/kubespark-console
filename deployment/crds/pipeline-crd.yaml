@@ -19,12 +19,6 @@ spec:
         openAPIV3Schema:
           type: object
           properties:
-            apiVersion:
-              type: string
-            kind:
-              type: string
-            metadata:
-              type: object
             spec:
               type: object
               properties:
@@ -46,5 +40,10 @@ spec:
                       maxLength: 63
                   required:
                     - name
+                data:
+                  type: object
+                  description: 类似 ConfigMap data，key 自定义，value 可存任意 YAML/脚本内容
+                  additionalProperties:
+                    type: string
               required:
                 - pipelineProjectRef

@@ -66,18 +66,46 @@
 - Kind: `Pipeline`
 - GVR: `tanqidi.com/v1alpha1/pipelines`
 - Scope: `Cluster`
-- 作用：流水线定义，并显式归属到 PipelineProject/Workspace。
+- 作用：流水线定义，并显式归属到 PipelineProject/Workspace，不直接表示某次执行。
 
 核心字段：
 
 - `spec.pipelineProjectRef.name`（必填）
 - `spec.workspaceRef.name`（可选）
+- `spec.data`（可选，类似 ConfigMap data：`key -> string`，可存任意 YAML/脚本内容）
 - 描述：`metadata.annotations.description`（与其他模块保持一致）
 
 说明：
 
 - Pipeline 与 PipelineProject 的归属关系通过 `pipelineProjectRef` 统一建模。
-- 当前设计不包含 `spec.source.* / spec.repo / spec.branch` 等字段。
+- 不再将流水线细节拆成大量硬编码字段，避免前后端高成本适配。
+- 约定可使用固定 key（例如 `drone.yml`）存储主流水线定义内容。
+
+### 2.5 PipelineRun
+
+- Kind: `PipelineRun`
+- GVR: `tanqidi.com/v1alpha1/pipelineruns`
+- Scope: `Cluster`
+- 作用：流水线运行实例；每次点击“运行”创建一条新记录。
+
+核心字段：
+
+- `spec.pipelineRef.name`（必填）
+- `spec.trigger.type`（可选，string，推荐值：`manual|cron|webhook`）
+- `spec.data`（可选，运行时覆盖数据，`key -> string`）
+
+状态字段（`status`）：
+
+- `status.phase`：string（推荐值：`Pending|Queued|Running|Succeeded|Failed|Canceled`）
+- `status.droneBuildNumber`
+- `status.droneBuildLink`
+- `status.startTime` / `status.completionTime`
+- `status.conditions[]`
+
+说明：
+
+- `Pipeline` 存定义，`PipelineRun` 存执行历史，职责分离。
+- 覆盖优先级：`Pipeline.spec.data` < `PipelineRun.spec.data`（同 key 后者覆盖前者）。
 
 ## 3. 关联关系约定
 
@@ -124,6 +152,7 @@ spec:
 - WorkspaceNamespaceBinding: `/resources/tanqidi.com/v1alpha1/workspacenamespacebindings`
 - PipelineProject: `/resources/tanqidi.com/v1alpha1/pipelineprojects`
 - Pipeline: `/resources/tanqidi.com/v1alpha1/pipelines`
+- PipelineRun: `/resources/tanqidi.com/v1alpha1/pipelineruns`
 
 ## 6. 命名建议
 
@@ -134,9 +163,27 @@ spec:
     - `binding`: `tanqidi-default`
     - `pipelineProject`: `tanqidi-backend`
     - `pipeline`: `tanqidi-backend-build`
+    - `pipelineRun`: `tanqidi-backend-build-xxxxx`（推荐 `generateName`）
 
 ## 7. 后续扩展建议
 
 1. 增加 `WorkspaceMemberBinding`，承载成员与角色绑定。
 2. 增加 `status.conditions` 规范，统一前端状态展示。
+
+## 8. 后端最小改造清单（对接 Drone）
+
+1. 资源入口保持不变，继续使用统一 GVR：
+   - `Pipeline`: `tanqidi.com/v1alpha1/pipelines`
+   - `PipelineRun`: `tanqidi.com/v1alpha1/pipelineruns`
+2. 控制器监听 `PipelineRun` 的新增事件。
+3. Reconcile 过程最小闭环：
+   - 读取 `PipelineRun.spec.pipelineRef` 对应 `Pipeline`
+   - 合并数据（`Pipeline.spec.data` + `PipelineRun.spec.data`）
+   - 从约定 key（如 `drone.yml`）读取流水线定义并调 Drone 触发构建
+   - 回写 `PipelineRun.status`（phase/build number/link/conditions）
+4. 前端“运行”按钮行为：创建 `PipelineRun`，不直接调用 Drone API。
+5. 错误处理：
+   - 参数问题：回写 `Failed` + `reason/message`
+   - Drone 调用失败：回写 `Failed` 并保留错误详情
+   - 幂等重试：仅针对 `Pending/Queued` 阶段执行触发逻辑
 
