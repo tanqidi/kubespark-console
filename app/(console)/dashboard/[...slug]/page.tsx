@@ -20,6 +20,7 @@ import {
 } from "@/app/(console)/dashboard/components/resource-pages"
 import { ResourceDetailPage } from "@/app/(console)/dashboard/components/resource-pages/resource-detail-page"
 import { PipelineProjectDetailTemplate } from "@/app/(console)/dashboard/components/resource-pages/projects/pipeline-project-detail-template"
+import { ProjectNamespaceDetailTemplate } from "@/app/(console)/dashboard/components/resource-pages/projects/project-namespace-detail-template"
 import {
   WorkloadDetailTemplate,
   type WorkloadDetailKind,
@@ -108,6 +109,55 @@ export default async function DashboardSectionPage({
     if (key === "workspaces") notFound()
 
     if (key === "projects") {
+      if (slug[1] === "namespaces") {
+        const namespaceName = decodeURIComponent(slug[2] ?? "")
+        return (
+          <ResourceDetailPage
+            sectionTitle="项目"
+            name={namespaceName}
+            backHref="/dashboard/projects"
+            detailContent={<ProjectNamespaceDetailTemplate name={namespaceName} />}
+          />
+        )
+      }
+
+      if (slug[1] === "devops" && slug.length > 3) {
+        const projectName = decodeURIComponent(slug[2] ?? "")
+        const pipelineName = decodeURIComponent(slug[3] ?? "")
+        return (
+          <ResourceDetailPage
+            sectionTitle={sectionLabels.pipelines}
+            name={pipelineName}
+            backHref={`/dashboard/projects/devops/${encodeURIComponent(projectName)}`}
+            detailContent={<PipelineRunsPageClient pipelineName={pipelineName} />}
+          />
+        )
+      }
+
+      if (slug[1] === "devops") {
+        const projectName = decodeURIComponent(slug[2] ?? "")
+        return (
+          <ResourceDetailPage
+            sectionTitle="流水线项目"
+            name={projectName}
+            backHref="/dashboard/projects"
+            detailContent={<PipelineProjectDetailTemplate name={projectName} />}
+          />
+        )
+      }
+
+      if (slug.length > 2) {
+        const projectName = decodeURIComponent(slug[1] ?? "")
+        return (
+          <ResourceDetailPage
+            sectionTitle={sectionLabels.pipelines}
+            name={resourceName}
+            backHref={`/dashboard/projects/${encodeURIComponent(projectName)}`}
+            detailContent={<PipelineRunsPageClient pipelineName={resourceName} />}
+          />
+        )
+      }
+
       return (
         <ResourceDetailPage
           sectionTitle="流水线项目"

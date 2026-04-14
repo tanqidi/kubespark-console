@@ -66,6 +66,7 @@ const MONACO_OPTIONS: EditorProps["options"] = {
 type PipelineDialogStep = "basic" | "advanced"
 type PipelinesPageClientProps = {
   pipelineProjectName?: string
+  detailBasePath?: string
 }
 
 type PipelineDialogMode = "create" | "edit"
@@ -233,7 +234,10 @@ function isNameRelatedCreateError(error: unknown): boolean {
   )
 }
 
-export function PipelinesPageClient({ pipelineProjectName }: PipelinesPageClientProps = {}) {
+export function PipelinesPageClient({
+  pipelineProjectName,
+  detailBasePath = "/dashboard/pipelines",
+}: PipelinesPageClientProps = {}) {
   const normalizedPipelineProjectName = pipelineProjectName?.trim() ?? ""
 
   const [rows, setRows] = React.useState<PipelineRow[]>([])
@@ -899,7 +903,7 @@ export function PipelinesPageClient({ pipelineProjectName }: PipelinesPageClient
         data={filteredRows}
         columns={columns}
         enableRowNavigation
-        getRowHref={(row) => `/dashboard/pipelines/${encodeURIComponent(row.name)}`}
+        getRowHref={(row) => `${detailBasePath}/${encodeURIComponent(row.name)}`}
         onCreate={openCreateDialog}
         onDeleteSelectedRows={handleDeleteSelectedRows}
         toolbarEnd={

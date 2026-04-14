@@ -1993,6 +1993,8 @@ export function ProjectsPageClient() {
         <DataTable
           data={filteredProjectRows}
           columns={projectTableColumns}
+          enableRowNavigation
+          getRowHref={(row) => `/dashboard/projects/namespaces/${encodeURIComponent(row.name)}`}
           onCreate={() => {
             resetCreateDialogState()
             setCreateDialogOpen(true)
@@ -2006,7 +2008,7 @@ export function ProjectsPageClient() {
           data={filteredPipelineRows}
           columns={pipelineTableColumns}
           enableRowNavigation
-          getRowHref={(row) => `/dashboard/projects/${encodeURIComponent(row.name)}`}
+          getRowHref={(row) => `/dashboard/projects/devops/${encodeURIComponent(row.name)}`}
           onCreate={openPipelineProjectCreateDialog}
           toolbarStart={projectTabs}
           toolbarEnd={projectFilters}

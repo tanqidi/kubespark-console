@@ -7,5 +7,10 @@ type PipelineProjectDetailTemplateProps = {
 }
 
 export function PipelineProjectDetailTemplate({ name }: PipelineProjectDetailTemplateProps) {
-  return <PipelinesPageClient pipelineProjectName={name} />
+  return (
+    <PipelinesPageClient
+      pipelineProjectName={name}
+      detailBasePath={`/dashboard/projects/devops/${encodeURIComponent(name)}`}
+    />
+  )
 }
