@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { IconPlayerPlay, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconPlayerPlay, IconTrash } from "@tabler/icons-react"
+import { stringify } from "yaml"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
@@ -16,6 +17,7 @@ import {
   fetchPipelineRunRows,
   type PipelineRunRow,
 } from "@/app/lib/kubespark/pipelines"
+import { fetchResourceByName } from "@/app/lib/kubespark/common"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,9 +31,25 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 
 type PipelineRunsPageClientProps = {
   pipelineName: string
+}
+
+function sanitizePipelineRunYamlPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload
+  const root = payload as Record<string, unknown>
+  const metadata =
+    root.metadata && typeof root.metadata === "object" && !Array.isArray(root.metadata)
+      ? ({ ...(root.metadata as Record<string, unknown>) })
+      : null
+  if (!metadata) return payload
+  delete metadata.managedFields
+  return {
+    ...root,
+    metadata,
+  }
 }
 
 const pipelineRunColumns: ColumnConfig<PipelineRunRow>[] = [
@@ -61,6 +79,11 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [runError, setRunError] = React.useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PipelineRunRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+  const [yamlOpen, setYamlOpen] = React.useState(false)
+  const [yamlLoading, setYamlLoading] = React.useState(false)
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlContent, setYamlContent] = React.useState("")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 PipelineRun 的 YAML 内容。")
 
   const loadRows = React.useCallback(
     async (silent: boolean) => {
@@ -136,6 +159,42 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       createColumns<PipelineRunRow>({
         columns: pipelineRunColumns,
         actionItems: [
+          {
+            label: (
+              <>
+                <IconEye className="size-4" />
+                查看 YAML
+              </>
+            ),
+            onSelect: (row) => {
+              const name = row.name.trim()
+              if (!name || name === "-") return
+
+              setYamlOpen(true)
+              setYamlLoading(true)
+              setYamlError(null)
+              setYamlContent("")
+              setYamlSubtitle(`查看 PipelineRun（${name}）的 YAML 内容。`)
+
+              void fetchResourceByName<unknown>("tanqidi.com", "v1alpha1", "pipelineruns", name)
+                .then(({ payload }) => {
+                  const sanitizedPayload = sanitizePipelineRunYamlPayload(payload)
+                  setYamlContent(
+                    stringify(sanitizedPayload, {
+                      indent: 2,
+                      lineWidth: 0,
+                      sortMapEntries: false,
+                    })
+                  )
+                })
+                .catch((e: unknown) => {
+                  setYamlError(e instanceof Error ? e.message : "加载 YAML 失败")
+                })
+                .finally(() => {
+                  setYamlLoading(false)
+                })
+            },
+          },
           {
             label: "打开构建",
             onSelect: (row) => {
@@ -226,6 +285,15 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
 
   return (
     <div className="flex flex-1 flex-col gap-4">
+      <MonacoViewerDialog
+        open={yamlOpen}
+        onOpenChange={setYamlOpen}
+        title="查看 YAML"
+        subtitle={yamlSubtitle}
+        value={yamlLoading ? "加载中..." : yamlContent}
+        language="yaml"
+        error={yamlError}
+      />
       <Dialog
         open={runDialogOpen}
         onOpenChange={(open) => {

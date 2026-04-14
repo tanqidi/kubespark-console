@@ -26,6 +26,23 @@ type CustomResourceItemsPageClientProps = {
   definitionName: string
 }
 
+function sanitizeCustomResourceYamlPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload
+  const root = payload as Record<string, unknown>
+  const metadata =
+    root.metadata && typeof root.metadata === "object" && !Array.isArray(root.metadata)
+      ? ({ ...(root.metadata as Record<string, unknown>) })
+      : null
+
+  if (!metadata) return payload
+  delete metadata.managedFields
+
+  return {
+    ...root,
+    metadata,
+  }
+}
+
 const itemColumns: ColumnConfig<CustomResourceItemRow>[] = [
   {
     key: "name",
@@ -75,8 +92,9 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
                 namespace ? { namespace } : undefined
               )
                 .then(({ payload }) => {
+                  const sanitizedPayload = sanitizeCustomResourceYamlPayload(payload)
                   setYamlContent(
-                    stringify(payload, {
+                    stringify(sanitizedPayload, {
                       indent: 2,
                       lineWidth: 0,
                       sortMapEntries: false,
