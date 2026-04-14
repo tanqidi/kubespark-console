@@ -185,6 +185,8 @@ export function CustomResourcesPageClient() {
       <DataTable
         data={filteredRows}
         columns={columns}
+        enableRowNavigation
+        getRowHref={(row) => `/dashboard/customresources/${encodeURIComponent(row.name)}`}
         onDeleteSelectedRows={handleDeleteSelectedRows}
         toolbarEnd={
           <>

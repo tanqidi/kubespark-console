@@ -24,7 +24,7 @@ import {
   WorkloadDetailTemplate,
   type WorkloadDetailKind,
 } from "@/app/(console)/dashboard/components/resource-pages/workloads/workload-detail-templates"
-import { WorkspaceDetailTemplate } from "@/app/(console)/dashboard/components/resource-pages/workspaces/workspace-detail-template"
+import { CustomResourceItemsPageClient } from "@/app/(console)/dashboard/components/resource-pages/customresources/customresource-items-page"
 
 const sectionRenderers = {
   nodes: NodesPageClient,
@@ -105,16 +105,7 @@ export default async function DashboardSectionPage({
       )
     }
 
-    if (key === "workspaces") {
-      return (
-        <ResourceDetailPage
-          sectionTitle={sectionLabels.workspaces}
-          name={resourceName}
-          backHref="/dashboard/workspaces"
-          detailContent={<WorkspaceDetailTemplate name={resourceName} />}
-        />
-      )
-    }
+    if (key === "workspaces") notFound()
 
     if (key === "projects") {
       return (
@@ -134,6 +125,17 @@ export default async function DashboardSectionPage({
           name={resourceName}
           backHref="/dashboard/pipelines"
           detailContent={<PipelineRunsPageClient pipelineName={resourceName} />}
+        />
+      )
+    }
+
+    if (key === "customresources") {
+      return (
+        <ResourceDetailPage
+          sectionTitle={sectionLabels.customresources}
+          name={resourceName}
+          backHref="/dashboard/customresources"
+          detailContent={<CustomResourceItemsPageClient definitionName={resourceName} />}
         />
       )
     }

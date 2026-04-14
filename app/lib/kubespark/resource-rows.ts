@@ -664,11 +664,32 @@ export type CustomResourceDefinitionRow = {
   name: string
   description: string
   group: string
+  version: string
+  resource: string
   scope: string
   kind: string
   versions: string
   age: string
   updatedAt: string
+}
+
+export type CustomResourceItemRow = {
+  id: string
+  name: string
+  description: string
+  namespace: string
+  age: string
+  updatedAt: string
+}
+
+function resolveCustomResourceVersion(spec: JsonObject): string {
+  const versionList = Array.isArray(spec.versions) ? spec.versions : []
+  const versions = versionList.map((version) => asObject(version))
+  const storageVersion = versions.find((version) => version.storage === true)
+  if (storageVersion) return asString(storageVersion.name, "")
+  const servedVersion = versions.find((version) => version.served === true)
+  if (servedVersion) return asString(servedVersion.name, "")
+  return asString(versions[0]?.name, "")
 }
 
 export async function fetchCustomResourceDefinitionRows(
@@ -681,6 +702,8 @@ export async function fetchCustomResourceDefinitionRows(
     const metadata = asObject(resource.metadata)
     const spec = asObject(resource.spec)
     const names = asObject(spec.names)
+    const version = resolveCustomResourceVersion(spec)
+    const resourceName = asString(names.plural, "")
     const versionList = Array.isArray(spec.versions) ? spec.versions : []
     const versions = versionList
       .map((version) => {
@@ -703,9 +726,37 @@ export async function fetchCustomResourceDefinitionRows(
       name: asString(metadata.name),
       description: readDescription(resource),
       group: asString(spec.group),
+      version,
+      resource: resourceName,
       scope: asString(spec.scope),
       kind: asString(names.kind),
       versions: versions.length > 0 ? versions.join(", ") : "-",
+      age: formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined),
+      updatedAt: resolveUpdatedAt(resource),
+    }
+  })
+}
+
+export async function fetchCustomResourceItemRows(
+  definition: Pick<CustomResourceDefinitionRow, "group" | "version" | "resource" | "scope">,
+  limit = 300
+): Promise<CustomResourceItemRow[]> {
+  if (!definition.group || !definition.version || !definition.resource) return []
+
+  const { items } = await fetchResourceCollection(definition.group, definition.version, definition.resource)
+  const isClusterScoped = definition.scope.toLowerCase() === "cluster"
+
+  return items.slice(0, limit).map((item, index) => {
+    const resource = asObject(item)
+    const metadata = asObject(resource.metadata)
+    const name = asString(metadata.name, definition.resource)
+    const namespace = isClusterScoped ? "-" : asString(metadata.namespace, "-")
+
+    return {
+      id: asString(metadata.uid, `${name}-${index}`),
+      name: asString(metadata.name),
+      description: readDescription(resource),
+      namespace,
       age: formatAge(typeof metadata.creationTimestamp === "string" ? metadata.creationTimestamp : undefined),
       updatedAt: resolveUpdatedAt(resource),
     }
