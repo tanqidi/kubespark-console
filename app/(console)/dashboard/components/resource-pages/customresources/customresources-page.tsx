@@ -126,7 +126,7 @@ export function CustomResourcesPageClient() {
     void loadRows(false)
     const timer = window.setInterval(() => {
       void loadRows(true)
-    }, 5000)
+    }, 3000)
 
     return () => {
       cancelled = true

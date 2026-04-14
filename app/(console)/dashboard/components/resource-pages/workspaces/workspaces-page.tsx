@@ -233,7 +233,7 @@ export function WorkspacesPageClient() {
     void run(false)
     const timer = window.setInterval(() => {
       void run(true)
-    }, 5000)
+    }, 3000)
 
     return () => {
       cancelled = true
