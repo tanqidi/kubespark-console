@@ -65,8 +65,6 @@ export type PipelineRunRow = {
   branch: string
   buildLink: string
   triggerTime: string
-  runNamespace: string
-  runRepo: string
 }
 
 export type CreatePipelineInput = {
@@ -213,18 +211,6 @@ function extractPipelineRunBranch(item: RawPipelineRun): string {
   const branch = readString(data.branch)
   if (branch) return branch
   return ""
-}
-
-function extractPipelineRunDataNamespace(item: RawPipelineRun): string {
-  const spec = asRecord(item.spec)
-  const data = asRecord(spec.data)
-  return readString(data.namespace)
-}
-
-function extractPipelineRunDataRepo(item: RawPipelineRun): string {
-  const spec = asRecord(item.spec)
-  const data = asRecord(spec.data)
-  return readString(data.repo)
 }
 
 function extractPipelineRunDescription(item: RawPipelineRun): string {
@@ -501,8 +487,6 @@ export async function fetchPipelineRunRows(pipelineName: string): Promise<Pipeli
       const branch = extractPipelineRunBranch(item)
       const buildLink = extractPipelineRunBuildLink(item)
       const description = extractPipelineRunDescription(item)
-      const runNamespace = extractPipelineRunDataNamespace(item)
-      const runRepo = extractPipelineRunDataRepo(item)
 
       return {
         id: metadata.uid || metadata.name || `pipelinerun-${index}`,
@@ -514,8 +498,6 @@ export async function fetchPipelineRunRows(pipelineName: string): Promise<Pipeli
         branch: branch || "-",
         buildLink: buildLink || "",
         triggerTime: extractPipelineRunTriggerTimeDisplay(item),
-        runNamespace: runNamespace || "",
-        runRepo: runRepo || "",
       }
     })
 }

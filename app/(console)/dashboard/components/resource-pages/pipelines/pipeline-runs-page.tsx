@@ -1,11 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { IconEye, IconPlayerPlay, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconPlayerPlay, IconSettings2, IconTrash } from "@tabler/icons-react"
 import { stringify } from "yaml"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import {
   createColumns,
   renderNameDescriptionCell,
@@ -73,6 +74,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [running, setRunning] = React.useState(false)
   const [nameQuery, setNameQuery] = React.useState("")
   const [runDialogOpen, setRunDialogOpen] = React.useState(false)
+  const [runStep, setRunStep] = React.useState<"basic" | "advanced">("basic")
   const [runNamespace, setRunNamespace] = React.useState("")
   const [runRepo, setRunRepo] = React.useState(normalizedPipelineName)
   const [runError, setRunError] = React.useState<string | null>(null)
@@ -83,14 +85,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 PipelineRun 的 YAML 内容。")
-  const suggestedRunNamespace = React.useMemo(
-    () => rows.find((row) => row.runNamespace.trim().length > 0)?.runNamespace ?? "",
-    [rows]
-  )
-  const suggestedRunRepo = React.useMemo(
-    () => rows.find((row) => row.runRepo.trim().length > 0)?.runRepo ?? normalizedPipelineName,
-    [rows, normalizedPipelineName]
-  )
 
   const loadRows = React.useCallback(
     async (silent: boolean) => {
@@ -128,10 +122,12 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     const namespace = runNamespace.trim()
     const repo = runRepo.trim()
     if (!namespace) {
+      setRunStep("basic")
       setRunError("请输入仓库命名空间（owner）")
       return
     }
     if (!repo) {
+      setRunStep("basic")
       setRunError("请输入仓库名称（repo）")
       return
     }
@@ -300,8 +296,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           if (!open && running) return
           setRunDialogOpen(open)
           if (open) {
-            setRunNamespace(suggestedRunNamespace)
-            setRunRepo(suggestedRunRepo)
+            setRunStep("basic")
+            setRunRepo(normalizedPipelineName)
             setRunError(null)
           }
         }}
@@ -318,42 +314,84 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                 <DialogDescription>录入 Drone 仓库信息后，创建一次 PipelineRun。</DialogDescription>
               </DialogHeader>
             </div>
+            <StepHeaderNav
+              items={[
+                {
+                  id: "basic",
+                  title: "基本信息",
+                  status: runStep === "basic" ? "当前" : "已设置",
+                  active: runStep === "basic",
+                  icon: <IconSettings2 className="size-4" />,
+                  disabled: running,
+                  onClick: () => {
+                    if (running) return
+                    setRunStep("basic")
+                  },
+                },
+                {
+                  id: "advanced",
+                  title: "高级设置",
+                  status: runStep === "advanced" ? "当前" : "未设置",
+                  active: runStep === "advanced",
+                  icon: <IconSettings2 className="size-4" />,
+                  disabled: running,
+                  onClick: () => {
+                    if (running) return
+                    setRunStep("advanced")
+                  },
+                },
+              ]}
+            />
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
-              <div className="mb-4">
-                <h3 className="text-[15px] font-semibold">运行参数</h3>
-                <p className="mt-1 text-sm text-muted-foreground">用于定位 Drone 仓库（owner/repo）。</p>
-              </div>
-              <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="pipeline-run-namespace">仓库命名空间（owner）</FieldLabel>
-                  <Input
-                    id="pipeline-run-namespace"
-                    value={runNamespace}
-                    onChange={(event) => {
-                      setRunNamespace(event.target.value)
-                      if (runError) setRunError(null)
-                    }}
-                    autoComplete="off"
-                    disabled={running}
-                  />
-                  <FieldDescription>将写入 `spec.data.namespace`。</FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="pipeline-run-repo">仓库名称（repo）</FieldLabel>
-                  <Input
-                    id="pipeline-run-repo"
-                    value={runRepo}
-                    onChange={(event) => {
-                      setRunRepo(event.target.value)
-                      if (runError) setRunError(null)
-                    }}
-                    autoComplete="off"
-                    disabled={running}
-                  />
-                  <FieldDescription>将写入 `spec.data.repo`。</FieldDescription>
-                </Field>
-              </FieldGroup>
-              {runError ? <FieldError className="mt-3">{runError}</FieldError> : null}
+              {runStep === "basic" ? (
+                <>
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">运行参数</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">用于定位 Drone 仓库（owner/repo）。</p>
+                  </div>
+                  <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="pipeline-run-namespace">仓库命名空间（owner）</FieldLabel>
+                      <Input
+                        id="pipeline-run-namespace"
+                        value={runNamespace}
+                        onChange={(event) => {
+                          setRunNamespace(event.target.value)
+                          if (runError) setRunError(null)
+                        }}
+                        placeholder="tanqidi"
+                        autoComplete="off"
+                        disabled={running}
+                      />
+                      <FieldDescription>将写入 `spec.data.namespace`。</FieldDescription>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="pipeline-run-repo">仓库名称（repo）</FieldLabel>
+                      <Input
+                        id="pipeline-run-repo"
+                        value={runRepo}
+                        onChange={(event) => {
+                          setRunRepo(event.target.value)
+                          if (runError) setRunError(null)
+                        }}
+                        placeholder="kubespark"
+                        autoComplete="off"
+                        disabled={running}
+                      />
+                      <FieldDescription>将写入 `spec.data.repo`。</FieldDescription>
+                    </Field>
+                  </FieldGroup>
+                  {runError ? <FieldError className="mt-3">{runError}</FieldError> : null}
+                </>
+              ) : (
+                <div>
+                  <div className="mb-4">
+                    <h3 className="text-[15px] font-semibold">高级设置</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">当前版本暂不需要额外配置，后续可在此扩展。</p>
+                  </div>
+                  <FieldDescription>保持默认即可，直接点击“立即运行”。</FieldDescription>
+                </div>
+              )}
             </div>
             <DialogFooter className="border-t bg-background px-6 py-5">
               <div className="flex w-full items-center justify-between gap-3">
