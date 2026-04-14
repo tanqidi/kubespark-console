@@ -62,8 +62,7 @@ const pipelineRunColumns: ColumnConfig<PipelineRunRow>[] = [
   { key: "triggerType", label: "触发方式" },
   { key: "phase", label: "状态", render: "status" },
   { key: "buildNumber", label: "构建号" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
+  { key: "triggerTime", label: "触发时间" },
 ]
 
 export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientProps) {

@@ -8,7 +8,7 @@ import {
   fetchResourceByName,
   fetchResourceCollection,
 } from "./common"
-import { formatAge, resolveUpdatedAt } from "./utils"
+import { formatAge, formatDateTime, resolveUpdatedAt } from "./utils"
 
 type RawPipeline = {
   metadata?: {
@@ -64,8 +64,7 @@ export type PipelineRunRow = {
   phase: string
   buildNumber: string
   buildLink: string
-  age: string
-  updatedAt: string
+  triggerTime: string
 }
 
 export type CreatePipelineInput = {
@@ -169,11 +168,20 @@ function extractPipelineRunTriggerType(item: RawPipelineRun): string {
 }
 
 function extractPipelineRunPhase(item: RawPipelineRun): string {
+  const drone = parsePipelineRunDroneAnnotation(item)
+  const droneStatus = readString(drone.status)
+  if (droneStatus) return droneStatus
+
   const status = asRecord(item.status)
   return readString(status.phase)
 }
 
 function extractPipelineRunBuildNumber(item: RawPipelineRun): string {
+  const drone = parsePipelineRunDroneAnnotation(item)
+  const droneNumber = drone.number
+  if (typeof droneNumber === "number" && Number.isFinite(droneNumber)) return String(Math.trunc(droneNumber))
+  if (typeof droneNumber === "string" && droneNumber.trim()) return droneNumber.trim()
+
   const status = asRecord(item.status)
   const value = status.droneBuildNumber
   if (typeof value === "number" && Number.isFinite(value)) return String(Math.trunc(value))
@@ -182,14 +190,75 @@ function extractPipelineRunBuildNumber(item: RawPipelineRun): string {
 }
 
 function extractPipelineRunBuildLink(item: RawPipelineRun): string {
+  const drone = parsePipelineRunDroneAnnotation(item)
+  const droneLink = readString(drone.link)
+  if (droneLink) return droneLink
+
   const status = asRecord(item.status)
   return readString(status.droneBuildLink)
 }
 
 function extractPipelineRunDescription(item: RawPipelineRun): string {
+  const drone = parsePipelineRunDroneAnnotation(item)
+  const message = readString(drone.message)
+  if (message) return message
+
   const metadata = item.metadata ?? {}
   const value = metadata.annotations?.description
   return typeof value === "string" ? value.trim() : ""
+}
+
+function parsePipelineRunDroneAnnotation(item: RawPipelineRun): Record<string, unknown> {
+  const metadata = item.metadata ?? {}
+  const raw = metadata.annotations?.["tanqidi.com/drone"]
+  if (typeof raw !== "string" || !raw.trim()) return {}
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return asRecord(parsed)
+  } catch {
+    return {}
+  }
+}
+
+function extractPipelineRunCreatedUnix(item: RawPipelineRun): number {
+  const drone = parsePipelineRunDroneAnnotation(item)
+  const created = drone.created
+  if (typeof created === "number" && Number.isFinite(created) && created > 0) return Math.trunc(created)
+  if (typeof created === "string" && created.trim()) {
+    const parsed = Number(created)
+    if (Number.isFinite(parsed) && parsed > 0) return Math.trunc(parsed)
+  }
+
+  const createdAt = item.metadata?.creationTimestamp
+  const ms = Date.parse(createdAt ?? "")
+  if (Number.isFinite(ms) && ms > 0) return Math.trunc(ms / 1000)
+  return 0
+}
+
+function extractPipelineRunCreatedRaw(item: RawPipelineRun): string {
+  const drone = parsePipelineRunDroneAnnotation(item)
+  const created = drone.created
+  if (typeof created === "number" && Number.isFinite(created)) return String(Math.trunc(created))
+  if (typeof created === "string" && created.trim()) return created.trim()
+
+  const createdAt = item.metadata?.creationTimestamp
+  return typeof createdAt === "string" ? createdAt : ""
+}
+
+function extractPipelineRunTriggerTimeDisplay(item: RawPipelineRun): string {
+  const raw = extractPipelineRunCreatedRaw(item)
+  if (!raw) return "-"
+
+  // Drone created is usually unix seconds; fall back to parsing as ISO datetime.
+  if (/^\d+$/.test(raw)) {
+    const seconds = Number(raw)
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return formatDateTime(new Date(seconds * 1000).toISOString())
+    }
+  }
+
+  return formatDateTime(raw)
 }
 
 function buildSpec(input: CreatePipelineInput, existingSpec?: Record<string, unknown>): PipelineSpec {
@@ -394,7 +463,8 @@ export async function fetchPipelineRunRows(pipelineName: string): Promise<Pipeli
     }
   )
 
-  return items
+  return [...items]
+    .sort((a, b) => extractPipelineRunCreatedUnix(b) - extractPipelineRunCreatedUnix(a))
     .map((item, index) => {
       const metadata = item.metadata ?? {}
       const triggerType = extractPipelineRunTriggerType(item)
@@ -412,11 +482,9 @@ export async function fetchPipelineRunRows(pipelineName: string): Promise<Pipeli
         phase: phase || "-",
         buildNumber: buildNumber || "-",
         buildLink: buildLink || "",
-        age: formatAge(metadata.creationTimestamp),
-        updatedAt: resolveUpdatedAt(item),
+        triggerTime: extractPipelineRunTriggerTimeDisplay(item),
       }
     })
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
 export async function deletePipelineRun(name: string): Promise<void> {

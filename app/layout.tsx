@@ -2,7 +2,6 @@ import type { Metadata } from "next"
 
 import "./globals.css"
 import { ActiveThemeProvider } from "@/components/active-theme"
-import { PollingIntervalBridge } from "@/components/polling-interval-bridge"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 
@@ -19,7 +18,6 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <ActiveThemeProvider initialTheme="default">
-            <PollingIntervalBridge />
             {children}
             <Toaster />
           </ActiveThemeProvider>

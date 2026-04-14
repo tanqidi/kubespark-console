@@ -148,7 +148,7 @@ app/
 
 - `DataTable`：选择、分页、列控制、批量删除、拖拽排序
 - `TableToolbar`：正常态/选中态切换
-- 自动刷新：首次加载后默认不轮询；仅在配置了 `NEXT_PUBLIC_AUTO_REFRESH_SECONDS`（正整数秒）后按该间隔静默刷新（失败仅日志）
+- 自动刷新：首次加载后默认按 3000ms 轮询（失败仅日志）
 
 ## 12. Dialog 内 Combobox 约定
 
@@ -161,7 +161,6 @@ app/
 - `KUBESPARK_API_BASE`
 - `NEXT_PUBLIC_API_PROXY_BASE`
 - `NEXT_PUBLIC_LOCALE`
-- `NEXT_PUBLIC_AUTO_REFRESH_SECONDS`
 
 ## 14. 当前边界
 

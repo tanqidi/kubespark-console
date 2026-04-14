@@ -127,8 +127,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### 自动刷新配置
 
-- 默认：关闭自动刷新（不启用定时轮询）。
-- 开启方式：配置 `NEXT_PUBLIC_AUTO_REFRESH_SECONDS` 为正整数秒数（例如 `5`）。
+- 默认：3000ms 自动刷新（3 秒定时轮询）。
 
 ### WebSocket 代理说明
 
