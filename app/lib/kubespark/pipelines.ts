@@ -60,11 +60,13 @@ export type PipelineRunRow = {
   name: string
   description: string
   pipeline: string
-  triggerType: string
   phase: string
   buildNumber: string
+  branch: string
   buildLink: string
   triggerTime: string
+  runNamespace: string
+  runRepo: string
 }
 
 export type CreatePipelineInput = {
@@ -161,12 +163,6 @@ function extractPipelineProjectName(item: RawPipeline): string {
   return readString(pipelineProjectRef.name)
 }
 
-function extractPipelineRunTriggerType(item: RawPipelineRun): string {
-  const spec = asRecord(item.spec)
-  const trigger = asRecord(spec.trigger)
-  return readString(trigger.type)
-}
-
 function extractPipelineRunPhase(item: RawPipelineRun): string {
   const drone = parsePipelineRunDroneAnnotation(item)
   const droneStatus = readString(drone.status)
@@ -196,6 +192,39 @@ function extractPipelineRunBuildLink(item: RawPipelineRun): string {
 
   const status = asRecord(item.status)
   return readString(status.droneBuildLink)
+}
+
+function extractPipelineRunBranch(item: RawPipelineRun): string {
+  const drone = parsePipelineRunDroneAnnotation(item)
+  const ref = readString(drone.ref)
+  if (ref) {
+    if (ref.startsWith("refs/heads/")) return ref.slice("refs/heads/".length)
+    if (ref.startsWith("refs/tags/")) return ref.slice("refs/tags/".length)
+    return ref
+  }
+
+  const source = readString(drone.source)
+  if (source) return source
+  const target = readString(drone.target)
+  if (target) return target
+
+  const spec = asRecord(item.spec)
+  const data = asRecord(spec.data)
+  const branch = readString(data.branch)
+  if (branch) return branch
+  return ""
+}
+
+function extractPipelineRunDataNamespace(item: RawPipelineRun): string {
+  const spec = asRecord(item.spec)
+  const data = asRecord(spec.data)
+  return readString(data.namespace)
+}
+
+function extractPipelineRunDataRepo(item: RawPipelineRun): string {
+  const spec = asRecord(item.spec)
+  const data = asRecord(spec.data)
+  return readString(data.repo)
 }
 
 function extractPipelineRunDescription(item: RawPipelineRun): string {
@@ -467,22 +496,26 @@ export async function fetchPipelineRunRows(pipelineName: string): Promise<Pipeli
     .sort((a, b) => extractPipelineRunCreatedUnix(b) - extractPipelineRunCreatedUnix(a))
     .map((item, index) => {
       const metadata = item.metadata ?? {}
-      const triggerType = extractPipelineRunTriggerType(item)
       const phase = extractPipelineRunPhase(item)
       const buildNumber = extractPipelineRunBuildNumber(item)
+      const branch = extractPipelineRunBranch(item)
       const buildLink = extractPipelineRunBuildLink(item)
       const description = extractPipelineRunDescription(item)
+      const runNamespace = extractPipelineRunDataNamespace(item)
+      const runRepo = extractPipelineRunDataRepo(item)
 
       return {
         id: metadata.uid || metadata.name || `pipelinerun-${index}`,
         name: metadata.name || "-",
         description: description || "-",
         pipeline: normalizedName,
-        triggerType: triggerType || "-",
         phase: phase || "-",
         buildNumber: buildNumber || "-",
+        branch: branch || "-",
         buildLink: buildLink || "",
         triggerTime: extractPipelineRunTriggerTimeDisplay(item),
+        runNamespace: runNamespace || "",
+        runRepo: runRepo || "",
       }
     })
 }

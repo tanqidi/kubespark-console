@@ -3,6 +3,7 @@
 import * as React from "react"
 import {
   IconCircleCheckFilled,
+  IconCircleXFilled,
   IconDotsVertical,
   IconLoader,
 } from "@tabler/icons-react"
@@ -68,9 +69,8 @@ export type ActionMenuItem<TData> = {
   onSelect?: (row: TData) => void
 }
 
-const HEALTHY_STATUS_SET = new Set<string>([
+const SUCCESS_STATUS_SET = new Set<string>([
   "done",
-  "running",
   "succeeded",
   "success",
   "successful",
@@ -85,13 +85,44 @@ const HEALTHY_STATUS_SET = new Set<string>([
   "true",
   "就绪",
   "正常",
-  "运行中",
   "成功",
   "已完成",
   "已绑定",
   "活跃",
   "可用",
   "在线",
+])
+
+const RUNNING_STATUS_SET = new Set<string>([
+  "running",
+  "pending",
+  "queued",
+  "starting",
+  "processing",
+  "in_progress",
+  "运行中",
+  "执行中",
+  "处理中",
+  "等待中",
+  "排队中",
+])
+
+const FAILED_STATUS_SET = new Set<string>([
+  "failed",
+  "failure",
+  "error",
+  "killed",
+  "cancelled",
+  "canceled",
+  "timeout",
+  "unknown",
+  "false",
+  "失败",
+  "错误",
+  "异常",
+  "已终止",
+  "已取消",
+  "超时",
 ])
 
 function renderCell<TData>(
@@ -116,19 +147,29 @@ function renderCell<TData>(
   if (col.render === "status") {
     const text = String(value ?? "-")
     const normalized = text.trim().toLowerCase()
-    const isHealthy = HEALTHY_STATUS_SET.has(normalized)
+    const isSuccess = SUCCESS_STATUS_SET.has(normalized)
+    const isRunning = RUNNING_STATUS_SET.has(normalized)
+    const isFailed = FAILED_STATUS_SET.has(normalized)
 
-    const statusClassName = isHealthy
-      ? "text-muted-foreground"
-      : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
+    const statusClassName = isSuccess
+      ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300"
+      : isRunning
+        ? "border-transparent"
+        : isFailed
+          ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/15 dark:text-rose-300"
+          : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
 
     return (
       <Badge
-        variant="outline"
+        variant={isRunning ? "secondary" : "outline"}
         className={cn("px-1.5", statusClassName, col.cellClassName)}
       >
-        {isHealthy ? (
+        {isSuccess ? (
           <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
+        ) : isRunning ? (
+          <IconLoader className="animate-spin text-muted-foreground" data-icon="inline-start" />
+        ) : isFailed ? (
+          <IconCircleXFilled className="fill-rose-500 dark:fill-rose-300" />
         ) : (
           <IconLoader className="text-amber-500 dark:text-amber-300" />
         )}

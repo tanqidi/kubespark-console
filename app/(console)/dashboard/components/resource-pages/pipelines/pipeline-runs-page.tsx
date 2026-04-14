@@ -59,9 +59,9 @@ const pipelineRunColumns: ColumnConfig<PipelineRunRow>[] = [
     enableHiding: false,
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
-  { key: "triggerType", label: "触发方式" },
   { key: "phase", label: "状态", render: "status" },
   { key: "buildNumber", label: "构建号" },
+  { key: "branch", label: "分支" },
   { key: "triggerTime", label: "触发时间" },
 ]
 
@@ -83,6 +83,14 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 PipelineRun 的 YAML 内容。")
+  const suggestedRunNamespace = React.useMemo(
+    () => rows.find((row) => row.runNamespace.trim().length > 0)?.runNamespace ?? "",
+    [rows]
+  )
+  const suggestedRunRepo = React.useMemo(
+    () => rows.find((row) => row.runRepo.trim().length > 0)?.runRepo ?? normalizedPipelineName,
+    [rows, normalizedPipelineName]
+  )
 
   const loadRows = React.useCallback(
     async (silent: boolean) => {
@@ -195,13 +203,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
             },
           },
           {
-            label: "打开构建",
-            onSelect: (row) => {
-              if (!row.buildLink) return
-              window.open(row.buildLink, "_blank", "noopener,noreferrer")
-            },
-          },
-          {
             label: (
               <>
                 <IconTrash className="size-4" />
@@ -299,7 +300,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           if (!open && running) return
           setRunDialogOpen(open)
           if (open) {
-            setRunRepo(normalizedPipelineName)
+            setRunNamespace(suggestedRunNamespace)
+            setRunRepo(suggestedRunRepo)
             setRunError(null)
           }
         }}
@@ -331,7 +333,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                       setRunNamespace(event.target.value)
                       if (runError) setRunError(null)
                     }}
-                    placeholder="tanqidi"
                     autoComplete="off"
                     disabled={running}
                   />
@@ -346,7 +347,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                       setRunRepo(event.target.value)
                       if (runError) setRunError(null)
                     }}
-                    placeholder="kubespark"
                     autoComplete="off"
                     disabled={running}
                   />
@@ -384,6 +384,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         data={filteredRows}
         columns={columns}
         onDeleteSelectedRows={handleDeleteSelectedRows}
+        showColumnCustomizer={false}
         toolbarEnd={
           <div className="flex items-center gap-2">
             <Input
