@@ -73,3 +73,20 @@ spec:
       maxSurge: 25%
       maxUnavailable: 25%
     type: RollingUpdate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubespark
+  namespace: kubespark
+  labels:
+    app: kubespark
+spec:
+  type: ClusterIP
+  selector:
+    app: kubespark
+  ports:
+    - name: tcp-8080
+      protocol: TCP
+      port: 8080
+      targetPort: tcp-8080
