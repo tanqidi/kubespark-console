@@ -3,7 +3,6 @@
 import * as React from "react"
 import {
   IconCircleCheckFilled,
-  IconCircleXFilled,
   IconDotsVertical,
   IconLoader,
 } from "@tabler/icons-react"
@@ -28,17 +27,17 @@ type ColumnRender = "text" | "badge" | "status" | "input"
 
 export function renderNameDescriptionCell(name: unknown, description?: unknown) {
   const primaryText =
-    typeof name === "string" && name.trim().length > 0 ? name : "-"
+      typeof name === "string" && name.trim().length > 0 ? name : "-"
   const secondaryText =
-    typeof description === "string" && description.trim().length > 0
-      ? description
-      : "-"
+      typeof description === "string" && description.trim().length > 0
+          ? description
+          : "-"
 
   return (
-    <div className="min-w-0">
-      <div className="truncate font-medium">{primaryText}</div>
-      <div className="truncate text-sm text-muted-foreground">{secondaryText}</div>
-    </div>
+      <div className="min-w-0">
+        <div className="truncate font-medium">{primaryText}</div>
+        <div className="truncate text-sm text-muted-foreground">{secondaryText}</div>
+      </div>
   )
 }
 
@@ -69,8 +68,9 @@ export type ActionMenuItem<TData> = {
   onSelect?: (row: TData) => void
 }
 
-const SUCCESS_STATUS_SET = new Set<string>([
+const HEALTHY_STATUS_SET = new Set<string>([
   "done",
+  "running",
   "succeeded",
   "success",
   "successful",
@@ -85,6 +85,7 @@ const SUCCESS_STATUS_SET = new Set<string>([
   "true",
   "就绪",
   "正常",
+  "运行中",
   "成功",
   "已完成",
   "已绑定",
@@ -93,119 +94,77 @@ const SUCCESS_STATUS_SET = new Set<string>([
   "在线",
 ])
 
-const RUNNING_STATUS_SET = new Set<string>([
-  "running",
-  "pending",
-  "queued",
-  "starting",
-  "processing",
-  "in_progress",
-  "运行中",
-  "执行中",
-  "处理中",
-  "等待中",
-  "排队中",
-])
-
-const FAILED_STATUS_SET = new Set<string>([
-  "failed",
-  "failure",
-  "error",
-  "killed",
-  "cancelled",
-  "canceled",
-  "timeout",
-  "unknown",
-  "false",
-  "失败",
-  "错误",
-  "异常",
-  "已终止",
-  "已取消",
-  "超时",
-])
-
 function renderCell<TData>(
-  col: ColumnConfig<TData>,
-  value: unknown,
-  row: TData,
-  rowId: string
+    col: ColumnConfig<TData>,
+    value: unknown,
+    row: TData,
+    rowId: string
 ) {
   if (col.cell) return col.cell(value, row)
 
   if (col.render === "badge") {
     return (
-      <Badge
-        variant="outline"
-        className={cn("text-muted-foreground px-1.5", col.cellClassName)}
-      >
-        {String(value ?? "-")}
-      </Badge>
+        <Badge
+            variant="outline"
+            className={cn("text-muted-foreground px-1.5", col.cellClassName)}
+        >
+          {String(value ?? "-")}
+        </Badge>
     )
   }
 
   if (col.render === "status") {
     const text = String(value ?? "-")
     const normalized = text.trim().toLowerCase()
-    const isSuccess = SUCCESS_STATUS_SET.has(normalized)
-    const isRunning = RUNNING_STATUS_SET.has(normalized)
-    const isFailed = FAILED_STATUS_SET.has(normalized)
+    const isHealthy = HEALTHY_STATUS_SET.has(normalized)
 
-    const statusClassName = isSuccess
-      ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300"
-      : isRunning
-        ? "border-transparent"
-        : isFailed
-          ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/15 dark:text-rose-300"
-          : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
+    const statusClassName = isHealthy
+        ? "text-muted-foreground"
+        : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
 
     return (
-      <Badge
-        variant={isRunning ? "secondary" : "outline"}
-        className={cn("px-1.5", statusClassName, col.cellClassName)}
-      >
-        {isSuccess ? (
-          <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-        ) : isRunning ? (
-          <IconLoader className="animate-spin text-muted-foreground" data-icon="inline-start" />
-        ) : isFailed ? (
-          <IconCircleXFilled className="fill-rose-500 dark:fill-rose-300" />
-        ) : (
-          <IconLoader className="text-amber-500 dark:text-amber-300" />
-        )}
-        {text}
-      </Badge>
+        <Badge
+            variant="outline"
+            className={cn("px-1.5", statusClassName, col.cellClassName)}
+        >
+          {isHealthy ? (
+              <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
+          ) : (
+              <IconLoader className="text-amber-500 dark:text-amber-300" />
+          )}
+          {text}
+        </Badge>
     )
   }
 
   if (col.render === "input") {
     const inputId = `${rowId}-${col.key}`
     return (
-      <>
-        <Label htmlFor={inputId} className="sr-only">
-          {typeof col.label === "string" ? col.label : col.key}
-        </Label>
-        <Input
-          className={cn(
-            "h-8 w-28 border-transparent bg-transparent",
-            col.cellClassName
-          )}
-          defaultValue={String(value ?? "")}
-          id={inputId}
-        />
-      </>
+        <>
+          <Label htmlFor={inputId} className="sr-only">
+            {typeof col.label === "string" ? col.label : col.key}
+          </Label>
+          <Input
+              className={cn(
+                  "h-8 w-28 border-transparent bg-transparent",
+                  col.cellClassName
+              )}
+              defaultValue={String(value ?? "")}
+              id={inputId}
+          />
+        </>
     )
   }
 
   return (
-    <span className={cn(col.cellClassName)}>
+      <span className={cn(col.cellClassName)}>
       {String(value ?? "-")}
     </span>
   )
 }
 
 export function createColumns<TData extends Record<string, unknown>>(
-  options: CreateColumnsOptions<TData>
+    options: CreateColumnsOptions<TData>
 ): ColumnDef<TData>[] {
   const {
     columns,
@@ -221,25 +180,25 @@ export function createColumns<TData extends Record<string, unknown>>(
     defs.push({
       id: "select",
       header: ({ table }) => (
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={
-              table.getIsAllPageRowsSelected() ||
-              (table.getIsSomePageRowsSelected() && "indeterminate")
-            }
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-          />
-        </div>
+          <div className="flex items-center justify-center">
+            <Checkbox
+                checked={
+                    table.getIsAllPageRowsSelected() ||
+                    (table.getIsSomePageRowsSelected() && "indeterminate")
+                }
+                onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                aria-label="Select all"
+            />
+          </div>
       ),
       cell: ({ row }) => (
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        </div>
+          <div className="flex items-center justify-center">
+            <Checkbox
+                checked={row.getIsSelected()}
+                onCheckedChange={(value) => row.toggleSelected(!!value)}
+                aria-label="Select row"
+            />
+          </div>
       ),
       enableSorting: false,
       enableHiding: false,
@@ -247,38 +206,38 @@ export function createColumns<TData extends Record<string, unknown>>(
   }
 
   defs.push(
-    ...columns.map((col) => {
-      const rawHeader = col.header ?? col.label
-      const normalizedHeader =
-        rawHeader === null ||
-        typeof rawHeader === "undefined" ||
-        typeof rawHeader === "boolean"
-          ? ""
-          : rawHeader
-      const headerTemplate: ColumnDef<TData>["header"] =
-        typeof normalizedHeader === "string"
-          ? normalizedHeader
-          : () =>
-              col.headerClassName ? (
-                <div className={cn("w-full", col.headerClassName)}>
-                  {normalizedHeader}
-                </div>
-              ) : (
-                <>{normalizedHeader}</>
-              )
+      ...columns.map((col) => {
+        const rawHeader = col.header ?? col.label
+        const normalizedHeader =
+            rawHeader === null ||
+            typeof rawHeader === "undefined" ||
+            typeof rawHeader === "boolean"
+                ? ""
+                : rawHeader
+        const headerTemplate: ColumnDef<TData>["header"] =
+            typeof normalizedHeader === "string"
+                ? normalizedHeader
+                : () =>
+                    col.headerClassName ? (
+                        <div className={cn("w-full", col.headerClassName)}>
+                          {normalizedHeader}
+                        </div>
+                    ) : (
+                        <>{normalizedHeader}</>
+                    )
 
-      return {
-        accessorKey: col.key,
-        header: headerTemplate,
-        cell: ({ row, getValue }) =>
-          renderCell(col, getValue(), row.original, row.id),
-        enableHiding: col.enableHiding ?? true,
-        enableSorting: col.enableSorting ?? true,
-        meta: {
-          label: typeof col.label === "string" ? col.label : undefined,
-        },
-      } satisfies ColumnDef<TData>
-    })
+        return {
+          accessorKey: col.key,
+          header: headerTemplate,
+          cell: ({ row, getValue }) =>
+              renderCell(col, getValue(), row.original, row.id),
+          enableHiding: col.enableHiding ?? true,
+          enableSorting: col.enableSorting ?? true,
+          meta: {
+            label: typeof col.label === "string" ? col.label : undefined,
+          },
+        } satisfies ColumnDef<TData>
+      })
   )
 
   if (includeActions) {
@@ -287,46 +246,46 @@ export function createColumns<TData extends Record<string, unknown>>(
       // header: "操作",
       header: "",
       cell: ({ row }) =>
-        visibleActionItems.length === 0 ? (
-          <Button
-            variant="ghost"
-            className="flex size-8 text-muted-foreground opacity-0 pointer-events-none"
-            size="icon"
-            tabIndex={-1}
-            aria-hidden
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          visibleActionItems.length === 0 ? (
               <Button
-                variant="ghost"
-                className="flex size-8 text-muted-foreground data-[state=open]:bg-muted focus-visible:ring-0 focus-visible:border-transparent"
-                size="icon"
+                  variant="ghost"
+                  className="flex size-8 text-muted-foreground opacity-0 pointer-events-none"
+                  size="icon"
+                  tabIndex={-1}
+                  aria-hidden
               >
                 <IconDotsVertical />
                 <span className="sr-only">Open menu</span>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
-              <DropdownMenuGroup>
-                {visibleActionItems.map((item, index) => (
-                  <React.Fragment key={`action-${index}`}>
-                    {item.withSeparator ? <DropdownMenuSeparator /> : null}
-                    <DropdownMenuItem
-                      variant={item.variant}
-                      onSelect={() => item.onSelect?.(row.original)}
-                    >
-                      {item.label}
-                    </DropdownMenuItem>
-                  </React.Fragment>
-                ))}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
+          ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                      variant="ghost"
+                      className="flex size-8 text-muted-foreground data-[state=open]:bg-muted focus-visible:ring-0 focus-visible:border-transparent"
+                      size="icon"
+                  >
+                    <IconDotsVertical />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuGroup>
+                    {visibleActionItems.map((item, index) => (
+                        <React.Fragment key={`action-${index}`}>
+                          {item.withSeparator ? <DropdownMenuSeparator /> : null}
+                          <DropdownMenuItem
+                              variant={item.variant}
+                              onSelect={() => item.onSelect?.(row.original)}
+                          >
+                            {item.label}
+                          </DropdownMenuItem>
+                        </React.Fragment>
+                    ))}
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+          ),
       enableSorting: false,
       enableHiding: false,
     })

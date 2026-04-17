@@ -1,10 +1,10 @@
-apiVersion: apps/v1
 kind: Deployment
+apiVersion: apps/v1
 metadata:
   name: kubespark-drone-runner
   namespace: kubespark
   annotations:
-    deployment.kubernetes.io/revision: "1"
+    deployment.kubernetes.io/revision: "11"
 spec:
   selector:
     matchLabels:
@@ -12,12 +12,10 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: kubespark-drone-runner
         app: kubespark-drone-runner
+        app.kubernetes.io/name: kubespark-drone-runner
     spec:
       restartPolicy: Always
-      terminationGracePeriodSeconds: 30
-      serviceAccountName: default
       containers:
         - name: drone-runner-kube
           image: drone/drone-runner-kube:1.0.0-rc.5
@@ -44,15 +42,35 @@ spec:
                 secretKeyRef:
                   name: drone-secret
                   key: DRONE_SERVER_PROTO
+            - name: HTTP_PROXY
+              value: http://172.31.0.1:7890
+            - name: HTTPS_PROXY
+              value: http://172.31.0.1:7890
+            - name: NO_PROXY
+              value: 127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local,kubernetes.default.svc,kubernetes.default
+          resources: {}
           volumeMounts:
             - name: host-time
-              readOnly: true
               mountPath: /etc/localtime
+              readOnly: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
       volumes:
         - name: host-time
           hostPath:
             path: /etc/localtime
             type: ""
-  revisionHistoryLimit: 10
-  replicas: 1
+      dnsPolicy: ClusterFirst
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: kubespark-admin
+      serviceAccountName: kubespark-admin
+      terminationGracePeriodSeconds: 30
   progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
