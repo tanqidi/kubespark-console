@@ -79,24 +79,45 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 
 ## Kubernetes 部署
 
-使用仓库内示例 YAML 创建 `Namespace + RBAC + Deployment + Service`。
+以下内容已按当前 `deployment/*.yaml` 实际清单同步。
 
-### 1) 应用部署清单
+### 1) 应用部署清单（与 YAML 对应）
 
-示例文件（按顺序应用）：
+- `deployment/kubespark-rbac.yaml`
+  - `Namespace/kubespark`
+  - `ServiceAccount/kubespark-admin`
+  - `ClusterRoleBinding/kubespark-admin -> cluster-admin`
+- `deployment/kubespark-secret.yaml`
+  - `Secret/kubespark-secret`
+  - 提供后端所需变量：`DRONE_YAML_SECRET`、`KUBESPARK_JWT_SECRET`、`KUBESPARK_USERNAME`、`KUBESPARK_PASSWORD`
+- `deployment/kubespark-terminal.yaml`
+  - `Deployment/kubespark-terminal`
+  - 镜像：`alpine/k8s:1.34.4`
+  - `serviceAccountName: kubespark-admin`
+- `deployment/kubespark.yaml`
+  - `Deployment/kubespark`
+  - 镜像：`tanqidi/kubespark:dev`
+  - `serviceAccountName: kubespark-admin`
+  - 从 `kubespark-secret` 注入认证与 Drone YAML 相关密钥
+- `deployment/kubespark-console.yaml`
+  - `Deployment/kubespark-console`
+  - `Service/kubespark-console`（`NodePort: 30000`）
+  - 控制台访问后端地址：`KUBESPARK_API_BASE=http://kubespark:8080`
 
-- `deployment/kubespark-rbac.yaml`（Namespace + ServiceAccount + ClusterRoleBinding）
-- `deployment/kubespark.yaml`（后端 kubespark Deployment + Service）
-- `deployment/kubespark-console.yaml`（前端 console Deployment + Service）
-
-应用：
+应用顺序建议：
 
 ```bash
 kubectl apply -f deployment/kubespark-rbac.yaml
+kubectl apply -f deployment/kubespark-secret.yaml
 kubectl apply -f deployment/kubespark-terminal.yaml
 kubectl apply -f deployment/kubespark.yaml
 kubectl apply -f deployment/kubespark-console.yaml
 ```
+
+说明：
+
+- 当前仓库内 `deployment/kubespark.yaml` 仅包含后端 Deployment，不包含 `Service/kubespark`。
+- 由于控制台默认访问 `http://kubespark:8080`，请确保集群内已存在名为 `kubespark` 的 Service（可由其他清单创建）。
 
 ### 2) dev 标签镜像更新说明（重要）
 

@@ -11,6 +11,16 @@
 
 ## 2. 当前 CRD 清单
 
+> 以下条目已与 `deployment/crds/*.yaml` 实际内容对齐（group=`tanqidi.com`、version=`v1alpha1`、scope=`Cluster`）。
+
+### 2.0 文件映射
+
+- `workspace-crd.yaml` -> `Workspace`（`workspaces.tanqidi.com`）
+- `workspace-namespace-binding-crd.yaml` -> `WorkspaceNamespaceBinding`（`workspacenamespacebindings.tanqidi.com`）
+- `pipeline-project-crd.yaml` -> `PipelineProject`（`pipelineprojects.tanqidi.com`）
+- `pipeline-crd.yaml` -> `Pipeline`（`pipelines.tanqidi.com`）
+- `pipeline-run-crd.yaml` -> `PipelineRun`（`pipelineruns.tanqidi.com`，含 `status` 子资源）
+
 ### 2.1 Workspace
 
 - Kind: `Workspace`
@@ -106,6 +116,26 @@
 
 - `Pipeline` 存定义，`PipelineRun` 存执行历史，职责分离。
 - 覆盖优先级：`Pipeline.spec.data` < `PipelineRun.spec.data`（同 key 后者覆盖前者）。
+
+## 2.6 Schema 约束摘要（按当前 YAML）
+
+- `Workspace.spec.owner`：必填，`1..128` 字符。
+- `WorkspaceNamespaceBinding.spec.workspaceRef.name`：必填，`1..63` 字符。
+- `WorkspaceNamespaceBinding.spec.namespaceRef.name`：必填，`1..63` 字符。
+- `PipelineProject.spec.workspaceRef.name`：必填，`1..63` 字符。
+- `PipelineProject.spec.displayName`：可选，`1..128` 字符。
+- `PipelineProject.spec.description`：可选，`1..2048` 字符。
+- `Pipeline.spec.pipelineProjectRef.name`：必填，`1..63` 字符。
+- `Pipeline.spec.workspaceRef.name`：可选，`1..63` 字符。
+- `Pipeline.spec.data`：可选，`map[string]string`。
+- `PipelineRun.spec.pipelineRef.name`：必填，`1..63` 字符。
+- `PipelineRun.spec.trigger.type`：可选，string。
+- `PipelineRun.spec.data`：可选，`map[string]string`。
+- `PipelineRun.status.droneBuildNumber`：`int64`，最小值 `1`。
+- `PipelineRun.status.droneBuildLink`：最长 `2048` 字符。
+- `PipelineRun.status.conditions[*].type`：必填，`1..128` 字符。
+- `PipelineRun.status.conditions[*].reason`：可选，最长 `128` 字符。
+- `PipelineRun.status.conditions[*].message`：可选，最长 `2048` 字符。
 
 ## 3. 关联关系约定
 

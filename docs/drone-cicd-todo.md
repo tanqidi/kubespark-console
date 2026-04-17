@@ -30,6 +30,16 @@
 
 - `DRONE_YAML_SECRET=<shared-secret>`（必须与 Drone Server 完全一致）
 
+### 3.3 开发期间宿主机变量（用于识别）
+
+开发期间请在宿主机 `/etc/environment` 增加：
+
+```bash
+DRONE_YAML_SECRET=aKzfRGBgZVARtEIarLGHvicy1qjSe9zHXhivgcD3hcYktzbRC4pSGldyxhKa580d
+```
+
+并确保该值与 `deployment/drone-pipelines/drone-secret.yaml` 中 `DRONE_YAML_SECRET` 完全一致。
+
 ## 4. YAML 存储位置
 
 Kubespark 当前从固定 Secret 读取：
