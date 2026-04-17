@@ -4,7 +4,7 @@ metadata:
   name: kubespark
   namespace: kubespark
   annotations:
-    deployment.kubernetes.io/revision: "14"
+    deployment.kubernetes.io/revision: "2"
 spec:
   selector:
     matchLabels:
@@ -23,6 +23,16 @@ spec:
           env:
             - name: TZ
               value: Asia/Shanghai
+            - name: DRONE_SERVER
+              valueFrom:
+                secretKeyRef:
+                  name: kubespark-secret
+                  key: DRONE_SERVER
+            - name: DRONE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: kubespark-secret
+                  key: DRONE_TOKEN
             - name: DRONE_YAML_SECRET
               valueFrom:
                 secretKeyRef:
@@ -73,6 +83,7 @@ spec:
       maxSurge: 25%
       maxUnavailable: 25%
     type: RollingUpdate
+
 ---
 apiVersion: v1
 kind: Service

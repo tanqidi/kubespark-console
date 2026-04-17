@@ -28,17 +28,15 @@
 
 ### 3.2 Kubespark 后端（处理 `/drone/yaml` 的进程）
 
-- `DRONE_YAML_SECRET=<shared-secret>`（必须与 Drone Server 完全一致）
+- 后端统一从 `kubespark/kubespark-secret` 读取：
+  - `DRONE_SERVER`
+  - `DRONE_TOKEN`
+  - `DRONE_YAML_SECRET`（必须与 Drone Server 完全一致）
 
-### 3.3 开发期间宿主机变量（用于识别）
+### 3.3 配置约束（当前）
 
-开发期间请在宿主机 `/etc/environment` 增加：
-
-```bash
-DRONE_YAML_SECRET=aKzfRGBgZVARtEIarLGHvicy1qjSe9zHXhivgcD3hcYktzbRC4pSGldyxhKa580d
-```
-
-并确保该值与 `deployment/drone-pipelines/drone-secret.yaml` 中 `DRONE_YAML_SECRET` 完全一致。
+- 不再依赖宿主机 `/etc/environment` 设置 `DRONE_YAML_SECRET`。
+- 相关配置统一维护在 `Secret/kubespark-secret`。
 
 ## 4. YAML 存储位置
 
@@ -67,7 +65,7 @@ key 匹配优先级：
 
 常见错误：
 
-- `missing DRONE_YAML_SECRET`：运行中的后端进程未配置变量。
+- `missing DRONE_YAML_SECRET`：`kubespark-secret` 缺少该键或值为空。
 - `invalid drone yaml signature`：两端 secret 不一致，或改完未重启进程。
 - `406 Not Acceptable`：扩展响应协商不匹配（现已兼容 Drone vendor accept）。
 

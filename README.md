@@ -89,7 +89,7 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
   - `ClusterRoleBinding/kubespark-admin -> cluster-admin`
 - `deployment/kubespark-secret.yaml`
   - `Secret/kubespark-secret`
-  - 提供后端所需变量：`DRONE_YAML_SECRET`、`KUBESPARK_JWT_SECRET`、`KUBESPARK_USERNAME`、`KUBESPARK_PASSWORD`
+  - 提供后端所需变量：`DRONE_SERVER`、`DRONE_TOKEN`、`DRONE_YAML_SECRET`、`KUBESPARK_JWT_SECRET`、`KUBESPARK_USERNAME`、`KUBESPARK_PASSWORD`
 - `deployment/kubespark-terminal.yaml`
   - `Deployment/kubespark-terminal`
   - 镜像：`alpine/k8s:1.34.4`
@@ -98,7 +98,7 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
   - `Deployment/kubespark`
   - 镜像：`tanqidi/kubespark:dev`
   - `serviceAccountName: kubespark-admin`
-  - 从 `kubespark-secret` 注入认证与 Drone YAML 相关密钥
+  - 从 `kubespark-secret` 注入 `KUBESPARK_*` 认证密钥（Drone 配置由后端直接读取该 Secret）
 - `deployment/kubespark-console.yaml`
   - `Deployment/kubespark-console`
   - `Service/kubespark-console`（`NodePort: 30000`）

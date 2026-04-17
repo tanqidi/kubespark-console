@@ -47,18 +47,14 @@
   - `HTTPS_PROXY=http://172.31.0.1:7890`
   - `NO_PROXY=127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local,kubernetes.default.svc,kubernetes.default`
 
-### 6. 开发期宿主机环境变量（必须保持一致）
+### 6. 后端统一配置来源（简化规则）
 
-开发期间需要在宿主机 `/etc/environment` 增加以下变量，供流程识别：
-
-```bash
-DRONE_YAML_SECRET=aKzfRGBgZVARtEIarLGHvicy1qjSe9zHXhivgcD3hcYktzbRC4pSGldyxhKa580d
-```
-
-要求：
-
-- 该值必须与 `deployment/drone-pipelines/drone-secret.yaml` 中 `DRONE_YAML_SECRET` 完全一致。
-- 修改后请重新加载环境变量或重启相关服务/容器，避免出现 `invalid drone yaml signature`。
+- `kubespark` 后端的 Drone 相关配置统一从 `kubespark/kubespark-secret` 读取。
+- 不再依赖宿主机 `/etc/environment` 注入 `DRONE_YAML_SECRET`。
+- 请保证 `kubespark-secret` 中以下键与 Drone Server 配置一致：
+  - `DRONE_SERVER`
+  - `DRONE_TOKEN`
+  - `DRONE_YAML_SECRET`
 
 ## 文件职责
 
