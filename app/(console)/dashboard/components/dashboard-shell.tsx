@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { usePathname } from "next/navigation"
 
 import {
   SidebarInset,
@@ -16,21 +15,13 @@ type DashboardShellProps = {
   enableDetailSidebarAnimation?: boolean
 }
 
-function isDashboardDetailPath(pathname: string) {
-  const segments = pathname.split("/").filter(Boolean)
-  return segments[0] === "dashboard" && segments.length >= 3
-}
-
 export function DashboardShell({
   children,
   defaultOpen,
   enableDetailSidebarAnimation = false,
 }: DashboardShellProps) {
-  const pathname = usePathname()
   const [open, setOpen] = React.useState(defaultOpen)
 
-  const forceCollapse = isDashboardDetailPath(pathname)
-  const effectiveOpen = forceCollapse ? false : open
   const noAnimationClassName = enableDetailSidebarAnimation
     ? undefined
     : [
@@ -41,11 +32,8 @@ export function DashboardShell({
 
   return (
     <SidebarProvider
-      open={effectiveOpen}
-      onOpenChange={(nextOpen) => {
-        if (forceCollapse) return
-        setOpen(nextOpen)
-      }}
+      open={open}
+      onOpenChange={setOpen}
       className={noAnimationClassName}
       style={
         {
