@@ -285,7 +285,7 @@ export function WorkspacesPageClient() {
       const annotations = metadataRecordToEntries(detail.annotations)
       setLabelEntries(labels)
       setAnnotationEntries(annotations)
-      setMetadataEnabled(hasUserProvidedMetadata(labels, annotations))
+      setMetadataEnabled(false)
     } catch (e: unknown) {
       setSubmitError(e instanceof Error ? e.message : "加载企业空间详情失败")
     } finally {

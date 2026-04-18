@@ -636,7 +636,7 @@ export function ProjectsPageClient() {
         setWorkspaceBindingExists(Boolean(bindingWorkspace))
         setLabelEntries(initialLabels)
         setAnnotationEntries(initialAnnotations)
-        setMetadataEnabled(hasUserProvidedMetadata(initialLabels, initialAnnotations))
+        setMetadataEnabled(false)
         setCreateNameInvalid(false)
         setCreateNameError(null)
         setCreateYamlMode(false)
@@ -722,9 +722,7 @@ export function ProjectsPageClient() {
           )
           setPipelineProjectCreateLabelEntries(nextLabels)
           setPipelineProjectCreateAnnotationEntries(nextAnnotations)
-          setPipelineProjectCreateMetadataEnabled(
-            hasUserProvidedMetadata(nextLabels, nextAnnotations)
-          )
+        setPipelineProjectCreateMetadataEnabled(false)
           setPipelineProjectCreateNameInvalid(false)
           setPipelineProjectCreateNameError(null)
           setPipelineProjectCreateWorkspaceInvalid(false)
@@ -763,9 +761,7 @@ export function ProjectsPageClient() {
         setPipelineProjectCreateLabelEntries(parsed.labels)
         const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
         setPipelineProjectCreateAnnotationEntries(protectedAnnotations)
-        setPipelineProjectCreateMetadataEnabled(
-          hasUserProvidedMetadata(parsed.labels, protectedAnnotations)
-        )
+        setPipelineProjectCreateMetadataEnabled(false)
         setPipelineProjectCreateYamlError(null)
       } catch (error) {
         setPipelineProjectCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
@@ -927,7 +923,7 @@ export function ProjectsPageClient() {
           setLabelEntries(parsed.labels)
           const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
           setAnnotationEntries(protectedAnnotations)
-          setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, protectedAnnotations))
+          setMetadataEnabled(false)
           setCreateYamlError(null)
         } catch (error) {
           setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
@@ -1322,7 +1318,7 @@ export function ProjectsPageClient() {
                         setLabelEntries(parsed.labels)
                         const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
                         setAnnotationEntries(protectedAnnotations)
-                        setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, protectedAnnotations))
+                        setMetadataEnabled(false)
                         setCreateYamlError(null)
                         setCreateYamlMode(false)
                       } catch (error) {

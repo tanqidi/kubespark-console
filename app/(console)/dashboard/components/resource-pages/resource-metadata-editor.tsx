@@ -4,10 +4,6 @@ import * as React from "react"
 import { IconTrash } from "@tabler/icons-react"
 
 import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
-import {
-  isAutoMetadataAnnotationKey,
-  isAutoMetadataLabelKey,
-} from "@/app/lib/kubespark/metadata-ignore"
 import { Button } from "@/components/ui/button"
 import { FieldLabel } from "@/components/ui/field"
 import {
@@ -23,24 +19,12 @@ export function isDescriptionAnnotationKey(key: string): boolean {
   return key.trim().toLowerCase() === "description"
 }
 
-function isIgnoredMetadataAnnotationKey(key: string): boolean {
-  return isAutoMetadataAnnotationKey(key)
-}
-
-function isIgnoredMetadataLabelKey(key: string): boolean {
-  return isAutoMetadataLabelKey(key)
-}
-
 export function hasUserProvidedMetadata(
   labels: MetadataEntry[],
   annotations: MetadataEntry[]
 ): boolean {
-  const hasLabel = labels.some(
-    (item) => item.key.trim().length > 0 && !isIgnoredMetadataLabelKey(item.key)
-  )
-  const hasAnnotation = annotations.some(
-    (item) => item.key.trim().length > 0 && !isIgnoredMetadataAnnotationKey(item.key)
-  )
+  const hasLabel = labels.some((item) => item.key.trim().length > 0)
+  const hasAnnotation = annotations.some((item) => item.key.trim().length > 0)
   return hasLabel || hasAnnotation
 }
 
@@ -134,15 +118,6 @@ export function ResourceMetadataEditor({
                 : [{ key: "", value: "" }]
             )
           }
-        }
-        if (!nextChecked) {
-          const descriptionText = description.trim()
-          setLabels([{ key: "", value: "" }])
-          setAnnotations(
-            descriptionText
-              ? [{ key: "description", value: descriptionText }]
-              : [{ key: "", value: "" }]
-          )
         }
         onCheckedChange(nextChecked)
       }}

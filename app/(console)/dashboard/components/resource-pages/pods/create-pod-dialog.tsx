@@ -527,7 +527,7 @@ export function CreatePodDialog({
       setDescription(next.description)
       setLabelEntries(next.labels)
       setAnnotationEntries(next.annotations)
-      setMetadataEnabled(hasUserProvidedMetadata(next.labels, next.annotations))
+      setMetadataEnabled(false)
       setContainers(Array.isArray(parsedContainers) ? parsedContainers.slice(0, 1) : [])
       const normalizedStorage = Array.isArray(next.storageList)
         ? next.storageList

@@ -480,7 +480,7 @@ export function PipelinesPageClient({
           const nextAnnotations = metadataRecordToEntries(detail.annotations)
           setLabelEntries(nextLabels)
           setAnnotationEntries(nextAnnotations)
-          setMetadataEnabled(hasUserProvidedMetadata(nextLabels, nextAnnotations))
+          setMetadataEnabled(false)
           setKeyValueEnabled(false)
           setKeyValueEntries([{ key: "", value: "" }])
           setCreateDialogOpen(true)
@@ -521,7 +521,6 @@ export function PipelinesPageClient({
         setCodeRepository(nextCodeRepository)
         setLabelEntries(nextLabels)
         setAnnotationEntries(nextAnnotations)
-        setMetadataEnabled(hasUserProvidedMetadata(nextLabels, nextAnnotations))
         setCreateYamlError(null)
       } catch (error) {
         setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
@@ -861,7 +860,6 @@ export function PipelinesPageClient({
                         setLabelEntries(parsed.labels)
                         setAnnotationEntries(parsed.annotations)
                         if (parsed.workspaceName.trim()) setWorkspaceName(parsed.workspaceName.trim())
-                        setMetadataEnabled(hasUserProvidedMetadata(parsed.labels, parsed.annotations))
                         setCreateYamlError(null)
                         setCreateYamlMode(false)
                       } catch (error) {

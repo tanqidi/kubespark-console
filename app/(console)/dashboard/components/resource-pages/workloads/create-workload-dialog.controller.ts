@@ -40,7 +40,6 @@ import {
 } from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog.logic"
 import { useContainerEditor } from "@/app/(console)/dashboard/components/resource-pages/use-container-editor"
 import {
-  hasUserProvidedMetadata,
   metadataEntriesToRecord,
   metadataRecordToEntries,
   type MetadataEntry,
@@ -238,13 +237,13 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     const initialAnnotationEntries = metadataRecordToEntries(initialValues.annotations ?? {})
     setLabelEntries(initialLabelEntries)
     setAnnotationEntries(initialAnnotationEntries)
-    setMetadataEnabled(hasUserProvidedMetadata(initialLabelEntries, initialAnnotationEntries))
+    setMetadataEnabled(false)
     setSchedule("")
     setBackoffLimit(initialValues.strategy?.backoffLimit ?? "")
     setCompletions(initialValues.strategy?.completions ?? "")
     setParallelism(initialValues.strategy?.parallelism ?? "")
     setActiveDeadlineSeconds(initialValues.strategy?.activeDeadlineSeconds ?? "")
-    setRollingUpdateEnabled(initialValues.strategy?.rollingUpdateEnabled === true)
+    setRollingUpdateEnabled(false)
     setRollingUpdateType(
       initialValues.strategy?.rollingUpdateType === "Recreate" ? "Recreate" : "RollingUpdate"
     )
@@ -253,7 +252,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setRestartPolicy("Always")
     setTerminationGracePeriodSeconds(initialValues.pod?.terminationGracePeriodSeconds?.trim() || "30")
     setServiceAccountName(initialValues.pod?.serviceAccountName?.trim() || "default")
-    setSchedulingPolicyEnabled(initialValues.pod?.schedulingPolicyEnabled === true)
+    setSchedulingPolicyEnabled(false)
     setSchedulingPolicy(initialValues.pod?.schedulingPolicy ?? "default")
     setContainers(
       Array.isArray(initialValues.pod?.containers)
@@ -582,13 +581,13 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     const nextAnnotationEntries = metadataRecordToEntries(snapshot.annotations)
     setLabelEntries(nextLabelEntries)
     setAnnotationEntries(nextAnnotationEntries)
-    setMetadataEnabled(hasUserProvidedMetadata(nextLabelEntries, nextAnnotationEntries))
+    setMetadataEnabled(false)
     setSchedule(snapshot.schedule)
     setBackoffLimit(snapshot.strategy.backoffLimit)
     setCompletions(snapshot.strategy.completions)
     setParallelism(snapshot.strategy.parallelism)
     setActiveDeadlineSeconds(snapshot.strategy.activeDeadlineSeconds)
-    setRollingUpdateEnabled(snapshot.strategy.rollingUpdateEnabled === true)
+    setRollingUpdateEnabled(false)
     setRollingUpdateType(
       snapshot.strategy.rollingUpdateType === "Recreate" ? "Recreate" : "RollingUpdate"
     )
@@ -597,7 +596,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     setRestartPolicy(snapshot.pod.restartPolicy)
     setTerminationGracePeriodSeconds(snapshot.pod.terminationGracePeriodSeconds?.trim() || "30")
     setServiceAccountName(snapshot.pod.serviceAccountName?.trim() || "default")
-    setSchedulingPolicyEnabled(snapshot.pod.schedulingPolicyEnabled === true)
+    setSchedulingPolicyEnabled(false)
     setSchedulingPolicy(snapshot.pod.schedulingPolicy ?? "default")
     setContainers(snapshot.pod.containers)
     const nextStorageVolumes = Array.isArray(snapshot.pod.storageList)

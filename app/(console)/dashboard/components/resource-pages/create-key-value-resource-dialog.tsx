@@ -390,7 +390,7 @@ export function CreateKeyValueResourceDialog({
     setDescription(snapshot.description)
     setLabelEntries(snapshot.labels)
     setAnnotationEntries(snapshot.annotations)
-    setMetadataEnabled(hasUserProvidedMetadata(snapshot.labels, snapshot.annotations))
+    setMetadataEnabled(false)
     setSecretType(snapshot.secretType || "Opaque")
     setItems(snapshot.items.length > 0 ? snapshot.items : [createEmptyItem()])
     setDataViewMode("list")
@@ -467,7 +467,7 @@ export function CreateKeyValueResourceDialog({
     const nextAnnotationEntries = metadataRecordToEntries(initialValues.annotations ?? {})
     setLabelEntries(nextLabelEntries)
     setAnnotationEntries(nextAnnotationEntries)
-    setMetadataEnabled(hasUserProvidedMetadata(nextLabelEntries, nextAnnotationEntries))
+    setMetadataEnabled(false)
     setSecretType(initialValues.type?.trim() || "Opaque")
     setItems(
       initialValues.items.length > 0

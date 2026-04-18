@@ -42,7 +42,6 @@ import {
 } from "@/app/(console)/dashboard/components/resource-pages/jobs/create-job-dialog.logic"
 import { useContainerEditor } from "@/app/(console)/dashboard/components/resource-pages/use-container-editor"
 import {
-  hasUserProvidedMetadata,
   metadataEntriesToRecord,
   metadataRecordToEntries,
   type MetadataEntry,
@@ -235,7 +234,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     const initialAnnotationEntries = metadataRecordToEntries(initialValues.annotations ?? {})
     setLabelEntries(initialLabelEntries)
     setAnnotationEntries(initialAnnotationEntries)
-    setMetadataEnabled(hasUserProvidedMetadata(initialLabelEntries, initialAnnotationEntries))
+    setMetadataEnabled(false)
     setSchedule((initialValues.schedule ?? "").trim() || (kind === "CronJob" ? DEFAULT_CRON_SCHEDULE : ""))
     setBackoffLimit(initialValues.strategy?.backoffLimit ?? "")
     setCompletions(initialValues.strategy?.completions ?? "")
@@ -553,7 +552,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     const nextAnnotationEntries = metadataRecordToEntries(snapshot.annotations)
     setLabelEntries(nextLabelEntries)
     setAnnotationEntries(nextAnnotationEntries)
-    setMetadataEnabled(hasUserProvidedMetadata(nextLabelEntries, nextAnnotationEntries))
+    setMetadataEnabled(false)
     setSchedule(snapshot.schedule)
     setBackoffLimit(snapshot.strategy.backoffLimit)
     setCompletions(snapshot.strategy.completions)

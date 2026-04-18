@@ -747,7 +747,7 @@ export function CreateServiceDialog({
     const initialAnnotationEntries = metadataRecordToEntries(initialValues.annotations ?? {})
     setLabelEntries(initialLabelEntries)
     setAnnotationEntries(initialAnnotationEntries)
-    setMetadataEnabled(hasUserProvidedMetadata(initialLabelEntries, initialAnnotationEntries))
+    setMetadataEnabled(false)
     setInternalAccessMode(initialValues.internalAccessMode)
     setSelectorItems(
       initialValues.selectors.length > 0
@@ -846,7 +846,7 @@ export function CreateServiceDialog({
     setDescription(snapshot.description)
     setLabelEntries(snapshot.labels)
     setAnnotationEntries(snapshot.annotations)
-    setMetadataEnabled(hasUserProvidedMetadata(snapshot.labels, snapshot.annotations))
+    setMetadataEnabled(false)
     setInternalAccessMode(snapshot.internalAccessMode)
     setSelectorItems(snapshot.selectorItems)
     setPortItems(snapshot.portItems)
