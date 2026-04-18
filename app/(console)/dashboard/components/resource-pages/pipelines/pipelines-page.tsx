@@ -15,6 +15,10 @@ import {
   metadataRecordToEntries,
   type MetadataEntry,
 } from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
+import {
+  ResourceKeyValueEditor,
+  hasUserProvidedKeyValues,
+} from "@/app/(console)/dashboard/components/resource-pages/resource-key-value-editor"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
 import {
   createColumns,
@@ -25,6 +29,7 @@ import {
   createPipelineRun,
   createPipeline,
   deletePipeline,
+  fetchDroneRepoOptions,
   fetchPipelineDetail,
   fetchPipelineRows,
   fetchPipelineYaml,
@@ -34,6 +39,14 @@ import {
 import { fetchPipelineProjectDetail } from "@/app/lib/kubespark/pipeline-projects"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 import {
   Dialog,
   DialogClose,
@@ -48,6 +61,7 @@ import { Input } from "@/components/ui/input"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -73,6 +87,7 @@ type PipelineDialogMode = "create" | "edit"
 
 const PIPELINE_NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
+const CODE_REPOSITORY_ANNOTATION_KEY = "tanqidi.com/code-repository"
 
 const pipelineColumns: ColumnConfig<PipelineRow>[] = [
   {
@@ -96,6 +111,7 @@ function validatePipelineName(name: string): string | null {
 function buildPipelineYamlText(params: {
   name: string
   description: string
+  codeRepository: string
   labels: MetadataEntry[]
   annotations: MetadataEntry[]
   workspaceName?: string
@@ -105,6 +121,11 @@ function buildPipelineYamlText(params: {
   const annotations = metadataEntriesToRecord(params.annotations)
   if (params.description.trim()) annotations.description = params.description.trim()
   else delete annotations.description
+  if (params.codeRepository.trim()) {
+    annotations[CODE_REPOSITORY_ANNOTATION_KEY] = params.codeRepository.trim()
+  } else {
+    delete annotations[CODE_REPOSITORY_ANNOTATION_KEY]
+  }
 
   return stringify(
     {
@@ -143,6 +164,7 @@ function buildPipelineYamlText(params: {
 function parsePipelineYamlText(yamlText: string): {
   name: string
   description: string
+  codeRepository: string
   labels: MetadataEntry[]
   annotations: MetadataEntry[]
   workspaceName: string
@@ -195,6 +217,10 @@ function parsePipelineYamlText(yamlText: string): {
   return {
     name: typeof metadata.name === "string" ? metadata.name : "",
     description: typeof annotations.description === "string" ? annotations.description : "",
+    codeRepository:
+      typeof annotations[CODE_REPOSITORY_ANNOTATION_KEY] === "string"
+        ? (annotations[CODE_REPOSITORY_ANNOTATION_KEY] as string)
+        : "",
     labels: metadataRecordToEntries(
       Object.fromEntries(
         Object.entries(labels).filter(([, value]) => typeof value === "string")
@@ -262,6 +288,7 @@ export function PipelinesPageClient({
   const [creating, setCreating] = React.useState(false)
 
   const [pipelineName, setPipelineName] = React.useState("")
+  const [codeRepository, setCodeRepository] = React.useState("")
   const [pipelineDescription, setPipelineDescription] = React.useState("")
   const [workspaceName, setWorkspaceName] = React.useState("")
   const [metadataEnabled, setMetadataEnabled] = React.useState(false)
@@ -269,12 +296,76 @@ export function PipelinesPageClient({
   const [annotationEntries, setAnnotationEntries] = React.useState<MetadataEntry[]>([
     { key: "", value: "" },
   ])
+  const [keyValueEnabled, setKeyValueEnabled] = React.useState(false)
+  const [keyValueEntries, setKeyValueEntries] = React.useState<MetadataEntry[]>([
+    { key: "", value: "" },
+  ])
+  const [droneRepoOptions, setDroneRepoOptions] = React.useState<string[]>([])
 
   const [createNameInvalid, setCreateNameInvalid] = React.useState(false)
   const [createNameError, setCreateNameError] = React.useState<string | null>(null)
+  const [codeRepositoryError, setCodeRepositoryError] = React.useState<string | null>(null)
   const [createYamlMode, setCreateYamlMode] = React.useState(false)
   const [createYamlText, setCreateYamlText] = React.useState("")
   const [createYamlError, setCreateYamlError] = React.useState<string | null>(null)
+  const createDialogPopupLayerRef = React.useRef<HTMLDivElement | null>(null)
+
+  const codeRepositoryOptions = React.useMemo<string[]>(() => {
+    const names = new Set<string>()
+    for (const option of droneRepoOptions) {
+      const value = option.trim()
+      if (value) names.add(value)
+    }
+    return Array.from(names)
+  }, [droneRepoOptions])
+
+  const matchedCodeRepositoryOptions = React.useMemo(() => {
+    const query = codeRepository.trim().toLowerCase()
+    if (!query) return codeRepositoryOptions
+    return codeRepositoryOptions.filter((item) => item.toLowerCase().includes(query))
+  }, [codeRepository, codeRepositoryOptions])
+
+  const normalizeRepositoryValue = React.useCallback((value: string) => value.trim().toLowerCase(), [])
+
+  const clearRepositoryIfNotMatched = React.useCallback(() => {
+    const current = codeRepository.trim()
+    if (!current) {
+      setCodeRepositoryError("请选择代码仓库")
+      return
+    }
+    const normalizedCurrent = normalizeRepositoryValue(current)
+    const matched = codeRepositoryOptions.some(
+      (item) => normalizeRepositoryValue(item) === normalizedCurrent
+    )
+    if (!matched) {
+      setCodeRepository("")
+      setCodeRepositoryError("请选择代码仓库")
+      return
+    }
+    setCodeRepositoryError(null)
+  }, [codeRepository, codeRepositoryOptions, normalizeRepositoryValue])
+
+  const handleNextStep = React.useCallback(() => {
+    if (creating) return
+
+    const nameError = validatePipelineName(pipelineName.trim())
+    if (nameError) {
+      setCreateNameInvalid(true)
+      setCreateNameError(nameError)
+    } else {
+      setCreateNameInvalid(false)
+      setCreateNameError(null)
+    }
+
+    if (!codeRepository.trim()) {
+      setCodeRepositoryError("请选择代码仓库")
+      return
+    }
+    setCodeRepositoryError(null)
+
+    if (nameError) return
+    setCreateStep("advanced")
+  }, [codeRepository, creating, pipelineName])
 
   const loadRows = React.useCallback(
     async (silent: boolean) => {
@@ -326,16 +417,39 @@ export function PipelinesPageClient({
     }
   }, [loadRows, normalizedPipelineProjectName])
 
+  React.useEffect(() => {
+    let cancelled = false
+
+    void fetchDroneRepoOptions()
+      .then((items) => {
+        if (cancelled) return
+        setDroneRepoOptions(items)
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        console.error("[Pipelines] load drone repos failed", e)
+        setDroneRepoOptions([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const resetCreateState = React.useCallback(() => {
     setCreateMode("create")
     setEditingName(null)
     setPipelineName("")
+    setCodeRepository("")
     setPipelineDescription("")
     setMetadataEnabled(false)
     setLabelEntries([{ key: "", value: "" }])
     setAnnotationEntries([{ key: "", value: "" }])
+    setKeyValueEnabled(false)
+    setKeyValueEntries([{ key: "", value: "" }])
     setCreateNameInvalid(false)
     setCreateNameError(null)
+    setCodeRepositoryError(null)
     setCreateYamlMode(false)
     setCreateYamlText("")
     setCreateYamlError(null)
@@ -359,6 +473,7 @@ export function PipelinesPageClient({
           setCreateMode("edit")
           setEditingName(detail.name)
           setPipelineName(detail.name)
+          setCodeRepository(detail.annotations[CODE_REPOSITORY_ANNOTATION_KEY] || detail.name)
           setPipelineDescription(detail.description)
           setWorkspaceName(detail.workspace || workspaceName)
           const nextLabels = metadataRecordToEntries(detail.labels)
@@ -366,6 +481,8 @@ export function PipelinesPageClient({
           setLabelEntries(nextLabels)
           setAnnotationEntries(nextAnnotations)
           setMetadataEnabled(hasUserProvidedMetadata(nextLabels, nextAnnotations))
+          setKeyValueEnabled(false)
+          setKeyValueEntries([{ key: "", value: "" }])
           setCreateDialogOpen(true)
         })
         .catch((e: unknown) => {
@@ -382,6 +499,7 @@ export function PipelinesPageClient({
     const allPipelineNames = rows.map((row) => row.name.trim())
     let nextName = pipelineName.trim()
     let nextDescription = pipelineDescription.trim()
+    let nextCodeRepository = codeRepository.trim()
     let nextLabels = labelEntries
     let nextAnnotations = annotationEntries
     let nextWorkspaceName = workspaceName.trim()
@@ -392,6 +510,7 @@ export function PipelinesPageClient({
         const parsed = parsePipelineYamlText(createYamlText)
         nextName = parsed.name.trim()
         nextDescription = parsed.description.trim()
+        nextCodeRepository = parsed.codeRepository.trim()
         nextLabels = parsed.labels
         nextAnnotations = parsed.annotations
         nextWorkspaceName = parsed.workspaceName.trim() || nextWorkspaceName
@@ -399,6 +518,7 @@ export function PipelinesPageClient({
 
         setPipelineName(nextName)
         setPipelineDescription(nextDescription)
+        setCodeRepository(nextCodeRepository)
         setLabelEntries(nextLabels)
         setAnnotationEntries(nextAnnotations)
         setMetadataEnabled(hasUserProvidedMetadata(nextLabels, nextAnnotations))
@@ -409,10 +529,19 @@ export function PipelinesPageClient({
       }
     }
 
+    if (!nextCodeRepository) {
+      const message = "请选择代码仓库"
+      setCodeRepositoryError(message)
+      setCreateStep("basic")
+      if (createYamlMode) setCreateYamlError(message)
+      return
+    }
+
     const nameError = validatePipelineName(nextName)
     if (nameError) {
       setCreateNameInvalid(true)
       setCreateNameError(nameError)
+      setCreateStep("basic")
       if (createYamlMode) setCreateYamlError(nameError)
       return
     }
@@ -435,16 +564,23 @@ export function PipelinesPageClient({
 
     setCreateNameInvalid(false)
     setCreateNameError(null)
+    setCodeRepositoryError(null)
     setCreateYamlError(null)
     setCreating(true)
 
     const targetName = isEditMode && editingName ? editingName : nextName
+    const nextAnnotationRecord = metadataEntriesToRecord(nextAnnotations)
+    if (nextCodeRepository) {
+      nextAnnotationRecord[CODE_REPOSITORY_ANNOTATION_KEY] = nextCodeRepository
+    } else {
+      delete nextAnnotationRecord[CODE_REPOSITORY_ANNOTATION_KEY]
+    }
     const request = isEditMode
       ? updatePipeline({
           name: targetName,
           description: nextDescription,
           labels: metadataEntriesToRecord(nextLabels),
-          annotations: metadataEntriesToRecord(nextAnnotations),
+          annotations: nextAnnotationRecord,
           workspaceName: nextWorkspaceName || undefined,
           pipelineProjectName: nextPipelineProjectName || undefined,
         })
@@ -452,7 +588,7 @@ export function PipelinesPageClient({
           name: targetName,
           description: nextDescription,
           labels: metadataEntriesToRecord(nextLabels),
-          annotations: metadataEntriesToRecord(nextAnnotations),
+          annotations: nextAnnotationRecord,
           workspaceName: nextWorkspaceName || undefined,
           pipelineProjectName: nextPipelineProjectName || undefined,
         })
@@ -478,6 +614,7 @@ export function PipelinesPageClient({
     createMode,
     createYamlMode,
     createYamlText,
+    codeRepository,
     creating,
     editingName,
     labelEntries,
@@ -685,6 +822,7 @@ export function PipelinesPageClient({
           onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
+          <div ref={createDialogPopupLayerRef} className="pointer-events-none absolute inset-0 z-50" />
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
@@ -703,6 +841,7 @@ export function PipelinesPageClient({
                           buildPipelineYamlText({
                             name: pipelineName,
                             description: pipelineDescription,
+                            codeRepository,
                             labels: labelEntries,
                             annotations: annotationEntries,
                             workspaceName,
@@ -718,6 +857,7 @@ export function PipelinesPageClient({
                         const parsed = parsePipelineYamlText(createYamlText)
                         setPipelineName(parsed.name)
                         setPipelineDescription(parsed.description)
+                        setCodeRepository(parsed.codeRepository.trim())
                         setLabelEntries(parsed.labels)
                         setAnnotationEntries(parsed.annotations)
                         if (parsed.workspaceName.trim()) setWorkspaceName(parsed.workspaceName.trim())
@@ -756,7 +896,8 @@ export function PipelinesPageClient({
                     status:
                       createStep === "advanced"
                         ? "当前"
-                        : hasUserProvidedMetadata(labelEntries, annotationEntries)
+                        : hasUserProvidedMetadata(labelEntries, annotationEntries) ||
+                            hasUserProvidedKeyValues(keyValueEntries)
                           ? "已设置"
                           : "可选",
                     active: createStep === "advanced",
@@ -798,7 +939,7 @@ export function PipelinesPageClient({
                     <p className="mt-1 text-sm text-muted-foreground">填写流水线基础信息。</p>
                   </div>
                   <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Field data-invalid={createNameInvalid} className="md:col-span-2">
+                    <Field data-invalid={createNameInvalid}>
                       <FieldLabel htmlFor="pipeline-create-name">名称</FieldLabel>
                       <Input
                         id="pipeline-create-name"
@@ -817,6 +958,60 @@ export function PipelinesPageClient({
                         <FieldError>{createNameError}</FieldError>
                       ) : (
                         <FieldDescription>{PIPELINE_NAME_RULE_MESSAGE}</FieldDescription>
+                      )}
+                    </Field>
+                    <Field data-invalid={Boolean(codeRepositoryError)}>
+                      <FieldLabel htmlFor="pipeline-create-repository">代码仓库</FieldLabel>
+                      <Combobox
+                        items={codeRepositoryOptions}
+                        value={codeRepository.trim() ? codeRepository : null}
+                        inputValue={codeRepository}
+                        onInputValueChange={(value) => {
+                          setCodeRepository(value ?? "")
+                          if (codeRepositoryError) setCodeRepositoryError(null)
+                        }}
+                        onValueChange={(item) => {
+                          if (typeof item === "string") {
+                            setCodeRepository(item)
+                            if (codeRepositoryError) setCodeRepositoryError(null)
+                          }
+                        }}
+                        disabled={creating}
+                      >
+                        <ComboboxInput
+                          placeholder="请选择代码仓库"
+                          className={cn(
+                            "w-full",
+                            codeRepositoryError
+                              ? "border-destructive ring-[3px] ring-destructive/20 dark:ring-destructive/40"
+                              : ""
+                          )}
+                          disabled={creating}
+                          onBlur={clearRepositoryIfNotMatched}
+                          aria-invalid={Boolean(codeRepositoryError)}
+                        />
+                        {matchedCodeRepositoryOptions.length > 0 ? (
+                          <ComboboxContent
+                            container={createDialogPopupLayerRef}
+                            className="pointer-events-auto"
+                          >
+                            <ComboboxEmpty />
+                            <ComboboxList>
+                              {(item, index) => (
+                                <ComboboxItem key={`${item}-${index}`} value={item}>
+                                  {item}
+                                </ComboboxItem>
+                              )}
+                            </ComboboxList>
+                          </ComboboxContent>
+                        ) : null}
+                      </Combobox>
+                      {codeRepositoryError ? (
+                        <FieldError>{codeRepositoryError}</FieldError>
+                      ) : (
+                        <FieldDescription>
+                          请选择要构建的 Drone 仓库（owner/repo）。
+                        </FieldDescription>
                       )}
                     </Field>
 
@@ -839,7 +1034,7 @@ export function PipelinesPageClient({
                 <div className="p-6">
                   <div className="mb-4">
                     <h3 className="text-[15px] font-semibold">高级设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">补充标签注解信息。</p>
+                    <p className="mt-1 text-sm text-muted-foreground">补充标签注解与键值配置。</p>
                   </div>
                   <FieldGroup className="flex flex-col gap-4">
                     <Field>
@@ -854,6 +1049,17 @@ export function PipelinesPageClient({
                         setDescription={setPipelineDescription}
                         disabled={creating}
                         titleText="统一管理流水线的标签与注解信息。"
+                      />
+                    </Field>
+                    <Field>
+                      <ResourceKeyValueEditor
+                        checked={keyValueEnabled}
+                        onCheckedChange={setKeyValueEnabled}
+                        entries={keyValueEntries}
+                        setEntries={setKeyValueEntries}
+                        disabled={creating}
+                        title="变量配置"
+                        description="维护流水线运行所需的键值变量或秘钥参数。"
                       />
                     </Field>
                   </FieldGroup>
@@ -880,7 +1086,7 @@ export function PipelinesPageClient({
                       取消
                     </Button>
                   </DialogClose>
-                  <Button type="button" disabled={creating} onClick={() => setCreateStep("advanced")}>
+                  <Button type="button" disabled={creating} onClick={handleNextStep}>
                     下一步
                   </Button>
                 </div>

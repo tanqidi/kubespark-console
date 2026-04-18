@@ -35,6 +35,13 @@ type RawPipelineRun = {
   status?: Record<string, unknown>
 }
 
+type RawDroneRepo = {
+  namespace?: string
+  name?: string
+  slug?: string
+  full_name?: string
+}
+
 export type PipelineRow = {
   id: string
   name: string
@@ -337,6 +344,33 @@ export async function fetchPipelineRows(pipelineProjectName?: string): Promise<P
       if (!expectedProject) return true
       return extractPipelineProjectName(items[index] ?? {}) === expectedProject
     })
+}
+
+function resolveDroneRepoOption(item: RawDroneRepo): string {
+  const slug = readString(item.slug)
+  if (slug) return slug
+
+  const fullName = readString(item.full_name)
+  if (fullName) return fullName
+
+  const namespace = readString(item.namespace)
+  const name = readString(item.name)
+  if (namespace && name) return `${namespace}/${name}`
+  if (name) return name
+
+  return ""
+}
+
+export async function fetchDroneRepoOptions(): Promise<string[]> {
+  const { items } = await fetchResourceCollection<RawDroneRepo>("drone", "v1", "repos")
+  const options = new Set<string>()
+
+  for (const item of items) {
+    const option = resolveDroneRepoOption(item)
+    if (option) options.add(option)
+  }
+
+  return Array.from(options)
 }
 
 export async function fetchPipelineDetail(name: string): Promise<PipelineDetail> {
