@@ -78,6 +78,14 @@ const MONACO_OPTIONS: EditorProps["options"] = {
 }
 
 type PipelineDialogStep = "basic" | "advanced"
+type PipelineYamlFormSnapshot = {
+  pipelineName: string
+  codeRepository: string
+  pipelineDescription: string
+  workspaceName: string
+  labelEntries: MetadataEntry[]
+  annotationEntries: MetadataEntry[]
+}
 type PipelinesPageClientProps = {
   pipelineProjectName?: string
   detailBasePath?: string
@@ -312,6 +320,8 @@ export function PipelinesPageClient({
   const [createDroneYamlMode, setCreateDroneYamlMode] = React.useState(false)
   const [createDroneYamlText, setCreateDroneYamlText] = React.useState("")
   const [createDroneYamlError, setCreateDroneYamlError] = React.useState<string | null>(null)
+  const createYamlSnapshotRef = React.useRef<PipelineYamlFormSnapshot | null>(null)
+  const createDroneYamlSnapshotRef = React.useRef<string>("")
   const createDialogPopupLayerRef = React.useRef<HTMLDivElement | null>(null)
 
   const codeRepositoryOptions = React.useMemo<string[]>(() => {
@@ -370,6 +380,89 @@ export function PipelinesPageClient({
     if (nameError) return
     setCreateStep("advanced")
   }, [codeRepository, creating, pipelineName])
+
+  const enterCreateYamlMode = React.useCallback(() => {
+    createYamlSnapshotRef.current = {
+      pipelineName,
+      codeRepository,
+      pipelineDescription,
+      workspaceName,
+      labelEntries: labelEntries.map((item) => ({ ...item })),
+      annotationEntries: annotationEntries.map((item) => ({ ...item })),
+    }
+    setCreateDroneYamlMode(false)
+    setCreateDroneYamlError(null)
+    setCreateYamlText(
+      buildPipelineYamlText({
+        name: pipelineName,
+        description: pipelineDescription,
+        codeRepository,
+        labels: labelEntries,
+        annotations: annotationEntries,
+        workspaceName,
+        pipelineProjectName: normalizedPipelineProjectName,
+      })
+    )
+    setCreateYamlError(null)
+    setCreateYamlMode(true)
+  }, [
+    annotationEntries,
+    codeRepository,
+    labelEntries,
+    normalizedPipelineProjectName,
+    pipelineDescription,
+    pipelineName,
+    workspaceName,
+  ])
+
+  const cancelCreateYamlMode = React.useCallback(() => {
+    const snapshot = createYamlSnapshotRef.current
+    if (snapshot) {
+      setPipelineName(snapshot.pipelineName)
+      setCodeRepository(snapshot.codeRepository)
+      setPipelineDescription(snapshot.pipelineDescription)
+      setWorkspaceName(snapshot.workspaceName)
+      setLabelEntries(snapshot.labelEntries.map((item) => ({ ...item })))
+      setAnnotationEntries(snapshot.annotationEntries.map((item) => ({ ...item })))
+    }
+    setCreateYamlError(null)
+    setCreateYamlMode(false)
+  }, [])
+
+  const confirmCreateYamlMode = React.useCallback(() => {
+    try {
+      const parsed = parsePipelineYamlText(createYamlText)
+      setPipelineName(parsed.name)
+      setPipelineDescription(parsed.description)
+      setCodeRepository(parsed.codeRepository.trim())
+      setLabelEntries(parsed.labels)
+      setAnnotationEntries(parsed.annotations)
+      if (parsed.workspaceName.trim()) setWorkspaceName(parsed.workspaceName.trim())
+      setCreateYamlError(null)
+      setCreateYamlMode(false)
+    } catch (error) {
+      setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [createYamlText])
+
+  const enterCreateDroneYamlMode = React.useCallback(() => {
+    createDroneYamlSnapshotRef.current = createDroneYamlText
+    setCreateYamlMode(false)
+    setCreateYamlError(null)
+    setCreateDroneYamlError(null)
+    setCreateDroneYamlMode(true)
+  }, [createDroneYamlText])
+
+  const cancelCreateDroneYamlMode = React.useCallback(() => {
+    setCreateDroneYamlText(createDroneYamlSnapshotRef.current)
+    setCreateDroneYamlError(null)
+    setCreateDroneYamlMode(false)
+  }, [])
+
+  const confirmCreateDroneYamlMode = React.useCallback(() => {
+    setCreateDroneYamlError(null)
+    setCreateDroneYamlMode(false)
+  }, [])
 
   const loadRows = React.useCallback(
     async (silent: boolean) => {
@@ -843,49 +936,22 @@ export function PipelinesPageClient({
                 <DialogDescription>{dialogDescription}</DialogDescription>
               </DialogHeader>
               <div className="me-20 flex h-full items-center gap-3">
-                {/*<div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
                   <span className="text-sm font-medium">编辑 YAML</span>
                   <Switch
                       checked={createYamlMode}
                       onCheckedChange={(checked) => {
                         if (creating) return
                         if (checked) {
-                          setCreateDroneYamlMode(false)
-                          setCreateDroneYamlError(null)
-                          setCreateYamlText(
-                              buildPipelineYamlText({
-                                name: pipelineName,
-                                description: pipelineDescription,
-                                codeRepository,
-                                labels: labelEntries,
-                                annotations: annotationEntries,
-                                workspaceName,
-                                pipelineProjectName: normalizedPipelineProjectName,
-                              })
-                          )
-                          setCreateYamlError(null)
-                          setCreateYamlMode(true)
-                          return
-                        }
-
-                        try {
-                          const parsed = parsePipelineYamlText(createYamlText)
-                          setPipelineName(parsed.name)
-                          setPipelineDescription(parsed.description)
-                          setCodeRepository(parsed.codeRepository.trim())
-                          setLabelEntries(parsed.labels)
-                          setAnnotationEntries(parsed.annotations)
-                          if (parsed.workspaceName.trim()) setWorkspaceName(parsed.workspaceName.trim())
-                          setCreateYamlError(null)
-                          setCreateYamlMode(false)
-                        } catch (error) {
-                          setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+                          enterCreateYamlMode()
+                        } else {
+                          cancelCreateYamlMode()
                         }
                       }}
                       disabled={creating}
                       aria-label="编辑 YAML"
                   />
-                </div>*/}
+                </div>
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
                   <span className="text-sm font-medium">编辑 .drone.yml</span>
                   <Switch
@@ -893,18 +959,10 @@ export function PipelinesPageClient({
                       onCheckedChange={(checked) => {
                         if (creating) return
                         if (checked) {
-                          setCreateYamlMode(false)
-                          setCreateYamlError(null)
-                          const annotations = metadataEntriesToRecord(annotationEntries)
-                          setCreateDroneYamlText(
-                              createDroneYamlText || annotations[DRONE_YAML_ANNOTATION_KEY] || ""
-                          )
-                          setCreateDroneYamlError(null)
-                          setCreateDroneYamlMode(true)
-                          return
+                          enterCreateDroneYamlMode()
+                        } else {
+                          cancelCreateDroneYamlMode()
                         }
-                        setCreateDroneYamlError(null)
-                        setCreateDroneYamlMode(false)
                       }}
                       disabled={creating}
                       aria-label="编辑 .drone.yml"
@@ -1125,13 +1183,20 @@ export function PipelinesPageClient({
             <DialogFooter className="border-t bg-background px-6 py-5">
               {createYamlMode || createDroneYamlMode ? (
                 <div className="flex w-full items-center justify-between gap-3">
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={creating}>
-                      取消
-                    </Button>
-                  </DialogClose>
-                  <Button type="button" onClick={handleCreateSubmit} disabled={creating}>
-                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={creating}
+                    onClick={createYamlMode ? cancelCreateYamlMode : cancelCreateDroneYamlMode}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={creating}
+                    onClick={createYamlMode ? confirmCreateYamlMode : confirmCreateDroneYamlMode}
+                  >
+                    确认保存
                   </Button>
                 </div>
               ) : createStep === "basic" ? (
