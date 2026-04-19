@@ -42,6 +42,16 @@ type RawDroneRepo = {
   full_name?: string
 }
 
+type RawDroneSecret = {
+  id?: number
+  name?: string
+}
+
+export type DroneSecretOption = {
+  id: number
+  name: string
+}
+
 export type PipelineRow = {
   id: string
   name: string
@@ -372,6 +382,89 @@ export async function fetchDroneRepoOptions(): Promise<string[]> {
   }
 
   return Array.from(options)
+}
+
+function resolveDroneRepoIdentity(repository: string): { namespace: string; repo: string } {
+  const source = repository.trim()
+  if (!source) return { namespace: "", repo: "" }
+
+  const segments = source
+    .split("/")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+  const namespace = segments[0] ?? ""
+  const repo = segments.length >= 2 ? segments.slice(1).join("/") : ""
+  return { namespace, repo }
+}
+
+export async function fetchDroneSecretKeyOptions(repository: string): Promise<DroneSecretOption[]> {
+  const { namespace, repo } = resolveDroneRepoIdentity(repository)
+  if (!namespace || !repo) return []
+
+  const { items } = await fetchResourceCollection<RawDroneSecret>("drone", "v1", "secrets", {
+    namespace,
+    fieldSelector: `metadata.name=${repo}`,
+  })
+  const options = new Map<string, number>()
+  for (const item of items) {
+    const name = readString(item.name)
+    const id = typeof item.id === "number" && Number.isFinite(item.id) ? Math.trunc(item.id) : 0
+    if (name && id > 0) options.set(name, id)
+  }
+  return Array.from(options.entries()).map(([name, id]) => ({ name, id }))
+}
+
+export async function createDroneSecret(repository: string, secretName: string, value: string): Promise<void> {
+  const key = secretName.trim()
+  const data = value.trim()
+  const { namespace, repo } = resolveDroneRepoIdentity(repository)
+  if (!namespace || !repo || !key) {
+    throw new Error("缺少代码仓库或 Secret 名称")
+  }
+
+  const base = buildResourceCollectionEndpoint("drone", "v1", "secrets", { namespace })
+  const requestUrl = `${base}${base.includes("?") ? "&" : "?"}repo=${encodeURIComponent(repo)}`
+  await fetchJsonDeduped<unknown>(requestUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: key,
+      data,
+    }),
+  })
+}
+
+export async function updateDroneSecret(repository: string, secretName: string, value: string): Promise<void> {
+  const key = secretName.trim()
+  const data = value.trim()
+  const { namespace, repo } = resolveDroneRepoIdentity(repository)
+  if (!namespace || !repo || !key) {
+    throw new Error("缺少代码仓库或 Secret 名称")
+  }
+
+  const base = buildResourceItemEndpoint("drone", "v1", "secrets", key, namespace)
+  const requestUrl = `${base}${base.includes("?") ? "&" : "?"}repo=${encodeURIComponent(repo)}`
+  await fetchJsonDeduped<unknown>(requestUrl, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      data,
+    }),
+  })
+}
+
+export async function deleteDroneSecret(repository: string, secretName: string): Promise<void> {
+  const key = secretName.trim()
+  const { namespace, repo } = resolveDroneRepoIdentity(repository)
+  if (!namespace || !repo || !key) {
+    throw new Error("缺少代码仓库或 Secret 名称")
+  }
+
+  const base = buildResourceItemEndpoint("drone", "v1", "secrets", key, namespace)
+  const requestUrl = `${base}${base.includes("?") ? "&" : "?"}repo=${encodeURIComponent(repo)}`
+  await fetchJsonDeduped<unknown>(requestUrl, {
+    method: "DELETE",
+  })
 }
 
 export async function fetchPipelineDetail(name: string): Promise<PipelineDetail> {

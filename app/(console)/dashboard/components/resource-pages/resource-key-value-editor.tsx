@@ -19,6 +19,8 @@ type ResourceKeyValueEditorProps = {
   onCheckedChange: (checked: boolean) => void
   entries: MetadataEntry[]
   setEntries: React.Dispatch<React.SetStateAction<MetadataEntry[]>>
+  onRequestDeleteEntry?: (entry: MetadataEntry, index: number) => void
+  resolveEntryStatus?: (entry: MetadataEntry, index: number) => string | null
   disabled?: boolean
   title?: string
   description?: string
@@ -33,9 +35,11 @@ export function ResourceKeyValueEditor({
   onCheckedChange,
   entries,
   setEntries,
+  onRequestDeleteEntry,
+  resolveEntryStatus,
   disabled = false,
   title = "变量配置",
-  description = "维护流水线运行所需的键值变量或秘钥参数。",
+  description = "维护流水线运行所需的键值变量或秘钥参数，值为空则跳过修改。",
 }: ResourceKeyValueEditorProps) {
   return (
     <AdvancedToggleCard
@@ -100,24 +104,33 @@ export function ResourceKeyValueEditor({
                   className="min-w-0"
                 />
               </InputGroup>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setEntries((current) =>
-                    current.length <= 1
-                      ? [{ key: "", value: "" }]
-                      : current.filter((_, itemIndex) => itemIndex !== index)
-                  )
-                }}
-                disabled={disabled}
-                className="shrink-0"
-                aria-label="删除键值"
-              >
-                <IconTrash data-icon="inline-start" />
-                删除
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (onRequestDeleteEntry) {
+                      onRequestDeleteEntry(entry, index)
+                      return
+                    }
+                    setEntries((current) =>
+                      current.length <= 1
+                        ? [{ key: "", value: "" }]
+                        : current.filter((_, itemIndex) => itemIndex !== index)
+                    )
+                  }}
+                  disabled={disabled}
+                  className="shrink-0"
+                  aria-label="删除键值"
+                >
+                  <IconTrash data-icon="inline-start" />
+                  删除
+                </Button>
+                {resolveEntryStatus ? (
+                  <span className="text-xs text-muted-foreground">{resolveEntryStatus(entry, index) ?? ""}</span>
+                ) : null}
+              </div>
             </div>
           ))}
           <div className="flex justify-end gap-2">

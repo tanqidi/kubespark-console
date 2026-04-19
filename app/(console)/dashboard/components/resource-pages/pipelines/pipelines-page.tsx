@@ -26,12 +26,16 @@ import {
   type ColumnConfig,
 } from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
+  createDroneSecret,
   createPipeline,
+  deleteDroneSecret,
   deletePipeline,
   fetchDroneRepoOptions,
+  fetchDroneSecretKeyOptions,
   fetchPipelineDetail,
   fetchPipelineRows,
   fetchPipelineYaml,
+  updateDroneSecret,
   updatePipeline,
   type PipelineRow,
 } from "@/app/lib/kubespark/pipelines"
@@ -221,7 +225,6 @@ function parsePipelineYamlText(yamlText: string): {
     !Array.isArray(spec.pipelineProjectRef)
       ? (spec.pipelineProjectRef as Record<string, unknown>)
       : {}
-
   return {
     name: typeof metadata.name === "string" ? metadata.name : "",
     description: typeof annotations.description === "string" ? annotations.description : "",
@@ -287,6 +290,8 @@ export function PipelinesPageClient({
 
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PipelineRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+  const [pendingDeleteSecretKey, setPendingDeleteSecretKey] = React.useState<string | null>(null)
+  const [deletingSecret, setDeletingSecret] = React.useState(false)
 
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [createStep, setCreateStep] = React.useState<PipelineDialogStep>("basic")
@@ -308,6 +313,8 @@ export function PipelinesPageClient({
     { key: "", value: "" },
   ])
   const [droneRepoOptions, setDroneRepoOptions] = React.useState<string[]>([])
+  const [droneSecretLoading, setDroneSecretLoading] = React.useState(false)
+  const [droneSecretIdByKey, setDroneSecretIdByKey] = React.useState<Record<string, number>>({})
 
   const [createNameInvalid, setCreateNameInvalid] = React.useState(false)
   const [createNameError, setCreateNameError] = React.useState<string | null>(null)
@@ -531,6 +538,51 @@ export function PipelinesPageClient({
     }
   }, [])
 
+  React.useEffect(() => {
+    if (!createDialogOpen || createStep !== "advanced" || createYamlMode || createDroneYamlMode) return
+    const repository = codeRepository.trim()
+    if (!repository) {
+      setDroneSecretLoading(false)
+      setKeyValueEntries([{ key: "", value: "" }])
+      setKeyValueEnabled(false)
+      setDroneSecretIdByKey({})
+      return
+    }
+
+    let cancelled = false
+    setDroneSecretLoading(true)
+    void fetchDroneSecretKeyOptions(repository)
+      .then((items) => {
+        if (cancelled) return
+        if (items.length === 0) {
+          setKeyValueEntries([{ key: "", value: "" }])
+          setKeyValueEnabled(false)
+          setDroneSecretIdByKey({})
+          return
+        }
+        setKeyValueEntries(items.map((item) => ({ key: item.name, value: "" })))
+        setDroneSecretIdByKey(
+          Object.fromEntries(items.map((item) => [item.name, item.id]))
+        )
+        setKeyValueEnabled(true)
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        console.error("[Pipelines] load drone secrets failed", e)
+        setKeyValueEntries([{ key: "", value: "" }])
+        setKeyValueEnabled(false)
+        setDroneSecretIdByKey({})
+      })
+      .finally(() => {
+        if (cancelled) return
+        setDroneSecretLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [codeRepository, createDialogOpen, createDroneYamlMode, createStep, createYamlMode])
+
   const resetCreateState = React.useCallback(() => {
     setCreateMode("create")
     setEditingName(null)
@@ -542,6 +594,7 @@ export function PipelinesPageClient({
     setAnnotationEntries([{ key: "", value: "" }])
     setKeyValueEnabled(false)
     setKeyValueEntries([{ key: "", value: "" }])
+    setDroneSecretIdByKey({})
     setCreateNameInvalid(false)
     setCreateNameError(null)
     setCodeRepositoryError(null)
@@ -678,40 +731,65 @@ export function PipelinesPageClient({
     } else {
       delete nextAnnotationRecord[DRONE_YAML_ANNOTATION_KEY]
     }
-    const request = isEditMode
-      ? updatePipeline({
-          name: targetName,
-          description: nextDescription,
-          labels: metadataEntriesToRecord(nextLabels),
-          annotations: nextAnnotationRecord,
-          workspaceName: nextWorkspaceName || undefined,
-          pipelineProjectName: nextPipelineProjectName || undefined,
-        })
-      : createPipeline({
-          name: targetName,
-          description: nextDescription,
-          labels: metadataEntriesToRecord(nextLabels),
-          annotations: nextAnnotationRecord,
-          workspaceName: nextWorkspaceName || undefined,
-          pipelineProjectName: nextPipelineProjectName || undefined,
-        })
+    void (async () => {
+      try {
+        if (keyValueEnabled) {
+          const normalized = new Map<string, string>()
+          for (const entry of keyValueEntries) {
+            const key = entry.key.trim()
+            if (!key) continue
+            if (normalized.has(key)) throw new Error(`变量键重复：${key}`)
+            normalized.set(key, entry.value.trim())
+          }
 
-    void request
-      .then(async () => {
+          const mutations: Array<Promise<void>> = []
+          for (const [key, value] of normalized) {
+            if (!value) continue
+            if (droneSecretIdByKey[key]) {
+              mutations.push(updateDroneSecret(nextCodeRepository, key, value))
+            } else {
+              mutations.push(createDroneSecret(nextCodeRepository, key, value))
+            }
+          }
+          if (mutations.length > 0) {
+            await Promise.all(mutations)
+          }
+        }
+
+        if (isEditMode) {
+          await updatePipeline({
+            name: targetName,
+            description: nextDescription,
+            labels: metadataEntriesToRecord(nextLabels),
+            annotations: nextAnnotationRecord,
+            workspaceName: nextWorkspaceName || undefined,
+            pipelineProjectName: nextPipelineProjectName || undefined,
+          })
+        } else {
+          await createPipeline({
+            name: targetName,
+            description: nextDescription,
+            labels: metadataEntriesToRecord(nextLabels),
+            annotations: nextAnnotationRecord,
+            workspaceName: nextWorkspaceName || undefined,
+            pipelineProjectName: nextPipelineProjectName || undefined,
+          })
+        }
+
         setCreateDialogOpen(false)
         resetCreateState()
         await loadRows(false)
-      })
-      .catch((e: unknown) => {
+      } catch (e: unknown) {
         const message = resolveCreatePipelineErrorMessage(e)
         const isNameError = isNameRelatedCreateError(e)
         setCreateNameInvalid(isNameError)
         setCreateNameError(isNameError ? message : null)
         if (createYamlMode) setCreateYamlError(message)
-      })
-      .finally(() => {
+        if (!isNameError) setError(message)
+      } finally {
         setCreating(false)
-      })
+      }
+    })()
   }, [
     annotationEntries,
     createMode,
@@ -720,7 +798,10 @@ export function PipelinesPageClient({
     createDroneYamlText,
     codeRepository,
     creating,
+    droneSecretIdByKey,
     editingName,
+    keyValueEnabled,
+    keyValueEntries,
     labelEntries,
     loadRows,
     normalizedPipelineProjectName,
@@ -794,6 +875,33 @@ export function PipelinesPageClient({
         setDeleting(false)
       })
   }, [deleting, loadRows, pendingDeleteRow])
+
+  const handleConfirmDeleteSecret = React.useCallback(() => {
+    if (deletingSecret) return
+    const key = pendingDeleteSecretKey?.trim() ?? ""
+    const repository = codeRepository.trim()
+    if (!key || !repository) return
+
+    setDeletingSecret(true)
+    void deleteDroneSecret(repository, key)
+      .then(async () => {
+        setPendingDeleteSecretKey(null)
+        const items = await fetchDroneSecretKeyOptions(repository)
+        setKeyValueEntries(
+          items.length > 0 ? items.map((item) => ({ key: item.name, value: "" })) : [{ key: "", value: "" }]
+        )
+        setDroneSecretIdByKey(
+          items.length > 0 ? Object.fromEntries(items.map((item) => [item.name, item.id])) : {}
+        )
+        setKeyValueEnabled(items.length > 0)
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "删除变量失败")
+      })
+      .finally(() => {
+        setDeletingSecret(false)
+      })
+  }, [codeRepository, deletingSecret, pendingDeleteSecretKey])
 
   const columns = React.useMemo(
     () =>
@@ -881,6 +989,16 @@ export function PipelinesPageClient({
           if (!open) setPendingDeleteRow(null)
         }}
         onConfirm={handleConfirmDelete}
+      />
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeleteSecretKey)}
+        title="删除变量"
+        description={pendingDeleteSecretKey ? `确定删除变量 ${pendingDeleteSecretKey} 吗？` : ""}
+        deleting={deletingSecret}
+        onOpenChange={(open) => {
+          if (!open && !deletingSecret) setPendingDeleteSecretKey(null)
+        }}
+        onConfirm={handleConfirmDeleteSecret}
       />
 
       <Dialog
@@ -1138,9 +1256,22 @@ export function PipelinesPageClient({
                         onCheckedChange={setKeyValueEnabled}
                         entries={keyValueEntries}
                         setEntries={setKeyValueEntries}
-                        disabled={creating}
+                        onRequestDeleteEntry={(entry, index) => {
+                          const key = entry.key.trim()
+                          if (!key) return
+                          if (!droneSecretIdByKey[key]) {
+                            setKeyValueEntries((current) =>
+                              current.length <= 1
+                                ? [{ key: "", value: "" }]
+                                : current.filter((_, itemIndex) => itemIndex !== index)
+                            )
+                            return
+                          }
+                          setPendingDeleteSecretKey(key)
+                        }}
+                        disabled={creating || droneSecretLoading}
                         title="变量配置"
-                        description="维护流水线运行所需的键值变量或秘钥参数。"
+                        description="维护流水线运行所需的键值变量或秘钥参数，值为空则跳过修改。"
                       />
                     </Field>
                   </FieldGroup>
