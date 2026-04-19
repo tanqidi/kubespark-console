@@ -1352,12 +1352,7 @@ export function RoutesPageClient() {
         setAnnotationEntries(
           metadataRecordToEntries(draft.annotations)
         )
-        setMetadataEnabled(
-          hasUserProvidedMetadata(
-            metadataRecordToEntries(draft.labels),
-            metadataRecordToEntries(draft.annotations)
-          )
-        )
+        setMetadataEnabled(false)
         setCreateHost(draft.host)
         setCreatePath(draft.path || "/")
         setCreateServiceName(draft.serviceName)

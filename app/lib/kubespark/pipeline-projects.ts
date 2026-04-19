@@ -12,6 +12,7 @@ type RawPipelineProject = {
   metadata?: {
     uid?: string
     name?: string
+    resourceVersion?: string
     labels?: Record<string, string>
     annotations?: Record<string, string>
     creationTimestamp?: string
@@ -53,6 +54,7 @@ export type PipelineProjectDetail = {
   description: string
   labels: Record<string, string>
   annotations: Record<string, string>
+  resourceVersion: string
 }
 
 const PIPELINE_PROJECT_GVR = {
@@ -176,6 +178,7 @@ export async function fetchPipelineProjectDetail(name: string): Promise<Pipeline
     description: description || "",
     labels,
     annotations,
+    resourceVersion: metadata.resourceVersion ?? "",
   }
 }
 
@@ -188,11 +191,14 @@ export async function updatePipelineProject(input: UpdatePipelineProjectInput): 
   if (description) annotations.description = description
   else delete annotations.description
 
+  const current = await fetchPipelineProjectDetail(name)
+
   const requestBody = {
     apiVersion: "tanqidi.com/v1alpha1",
     kind: "PipelineProject",
     metadata: {
       name,
+      ...(current.resourceVersion ? { resourceVersion: current.resourceVersion } : {}),
       ...(Object.keys(labels).length > 0 ? { labels } : {}),
       ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
     },

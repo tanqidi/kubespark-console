@@ -1118,7 +1118,7 @@ export function ProjectsPageClient() {
       setPipelineProjectCreateLabelEntries(parsed.labels)
       const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
       setPipelineProjectCreateAnnotationEntries(protectedAnnotations)
-      setPipelineProjectCreateMetadataEnabled(hasUserProvidedMetadata(parsed.labels, protectedAnnotations))
+      setPipelineProjectCreateMetadataEnabled(false)
       setPipelineProjectCreateYamlError(null)
       setPipelineProjectCreateYamlMode(false)
     } catch (error) {

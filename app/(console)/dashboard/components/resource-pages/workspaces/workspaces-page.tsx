@@ -169,7 +169,7 @@ function parseWorkspaceYamlText(yamlText: string): {
     name: typeof metadata.name === "string" ? metadata.name : "",
     description: typeof annotationRecord.description === "string" ? annotationRecord.description : "",
     owner: typeof spec.owner === "string" ? spec.owner : "",
-    metadataEnabled: hasUserProvidedMetadata(labelEntries, annotationEntries),
+    metadataEnabled: false,
     labelEntries,
     annotationEntries,
   }
@@ -380,7 +380,7 @@ export function WorkspacesPageClient() {
         nextName = parsed.name.trim()
         nextDescription = parsed.description.trim()
         nextOwner = parsed.owner.trim()
-        nextMetadataEnabled = parsed.metadataEnabled
+        nextMetadataEnabled = false
         nextLabelEntries = parsed.labelEntries
         nextAnnotationEntries = parsed.annotationEntries
 
@@ -500,7 +500,7 @@ export function WorkspacesPageClient() {
       setWorkspaceName(parsed.name)
       setWorkspaceDescription(parsed.description)
       setWorkspaceOwner(parsed.owner)
-      setMetadataEnabled(parsed.metadataEnabled)
+      setMetadataEnabled(false)
       setLabelEntries(parsed.labelEntries)
       setAnnotationEntries(parsed.annotationEntries)
       setCreateYamlError(null)
