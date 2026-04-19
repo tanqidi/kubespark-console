@@ -891,6 +891,30 @@ export function CreateServiceDialog({
     [applySnapshot, getSnapshot, initialValues, isBusy, isEditMode, yamlText]
   )
 
+  const cancelYamlMode = React.useCallback(() => {
+    setYamlError(null)
+    setYamlMode(false)
+  }, [])
+
+  const confirmYamlMode = React.useCallback(() => {
+    try {
+      const parsed = parseServiceYamlText(yamlText)
+      const nextSnapshot =
+        isEditMode && initialValues
+          ? {
+              ...parsed,
+              name: initialValues.name,
+              namespace: initialValues.namespace,
+            }
+          : parsed
+      applySnapshot(nextSnapshot)
+      setYamlError(null)
+      setYamlMode(false)
+    } catch (error) {
+      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [applySnapshot, initialValues, isEditMode, yamlText])
+
   const handleBasicNext = React.useCallback(async () => {
     if (checkingNext) return
 
@@ -1448,7 +1472,13 @@ export function CreateServiceDialog({
                 <span className="text-sm font-medium">编辑 YAML</span>
                 <Switch
                   checked={yamlMode}
-                  onCheckedChange={handleYamlModeChange}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      handleYamlModeChange(true)
+                      return
+                    }
+                    cancelYamlMode()
+                  }}
                   disabled={isBusy}
                   aria-label="编辑 YAML"
                 />
@@ -1949,13 +1979,11 @@ export function CreateServiceDialog({
           {workloadPickerOpen ? null : yamlMode ? (
               <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
                 <div className="flex w-full items-center justify-between gap-3">
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={isBusy}>
-                      取消
-                    </Button>
-                  </DialogClose>
-                  <Button type="button" onClick={() => void handleCreateSubmit()} disabled={isBusy}>
-                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  <Button type="button" variant="outline" disabled={isBusy} onClick={cancelYamlMode}>
+                    取消
+                  </Button>
+                  <Button type="button" onClick={confirmYamlMode} disabled={isBusy}>
+                    确认保存
                   </Button>
                 </div>
               </DialogFooter>

@@ -1029,6 +1029,103 @@ export function ProjectsPageClient() {
     ]
   )
 
+  const enterCreateYamlMode = React.useCallback(() => {
+    const annotationsForYaml = metadataEntriesToRecord(annotationEntries)
+    const workspaceValue = createWorkspace.trim()
+    if (workspaceValue) {
+      annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION] = workspaceValue
+    } else {
+      delete annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION]
+    }
+    setCreateYamlText(
+      buildProjectYamlText({
+        name: editingRow?.name ?? createName,
+        description: createDescription,
+        labels: labelEntries,
+        annotations: metadataRecordToEntries(annotationsForYaml),
+      })
+    )
+    setCreateYamlError(null)
+    setCreateYamlMode(true)
+  }, [annotationEntries, createDescription, createName, createWorkspace, editingRow?.name, labelEntries])
+
+  const cancelCreateYamlMode = React.useCallback(() => {
+    setCreateYamlError(null)
+    setCreateYamlMode(false)
+  }, [])
+
+  const confirmCreateYamlMode = React.useCallback(() => {
+    try {
+      const parsed = parseProjectYamlText(createYamlText)
+      if (!isEditMode) {
+        setCreateName(parsed.name)
+      }
+      setCreateDescription(parsed.description)
+      const parsedWorkspace =
+        parsed.annotations.find((entry) => entry.key === PROJECT_WORKSPACE_ANNOTATION)?.value ?? ""
+      const nextWorkspace = parsedWorkspace.trim() || createWorkspace.trim()
+      setCreateWorkspace(nextWorkspace)
+      setLabelEntries(parsed.labels)
+      const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
+      setAnnotationEntries(protectedAnnotations)
+      setMetadataEnabled(false)
+      setCreateYamlError(null)
+      setCreateYamlMode(false)
+    } catch (error) {
+      setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [createWorkspace, createYamlText, isEditMode])
+
+  const enterPipelineProjectCreateYamlMode = React.useCallback(() => {
+    const annotationsForYaml = metadataEntriesToRecord(pipelineProjectCreateAnnotationEntries)
+    const workspaceValue = pipelineProjectCreateWorkspace.trim()
+    if (workspaceValue) {
+      annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION] = workspaceValue
+    } else {
+      delete annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION]
+    }
+    setPipelineProjectCreateYamlText(
+      buildPipelineProjectYamlText({
+        name: pipelineProjectCreateName,
+        description: pipelineProjectCreateDescription,
+        workspaceName: pipelineProjectCreateWorkspace,
+        labels: pipelineProjectCreateLabelEntries,
+        annotations: metadataRecordToEntries(annotationsForYaml),
+      })
+    )
+    setPipelineProjectCreateYamlError(null)
+    setPipelineProjectCreateYamlMode(true)
+  }, [
+    pipelineProjectCreateAnnotationEntries,
+    pipelineProjectCreateDescription,
+    pipelineProjectCreateLabelEntries,
+    pipelineProjectCreateName,
+    pipelineProjectCreateWorkspace,
+  ])
+
+  const cancelPipelineProjectCreateYamlMode = React.useCallback(() => {
+    setPipelineProjectCreateYamlError(null)
+    setPipelineProjectCreateYamlMode(false)
+  }, [])
+
+  const confirmPipelineProjectCreateYamlMode = React.useCallback(() => {
+    try {
+      const parsed = parsePipelineProjectYamlText(pipelineProjectCreateYamlText)
+      setPipelineProjectCreateName(parsed.name)
+      setPipelineProjectCreateDescription(parsed.description)
+      const nextWorkspace = parsed.workspaceName.trim() || pipelineProjectCreateWorkspace.trim()
+      setPipelineProjectCreateWorkspace(nextWorkspace)
+      setPipelineProjectCreateLabelEntries(parsed.labels)
+      const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
+      setPipelineProjectCreateAnnotationEntries(protectedAnnotations)
+      setPipelineProjectCreateMetadataEnabled(hasUserProvidedMetadata(parsed.labels, protectedAnnotations))
+      setPipelineProjectCreateYamlError(null)
+      setPipelineProjectCreateYamlMode(false)
+    } catch (error) {
+      setPipelineProjectCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [pipelineProjectCreateWorkspace, pipelineProjectCreateYamlText])
+
   const projectTableColumns = React.useMemo(
     () =>
       createColumns<NamespaceRow>({
@@ -1285,45 +1382,10 @@ export function ProjectsPageClient() {
                     onCheckedChange={(checked) => {
                       if (creating) return
                       if (checked) {
-                        const annotationsForYaml = metadataEntriesToRecord(annotationEntries)
-                        const workspaceValue = createWorkspace.trim()
-                        if (workspaceValue) {
-                          annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION] = workspaceValue
-                        } else {
-                          delete annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION]
-                        }
-                        setCreateYamlText(
-                          buildProjectYamlText({
-                            name: editingRow?.name ?? createName,
-                            description: createDescription,
-                            labels: labelEntries,
-                            annotations: metadataRecordToEntries(annotationsForYaml),
-                          })
-                        )
-                        setCreateYamlError(null)
-                        setCreateYamlMode(true)
+                        enterCreateYamlMode()
                         return
                       }
-
-                      try {
-                        const parsed = parseProjectYamlText(createYamlText)
-                        if (!isEditMode) {
-                          setCreateName(parsed.name)
-                        }
-                        setCreateDescription(parsed.description)
-                        const parsedWorkspace =
-                          parsed.annotations.find((entry) => entry.key === PROJECT_WORKSPACE_ANNOTATION)?.value ?? ""
-                        const nextWorkspace = parsedWorkspace.trim() || createWorkspace.trim()
-                        setCreateWorkspace(nextWorkspace)
-                        setLabelEntries(parsed.labels)
-                        const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
-                        setAnnotationEntries(protectedAnnotations)
-                        setMetadataEnabled(false)
-                        setCreateYamlError(null)
-                        setCreateYamlMode(false)
-                      } catch (error) {
-                        setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
-                      }
+                      cancelCreateYamlMode()
                     }}
                     disabled={creating}
                     aria-label="编辑 YAML"
@@ -1510,23 +1572,21 @@ export function ProjectsPageClient() {
 
             <DialogFooter className="border-t bg-background px-6 py-5">
               {createYamlMode ? (
-                <>
+                <div className="flex w-full items-center justify-between gap-3">
+                  <Button type="button" variant="outline" disabled={creating} onClick={cancelCreateYamlMode}>
+                    取消
+                  </Button>
+                  <Button type="button" onClick={confirmCreateYamlMode} disabled={creating}>
+                    确认保存
+                  </Button>
+                </div>
+              ) : createStep === "basic" ? (
+                <div className="flex w-full items-center justify-between gap-3">
                   <DialogClose asChild>
                     <Button type="button" variant="outline" disabled={creating}>
                       取消
                     </Button>
                   </DialogClose>
-                  <Button type="button" onClick={() => handleCreateSubmit()} disabled={creating}>
-                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
-                  </Button>
-                </>
-              ) : createStep === "basic" ? (
-                <>
-                  <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={creating}>
-                    取消
-                  </Button>
-                </DialogClose>
                   <Button
                     type="button"
                     disabled={creating}
@@ -1572,16 +1632,16 @@ export function ProjectsPageClient() {
                   >
                     下一步
                   </Button>
-                </>
+                </div>
               ) : (
-                <>
+                <div className="flex w-full items-center justify-between gap-3">
                   <Button type="button" variant="outline" disabled={creating} onClick={() => setCreateStep("basic")}>
                     上一步
                   </Button>
                   <Button type="button" onClick={() => handleCreateSubmit()} disabled={creating}>
                     {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
                   </Button>
-                </>
+                </div>
               )}
             </DialogFooter>
           </div>
@@ -1664,44 +1724,10 @@ export function ProjectsPageClient() {
                     onCheckedChange={(checked) => {
                       if (pipelineProjectCreating) return
                       if (checked) {
-                        const annotationsForYaml = metadataEntriesToRecord(pipelineProjectCreateAnnotationEntries)
-                        const workspaceValue = pipelineProjectCreateWorkspace.trim()
-                        if (workspaceValue) {
-                          annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION] = workspaceValue
-                        } else {
-                          delete annotationsForYaml[PROJECT_WORKSPACE_ANNOTATION]
-                        }
-                        setPipelineProjectCreateYamlText(
-                          buildPipelineProjectYamlText({
-                            name: pipelineProjectCreateName,
-                            description: pipelineProjectCreateDescription,
-                            workspaceName: pipelineProjectCreateWorkspace,
-                            labels: pipelineProjectCreateLabelEntries,
-                            annotations: metadataRecordToEntries(annotationsForYaml),
-                          })
-                        )
-                        setPipelineProjectCreateYamlError(null)
-                        setPipelineProjectCreateYamlMode(true)
+                        enterPipelineProjectCreateYamlMode()
                         return
                       }
-
-                      try {
-                        const parsed = parsePipelineProjectYamlText(pipelineProjectCreateYamlText)
-                        setPipelineProjectCreateName(parsed.name)
-                        setPipelineProjectCreateDescription(parsed.description)
-                        const nextWorkspace = parsed.workspaceName.trim() || pipelineProjectCreateWorkspace.trim()
-                        setPipelineProjectCreateWorkspace(nextWorkspace)
-                        setPipelineProjectCreateLabelEntries(parsed.labels)
-                        const protectedAnnotations = ensureWorkspaceAnnotationEntries(parsed.annotations, nextWorkspace)
-                        setPipelineProjectCreateAnnotationEntries(protectedAnnotations)
-                        setPipelineProjectCreateMetadataEnabled(
-                          hasUserProvidedMetadata(parsed.labels, protectedAnnotations)
-                        )
-                        setPipelineProjectCreateYamlError(null)
-                        setPipelineProjectCreateYamlMode(false)
-                      } catch (error) {
-                        setPipelineProjectCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
-                      }
+                      cancelPipelineProjectCreateYamlMode()
                     }}
                     disabled={pipelineProjectCreating}
                     aria-label="编辑 YAML"
@@ -1887,31 +1913,25 @@ export function ProjectsPageClient() {
 
             <DialogFooter className="border-t bg-background px-6 py-5">
               {pipelineProjectCreateYamlMode ? (
-                <>
+                <div className="flex w-full items-center justify-between gap-3">
                   <Button
                     type="button"
                     variant="outline"
                     disabled={pipelineProjectCreating}
-                    onClick={() => setPipelineProjectCreateOpen(false)}
+                    onClick={cancelPipelineProjectCreateYamlMode}
                   >
                     取消
                   </Button>
                   <Button
                     type="button"
-                    onClick={handlePipelineProjectCreateSubmit}
+                    onClick={confirmPipelineProjectCreateYamlMode}
                     disabled={pipelineProjectCreating}
                   >
-                    {pipelineProjectCreating
-                      ? isPipelineProjectEditMode
-                        ? "保存中..."
-                        : "创建中..."
-                      : isPipelineProjectEditMode
-                        ? "保存"
-                        : "创建"}
+                    确认保存
                   </Button>
-                </>
+                </div>
               ) : pipelineProjectCreateStep === "basic" ? (
-                <>
+                <div className="flex w-full items-center justify-between gap-3">
                   <Button
                     type="button"
                     variant="outline"
@@ -1955,9 +1975,9 @@ export function ProjectsPageClient() {
                   >
                     下一步
                   </Button>
-                </>
+                </div>
               ) : (
-                <>
+                <div className="flex w-full items-center justify-between gap-3">
                   <Button
                     type="button"
                     variant="outline"
@@ -1979,7 +1999,7 @@ export function ProjectsPageClient() {
                         ? "保存"
                         : "创建"}
                   </Button>
-                </>
+                </div>
               )}
             </DialogFooter>
           </div>

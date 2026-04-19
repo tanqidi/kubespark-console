@@ -640,6 +640,26 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     [applySnapshot, getSnapshot, isBusy, kind, withLockedIdentity, yamlText]
   )
 
+  const enterYamlMode = React.useCallback((configMounts?: JobConfigInput[]) => {
+    handleYamlModeChange(true, configMounts)
+  }, [handleYamlModeChange])
+
+  const cancelYamlMode = React.useCallback(() => {
+    setYamlError(null)
+    setYamlMode(false)
+  }, [])
+
+  const confirmYamlMode = React.useCallback(() => {
+    try {
+      const source = withLockedIdentity(parseJobYamlText(kind, yamlText))
+      applySnapshot(source)
+      setYamlError(null)
+      setYamlMode(false)
+    } catch (error) {
+      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [applySnapshot, kind, withLockedIdentity, yamlText])
+
   const runBasicValidation = React.useCallback(async (source?: Pick<JobDialogSnapshot, "name" | "namespace" | "schedule">) => {
     const nextName = (lockedIdentity?.name ?? source?.name ?? name).trim().toLowerCase()
     const nextNamespace = (lockedIdentity?.namespace ?? source?.namespace ?? namespace).trim()
@@ -1046,6 +1066,9 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     goNext,
     goPrev,
     handleCreate,
+    confirmYamlMode,
+    cancelYamlMode,
+    enterYamlMode,
     handleYamlModeChange,
     isBasicStep,
     isBusy,

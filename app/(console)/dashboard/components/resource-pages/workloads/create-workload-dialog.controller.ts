@@ -679,6 +679,26 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     [applySnapshot, getSnapshot, isBusy, kind, withLockedIdentity, yamlText]
   )
 
+  const enterYamlMode = React.useCallback((configMounts?: ConfigMountInput[]) => {
+    handleYamlModeChange(true, configMounts)
+  }, [handleYamlModeChange])
+
+  const cancelYamlMode = React.useCallback(() => {
+    setYamlError(null)
+    setYamlMode(false)
+  }, [])
+
+  const confirmYamlMode = React.useCallback(() => {
+    try {
+      const source = withLockedIdentity(parseWorkloadYamlText(kind, yamlText))
+      applySnapshot(source)
+      setYamlError(null)
+      setYamlMode(false)
+    } catch (error) {
+      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [applySnapshot, kind, withLockedIdentity, yamlText])
+
   const runBasicValidation = React.useCallback(async (source?: Pick<WorkloadDialogSnapshot, "name" | "namespace">) => {
     const nextName = (lockedIdentity?.name ?? source?.name ?? name).trim().toLowerCase()
     const nextNamespace = (lockedIdentity?.namespace ?? source?.namespace ?? namespace).trim()
@@ -896,6 +916,9 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     goNext,
     goPrev,
     handleCreate,
+    confirmYamlMode,
+    cancelYamlMode,
+    enterYamlMode,
     handleYamlModeChange,
     isBasicStep,
     isBusy,

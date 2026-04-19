@@ -474,6 +474,42 @@ export function WorkspacesPageClient() {
     workspaceOwner,
   ])
 
+  const enterCreateYamlMode = React.useCallback(() => {
+    setCreateYamlText(
+      buildWorkspaceYamlText({
+        name: workspaceName,
+        description: workspaceDescription,
+        owner: workspaceOwner,
+        metadataEnabled,
+        labelEntries,
+        annotationEntries,
+      })
+    )
+    setCreateYamlError(null)
+    setCreateYamlMode(true)
+  }, [annotationEntries, labelEntries, metadataEnabled, workspaceDescription, workspaceName, workspaceOwner])
+
+  const cancelCreateYamlMode = React.useCallback(() => {
+    setCreateYamlError(null)
+    setCreateYamlMode(false)
+  }, [])
+
+  const confirmCreateYamlMode = React.useCallback(() => {
+    try {
+      const parsed = parseWorkspaceYamlText(createYamlText)
+      setWorkspaceName(parsed.name)
+      setWorkspaceDescription(parsed.description)
+      setWorkspaceOwner(parsed.owner)
+      setMetadataEnabled(parsed.metadataEnabled)
+      setLabelEntries(parsed.labelEntries)
+      setAnnotationEntries(parsed.annotationEntries)
+      setCreateYamlError(null)
+      setCreateYamlMode(false)
+    } catch (error) {
+      setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [createYamlText])
+
   if (error) {
     return (
       <div className="px-4 lg:px-6">
@@ -535,34 +571,10 @@ export function WorkspacesPageClient() {
                     onCheckedChange={(checked) => {
                       if (submitting || loadingEditData) return
                       if (checked) {
-                        setCreateYamlText(
-                          buildWorkspaceYamlText({
-                            name: workspaceName,
-                            description: workspaceDescription,
-                            owner: workspaceOwner,
-                            metadataEnabled,
-                            labelEntries,
-                            annotationEntries,
-                          })
-                        )
-                        setCreateYamlError(null)
-                        setCreateYamlMode(true)
+                        enterCreateYamlMode()
                         return
                       }
-
-                      try {
-                        const parsed = parseWorkspaceYamlText(createYamlText)
-                        setWorkspaceName(parsed.name)
-                        setWorkspaceDescription(parsed.description)
-                        setWorkspaceOwner(parsed.owner)
-                        setMetadataEnabled(parsed.metadataEnabled)
-                        setLabelEntries(parsed.labelEntries)
-                        setAnnotationEntries(parsed.annotationEntries)
-                        setCreateYamlError(null)
-                        setCreateYamlMode(false)
-                      } catch (error) {
-                        setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
-                      }
+                      cancelCreateYamlMode()
                     }}
                     disabled={submitting || loadingEditData}
                     aria-label="编辑 YAML"
@@ -723,13 +735,11 @@ export function WorkspacesPageClient() {
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               {createYamlMode ? (
                 <div className="flex w-full items-center justify-between gap-3">
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={submitting || loadingEditData}>
-                      取消
-                    </Button>
-                  </DialogClose>
-                  <Button type="button" onClick={handleCreateSubmit} disabled={submitting || loadingEditData}>
-                    {submitting ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  <Button type="button" variant="outline" onClick={cancelCreateYamlMode} disabled={submitting || loadingEditData}>
+                    取消
+                  </Button>
+                  <Button type="button" onClick={confirmCreateYamlMode} disabled={submitting || loadingEditData}>
+                    确认保存
                   </Button>
                 </div>
               ) : createStep === "basic" ? (

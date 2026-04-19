@@ -818,6 +818,39 @@ export function VolumesPageClient() {
     resetCreateForm,
   ])
 
+  const enterCreateYamlMode = React.useCallback(() => {
+    setCreateYamlText(buildCreateYaml())
+    setCreateYamlError(null)
+    setCreateYamlMode(true)
+  }, [buildCreateYaml])
+
+  const cancelCreateYamlMode = React.useCallback(() => {
+    setCreateYamlError(null)
+    setCreateYamlMode(false)
+  }, [])
+
+  const confirmCreateYamlMode = React.useCallback(() => {
+    try {
+      const parsed = parsePvcYamlText(createYamlText)
+      setCreateName(parsed.name)
+      setCreateNamespace(parsed.namespace)
+      setCreateDescription(parsed.description)
+      setLabelEntries(parsed.labels)
+      setAnnotationEntries(parsed.annotations)
+      setMetadataEnabled(false)
+      setCreateAccessMode(parsed.accessMode)
+      setCreateStorageRequest(normalizeStorageRequest(parsed.storageRequest))
+      setCreateStorageUnit(parsed.storageUnit)
+      setCreateStorageClassName(parsed.storageClassName)
+      setCreateVolumeMode(parsed.volumeMode)
+      setCreateVolumeName(parsed.volumeName)
+      setCreateYamlError(null)
+      setCreateYamlMode(false)
+    } catch (error) {
+      setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [createYamlText])
+
   const pvcColumns = React.useMemo(
     () =>
       createColumns<PersistentVolumeClaimRow>({
@@ -1037,30 +1070,10 @@ export function VolumesPageClient() {
                     onCheckedChange={(checked) => {
                       if (creating) return
                       if (checked) {
-                        setCreateYamlText(buildCreateYaml())
-                        setCreateYamlError(null)
-                        setCreateYamlMode(true)
+                        enterCreateYamlMode()
                         return
                       }
-                      try {
-                        const parsed = parsePvcYamlText(createYamlText)
-                        setCreateName(parsed.name)
-                        setCreateNamespace(parsed.namespace)
-                        setCreateDescription(parsed.description)
-                        setLabelEntries(parsed.labels)
-                        setAnnotationEntries(parsed.annotations)
-                        setMetadataEnabled(false)
-                        setCreateAccessMode(parsed.accessMode)
-                        setCreateStorageRequest(normalizeStorageRequest(parsed.storageRequest))
-                        setCreateStorageUnit(parsed.storageUnit)
-                        setCreateStorageClassName(parsed.storageClassName)
-                        setCreateVolumeMode(parsed.volumeMode)
-                        setCreateVolumeName(parsed.volumeName)
-                        setCreateYamlError(null)
-                        setCreateYamlMode(false)
-                      } catch (error) {
-                        setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
-                      }
+                      cancelCreateYamlMode()
                     }}
                     disabled={creating}
                     aria-label="编辑 YAML"
@@ -1319,11 +1332,17 @@ export function VolumesPageClient() {
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 {createYamlMode || createStep === "basic" ? (
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={creating || checkingCreateNext}>
+                  createYamlMode ? (
+                    <Button type="button" variant="outline" disabled={creating || checkingCreateNext} onClick={cancelCreateYamlMode}>
                       取消
                     </Button>
-                  </DialogClose>
+                  ) : (
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline" disabled={creating || checkingCreateNext}>
+                        取消
+                      </Button>
+                    </DialogClose>
+                  )
                 ) : (
                   <Button
                     type="button"
@@ -1336,13 +1355,19 @@ export function VolumesPageClient() {
                 )}
 
                 {createYamlMode || createStep === "advanced" ? (
-                  <Button
-                    type="button"
-                    onClick={() => void handleCreateSubmit()}
-                    disabled={creating || checkingCreateNext}
-                  >
-                    {creating ? "创建中..." : "创建"}
-                  </Button>
+                  createYamlMode ? (
+                    <Button type="button" onClick={confirmCreateYamlMode} disabled={creating || checkingCreateNext}>
+                      确认保存
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={() => void handleCreateSubmit()}
+                      disabled={creating || checkingCreateNext}
+                    >
+                      {creating ? "创建中..." : "创建"}
+                    </Button>
+                  )
                 ) : (
                   <Button type="button" onClick={() => void handleCreateNext()} disabled={creating || checkingCreateNext}>
                     {checkingCreateNext && createStep === "basic" ? "校验中..." : "下一步"}

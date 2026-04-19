@@ -1189,6 +1189,44 @@ export function RoutesPageClient() {
     resetCreateForm,
   ])
 
+  const enterCreateYamlMode = React.useCallback(() => {
+    setCreateYamlText(buildCreateYaml())
+    setCreateYamlError(null)
+    setCreateYamlMode(true)
+  }, [buildCreateYaml])
+
+  const cancelCreateYamlMode = React.useCallback(() => {
+    setCreateYamlError(null)
+    setCreateYamlMode(false)
+  }, [])
+
+  const confirmCreateYamlMode = React.useCallback(() => {
+    try {
+      const parsed = parseRouteYamlText(createYamlText)
+      const nextName = isEditMode && editingRouteRef ? editingRouteRef.name : parsed.name
+      const nextNamespace = isEditMode && editingRouteRef ? editingRouteRef.namespace : parsed.namespace
+      setCreateName(nextName)
+      setCreateNamespace(nextNamespace)
+      setCreateDescription(parsed.description)
+      setLabelEntries(parsed.labels)
+      setAnnotationEntries(parsed.annotations)
+      setMetadataEnabled(false)
+      setCreateHost(parsed.host)
+      setCreatePath(parsed.path || "/")
+      setCreateServiceName(parsed.serviceName)
+      setCreateServicePort(parsed.servicePort)
+      setCreateProtocol(parsed.protocol)
+      setCreateTlsSecretName(parsed.tlsSecretName)
+      setCreateRules(parsed.rules.map((rule) => normalizeRuleItem(rule)))
+      setCreateIngressClassName(parsed.ingressClassName)
+      setCreateRuleViewMode("list")
+      setCreateYamlError(null)
+      setCreateYamlMode(false)
+    } catch (parseError: unknown) {
+      setCreateYamlError(parseError instanceof Error ? parseError.message : "YAML 解析失败")
+    }
+  }, [createYamlText, editingRouteRef, isEditMode])
+
   const handleViewYaml = React.useCallback((row: RouteRow) => {
     setYamlOpen(true)
     setYamlError(null)
@@ -1556,35 +1594,10 @@ export function RoutesPageClient() {
                     onCheckedChange={(checked) => {
                       if (creating) return
                       if (checked) {
-                        setCreateYamlText(buildCreateYaml())
-                        setCreateYamlError(null)
-                        setCreateYamlMode(true)
+                        enterCreateYamlMode()
                         return
                       }
-                      try {
-                        const parsed = parseRouteYamlText(createYamlText)
-                        const nextName = isEditMode && editingRouteRef ? editingRouteRef.name : parsed.name
-                        const nextNamespace = isEditMode && editingRouteRef ? editingRouteRef.namespace : parsed.namespace
-                        setCreateName(nextName)
-                        setCreateNamespace(nextNamespace)
-                        setCreateDescription(parsed.description)
-                        setLabelEntries(parsed.labels)
-                        setAnnotationEntries(parsed.annotations)
-                        setMetadataEnabled(false)
-                        setCreateHost(parsed.host)
-                        setCreatePath(parsed.path || "/")
-                        setCreateServiceName(parsed.serviceName)
-                        setCreateServicePort(parsed.servicePort)
-                        setCreateProtocol(parsed.protocol)
-                        setCreateTlsSecretName(parsed.tlsSecretName)
-                        setCreateRules(parsed.rules.map((rule) => normalizeRuleItem(rule)))
-                        setCreateIngressClassName(parsed.ingressClassName)
-                        setCreateRuleViewMode("list")
-                        setCreateYamlError(null)
-                        setCreateYamlMode(false)
-                      } catch (parseError: unknown) {
-                        setCreateYamlError(parseError instanceof Error ? parseError.message : "YAML 解析失败")
-                      }
+                      cancelCreateYamlMode()
                     }}
                     disabled={creating || checkingCreateNext}
                     aria-label="编辑 YAML"
@@ -2103,7 +2116,11 @@ export function RoutesPageClient() {
                     取消
                   </Button>
                 ) : createYamlMode || createStep === "basic" ? (
-                  <DialogClose asChild><Button type="button" variant="outline" disabled={creating || checkingCreateNext}>取消</Button></DialogClose>
+                  createYamlMode ? (
+                    <Button type="button" variant="outline" disabled={creating || checkingCreateNext} onClick={cancelCreateYamlMode}>取消</Button>
+                  ) : (
+                    <DialogClose asChild><Button type="button" variant="outline" disabled={creating || checkingCreateNext}>取消</Button></DialogClose>
+                  )
                 ) : (
                   <Button type="button" variant="outline" onClick={() => setCreateStep(createStep === "advanced" ? "rule" : "basic")} disabled={creating || checkingCreateNext}>上一步</Button>
                 )}
@@ -2118,9 +2135,13 @@ export function RoutesPageClient() {
                     确认保存
                   </Button>
                 ) : createYamlMode || createStep === "advanced" ? (
-                  <Button type="button" onClick={() => void handleCreateSubmit()} disabled={creating || checkingCreateNext}>
-                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
-                  </Button>
+                  createYamlMode ? (
+                    <Button type="button" onClick={confirmCreateYamlMode} disabled={creating || checkingCreateNext}>确认保存</Button>
+                  ) : (
+                    <Button type="button" onClick={() => void handleCreateSubmit()} disabled={creating || checkingCreateNext}>
+                      {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                    </Button>
+                  )
                 ) : (
                   <Button type="button" onClick={() => void handleCreateNext()} disabled={creating || checkingCreateNext}>{checkingCreateNext && createStep === "basic" ? "校验中..." : "下一步"}</Button>
                 )}

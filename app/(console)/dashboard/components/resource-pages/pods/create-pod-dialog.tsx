@@ -994,6 +994,35 @@ export function CreatePodDialog({
     savedStorageVolumes,
   ])
 
+  const enterYamlMode = React.useCallback(() => {
+    setYamlText(
+      buildYamlText(
+        buildSnapshot(),
+        configuredContainers,
+        savedStorageVolumes,
+        savedConfigMounts
+      )
+    )
+    setYamlError(null)
+    setYamlMode(true)
+  }, [buildSnapshot, configuredContainers, savedConfigMounts, savedStorageVolumes])
+
+  const cancelYamlMode = React.useCallback(() => {
+    setYamlError(null)
+    setYamlMode(false)
+  }, [])
+
+  const confirmYamlMode = React.useCallback(() => {
+    try {
+      const parsed = parseYamlText(yamlText)
+      applySnapshot(withLockedIdentity(parsed.snapshot), parsed.containers)
+      setYamlError(null)
+      setYamlMode(false)
+    } catch (error) {
+      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [applySnapshot, withLockedIdentity, yamlText])
+
   return (
     <Dialog
       open={open}
@@ -1026,26 +1055,10 @@ export function CreatePodDialog({
                   onCheckedChange={(checked) => {
                     if (creating) return
                     if (checked) {
-                      setYamlText(
-                        buildYamlText(
-                          buildSnapshot(),
-                          configuredContainers,
-                          savedStorageVolumes,
-                          savedConfigMounts
-                        )
-                      )
-                      setYamlError(null)
-                      setYamlMode(true)
+                      enterYamlMode()
                       return
                     }
-                    try {
-                      const parsed = parseYamlText(yamlText)
-                      applySnapshot(withLockedIdentity(parsed.snapshot), parsed.containers)
-                      setYamlError(null)
-                      setYamlMode(false)
-                    } catch (error) {
-                      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
-                    }
+                    cancelYamlMode()
                   }}
                   disabled={isBusy}
                   aria-label="编辑 YAML"
@@ -1554,27 +1567,11 @@ export function CreatePodDialog({
           {yamlMode ? (
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={isBusy}>
-                    取消
-                  </Button>
-                </DialogClose>
-                <Button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const parsed = parseYamlText(yamlText)
-                      applySnapshot(withLockedIdentity(parsed.snapshot), parsed.containers)
-                      setYamlError(null)
-                    } catch (error) {
-                      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
-                      return
-                    }
-                    await handleCreate()
-                  }}
-                  disabled={isBusy}
-                >
-                  {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                <Button type="button" variant="outline" onClick={cancelYamlMode} disabled={isBusy}>
+                  取消
+                </Button>
+                <Button type="button" onClick={confirmYamlMode} disabled={isBusy}>
+                  确认保存
                 </Button>
               </div>
             </DialogFooter>

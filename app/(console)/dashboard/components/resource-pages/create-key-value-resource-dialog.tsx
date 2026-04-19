@@ -693,6 +693,27 @@ export function CreateKeyValueResourceDialog({
     ]
   )
 
+  const enterYamlMode = React.useCallback(() => {
+    handleYamlModeChange(true)
+  }, [handleYamlModeChange])
+
+  const cancelYamlMode = React.useCallback(() => {
+    setYamlError(null)
+    setYamlMode(false)
+  }, [])
+
+  const confirmYamlMode = React.useCallback(() => {
+    try {
+      const snapshot = withLockedIdentity(parseYamlText(kind, yamlText))
+      applySnapshot(snapshot)
+      clearInlineErrors()
+      setYamlError(null)
+      setYamlMode(false)
+    } catch (error) {
+      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+    }
+  }, [applySnapshot, clearInlineErrors, kind, withLockedIdentity, yamlText])
+
   const handleNextStep = React.useCallback(async (event?: React.MouseEvent<HTMLButtonElement>) => {
     event?.preventDefault()
     event?.stopPropagation()
@@ -898,7 +919,13 @@ export function CreateKeyValueResourceDialog({
                 <Switch
                   id={`${kind}-yaml-mode`}
                   checked={yamlMode}
-                  onCheckedChange={handleYamlModeChange}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      enterYamlMode()
+                      return
+                    }
+                    cancelYamlMode()
+                  }}
                   disabled={isBusy}
                   aria-label="编辑 YAML"
                 />
@@ -1297,21 +1324,11 @@ export function CreateKeyValueResourceDialog({
           ) : yamlMode ? (
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={isBusy}>
-                    取消
-                  </Button>
-                </DialogClose>
-                <Button type="button" onClick={() => void handleSubmit()} disabled={isBusy}>
-                  {creating
-                    ? isEditMode
-                      ? "保存中..."
-                      : "创建中..."
-                    : checkingNext
-                      ? "校验中..."
-                      : isEditMode
-                        ? "保存"
-                        : "创建"}
+                <Button type="button" variant="outline" onClick={cancelYamlMode} disabled={isBusy}>
+                  取消
+                </Button>
+                <Button type="button" onClick={confirmYamlMode} disabled={isBusy}>
+                  确认保存
                 </Button>
               </div>
             </DialogFooter>

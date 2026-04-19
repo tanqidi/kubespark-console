@@ -145,8 +145,10 @@ export function CreateJobDialog({
     editingPortFieldErrors,
     goNext,
     goPrev,
+    enterYamlMode,
+    cancelYamlMode,
+    confirmYamlMode,
     handleCreate,
-    handleYamlModeChange,
     isBasicStep,
     isBusy,
     isEditingStorageView,
@@ -585,7 +587,13 @@ export function CreateJobDialog({
                 <span className="text-sm font-medium">编辑 YAML</span>
                 <Switch
                   checked={yamlMode}
-                  onCheckedChange={(checked) => handleYamlModeChange(checked, savedConfigMounts)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      enterYamlMode(savedConfigMounts)
+                      return
+                    }
+                    cancelYamlMode()
+                  }}
                   disabled={isBusy}
                   aria-label="编辑 YAML"
                 />
@@ -1377,13 +1385,11 @@ export function CreateJobDialog({
           {yamlMode ? (
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={isBusy}>
-                    取消
-                  </Button>
-                </DialogClose>
-                <Button type="button" onClick={() => void handleCreate(savedConfigMounts)} disabled={isBusy}>
-                  {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                <Button type="button" variant="outline" onClick={cancelYamlMode} disabled={isBusy}>
+                  取消
+                </Button>
+                <Button type="button" onClick={confirmYamlMode} disabled={isBusy}>
+                  确认保存
                 </Button>
               </div>
             </DialogFooter>
