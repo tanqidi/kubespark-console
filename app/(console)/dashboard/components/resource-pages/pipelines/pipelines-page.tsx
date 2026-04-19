@@ -824,23 +824,23 @@ export function PipelinesPageClient({
           {
             label: (
               <>
-                <IconPlayerPlay className="size-4" />
-                运行
-              </>
-            ),
-            onSelect: (row) => {
-              handleRunPipeline(row)
-            },
-          },
-          {
-            label: (
-              <>
                 <IconEye className="size-4" />
                 查看 YAML
               </>
             ),
             onSelect: (row) => {
               handleViewYaml(row)
+            },
+          },
+          {
+            label: (
+                <>
+                  <IconPlayerPlay className="size-4" />
+                  运行
+                </>
+            ),
+            onSelect: (row) => {
+              handleRunPipeline(row)
             },
           },
           {

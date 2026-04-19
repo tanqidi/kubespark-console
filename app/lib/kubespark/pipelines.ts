@@ -451,7 +451,24 @@ export async function updatePipeline(input: UpdatePipelineInput): Promise<void> 
 
 export async function fetchPipelineYaml(name: string): Promise<string> {
   const payload = await fetchPipelineRawByName(name)
-  return stringify(payload, {
+  const sanitized =
+    payload && typeof payload === "object" && !Array.isArray(payload)
+      ? (() => {
+          const root = payload as Record<string, unknown>
+          const metadata =
+            root.metadata && typeof root.metadata === "object" && !Array.isArray(root.metadata)
+              ? ({ ...(root.metadata as Record<string, unknown>) })
+              : null
+          if (!metadata) return payload
+          delete metadata.managedFields
+          return {
+            ...root,
+            metadata,
+          }
+        })()
+      : payload
+
+  return stringify(sanitized, {
     indent: 2,
     lineWidth: 0,
     sortMapEntries: false,
