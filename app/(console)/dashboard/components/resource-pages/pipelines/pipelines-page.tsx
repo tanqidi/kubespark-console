@@ -1175,7 +1175,7 @@ export function PipelinesPageClient({
                             if (codeRepositoryError) setCodeRepositoryError(null)
                           }
                         }}
-                        disabled={creating}
+                        disabled={creating || isEditMode}
                       >
                         <ComboboxInput
                           placeholder="请选择代码仓库"
@@ -1185,7 +1185,7 @@ export function PipelinesPageClient({
                               ? "border-destructive ring-[3px] ring-destructive/20 dark:ring-destructive/40"
                               : ""
                           )}
-                          disabled={creating}
+                          disabled={creating || isEditMode}
                           onBlur={clearRepositoryIfNotMatched}
                           aria-invalid={Boolean(codeRepositoryError)}
                         />
@@ -1269,9 +1269,13 @@ export function PipelinesPageClient({
                           }
                           setPendingDeleteSecretKey(key)
                         }}
-                        disabled={creating || droneSecretLoading}
+                        disabled={!isEditMode || creating || droneSecretLoading}
                         title="变量配置"
-                        description="维护流水线运行所需的键值变量或秘钥参数，值为空则跳过修改。"
+                        description={
+                          isEditMode
+                            ? "维护流水线运行所需的键值变量或秘钥参数，值为空则跳过修改。"
+                            : "该能力仅支持编辑流水线时使用，请从编辑状态进入后配置变量。"
+                        }
                       />
                     </Field>
                   </FieldGroup>
