@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from "react"
+import type { EditorProps } from "@monaco-editor/react"
 import { IconEye, IconPlayerPlay, IconSettings2, IconTrash } from "@tabler/icons-react"
+import dynamic from "next/dynamic"
 import { parse as parseYaml, stringify } from "yaml"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
@@ -34,13 +36,148 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
+import { Switch } from "@/components/ui/switch"
 
 type PipelineRunsPageClientProps = {
   pipelineName: string
 }
 const CODE_REPOSITORY_ANNOTATION_KEY = "tanqidi.com/code-repository"
+const DRONE_YAML_ANNOTATION_KEY = "tanqidi.com/drone-yaml"
 
-function extractCodeRepositoryFromPipelinePayload(payload: unknown): string {
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+})
+
+const MONACO_OPTIONS: EditorProps["options"] = {
+  automaticLayout: true,
+  fontSize: 13,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  stickyScroll: { enabled: false },
+  tabSize: 2,
+  wordWrap: "on",
+}
+
+function splitRepository(value: string): { namespace: string; repo: string } {
+  const segments = value
+    .split("/")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+  return {
+    namespace: segments[0] ?? "",
+    repo: segments.length >= 2 ? segments.slice(1).join("/") : "",
+  }
+}
+
+function buildPipelineRunYamlText(params: {
+  pipelineName: string
+  repository: string
+  droneYaml: string
+}): string {
+  const source = params.repository.trim()
+  const parts = splitRepository(source)
+  return stringify(
+    {
+      apiVersion: "tanqidi.com/v1alpha1",
+      kind: "PipelineRun",
+      metadata: {
+        generateName: `${params.pipelineName.trim()}-`,
+        labels: {
+          pipeline: params.pipelineName.trim(),
+        },
+        ...(params.droneYaml.trim()
+          ? {
+              annotations: {
+                [DRONE_YAML_ANNOTATION_KEY]: params.droneYaml.trim(),
+              },
+            }
+          : {}),
+      },
+      spec: {
+        pipelineRef: {
+          name: params.pipelineName.trim(),
+        },
+        trigger: {
+          type: "manual",
+        },
+        ...(parts.namespace && parts.repo
+          ? {
+              data: {
+                namespace: parts.namespace,
+                repo: parts.repo,
+              },
+            }
+          : {}),
+      },
+    },
+    {
+      indent: 2,
+      lineWidth: 0,
+      sortMapEntries: false,
+    }
+  )
+}
+
+function parsePipelineRunYamlText(
+  yamlText: string,
+  pipelineName: string
+): { repository: string; droneYaml: string } {
+  const normalized = yamlText.trim()
+  if (!normalized) throw new Error("请输入 YAML 内容")
+
+  const parsed = parseYaml(normalized)
+  const root =
+    typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null
+  if (!root) throw new Error("YAML 内容格式无效")
+
+  const kind = typeof root.kind === "string" ? root.kind.trim() : ""
+  if (kind && kind !== "PipelineRun") throw new Error("YAML 资源类型必须是 PipelineRun")
+
+  const metadata =
+    typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
+      ? (root.metadata as Record<string, unknown>)
+      : {}
+  const annotations =
+    typeof metadata.annotations === "object" &&
+    metadata.annotations !== null &&
+    !Array.isArray(metadata.annotations)
+      ? (metadata.annotations as Record<string, unknown>)
+      : {}
+  const spec =
+    typeof root.spec === "object" && root.spec !== null && !Array.isArray(root.spec)
+      ? (root.spec as Record<string, unknown>)
+      : {}
+  const pipelineRef =
+    typeof spec.pipelineRef === "object" && spec.pipelineRef !== null && !Array.isArray(spec.pipelineRef)
+      ? (spec.pipelineRef as Record<string, unknown>)
+      : {}
+  const data =
+    typeof spec.data === "object" && spec.data !== null && !Array.isArray(spec.data)
+      ? (spec.data as Record<string, unknown>)
+      : {}
+
+  const refName = typeof pipelineRef.name === "string" ? pipelineRef.name.trim() : ""
+  if (refName && refName !== pipelineName) {
+    throw new Error(`pipelineRef.name 必须为当前流水线：${pipelineName}`)
+  }
+
+  const namespace = typeof data.namespace === "string" ? data.namespace.trim() : ""
+  const repo = typeof data.repo === "string" ? data.repo.trim() : ""
+  const repository = namespace && repo ? `${namespace}/${repo}` : ""
+  const droneYaml =
+    typeof annotations[DRONE_YAML_ANNOTATION_KEY] === "string"
+      ? (annotations[DRONE_YAML_ANNOTATION_KEY] as string)
+      : ""
+
+  return {
+    repository,
+    droneYaml,
+  }
+}
+
+function extractAnnotationFromPipelinePayload(payload: unknown, key: string): string {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return ""
   const root = payload as Record<string, unknown>
   const metadata =
@@ -53,11 +190,11 @@ function extractCodeRepositoryFromPipelinePayload(payload: unknown): string {
       ? (metadata.annotations as Record<string, unknown>)
       : null
   if (!annotations) return ""
-  const value = annotations[CODE_REPOSITORY_ANNOTATION_KEY]
+  const value = annotations[key]
   return typeof value === "string" ? value.trim() : ""
 }
 
-function extractCodeRepositoryFromPipelineYamlText(yamlText: string): string {
+function extractAnnotationFromPipelineYamlText(yamlText: string, key: string): string {
   const parsed = parseYaml(yamlText)
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return ""
   const root = parsed as Record<string, unknown>
@@ -71,7 +208,7 @@ function extractCodeRepositoryFromPipelineYamlText(yamlText: string): string {
       ? (metadata.annotations as Record<string, unknown>)
       : null
   if (!annotations) return ""
-  const value = annotations[CODE_REPOSITORY_ANNOTATION_KEY]
+  const value = annotations[key]
   return typeof value === "string" ? value.trim() : ""
 }
 
@@ -112,8 +249,15 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [nameQuery, setNameQuery] = React.useState("")
   const [runDialogOpen, setRunDialogOpen] = React.useState(false)
   const [runStep, setRunStep] = React.useState<"basic" | "advanced">("basic")
+  const [runYamlMode, setRunYamlMode] = React.useState(false)
+  const [runDroneYamlMode, setRunDroneYamlMode] = React.useState(false)
   const [runRepository, setRunRepository] = React.useState("")
   const [runRepositoryLoading, setRunRepositoryLoading] = React.useState(false)
+  const [runYamlDraft, setRunYamlDraft] = React.useState("")
+  const [runDroneYamlDefault, setRunDroneYamlDefault] = React.useState("")
+  const [runDroneYaml, setRunDroneYaml] = React.useState("")
+  const [runDroneYamlDraft, setRunDroneYamlDraft] = React.useState("")
+  const [runYamlError, setRunYamlError] = React.useState<string | null>(null)
   const [runError, setRunError] = React.useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PipelineRunRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -161,21 +305,31 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
 
     void fetchResourceByName<unknown>("tanqidi.com", "v1alpha1", "pipelines", normalizedPipelineName)
       .then(async ({ payload }) => {
-        let nextRepository = extractCodeRepositoryFromPipelinePayload(payload)
+        let nextRepository = extractAnnotationFromPipelinePayload(payload, CODE_REPOSITORY_ANNOTATION_KEY)
+        let nextDroneYaml = extractAnnotationFromPipelinePayload(payload, DRONE_YAML_ANNOTATION_KEY)
         if (!nextRepository) {
           try {
             const yamlText = await fetchPipelineYaml(normalizedPipelineName)
-            nextRepository = extractCodeRepositoryFromPipelineYamlText(yamlText)
+            nextRepository = extractAnnotationFromPipelineYamlText(yamlText, CODE_REPOSITORY_ANNOTATION_KEY)
+            if (!nextDroneYaml) {
+              nextDroneYaml = extractAnnotationFromPipelineYamlText(yamlText, DRONE_YAML_ANNOTATION_KEY)
+            }
           } catch {
             // ignore fallback parse errors and keep empty value
           }
         }
         if (cancelled) return
         setRunRepository(nextRepository)
+        setRunDroneYamlDefault(nextDroneYaml)
+        setRunDroneYaml(nextDroneYaml)
+        setRunDroneYamlDraft(nextDroneYaml)
       })
       .catch(() => {
         if (cancelled) return
         setRunRepository("")
+        setRunDroneYamlDefault("")
+        setRunDroneYaml("")
+        setRunDroneYamlDraft("")
       })
       .finally(() => {
         if (cancelled) return
@@ -190,16 +344,12 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const handleRun = React.useCallback(() => {
     if (running || runRepositoryLoading) return
     const source = runRepository.trim()
-    const segments = source.split("/").map((item) => item.trim()).filter((item) => item.length > 0)
-    const namespace = segments[0] ?? ""
-    const repo = segments.length >= 2 ? segments.slice(1).join("/") : ""
+    const { namespace, repo } = splitRepository(source)
     if (!source) {
-      setRunStep("basic")
       setRunError("请先在流水线中配置代码仓库（owner/repo）")
       return
     }
     if (!namespace || !repo) {
-      setRunStep("basic")
       setRunError("代码仓库注解格式无效，需为 owner/repo")
       return
     }
@@ -207,6 +357,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     setRunning(true)
     setRunError(null)
     setError(null)
+    const normalizedDroneYaml = runDroneYaml.trim()
     void createPipelineRun({
         pipelineName: normalizedPipelineName,
         triggerType: "manual",
@@ -214,6 +365,13 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           namespace,
           repo,
         },
+        ...(normalizedDroneYaml
+          ? {
+              annotations: {
+                [DRONE_YAML_ANNOTATION_KEY]: normalizedDroneYaml,
+              },
+            }
+          : {}),
       })
       .then(() => {
         // Trigger request accepted: close immediately, no need to wait build completion.
@@ -227,7 +385,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         setError(message)
         setRunning(false)
       })
-  }, [loadRows, normalizedPipelineName, runRepository, runRepositoryLoading, running])
+  }, [loadRows, normalizedPipelineName, runDroneYaml, runRepository, runRepositoryLoading, running])
 
   const columns = React.useMemo(
     () =>
@@ -369,7 +527,19 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           setRunDialogOpen(open)
           if (open) {
             setRunStep("basic")
+            setRunYamlMode(false)
+            setRunDroneYamlMode(false)
+            setRunYamlError(null)
             setRunError(null)
+            setRunDroneYaml(runDroneYamlDefault)
+            setRunDroneYamlDraft(runDroneYamlDefault)
+            setRunYamlDraft(
+              buildPipelineRunYamlText({
+                pipelineName: normalizedPipelineName,
+                repository: runRepository,
+                droneYaml: runDroneYamlDefault,
+              })
+            )
             if (!runRepository.trim()) {
               setRunError("请先在流水线中配置代码仓库（owner/repo）")
             }
@@ -382,43 +552,89 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b bg-muted/15">
+            <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
                 <DialogTitle>立即运行</DialogTitle>
-                <DialogDescription>录入 Drone 仓库信息后，创建一次 PipelineRun。</DialogDescription>
+                <DialogDescription>创建一次 PipelineRun，可按需覆盖 .drone.yml。</DialogDescription>
               </DialogHeader>
+              <div className="me-20 flex h-full items-center">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                    <span className="text-sm font-medium">编辑 YAML</span>
+                    <Switch
+                      checked={runYamlMode}
+                      onCheckedChange={(checked) => {
+                        if (running || runRepositoryLoading) return
+                        setRunYamlError(null)
+                        if (checked) {
+                          setRunYamlDraft(
+                            buildPipelineRunYamlText({
+                              pipelineName: normalizedPipelineName,
+                              repository: runRepository,
+                              droneYaml: runDroneYaml,
+                            })
+                          )
+                        }
+                        setRunYamlMode(checked)
+                        if (checked) setRunDroneYamlMode(false)
+                      }}
+                      disabled={running || runRepositoryLoading}
+                      aria-label="编辑 YAML"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                    <span className="text-sm font-medium">编辑 .drone.yml</span>
+                    <Switch
+                      checked={runDroneYamlMode}
+                      onCheckedChange={(checked) => {
+                        if (running || runRepositoryLoading) return
+                        if (checked) {
+                          setRunDroneYamlDraft(runDroneYaml)
+                        }
+                        setRunDroneYamlMode(checked)
+                        if (checked) setRunYamlMode(false)
+                      }}
+                      disabled={running || runRepositoryLoading}
+                      aria-label="编辑 .drone.yml"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <StepHeaderNav
-              items={[
-                {
-                  id: "basic",
-                  title: "基本信息",
-                  status: runStep === "basic" ? "当前" : "已设置",
-                  active: runStep === "basic",
-                  icon: <IconSettings2 className="size-4" />,
-                  disabled: running,
-                  onClick: () => {
-                    if (running) return
-                    setRunStep("basic")
+            {!runDroneYamlMode && !runYamlMode ? (
+              <StepHeaderNav
+                items={[
+                  {
+                    id: "basic",
+                    title: "基本信息",
+                    status: runStep === "basic" ? "当前" : "已设置",
+                    active: runStep === "basic",
+                    icon: <IconSettings2 className="size-4" />,
+                    disabled: running || runRepositoryLoading,
+                    onClick: () => {
+                      if (running || runRepositoryLoading) return
+                      setRunStep("basic")
+                    },
                   },
-                },
-                {
-                  id: "advanced",
-                  title: "高级设置",
-                  status: runStep === "advanced" ? "当前" : "未设置",
-                  active: runStep === "advanced",
-                  icon: <IconSettings2 className="size-4" />,
-                  disabled: running,
-                  onClick: () => {
-                    if (running) return
-                    setRunStep("advanced")
+                  {
+                    id: "advanced",
+                    title: "高级设置",
+                    status: runStep === "advanced" ? "当前" : "已设置",
+                    active: runStep === "advanced",
+                    icon: <IconSettings2 className="size-4" />,
+                    disabled: running || runRepositoryLoading,
+                    onClick: () => {
+                      if (running || runRepositoryLoading) return
+                      setRunStep("advanced")
+                    },
                   },
-                },
-              ]}
-            />
-            <div className="min-h-0 flex-1 overflow-y-auto p-6">
-              {runStep === "basic" ? (
-                <>
+                ]}
+              />
+            ) : null}
+            <div className={`min-h-0 flex-1 p-6 ${runDroneYamlMode || runYamlMode ? "flex flex-col" : "overflow-y-auto"}`}>
+              {!runDroneYamlMode && !runYamlMode ? (
+                runStep === "basic" ? (
+                  <>
                   <div className="mb-4">
                     <h3 className="text-[15px] font-semibold">运行参数</h3>
                     <p className="mt-1 text-sm text-muted-foreground">指定本次运行使用的参数，流水线将从该仓库获取代码并执行</p>
@@ -438,14 +654,57 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                     </Field>
                   </FieldGroup>
                   {runError ? <FieldError className="mt-3">{runError}</FieldError> : null}
-                </>
-              ) : (
-                <div>
-                  <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">高级设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">当前版本暂不需要额外配置，后续可在此扩展。</p>
+                  </>
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-slate-300/80 bg-muted/10">
+                    <p className="text-sm text-muted-foreground">高级设置能力敬请期待。</p>
                   </div>
-                  <FieldDescription>保持默认即可，直接点击“立即运行”。</FieldDescription>
+                )
+              ) : runYamlMode ? (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <FieldGroup className="grid min-h-0 flex-1 grid-cols-1 gap-4">
+                    <Field className="flex min-h-0 flex-1 flex-col">
+                      <div
+                        id="pipeline-run-yaml"
+                        className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-700/60 bg-[#1e1e1e] shadow-inner"
+                      >
+                        <MonacoEditor
+                          language="yaml"
+                          theme="vs-dark"
+                          value={runYamlDraft}
+                          onChange={(value) => {
+                            setRunYamlDraft(value ?? "")
+                            if (runYamlError) setRunYamlError(null)
+                          }}
+                          options={MONACO_OPTIONS}
+                          height="100%"
+                          loading={<div className="p-3 text-xs text-slate-300">编辑器加载中...</div>}
+                        />
+                      </div>
+                      {runYamlError ? <FieldError className="mt-3">{runYamlError}</FieldError> : null}
+                    </Field>
+                  </FieldGroup>
+                </div>
+              ) : (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <FieldGroup className="grid min-h-0 flex-1 grid-cols-1 gap-4">
+                    <Field className="flex min-h-0 flex-1 flex-col">
+                      <div
+                        id="pipeline-run-drone-yaml"
+                        className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-700/60 bg-[#1e1e1e] shadow-inner"
+                      >
+                        <MonacoEditor
+                          language="yaml"
+                          theme="vs-dark"
+                          value={runDroneYamlDraft}
+                          onChange={(value) => setRunDroneYamlDraft(value ?? "")}
+                          options={MONACO_OPTIONS}
+                          height="100%"
+                          loading={<div className="p-3 text-xs text-slate-300">编辑器加载中...</div>}
+                        />
+                      </div>
+                    </Field>
+                  </FieldGroup>
                 </div>
               )}
             </div>
@@ -456,9 +715,42 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                     取消
                   </Button>
                 </DialogClose>
-                <Button type="button" onClick={() => void handleRun()} disabled={running || runRepositoryLoading}>
-                  {runRepositoryLoading ? "读取中..." : running ? "触发中..." : "立即运行"}
-                </Button>
+                {runYamlMode ? (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        const parsed = parsePipelineRunYamlText(runYamlDraft, normalizedPipelineName)
+                        setRunRepository(parsed.repository)
+                        setRunDroneYaml(parsed.droneYaml)
+                        setRunDroneYamlDraft(parsed.droneYaml)
+                        setRunYamlError(null)
+                        setRunError(null)
+                        setRunYamlMode(false)
+                      } catch (e: unknown) {
+                        setRunYamlError(e instanceof Error ? e.message : "YAML 解析失败")
+                      }
+                    }}
+                    disabled={running || runRepositoryLoading}
+                  >
+                    确认保存
+                  </Button>
+                ) : runDroneYamlMode ? (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setRunDroneYaml(runDroneYamlDraft)
+                      setRunDroneYamlMode(false)
+                    }}
+                    disabled={running || runRepositoryLoading}
+                  >
+                    确认保存
+                  </Button>
+                ) : (
+                  <Button type="button" onClick={() => void handleRun()} disabled={running || runRepositoryLoading}>
+                    {runRepositoryLoading ? "读取中..." : running ? "触发中..." : "立即运行"}
+                  </Button>
+                )}
               </div>
             </DialogFooter>
           </div>

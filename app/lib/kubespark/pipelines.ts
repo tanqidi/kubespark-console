@@ -89,6 +89,7 @@ export type CreatePipelineRunInput = {
   pipelineName: string
   triggerType?: string
   data?: Record<string, string>
+  annotations?: Record<string, string>
 }
 
 const PIPELINE_GVR = {
@@ -484,6 +485,7 @@ export async function createPipelineRun(input: CreatePipelineRunInput): Promise<
   const pipelineName = normalizePipelineName(input.pipelineName)
   const triggerType = input.triggerType?.trim() || "manual"
   const data = normalizeStringRecord(input.data)
+  const annotations = normalizeStringRecord(input.annotations)
 
   const requestBody = {
     apiVersion: "tanqidi.com/v1alpha1",
@@ -493,6 +495,7 @@ export async function createPipelineRun(input: CreatePipelineRunInput): Promise<
       labels: {
         pipeline: pipelineName,
       },
+      ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
     },
     spec: {
       pipelineRef: {
