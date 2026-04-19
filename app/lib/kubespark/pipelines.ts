@@ -449,15 +449,8 @@ export async function updateDroneSecret(repository: string, secretName: string, 
     throw new Error("缺少代码仓库或 Secret 名称")
   }
 
-  const base = buildResourceItemEndpoint("drone", "v1", "secrets", key, namespace)
-  const requestUrl = `${base}${base.includes("?") ? "&" : "?"}repo=${encodeURIComponent(repo)}`
-  await fetchJsonDeduped<unknown>(requestUrl, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      data,
-    }),
-  })
+  await deleteDroneSecret(repository, key)
+  await createDroneSecret(repository, key, data)
 }
 
 export async function deleteDroneSecret(repository: string, secretName: string): Promise<void> {
