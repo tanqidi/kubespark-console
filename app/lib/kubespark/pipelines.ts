@@ -384,6 +384,13 @@ export async function fetchDroneRepoOptions(): Promise<string[]> {
   return Array.from(options)
 }
 
+export async function syncDroneRepos(): Promise<void> {
+  const url = buildResourceCollectionEndpoint("drone", "v1", "reposync")
+  await fetchJsonDeduped<unknown>(url, {
+    method: "POST",
+  })
+}
+
 function resolveDroneRepoIdentity(repository: string): { namespace: string; repo: string } {
   const source = repository.trim()
   if (!source) return { namespace: "", repo: "" }

@@ -35,6 +35,7 @@ import {
   fetchPipelineDetail,
   fetchPipelineRows,
   fetchPipelineYaml,
+  syncDroneRepos,
   updateDroneSecret,
   updatePipeline,
   type PipelineRow,
@@ -611,6 +612,14 @@ export function PipelinesPageClient({
     resetCreateState()
     setCreateMode("create")
     setCreateDialogOpen(true)
+    void syncDroneRepos()
+      .then(() => fetchDroneRepoOptions())
+      .then((items) => {
+        setDroneRepoOptions(items)
+      })
+      .catch((e: unknown) => {
+        console.error("[Pipelines] sync drone repos failed", e)
+      })
   }, [resetCreateState])
 
   const openEditDialog = React.useCallback(
