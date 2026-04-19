@@ -1,76 +1,59 @@
-# Drone 动态 YAML 集成记录（已落地）
+# Drone CI/CD 集成说明（前端）
 
-更新时间：2026-04-14
+更新时间：2026-04-19
 
-## 1. 当前状态
+本文说明 `kubespark-console` 当前与 Drone 相关的真实交互，不再使用历史方案。
 
-- 已接入 Drone Configuration Extension。
-- 已实现“构建前从平台读取 YAML”，不强依赖仓库 `.drone.yml`。
-- 已启用官方共享密钥验签：`DRONE_YAML_SECRET`。
-
-## 2. 实际链路
+## 1. 当前链路
 
 ```text
-前端创建 PipelineRun
-  -> Kubespark 后端触发 Drone Build
-  -> Drone Server 请求 Kubespark /kapis/v1alpha1/drone/yaml
-  -> Kubespark 从 K8s Secret 读取 YAML 并返回
+用户创建 PipelineRun
+  -> 后端触发 Drone Build
+  -> Drone Server 调用 /kapis/v1alpha1/drone/yaml
+  -> 后端从 PipelineRun 注解读取 tanqidi.com/drone-yaml 并返回
   -> Drone 执行构建
-  -> Kubespark 回写 PipelineRun 注解 tanqidi.com/drone
+  -> 后端回写 PipelineRun 注解 tanqidi.com/drone（构建状态）
 ```
 
-## 3. 必配参数
+## 2. `.drone.yml` 的来源与覆盖
 
-### 3.1 Drone Server
+- 流水线级默认配置：`Pipeline.metadata.annotations["tanqidi.com/drone-yaml"]`
+- 运行时覆盖配置：`PipelineRun.metadata.annotations["tanqidi.com/drone-yaml"]`
 
-- `DRONE_YAML_ENDPOINT=http://<kubespark-host>:8080/kapis/v1alpha1/drone/yaml`
-- `DRONE_YAML_SECRET=<shared-secret>`
+规则：
 
-### 3.2 Kubespark 后端（处理 `/drone/yaml` 的进程）
+- 创建运行时，如果用户不编辑 `.drone.yml`，沿用流水线注解内容。
+- 如果用户在运行页面编辑 `.drone.yml`，保存后写入本次 `PipelineRun` 注解，仅覆盖本次运行。
 
-- 后端统一从 `kubespark/kubespark-secret` 读取：
-  - `DRONE_SERVER`
-  - `DRONE_TOKEN`
-  - `DRONE_YAML_SECRET`（必须与 Drone Server 完全一致）
+## 3. 代码仓库配置
 
-### 3.3 配置约束（当前）
+- 流水线编辑页维护注解：`tanqidi.com/code-repository`（格式 `owner/repo`）。
+- PipelineRun 页面显示并使用当前流水线的代码仓库配置。
+- 运行时将使用当前流水线的代码仓库。
 
-- 不再依赖宿主机 `/etc/environment` 设置 `DRONE_YAML_SECRET`。
-- 相关配置统一维护在 `Secret/kubespark-secret`。
+## 4. Drone Secret（流水线变量/密钥）维护
 
-## 4. YAML 存储位置
+前端通过 GVR 访问后端 Drone 代理：
 
-Kubespark 当前从固定 Secret 读取：
+- `GET /resources/drone/v1/secrets`
+- `POST /resources/drone/v1/secrets`
+- `DELETE /resources/drone/v1/secrets/{name}`
 
-- namespace: `kubespark`
-- name: `kubespark-drone-yaml-secret`
+保存策略：
 
-key 匹配优先级：
+- 有 `id` 且值非空：删除旧 key 后重新创建（前端层面等价更新）。
+- 无 `id` 且值非空：创建。
+- 值为空：跳过修改。
+- 删除操作需二次确认。
 
-1. `owner__repo`
-2. `owner_repo`
-3. `owner-repo`
-4. `owner.repo`
-5. `repo`
+## 5. 仓库下拉来源
 
-## 5. 调试日志要点
+- 前端可读取 `GET /resources/drone/v1/repos` 获取仓库选项。
+- 创建流水线时会触发 `POST /resources/drone/v1/reposync` 同步仓库，降低仓库列表滞后问题。
 
-成功链路应看到：
+## 6. 注意事项
 
-- `[drone-yaml] request ...`
-- `[drone-yaml] hit: owner=... repo=... key=...`
-- `[drone-yaml] response: format=json`
-- `POST /api/repos/{owner}/{repo}/builds status=200`
-- `[pipeline-run] trigger build success ...`
+- 用户不需要进入 Drone UI 绑定流程；平台侧使用统一 Drone 配置与代理接口。
+- Drone 配置由后端固定从 `kubespark/kubespark-secret` 读取。
+- 若后端返回 `503`，通常是 `DRONE_SERVER` / `DRONE_TOKEN` 缺失或不可用。
 
-常见错误：
-
-- `missing DRONE_YAML_SECRET`：`kubespark-secret` 缺少该键或值为空。
-- `invalid drone yaml signature`：两端 secret 不一致，或改完未重启进程。
-- `406 Not Acceptable`：扩展响应协商不匹配（现已兼容 Drone vendor accept）。
-
-## 6. 后续优化项
-
-- 支持在 UI 的“高级设置”直接录入 YAML（可选）。
-- 支持多环境 YAML（dev/test/prod）映射。
-- 给 YAML 来源增加版本号与审计字段。

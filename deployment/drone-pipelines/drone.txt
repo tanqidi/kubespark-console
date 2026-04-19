@@ -1,3 +1,4 @@
 https://docs.drone.io/extensions/configuration/?utm_source=chatgpt.com
 https://github.com/drone/drone-go
 https://docs.drone.io/runner/vm/configuration/reference/
+https://docs.drone.io/yaml/kubernetes/#the-image_pull_secrets-attribute
