@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
-import { IconEye, IconPlayerPlay, IconPencil, IconSettings2, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconPencil, IconSettings2, IconTrash } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import { parse, stringify } from "yaml"
 
@@ -26,7 +26,6 @@ import {
   type ColumnConfig,
 } from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
-  createPipelineRun,
   createPipeline,
   deletePipeline,
   fetchDroneRepoOptions,
@@ -288,7 +287,6 @@ export function PipelinesPageClient({
 
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PipelineRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
-  const [running, setRunning] = React.useState(false)
 
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [createStep, setCreateStep] = React.useState<PipelineDialogStep>("basic")
@@ -797,25 +795,6 @@ export function PipelinesPageClient({
       })
   }, [deleting, loadRows, pendingDeleteRow])
 
-  const handleRunPipeline = React.useCallback(
-    (row: PipelineRow) => {
-      if (running) return
-      const targetName = row.name.trim()
-      if (!targetName || targetName === "-") return
-
-      setRunning(true)
-      setError(null)
-      void createPipelineRun({ pipelineName: targetName })
-        .catch((e: unknown) => {
-          setError(e instanceof Error ? e.message : "触发流水线运行失败")
-        })
-        .finally(() => {
-          setRunning(false)
-        })
-    },
-    [running]
-  )
-
   const columns = React.useMemo(
     () =>
       createColumns<PipelineRow>({
@@ -830,17 +809,6 @@ export function PipelinesPageClient({
             ),
             onSelect: (row) => {
               handleViewYaml(row)
-            },
-          },
-          {
-            label: (
-                <>
-                  <IconPlayerPlay className="size-4" />
-                  运行
-                </>
-            ),
-            onSelect: (row) => {
-              handleRunPipeline(row)
             },
           },
           {
@@ -869,7 +837,7 @@ export function PipelinesPageClient({
           },
         ],
       }),
-    [handleRunPipeline, handleViewYaml, openEditDialog]
+    [handleViewYaml, openEditDialog]
   )
 
   const query = nameQuery.trim().toLowerCase()

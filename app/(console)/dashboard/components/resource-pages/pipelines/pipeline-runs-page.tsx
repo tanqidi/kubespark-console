@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { IconEye, IconPlayerPlay, IconSettings2, IconTrash } from "@tabler/icons-react"
-import { stringify } from "yaml"
+import { parse as parseYaml, stringify } from "yaml"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
@@ -15,6 +15,7 @@ import {
 import {
   createPipelineRun,
   deletePipelineRun,
+  fetchPipelineYaml,
   fetchPipelineRunRows,
   type PipelineRunRow,
 } from "@/app/lib/kubespark/pipelines"
@@ -36,6 +37,42 @@ import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 
 type PipelineRunsPageClientProps = {
   pipelineName: string
+}
+const CODE_REPOSITORY_ANNOTATION_KEY = "tanqidi.com/code-repository"
+
+function extractCodeRepositoryFromPipelinePayload(payload: unknown): string {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return ""
+  const root = payload as Record<string, unknown>
+  const metadata =
+    root.metadata && typeof root.metadata === "object" && !Array.isArray(root.metadata)
+      ? (root.metadata as Record<string, unknown>)
+      : null
+  if (!metadata) return ""
+  const annotations =
+    metadata.annotations && typeof metadata.annotations === "object" && !Array.isArray(metadata.annotations)
+      ? (metadata.annotations as Record<string, unknown>)
+      : null
+  if (!annotations) return ""
+  const value = annotations[CODE_REPOSITORY_ANNOTATION_KEY]
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function extractCodeRepositoryFromPipelineYamlText(yamlText: string): string {
+  const parsed = parseYaml(yamlText)
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return ""
+  const root = parsed as Record<string, unknown>
+  const metadata =
+    root.metadata && typeof root.metadata === "object" && !Array.isArray(root.metadata)
+      ? (root.metadata as Record<string, unknown>)
+      : null
+  if (!metadata) return ""
+  const annotations =
+    metadata.annotations && typeof metadata.annotations === "object" && !Array.isArray(metadata.annotations)
+      ? (metadata.annotations as Record<string, unknown>)
+      : null
+  if (!annotations) return ""
+  const value = annotations[CODE_REPOSITORY_ANNOTATION_KEY]
+  return typeof value === "string" ? value.trim() : ""
 }
 
 function sanitizePipelineRunYamlPayload(payload: unknown): unknown {
@@ -75,8 +112,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [nameQuery, setNameQuery] = React.useState("")
   const [runDialogOpen, setRunDialogOpen] = React.useState(false)
   const [runStep, setRunStep] = React.useState<"basic" | "advanced">("basic")
-  const [runNamespace, setRunNamespace] = React.useState("")
-  const [runRepo, setRunRepo] = React.useState(normalizedPipelineName)
+  const [runRepository, setRunRepository] = React.useState("")
+  const [runRepositoryLoading, setRunRepositoryLoading] = React.useState(false)
   const [runError, setRunError] = React.useState<string | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PipelineRunRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -117,18 +154,53 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     }
   }, [loadRows])
 
+  React.useEffect(() => {
+    let cancelled = false
+    setRunRepositoryLoading(true)
+    setRunError(null)
+
+    void fetchResourceByName<unknown>("tanqidi.com", "v1alpha1", "pipelines", normalizedPipelineName)
+      .then(async ({ payload }) => {
+        let nextRepository = extractCodeRepositoryFromPipelinePayload(payload)
+        if (!nextRepository) {
+          try {
+            const yamlText = await fetchPipelineYaml(normalizedPipelineName)
+            nextRepository = extractCodeRepositoryFromPipelineYamlText(yamlText)
+          } catch {
+            // ignore fallback parse errors and keep empty value
+          }
+        }
+        if (cancelled) return
+        setRunRepository(nextRepository)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setRunRepository("")
+      })
+      .finally(() => {
+        if (cancelled) return
+        setRunRepositoryLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [normalizedPipelineName])
+
   const handleRun = React.useCallback(() => {
-    if (running) return
-    const namespace = runNamespace.trim()
-    const repo = runRepo.trim()
-    if (!namespace) {
+    if (running || runRepositoryLoading) return
+    const source = runRepository.trim()
+    const segments = source.split("/").map((item) => item.trim()).filter((item) => item.length > 0)
+    const namespace = segments[0] ?? ""
+    const repo = segments.length >= 2 ? segments.slice(1).join("/") : ""
+    if (!source) {
       setRunStep("basic")
-      setRunError("请输入仓库命名空间（owner）")
+      setRunError("请先在流水线中配置代码仓库（owner/repo）")
       return
     }
-    if (!repo) {
+    if (!namespace || !repo) {
       setRunStep("basic")
-      setRunError("请输入仓库名称（repo）")
+      setRunError("代码仓库注解格式无效，需为 owner/repo")
       return
     }
 
@@ -155,7 +227,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         setError(message)
         setRunning(false)
       })
-  }, [loadRows, normalizedPipelineName, runNamespace, runRepo, running])
+  }, [loadRows, normalizedPipelineName, runRepository, runRepositoryLoading, running])
 
   const columns = React.useMemo(
     () =>
@@ -297,8 +369,10 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           setRunDialogOpen(open)
           if (open) {
             setRunStep("basic")
-            setRunRepo(normalizedPipelineName)
             setRunError(null)
+            if (!runRepository.trim()) {
+              setRunError("请先在流水线中配置代码仓库（owner/repo）")
+            }
           }
         }}
       >
@@ -347,38 +421,20 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                 <>
                   <div className="mb-4">
                     <h3 className="text-[15px] font-semibold">运行参数</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">用于定位 Drone 仓库（owner/repo）。</p>
+                    <p className="mt-1 text-sm text-muted-foreground">指定本次运行使用的参数，流水线将从该仓库获取代码并执行</p>
                   </div>
-                  <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FieldGroup className="grid grid-cols-1 gap-4">
                     <Field>
-                      <FieldLabel htmlFor="pipeline-run-namespace">仓库命名空间（owner）</FieldLabel>
+                      <FieldLabel htmlFor="pipeline-run-repository">代码仓库</FieldLabel>
                       <Input
-                        id="pipeline-run-namespace"
-                        value={runNamespace}
-                        onChange={(event) => {
-                          setRunNamespace(event.target.value)
-                          if (runError) setRunError(null)
-                        }}
-                        placeholder="tanqidi"
+                        id="pipeline-run-repository"
+                        value={runRepository}
+                        placeholder={runRepositoryLoading ? "读取中..." : "owner/repo"}
                         autoComplete="off"
-                        disabled={running}
+                        disabled
+                        readOnly
                       />
-                      <FieldDescription>将写入 `spec.data.namespace`。</FieldDescription>
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="pipeline-run-repo">仓库名称（repo）</FieldLabel>
-                      <Input
-                        id="pipeline-run-repo"
-                        value={runRepo}
-                        onChange={(event) => {
-                          setRunRepo(event.target.value)
-                          if (runError) setRunError(null)
-                        }}
-                        placeholder="kubespark"
-                        autoComplete="off"
-                        disabled={running}
-                      />
-                      <FieldDescription>将写入 `spec.data.repo`。</FieldDescription>
+                      <FieldDescription>要构建的 Drone 仓库（owner/repo）</FieldDescription>
                     </Field>
                   </FieldGroup>
                   {runError ? <FieldError className="mt-3">{runError}</FieldError> : null}
@@ -396,12 +452,12 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
             <DialogFooter className="border-t bg-background px-6 py-5">
               <div className="flex w-full items-center justify-between gap-3">
                 <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={running}>
+                  <Button type="button" variant="outline" disabled={running || runRepositoryLoading}>
                     取消
                   </Button>
                 </DialogClose>
-                <Button type="button" onClick={() => void handleRun()} disabled={running}>
-                  {running ? "触发中..." : "立即运行"}
+                <Button type="button" onClick={() => void handleRun()} disabled={running || runRepositoryLoading}>
+                  {runRepositoryLoading ? "读取中..." : running ? "触发中..." : "立即运行"}
                 </Button>
               </div>
             </DialogFooter>
