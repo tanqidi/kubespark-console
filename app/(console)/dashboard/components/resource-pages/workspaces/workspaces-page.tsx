@@ -65,6 +65,7 @@ type WorkspaceDialogMode = "create" | "edit"
 
 const WORKSPACE_NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
+const WORKSPACE_OWNER_RULE_MESSAGE = "负责人为必填项。"
 
 const workspaceColumns: ColumnConfig<WorkspaceRow>[] = [
   {
@@ -363,6 +364,20 @@ export function WorkspacesPageClient() {
   )
 
   const isEditMode = dialogMode === "edit"
+
+  const handleNextStep = React.useCallback(() => {
+    if (submitting || loadingEditData) return
+
+    const nameError = validateWorkspaceName(workspaceName.trim())
+    setCreateNameInvalid(Boolean(nameError))
+    setCreateNameError(nameError)
+
+    const ownerError = workspaceOwner.trim() ? null : "请输入负责人"
+    setCreateOwnerError(ownerError)
+
+    if (nameError || ownerError) return
+    setCreateStep("advanced")
+  }, [loadingEditData, submitting, workspaceName, workspaceOwner])
 
   const handleCreateSubmit = React.useCallback(() => {
     if (submitting || loadingEditData) return
@@ -683,9 +698,14 @@ export function WorkspacesPageClient() {
                         }}
                         placeholder="请输入负责人"
                         autoComplete="off"
+                        aria-invalid={Boolean(createOwnerError)}
                         disabled={submitting || loadingEditData}
                       />
-                      {createOwnerError ? <FieldError>{createOwnerError}</FieldError> : null}
+                      {createOwnerError ? (
+                        <FieldError>{createOwnerError}</FieldError>
+                      ) : (
+                        <FieldDescription>{WORKSPACE_OWNER_RULE_MESSAGE}</FieldDescription>
+                      )}
                     </Field>
 
                     <Field className="md:col-span-2">
@@ -749,7 +769,7 @@ export function WorkspacesPageClient() {
                       取消
                     </Button>
                   </DialogClose>
-                  <Button type="button" disabled={submitting || loadingEditData} onClick={() => setCreateStep("advanced")}>
+                  <Button type="button" disabled={submitting || loadingEditData} onClick={handleNextStep}>
                     下一步
                   </Button>
                 </div>

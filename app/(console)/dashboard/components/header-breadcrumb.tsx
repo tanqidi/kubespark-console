@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import * as React from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 
 import {
   Breadcrumb,
@@ -50,7 +50,13 @@ function segmentToLabel(segment: string) {
   return SEGMENT_LABELS[segment] ?? decodeSegment(segment)
 }
 
-function buildCrumbs(pathname: string): Crumb[] {
+function workloadKindToLabel(kind: string): string {
+  if (kind === "StatefulSet") return "有状态副本集"
+  if (kind === "DaemonSet") return "守护进程集"
+  return "部署"
+}
+
+function buildCrumbs(pathname: string, kind: string): Crumb[] {
   const segments = pathname.split("/").filter(Boolean)
   if (segments[0] !== "dashboard") {
     return [{ href: "/", label: "控制台" }]
@@ -65,7 +71,7 @@ function buildCrumbs(pathname: string): Crumb[] {
   //   -> "控制台 > 项目 > {projectName} > {pipelineName}"
   if (tail[0] === "projects" && tail[1] === "devops" && tail[2]) {
     const projectName = decodeSegment(tail[2])
-    result.push({ href: "/dashboard/projects", label: "项目" })
+    result.push({ href: "/dashboard/projects", label: "流水线项目" })
     result.push({
       href: `/dashboard/projects/devops/${tail[2]}`,
       label: projectName,
@@ -92,6 +98,21 @@ function buildCrumbs(pathname: string): Crumb[] {
     return result
   }
 
+  // /dashboard/workloads/:namespace/:name -> "控制台 > 工作负载 > {kindLabel} > {name}"
+  if (tail[0] === "workloads" && tail[1] && tail[2]) {
+    return [
+      { href: "/dashboard/workloads", label: "工作负载" },
+      {
+        href: `/dashboard/workloads/${tail[1]}/${tail[2]}?kind=${encodeURIComponent(kind || "Deployment")}`,
+        label: workloadKindToLabel(kind),
+      },
+      {
+        href: `/dashboard/workloads/${tail[1]}/${tail[2]}`,
+        label: decodeSegment(tail[2]),
+      },
+    ]
+  }
+
   let href = "/dashboard"
   for (const segment of tail) {
     href += `/${segment}`
@@ -103,7 +124,16 @@ function buildCrumbs(pathname: string): Crumb[] {
 
 export function HeaderBreadcrumb() {
   const pathname = usePathname()
-  const crumbs = React.useMemo(() => buildCrumbs(pathname), [pathname])
+  const searchParams = useSearchParams()
+  const kind = searchParams.get("kind") ?? "Deployment"
+  const crumbs = React.useMemo(() => buildCrumbs(pathname, kind), [pathname, kind])
+  const segments = React.useMemo(() => pathname.split("/").filter(Boolean), [pathname])
+  const isTopLevelModulePage =
+    segments[0] === "dashboard" &&
+    segments.length <= 2 &&
+    segments[1] !== undefined
+
+  if (isTopLevelModulePage) return null
 
   return (
     <Breadcrumb className="min-w-0">

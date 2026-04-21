@@ -92,7 +92,7 @@ export function WorkloadDetailTemplate({ kind, namespace }: WorkloadDetailTempla
   }
 
   return (
-      <div>
+      <div className="px-4 lg:px-6">
         <div className="flex items-center justify-between gap-2">
           <Tabs
               value={activeTab}

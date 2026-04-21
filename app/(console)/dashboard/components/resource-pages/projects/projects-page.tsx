@@ -1484,7 +1484,7 @@ export function ProjectsPageClient() {
                         )}
                       </Field>
 
-                      <Field>
+                      <Field data-invalid={createWorkspaceInvalid}>
                         <FieldLabel htmlFor="project-create-workspace">企业空间</FieldLabel>
                         <FilterCombobox
                           options={workspaceOptions}
@@ -1830,7 +1830,7 @@ export function ProjectsPageClient() {
                           <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
                         )}
                       </Field>
-                      <Field>
+                      <Field data-invalid={pipelineProjectCreateWorkspaceInvalid}>
                         <FieldLabel htmlFor="project-pipeline-project-create-workspace">企业空间</FieldLabel>
                         <FilterCombobox
                           options={workspaceOptions}
