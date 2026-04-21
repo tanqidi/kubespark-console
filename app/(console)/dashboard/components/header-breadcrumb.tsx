@@ -59,11 +59,11 @@ function workloadKindToLabel(kind: string): string {
 function buildCrumbs(pathname: string, kind: string): Crumb[] {
   const segments = pathname.split("/").filter(Boolean)
   if (segments[0] !== "dashboard") {
-    return [{ href: "/", label: "控制台" }]
+    return []
   }
 
   const tail = segments.slice(1)
-  const result: Crumb[] = [{ href: "/dashboard", label: "控制台" }]
+  const result: Crumb[] = []
 
   // Special rule:
   // /dashboard/projects/devops/:projectName -> "控制台 > 项目 > {projectName}"
@@ -90,7 +90,7 @@ function buildCrumbs(pathname: string, kind: string): Crumb[] {
   // /dashboard/projects/namespaces/:namespaceName -> "控制台 > 项目 > {namespaceName}"
   if (tail[0] === "projects" && tail[1] === "namespaces" && tail[2]) {
     const namespaceName = decodeSegment(tail[2])
-    result.push({ href: "/dashboard/projects", label: "项目" })
+    result.push({ href: `/dashboard/projects/namespaces/${tail[2]}`, label: "命名空间" })
     result.push({
       href: `/dashboard/projects/namespaces/${tail[2]}`,
       label: namespaceName,
@@ -98,10 +98,9 @@ function buildCrumbs(pathname: string, kind: string): Crumb[] {
     return result
   }
 
-  // /dashboard/workloads/:namespace/:name -> "控制台 > 工作负载 > {kindLabel} > {name}"
+  // /dashboard/workloads/:namespace/:name -> "控制台 > {kindLabel} > {name}"
   if (tail[0] === "workloads" && tail[1] && tail[2]) {
     return [
-      { href: "/dashboard/workloads", label: "工作负载" },
       {
         href: `/dashboard/workloads/${tail[1]}/${tail[2]}?kind=${encodeURIComponent(kind || "Deployment")}`,
         label: workloadKindToLabel(kind),
@@ -113,8 +112,10 @@ function buildCrumbs(pathname: string, kind: string): Crumb[] {
     ]
   }
 
-  let href = "/dashboard"
-  for (const segment of tail) {
+  const startIndex = tail.length > 1 ? 1 : 0
+  let href = startIndex > 0 ? `/dashboard/${tail[0]}` : "/dashboard"
+  for (let index = startIndex; index < tail.length; index += 1) {
+    const segment = tail[index]
     href += `/${segment}`
     result.push({ href, label: segmentToLabel(segment) })
   }
@@ -133,7 +134,7 @@ export function HeaderBreadcrumb() {
     segments.length <= 2 &&
     segments[1] !== undefined
 
-  if (isTopLevelModulePage) return null
+  if (isTopLevelModulePage || crumbs.length === 0) return null
 
   return (
     <Breadcrumb className="min-w-0">
