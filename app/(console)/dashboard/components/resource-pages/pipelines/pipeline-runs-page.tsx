@@ -17,6 +17,7 @@ import {
 import {
   createPipelineRun,
   deletePipelineRun,
+  fetchDroneBranchOptions,
   fetchPipelineYaml,
   fetchPipelineRunRows,
   type PipelineRunRow,
@@ -35,8 +36,10 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { FilterCombobox, type FilterComboboxOption } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 
 type PipelineRunsPageClientProps = {
   pipelineName: string
@@ -252,6 +255,11 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [runYamlMode, setRunYamlMode] = React.useState(false)
   const [runDroneYamlMode, setRunDroneYamlMode] = React.useState(false)
   const [runRepository, setRunRepository] = React.useState("")
+  const [runBranch, setRunBranch] = React.useState("")
+  const [runBranchOptions, setRunBranchOptions] = React.useState<FilterComboboxOption[]>([])
+  const [runBranchLoading, setRunBranchLoading] = React.useState(false)
+  const [runBranchError, setRunBranchError] = React.useState<string | null>(null)
+  const [runDescription, setRunDescription] = React.useState("")
   const [runRepositoryLoading, setRunRepositoryLoading] = React.useState(false)
   const [runYamlDraft, setRunYamlDraft] = React.useState("")
   const [runDroneYamlDefault, setRunDroneYamlDefault] = React.useState("")
@@ -341,6 +349,46 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     }
   }, [normalizedPipelineName])
 
+  React.useEffect(() => {
+    if (!runDialogOpen) return
+    const repository = runRepository.trim()
+    if (!repository) {
+      setRunBranchOptions([])
+      setRunBranch("")
+      setRunBranchError(null)
+      return
+    }
+
+    let cancelled = false
+    setRunBranchLoading(true)
+    setRunBranchError(null)
+    void fetchDroneBranchOptions(repository)
+      .then((items) => {
+        if (cancelled) return
+        const options = items.map((item) => ({ id: item, name: item }))
+        setRunBranchOptions(options)
+        if (options.length === 0) {
+          setRunBranch("")
+          return
+        }
+        setRunBranch((prev) => (options.some((option) => option.id === prev) ? prev : options[0]?.id ?? ""))
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setRunBranchOptions([])
+        setRunBranch("")
+        setRunBranchError(e instanceof Error ? e.message : "加载分支失败")
+      })
+      .finally(() => {
+        if (cancelled) return
+        setRunBranchLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [runDialogOpen, runRepository])
+
   const handleRun = React.useCallback(() => {
     if (running || runRepositoryLoading) return
     const source = runRepository.trim()
@@ -364,6 +412,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         data: {
           namespace,
           repo,
+          ...(runBranch.trim() ? { branch: runBranch.trim() } : {}),
         },
         ...(normalizedDroneYaml
           ? {
@@ -385,7 +434,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         setError(message)
         setRunning(false)
       })
-  }, [loadRows, normalizedPipelineName, runDroneYaml, runRepository, runRepositoryLoading, running])
+  }, [loadRows, normalizedPipelineName, runBranch, runDroneYaml, runRepository, runRepositoryLoading, running])
 
   const columns = React.useMemo(
     () =>
@@ -531,6 +580,10 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
             setRunDroneYamlMode(false)
             setRunYamlError(null)
             setRunError(null)
+            setRunBranch("")
+            setRunBranchOptions([])
+            setRunBranchError(null)
+            setRunDescription("")
             setRunDroneYaml(runDroneYamlDefault)
             setRunDroneYamlDraft(runDroneYamlDefault)
             setRunYamlDraft(
@@ -555,7 +608,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
                 <DialogTitle>立即运行</DialogTitle>
-                <DialogDescription>创建一次 PipelineRun，可按需覆盖 .drone.yml。</DialogDescription>
+                <DialogDescription>创建一次 PipelineRun，可按需覆盖 .drone.yml</DialogDescription>
               </DialogHeader>
               <div className="me-20 flex h-full items-center">
                 <div className="flex items-center gap-3">
@@ -640,17 +693,49 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                     <p className="mt-1 text-sm text-muted-foreground">指定本次运行使用的参数，流水线将从该仓库获取代码并执行</p>
                   </div>
                   <FieldGroup className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <Field>
+                        <FieldLabel htmlFor="pipeline-run-repository">代码仓库</FieldLabel>
+                        <Input
+                          id="pipeline-run-repository"
+                          value={runRepository}
+                          placeholder={runRepositoryLoading ? "读取中..." : "owner/repo"}
+                          autoComplete="off"
+                          disabled
+                          readOnly
+                        />
+                        <FieldDescription>要构建的 Drone 仓库（owner/repo）</FieldDescription>
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="pipeline-run-branch">分支</FieldLabel>
+                        <FilterCombobox
+                          options={runBranchOptions}
+                          value={runBranch}
+                          onValueChange={setRunBranch}
+                          placeholder={runBranchLoading ? "加载分支中..." : "请选择分支"}
+                          emptyText={runBranchLoading ? "分支加载中..." : "暂无分支"}
+                          className="h-10"
+                          disabled={running || runRepositoryLoading}
+                        />
+                        {runBranchError ? (
+                          <FieldError>{runBranchError}</FieldError>
+                        ) : (
+                          <FieldDescription>从 Drone 仓库实时获取分支列表。</FieldDescription>
+                        )}
+                      </Field>
+                    </div>
                     <Field>
-                      <FieldLabel htmlFor="pipeline-run-repository">代码仓库</FieldLabel>
-                      <Input
-                        id="pipeline-run-repository"
-                        value={runRepository}
-                        placeholder={runRepositoryLoading ? "读取中..." : "owner/repo"}
-                        autoComplete="off"
-                        disabled
-                        readOnly
+                      <FieldLabel htmlFor="pipeline-run-description">描述</FieldLabel>
+                      <Textarea
+                        id="pipeline-run-description"
+                        value={runDescription}
+                        onChange={(event) => setRunDescription(event.target.value)}
+                        placeholder="请输入描述"
+                        className="min-h-28"
+                        maxLength={256}
+                        disabled={running || runRepositoryLoading}
                       />
-                      <FieldDescription>要构建的 Drone 仓库（owner/repo）</FieldDescription>
+                      <FieldDescription>描述信息仅用于本次运行说明，最长 256 个字符</FieldDescription>
                     </Field>
                   </FieldGroup>
                   {runError ? <FieldError className="mt-3">{runError}</FieldError> : null}

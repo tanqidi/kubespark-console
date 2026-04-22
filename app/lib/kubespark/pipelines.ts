@@ -47,6 +47,11 @@ type RawDroneSecret = {
   name?: string
 }
 
+type RawDroneBranch = {
+  name?: string
+  ref?: string
+}
+
 export type DroneSecretOption = {
   id: number
   name: string
@@ -419,6 +424,44 @@ export async function fetchDroneSecretKeyOptions(repository: string): Promise<Dr
     if (name && id > 0) options.set(name, id)
   }
   return Array.from(options.entries()).map(([name, id]) => ({ name, id }))
+}
+
+function extractDroneBranchName(item: RawDroneBranch): string {
+  const name = readString(item.name)
+  if (name) return name
+
+  const ref = readString(item.ref)
+  if (!ref) return ""
+  if (ref.startsWith("refs/heads/")) return ref.slice("refs/heads/".length)
+  if (ref.startsWith("refs/tags/")) return ref.slice("refs/tags/".length)
+  return ref
+}
+
+export async function fetchDroneBranchOptions(repository: string): Promise<string[]> {
+  const { namespace, repo } = resolveDroneRepoIdentity(repository)
+  if (!namespace || !repo) return []
+
+  const base = buildResourceCollectionEndpoint("drone", "v1", "branches", { namespace })
+  const requestUrl = `${base}${base.includes("?") ? "&" : "?"}repo=${encodeURIComponent(repo)}`
+  let payload: unknown
+  try {
+    payload = await fetchJsonDeduped<unknown>(requestUrl)
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : ""
+    if (message.includes("unsupported drone resource: branches")) {
+      throw new Error("后端暂未实现 Drone 分支列表接口（drone/v1/branches）")
+    }
+    throw e
+  }
+  const container = asRecord(asRecord(payload).data ?? payload)
+  const items = Array.isArray(container.items) ? (container.items as RawDroneBranch[]) : []
+
+  const options = new Set<string>()
+  for (const item of items) {
+    const branch = extractDroneBranchName(item)
+    if (branch) options.add(branch)
+  }
+  return Array.from(options)
 }
 
 export async function createDroneSecret(repository: string, secretName: string, value: string): Promise<void> {
