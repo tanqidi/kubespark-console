@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconTrash } from "@tabler/icons-react"
+import { IconEye, IconTrash } from "@tabler/icons-react"
 import { stringify } from "yaml"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
@@ -50,7 +50,6 @@ const itemColumns: ColumnConfig<CustomResourceItemRow>[] = [
     enableHiding: false,
     cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
   },
-  { key: "namespace", label: "命名空间" },
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
 ]
@@ -74,7 +73,12 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
         columns: itemColumns,
         actionItems: [
           {
-            label: "查看 YAML",
+            label: (
+              <>
+                <IconEye className="size-4" />
+                查看 YAML
+              </>
+            ),
             onSelect: (row) => {
               if (!definition) return
               const namespace = row.namespace && row.namespace !== "-" ? row.namespace : undefined
