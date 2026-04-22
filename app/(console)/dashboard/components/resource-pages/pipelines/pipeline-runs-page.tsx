@@ -236,6 +236,87 @@ function sanitizePipelineRunYamlPayload(payload: unknown): unknown {
   }
 }
 
+function countLeadingSpaces(line: string): number {
+  const match = line.match(/^ */)
+  return match ? match[0].length : 0
+}
+
+function toYamlScalar(value: string): string {
+  // Keep common git branch names unquoted; quote only when necessary.
+  if (/^[A-Za-z0-9._/\-]+$/.test(value)) return value
+  return `'${value.replace(/'/g, "''")}'`
+}
+
+function syncDroneYamlBranch(yamlText: string, branch: string): string {
+  const normalizedYaml = yamlText.trim()
+  const normalizedBranch = branch.trim()
+  if (!normalizedYaml || !normalizedBranch) return yamlText
+
+  try {
+    const lines = yamlText.split(/\r?\n/)
+    const triggerIndex = lines.findIndex((line) => /^\s*trigger\s*:\s*(#.*)?$/.test(line))
+    if (triggerIndex < 0) return yamlText
+
+    const triggerIndent = countLeadingSpaces(lines[triggerIndex] ?? "")
+    let triggerEnd = lines.length
+    for (let i = triggerIndex + 1; i < lines.length; i++) {
+      const line = lines[i] ?? ""
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith("#")) continue
+      if (countLeadingSpaces(line) <= triggerIndent) {
+        triggerEnd = i
+        break
+      }
+    }
+
+    let branchIndex = -1
+    for (let i = triggerIndex + 1; i < triggerEnd; i++) {
+      const line = lines[i] ?? ""
+      if (/^\s*branch\s*:\s*(#.*)?$/.test(line)) {
+        branchIndex = i
+        break
+      }
+    }
+
+    const branchScalar = toYamlScalar(normalizedBranch)
+
+    if (branchIndex >= 0) {
+      const branchIndent = countLeadingSpaces(lines[branchIndex] ?? "")
+      let branchEnd = triggerEnd
+      for (let i = branchIndex + 1; i < triggerEnd; i++) {
+        const line = lines[i] ?? ""
+        const trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith("#")) continue
+        if (countLeadingSpaces(line) <= branchIndent) {
+          branchEnd = i
+          break
+        }
+      }
+
+      const itemIndent = " ".repeat(branchIndent + 2)
+      const nextLines = [
+        ...lines.slice(0, branchIndex + 1),
+        `${itemIndent}- ${branchScalar}`,
+        ...lines.slice(branchEnd),
+      ]
+      return nextLines.join("\n")
+    }
+
+    // trigger exists but no branch section yet: inject it as first child under trigger.
+    const childIndent = " ".repeat(triggerIndent + 2)
+    const itemIndent = " ".repeat(triggerIndent + 4)
+    const injected = [
+      ...lines.slice(0, triggerIndex + 1),
+      `${childIndent}branch:`,
+      `${itemIndent}- ${branchScalar}`,
+      ...lines.slice(triggerIndex + 1),
+    ]
+    return injected.join("\n")
+  } catch {
+    return yamlText
+  }
+}
+
 const pipelineRunColumns: ColumnConfig<PipelineRunRow>[] = [
   {
     key: "name",
@@ -392,6 +473,14 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     }
   }, [runDialogOpen, runRepository])
 
+  React.useEffect(() => {
+    if (!runDialogOpen) return
+    const nextYaml = syncDroneYamlBranch(runDroneYaml, runBranch)
+    if (nextYaml === runDroneYaml) return
+    setRunDroneYaml(nextYaml)
+    setRunDroneYamlDraft(nextYaml)
+  }, [runBranch, runDialogOpen, runDroneYaml])
+
   const handleRun = React.useCallback(() => {
     if (running || runRepositoryLoading) return
     const source = runRepository.trim()
@@ -408,7 +497,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     setRunning(true)
     setRunError(null)
     setError(null)
-    const normalizedDroneYaml = runDroneYaml.trim()
+    const normalizedDroneYaml = syncDroneYamlBranch(runDroneYaml.trim(), runBranch.trim()).trim()
     void createPipelineRun({
         pipelineName: normalizedPipelineName,
         triggerType: "manual",
