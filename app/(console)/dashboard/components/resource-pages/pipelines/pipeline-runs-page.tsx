@@ -26,6 +26,13 @@ import { fetchResourceByName } from "@/app/lib/kubespark/common"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
+  Combobox,
+  ComboboxContent,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
+import {
   Dialog,
   DialogClose,
   DialogContent,
@@ -36,7 +43,6 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { FilterCombobox, type FilterComboboxOption } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -256,7 +262,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [runDroneYamlMode, setRunDroneYamlMode] = React.useState(false)
   const [runRepository, setRunRepository] = React.useState("")
   const [runBranch, setRunBranch] = React.useState("")
-  const [runBranchOptions, setRunBranchOptions] = React.useState<FilterComboboxOption[]>([])
+  const [runBranchOptions, setRunBranchOptions] = React.useState<string[]>([])
   const [runBranchLoading, setRunBranchLoading] = React.useState(false)
   const [runBranchError, setRunBranchError] = React.useState<string | null>(null)
   const [runDescription, setRunDescription] = React.useState("")
@@ -274,6 +280,11 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 PipelineRun 的 YAML 内容。")
+  const matchedRunBranchOptions = React.useMemo(() => {
+    const query = runBranch.trim().toLowerCase()
+    if (!query) return runBranchOptions
+    return runBranchOptions.filter((item) => item.toLowerCase().includes(query))
+  }, [runBranch, runBranchOptions])
 
   const loadRows = React.useCallback(
     async (silent: boolean) => {
@@ -354,7 +365,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     const repository = runRepository.trim()
     if (!repository) {
       setRunBranchOptions([])
-      setRunBranch("")
       setRunBranchError(null)
       return
     }
@@ -365,18 +375,11 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     void fetchDroneBranchOptions(repository)
       .then((items) => {
         if (cancelled) return
-        const options = items.map((item) => ({ id: item, name: item }))
-        setRunBranchOptions(options)
-        if (options.length === 0) {
-          setRunBranch("")
-          return
-        }
-        setRunBranch((prev) => (options.some((option) => option.id === prev) ? prev : options[0]?.id ?? ""))
+        setRunBranchOptions(items)
       })
       .catch((e: unknown) => {
         if (cancelled) return
         setRunBranchOptions([])
-        setRunBranch("")
         setRunBranchError(e instanceof Error ? e.message : "加载分支失败")
       })
       .finally(() => {
@@ -708,19 +711,41 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                       </Field>
                       <Field>
                         <FieldLabel htmlFor="pipeline-run-branch">分支</FieldLabel>
-                        <FilterCombobox
-                          options={runBranchOptions}
-                          value={runBranch}
-                          onValueChange={setRunBranch}
-                          placeholder={runBranchLoading ? "加载分支中..." : "请选择分支"}
-                          emptyText={runBranchLoading ? "分支加载中..." : "暂无分支"}
-                          className="h-10"
+                        <Combobox
+                          items={runBranchOptions}
+                          value={runBranch.trim() ? runBranch : null}
+                          inputValue={runBranch}
+                          onInputValueChange={(value) => {
+                            setRunBranch(value ?? "")
+                          }}
+                          onValueChange={(item) => {
+                            if (typeof item === "string") {
+                              setRunBranch(item)
+                            }
+                          }}
                           disabled={running || runRepositoryLoading}
-                        />
+                        >
+                          <ComboboxInput
+                            placeholder={runBranchLoading ? "加载分支中..." : "请选择分支"}
+                            className="h-10 w-full"
+                            disabled={running || runRepositoryLoading}
+                          />
+                          {matchedRunBranchOptions.length > 0 ? (
+                            <ComboboxContent className="pointer-events-auto">
+                              <ComboboxList>
+                                {(item, index) => (
+                                  <ComboboxItem key={`${item}-${index}`} value={item}>
+                                    {item}
+                                  </ComboboxItem>
+                                )}
+                              </ComboboxList>
+                            </ComboboxContent>
+                          ) : null}
+                        </Combobox>
                         {runBranchError ? (
                           <FieldError>{runBranchError}</FieldError>
                         ) : (
-                          <FieldDescription>从 Drone 仓库实时获取分支列表。</FieldDescription>
+                          <FieldDescription>从 Git 平台实时获取分支列表</FieldDescription>
                         )}
                       </Field>
                     </div>

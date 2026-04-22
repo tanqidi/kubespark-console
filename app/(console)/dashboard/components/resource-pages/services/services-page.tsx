@@ -43,13 +43,15 @@ const serviceColumns: ColumnConfig<ServiceRow>[] = [
     key: "internalAccess",
     label: "内部访问",
     cell: (_value, row) =>
-      renderNameDescriptionCell(row.internalAccess, row.internalAccessType),
+      // renderNameDescriptionCell(row.internalAccess, row.internalAccessType),
+      renderNameDescriptionCell(row.internalAccess, null),
   },
   {
     key: "externalAccess",
     label: "外部访问",
     cell: (_value, row) =>
-      renderNameDescriptionCell(row.externalAccess, row.externalAccessType),
+      // renderNameDescriptionCell(row.externalAccess, row.externalAccessType),
+      renderNameDescriptionCell(row.externalAccess, null),
   },
   { key: "age", label: "运行时间" },
   { key: "updatedAt", label: "更新时间" },
