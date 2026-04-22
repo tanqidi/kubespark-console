@@ -27,8 +27,6 @@ spec:
                   properties:
                     name:
                       type: string
-                      minLength: 1
-                      maxLength: 63
                   required:
                     - name
                 pipelineProjectRef:
@@ -36,13 +34,10 @@ spec:
                   properties:
                     name:
                       type: string
-                      minLength: 1
-                      maxLength: 63
                   required:
                     - name
                 data:
                   type: object
-                  description: 类似 ConfigMap data，key 自定义，value 可存任意 YAML/脚本内容
                   additionalProperties:
                     type: string
               required:

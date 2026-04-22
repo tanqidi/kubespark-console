@@ -33,17 +33,11 @@ spec:
                   properties:
                     name:
                       type: string
-                      minLength: 1
-                      maxLength: 63
                   required:
                     - name
                 displayName:
                   type: string
-                  minLength: 1
-                  maxLength: 128
                 description:
                   type: string
-                  minLength: 1
-                  maxLength: 2048
               required:
                 - workspaceRef
