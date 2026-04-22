@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { IconTrash } from "@tabler/icons-react"
+import { IconEye, IconTrash } from "@tabler/icons-react"
+import { stringify } from "yaml"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
@@ -14,10 +15,12 @@ import {
   fetchCustomResourceDefinitionRows,
   type CustomResourceDefinitionRow,
 } from "@/app/lib/kubespark/resource-rows"
+import { fetchResourceByName } from "@/app/lib/kubespark/common"
 import { deleteCustomResourceDefinition } from "@/app/lib/kubespark/resource-delete"
 import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 
 type CustomResourceRow = CustomResourceDefinitionRow
 
@@ -36,6 +39,45 @@ const customResourceColumns: ColumnConfig<CustomResourceRow>[] = [
   { key: "updatedAt", label: "更新时间" },
 ]
 
+function sanitizeCustomResourceDefinitionYamlPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload
+  const root = payload as Record<string, unknown>
+  const metadata =
+    root.metadata && typeof root.metadata === "object" && !Array.isArray(root.metadata)
+      ? ({ ...(root.metadata as Record<string, unknown>) })
+      : null
+
+  if (!metadata) {
+    const fallback = { ...root }
+    delete fallback.status
+    return fallback
+  }
+
+  const annotations =
+    metadata.annotations && typeof metadata.annotations === "object" && !Array.isArray(metadata.annotations)
+      ? ({ ...(metadata.annotations as Record<string, unknown>) })
+      : null
+  if (annotations) {
+    delete annotations["kubectl.kubernetes.io/last-applied-configuration"]
+    if (Object.keys(annotations).length > 0) metadata.annotations = annotations
+    else delete metadata.annotations
+  }
+
+  delete metadata.uid
+  delete metadata.resourceVersion
+  delete metadata.generation
+  delete metadata.creationTimestamp
+  delete metadata.managedFields
+  delete metadata.selfLink
+
+  const normalized: Record<string, unknown> = {
+    ...root,
+    metadata,
+  }
+  delete normalized.status
+  return normalized
+}
+
 export function CustomResourcesPageClient() {
   const [rows, setRows] = React.useState<CustomResourceRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -45,6 +87,11 @@ export function CustomResourcesPageClient() {
   const [nameQuery, setNameQuery] = React.useState("")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<CustomResourceRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+  const [yamlOpen, setYamlOpen] = React.useState(false)
+  const [yamlLoading, setYamlLoading] = React.useState(false)
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlContent, setYamlContent] = React.useState("")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 CRD 的 YAML 内容。")
 
   const requestDelete = React.useCallback((row: CustomResourceRow) => {
     setPendingDeleteRow(row)
@@ -82,6 +129,47 @@ export function CustomResourcesPageClient() {
       createColumns<CustomResourceRow>({
         columns: customResourceColumns,
         actionItems: [
+          {
+            label: (
+              <>
+                <IconEye className="size-4" />
+                查看 YAML
+              </>
+            ),
+            onSelect: (row) => {
+              const name = row.name.trim()
+              if (!name || name === "-") return
+
+              setYamlOpen(true)
+              setYamlLoading(true)
+              setYamlError(null)
+              setYamlContent("")
+              setYamlSubtitle(`查看 CRD（${name}）的 YAML 内容。`)
+
+              void fetchResourceByName<unknown>(
+                "apiextensions.k8s.io",
+                "v1",
+                "customresourcedefinitions",
+                name
+              )
+                .then(({ payload }) => {
+                  const sanitizedPayload = sanitizeCustomResourceDefinitionYamlPayload(payload)
+                  setYamlContent(
+                    stringify(sanitizedPayload, {
+                      indent: 2,
+                      lineWidth: 0,
+                      sortMapEntries: false,
+                    })
+                  )
+                })
+                .catch((e: unknown) => {
+                  setYamlError(e instanceof Error ? e.message : "加载 YAML 失败")
+                })
+                .finally(() => {
+                  setYamlLoading(false)
+                })
+            },
+          },
           {
             label: (
               <>
@@ -172,6 +260,16 @@ export function CustomResourcesPageClient() {
 
   return (
     <>
+      <MonacoViewerDialog
+        open={yamlOpen}
+        onOpenChange={setYamlOpen}
+        title="查看 YAML"
+        subtitle={yamlSubtitle}
+        value={yamlContent}
+        language="yaml"
+        loading={yamlLoading}
+        error={yamlError}
+      />
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
         onOpenChange={(open) => {
