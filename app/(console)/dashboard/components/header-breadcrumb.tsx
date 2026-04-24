@@ -9,7 +9,6 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 
@@ -90,7 +89,7 @@ function buildCrumbs(pathname: string, kind: string): Crumb[] {
   // /dashboard/projects/namespaces/:namespaceName -> "控制台 > 项目 > {namespaceName}"
   if (tail[0] === "projects" && tail[1] === "namespaces" && tail[2]) {
     const namespaceName = decodeSegment(tail[2])
-    result.push({ href: `/dashboard/projects/namespaces/${tail[2]}`, label: "命名空间" })
+    result.push({ href: "/dashboard/projects", label: "项目" })
     result.push({
       href: `/dashboard/projects/namespaces/${tail[2]}`,
       label: namespaceName,
@@ -112,9 +111,8 @@ function buildCrumbs(pathname: string, kind: string): Crumb[] {
     ]
   }
 
-  const startIndex = tail.length > 1 ? 1 : 0
-  let href = startIndex > 0 ? `/dashboard/${tail[0]}` : "/dashboard"
-  for (let index = startIndex; index < tail.length; index += 1) {
+  let href = "/dashboard"
+  for (let index = 0; index < tail.length; index += 1) {
     const segment = tail[index]
     href += `/${segment}`
     result.push({ href, label: segmentToLabel(segment) })
@@ -144,13 +142,14 @@ export function HeaderBreadcrumb() {
           return (
             <React.Fragment key={crumb.href}>
               <BreadcrumbItem>
-                {isLast ? (
-                  <BreadcrumbPage className="truncate">{crumb.label}</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink asChild className="truncate">
-                    <Link href={crumb.href}>{crumb.label}</Link>
-                  </BreadcrumbLink>
-                )}
+                <BreadcrumbLink asChild className="truncate">
+                  <Link
+                    href={crumb.href}
+                    className={isLast ? "font-medium text-foreground" : undefined}
+                  >
+                    {crumb.label}
+                  </Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               {!isLast && <BreadcrumbSeparator />}
             </React.Fragment>
