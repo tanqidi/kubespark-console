@@ -1,6 +1,6 @@
-# KubeSpark 控制台（React + Next.js）
+# kubespark-console 控制台（React + Next.js）
 
-KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 CRUD 与 YAML 协同编辑。  
+kubespark-console 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 CRUD 与 YAML 协同编辑。  
 当前已覆盖命名空间、Pod、Service、Job/CronJob 等常见资源的列表管理、创建/编辑与 YAML 查看能力；并在部分资源提供原生 `kubectl describe` 风格的“详情”查看能力。
 
 ## 界面预览
@@ -13,99 +13,7 @@ KubeSpark 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 
 ![实时容器日志](docs/img/img_5.png)
 ![容器终端](docs/img/img_6.png)
 
-## 核心能力（当前）
-
-### 1. 统一资源管理工作台
-
-- 覆盖 Namespace、Pod、Service、ConfigMap、Secret、Job、CronJob、Ingress、PV/PVC、StorageClass 等常见资源。
-- 提供统一列表体验：分页、筛选、可配置自动刷新、行级操作、批量删除。
-- 内置查看 YAML 与删除确认弹窗，满足日常运维闭环。
-
-### 2. 表单 + YAML 双模式协同
-
-- 支持可视化配置与 YAML 查看/编辑切换。
-- 在关键创建/编辑流程中，保证“表单输入”和“资源 YAML”之间可互相映射。
-- 通过统一校验与错误定位机制（首个错误字段自动滚动聚焦）提升录入效率。
-
-### 3. Service 可视化配置
-
-- 支持 Service 基本信息、访问模式、工作负载选择器、端口映射等配置。
-- 兼容常见服务暴露场景，适配应用发布和集群内访问需求。
-- 可在弹窗内分步骤完成配置，并结合 YAML 结果核对。
-
-### 4. Job / CronJob 多步骤编排
-
-- 提供多步骤配置流程：基础信息、调度策略、容器组设置、存储设置、高级设置。
-- Cron 表达式、重试策略、并发策略等关键字段可视化录入。
-- 支持任务创建与 YAML 查看，便于运维排障与配置审计。
-
-### 5. 容器录入能力
-
-- 支持镜像地址、拉取策略、容器类型（工作/初始化）配置。
-- 支持 CPU/内存请求与上限配置，端口协议/名称/端口录入。
-- 支持环境变量、探针等配置项，满足常规应用部署参数要求。
-- 在“至少一个容器”约束下提供前置拦截与警告提示，避免提交无效配置。
-
-### 6. 存储挂载能力（Job / CronJob）
-
-- 支持 PVC、EmptyDir、HostPath 三类卷配置与容器挂载路径设置。
-- PVC 下拉读取真实集群数据，不再使用静态示例项。
-- 支持完整回显链路：`YAML -> 表单 -> YAML`。
-- 兼容用户手写 YAML 的自定义卷名：
-  - 保留 `volumes[].name` 作为卷名（`volumeId`）。
-  - 保留 `persistentVolumeClaim.claimName` 作为 PVC 名（`volumeName`）。
-  - 编辑时不强制改写原有卷名。
-- 保存校验按“卷名”维度处理重复，允许“同 PVC、不同卷名”的合法场景。
-
-### 7. 表单交互一致性优化（近期）
-
-- 创建/编辑弹窗中的“项目”选择统一为可输入可选择的 Combobox 交互，降低长列表选择成本。
-- Dialog 场景统一挂载弹层容器，避免下拉“可见但无法选中”的交互问题。
-- 路由创建流程中项目不再自动带入默认值，改为用户显式选择/输入。
-- Job/CronJob 的“配置挂载”流程补齐为与 Workload 一致（新增、编辑、删除、YAML 联动）。
-
-### 8. 容器日志与终端
-
-- Pod 支持日志查看（普通/实时）与日志下载（默认最近 2000 行）。
-- Pod 支持终端会话（`/bin/sh`）并通过 WebSocket 与后端 `exec` 子资源交互。
-- 前端终端连接统一走同源 `/api/kubespark-ws/*` 代理，不直接暴露后端地址。
-
-### 9. 资源详情（Describe）
-
-- 已支持“详情”（Describe）资源：
-  - Namespace、Node、Pod、Service、Workload（Deployment/StatefulSet/DaemonSet）、Job/CronJob
-- 暂不提供“详情”入口资源：
-  - ConfigMap、Secret、PersistentVolume/PersistentVolumeClaim、StorageClass、Ingress（Route）。
-
 ## Kubernetes 部署
-
-以下内容已按当前 `deployment/*.yaml` 实际清单同步。
-
-### 1) 应用部署清单（与 YAML 对应）
-
-- `deployment/kubespark-rbac.yaml`
-  - `Namespace/kubespark`
-  - `ServiceAccount/kubespark-admin`
-  - `ClusterRoleBinding/kubespark-admin -> cluster-admin`
-- `deployment/kubespark-secret.yaml`
-  - `Secret/kubespark-secret`
-  - 提供后端所需变量：`DRONE_SERVER`、`DRONE_TOKEN`、`DRONE_YAML_SECRET`、`KUBESPARK_JWT_SECRET`、`KUBESPARK_USERNAME`、`KUBESPARK_PASSWORD`
-- `deployment/kubespark-terminal.yaml`
-  - `Deployment/kubespark-terminal`
-  - 镜像：`alpine/k8s:1.34.4`
-  - `serviceAccountName: kubespark-admin`
-- `deployment/kubespark.yaml`
-  - `Deployment/kubespark`
-  - 镜像：`tanqidi/kubespark:dev`
-  - `serviceAccountName: kubespark-admin`
-  - 从 `kubespark-secret` 注入 `KUBESPARK_*` 认证密钥（Drone 配置由后端直接读取该 Secret）
-- `deployment/kubespark-console.yaml`
-  - `Deployment/kubespark-console`
-  - `Service/kubespark-console`（`NodePort: 30000`）
-  - 控制台访问后端地址：`KUBESPARK_API_BASE=http://kubespark:8080`
-
-应用顺序建议：
-
 ```bash
 kubectl apply -f deployment/kubespark-rbac.yaml
 kubectl apply -f deployment/kubespark-secret.yaml
@@ -113,11 +21,6 @@ kubectl apply -f deployment/kubespark-terminal.yaml
 kubectl apply -f deployment/kubespark.yaml
 kubectl apply -f deployment/kubespark-console.yaml
 ```
-
-说明：
-
-- 当前仓库内 `deployment/kubespark.yaml` 仅包含后端 Deployment，不包含 `Service/kubespark`。
-- 由于控制台默认访问 `http://kubespark:8080`，请确保集群内已存在名为 `kubespark` 的 Service（可由其他清单创建）。
 
 ### 2) dev 标签镜像更新说明（重要）
 
@@ -164,6 +67,6 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## 社区交流
 
-欢迎加入 KubeSpark 用户交流群，反馈问题、交流使用经验与部署实践：
+欢迎加入 kubespark-console 用户交流群，反馈问题、交流使用经验与部署实践：
 
 - QQ 群：`1095765093`
