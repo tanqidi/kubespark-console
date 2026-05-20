@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
-import { IconEye, IconPlayerPlay, IconSettings2, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconFileText, IconPlayerPlay, IconSettings2, IconTrash } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import { parse as parseYaml, stringify } from "yaml"
 
@@ -359,7 +359,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [logError, setLogError] = React.useState<string | null>(null)
   const [logContent, setLogContent] = React.useState("")
   const [logRealtime, setLogRealtime] = React.useState(false)
-  const [logTitle, setLogTitle] = React.useState("查看构建日志")
+  const [logTitle, setLogTitle] = React.useState("查看日志")
+  const [logSubtitle, setLogSubtitle] = React.useState("")
   const [currentLogBuildNumber, setCurrentLogBuildNumber] = React.useState("")
   const [currentLogRepository, setCurrentLogRepository] = React.useState("")
   const [currentLogStages, setCurrentLogStages] = React.useState<PipelineRunStage[]>([])
@@ -514,7 +515,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         setLogLoading(false)
         setLogError("无法获取仓库信息")
         setLogContent("")
-        setLogTitle(`查看构建 ${buildNumber} 日志`)
+        setLogTitle("查看日志")
+        setLogSubtitle(`查看 Drone PipelineRun（${row.name}）的日志内容。`)
         setCurrentLogBuildNumber(buildNumber)
         setCurrentLogRepository("")
         setCurrentLogStages([])
@@ -523,11 +525,15 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         return
       }
 
+      const repoParts = repository.split("/")
+      const displayRepo = repoParts.length >= 2 ? repoParts.slice(-2).join("/") : repository
+
       setLogOpen(true)
       setLogLoading(true)
       setLogError(null)
       setLogContent("")
-      setLogTitle(`查看构建 ${buildNumber} 日志`)
+      setLogTitle("查看日志")
+      setLogSubtitle(`查看 Drone PipelineRun（${displayRepo}/${row.name}）的日志内容。`)
       setCurrentLogBuildNumber(buildNumber)
       setCurrentLogRepository(repository)
       setCurrentLogStages(row.stages || [])
@@ -664,8 +670,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           {
             label: (
               <>
-                <IconEye className="size-4" />
-                查看日志
+                <IconFileText className="size-4" />
+                日志
               </>
             ),
             onSelect: handleViewLogs,
@@ -766,6 +772,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         open={logOpen}
         onOpenChange={setLogOpen}
         title={logTitle}
+        subtitle={logSubtitle}
         realtime={logRealtime}
         onRealtimeChange={setLogRealtime}
         loading={logLoading}
