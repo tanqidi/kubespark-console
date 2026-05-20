@@ -7,6 +7,7 @@ import {
   fetchJsonDeduped,
   fetchResourceByName,
   fetchResourceCollection,
+  fetchText,
 } from "./common"
 import { formatAge, formatDateTime, resolveUpdatedAt } from "./utils"
 
@@ -77,6 +78,20 @@ export type PipelineDetail = {
   annotations: Record<string, string>
 }
 
+export type PipelineRunStage = {
+  id: number
+  name: string
+  number: number
+  status: string
+  steps: Array<{
+    id: number
+    name: string
+    number: number
+    status: string
+    image: string
+  }>
+}
+
 export type PipelineRunRow = {
   id: string
   name: string
@@ -87,6 +102,8 @@ export type PipelineRunRow = {
   branch: string
   buildLink: string
   triggerTime: string
+  repository: string
+  stages: PipelineRunStage[]
 }
 
 export type CreatePipelineInput = {
@@ -234,6 +251,48 @@ function extractPipelineRunBranch(item: RawPipelineRun): string {
   const branch = readString(data.branch)
   if (branch) return branch
   return ""
+}
+
+function extractPipelineRunRepository(item: RawPipelineRun): string {
+  const spec = asRecord(item.spec)
+  const data = asRecord(spec.data)
+  const namespace = readString(data.namespace)
+  const repo = readString(data.repo)
+  if (namespace && repo) {
+    return `${namespace}/${repo}`
+  }
+  return ""
+}
+
+function extractPipelineRunStages(item: RawPipelineRun): PipelineRunStage[] {
+  const drone = parsePipelineRunDroneAnnotation(item)
+  const stages = drone.stages
+  if (!Array.isArray(stages)) return []
+
+  return stages.map((stage: unknown) => {
+    const s = asRecord(stage)
+    const steps = s.steps
+    const stepList = Array.isArray(steps)
+      ? steps.map((step: unknown) => {
+          const st = asRecord(step)
+          return {
+            id: typeof st.id === "number" ? Math.trunc(st.id) : 0,
+            name: readString(st.name),
+            number: typeof st.number === "number" ? Math.trunc(st.number) : 0,
+            status: readString(st.status),
+            image: readString(st.image),
+          }
+        })
+      : []
+
+    return {
+      id: typeof s.id === "number" ? Math.trunc(s.id) : 0,
+      name: readString(s.name),
+      number: typeof s.number === "number" ? Math.trunc(s.number) : 0,
+      status: readString(s.status),
+      steps: stepList,
+    }
+  })
 }
 
 function extractPipelineRunDescription(item: RawPipelineRun): string {
@@ -677,6 +736,8 @@ export async function fetchPipelineRunRows(pipelineName: string): Promise<Pipeli
       const branch = extractPipelineRunBranch(item)
       const buildLink = extractPipelineRunBuildLink(item)
       const description = extractPipelineRunDescription(item)
+      const repository = extractPipelineRunRepository(item)
+      const stages = extractPipelineRunStages(item)
 
       return {
         id: metadata.uid || metadata.name || `pipelinerun-${index}`,
@@ -688,6 +749,8 @@ export async function fetchPipelineRunRows(pipelineName: string): Promise<Pipeli
         branch: branch || "-",
         buildLink: buildLink || "",
         triggerTime: extractPipelineRunTriggerTimeDisplay(item),
+        repository: repository || "-",
+        stages,
       }
     })
 }
@@ -700,4 +763,28 @@ export async function deletePipelineRun(name: string): Promise<void> {
 		PIPELINE_RUN_GVR.resource,
 		normalizedName
 	)
+}
+
+export async function fetchDroneBuildLogs(repository: string, buildNumber: string, stage?: number, step?: number): Promise<string> {
+	if (!repository) {
+		throw new Error("仓库信息未配置")
+	}
+	const { namespace, repo } = resolveDroneRepoIdentity(repository)
+	if (!namespace || !repo) {
+		throw new Error("无效的仓库格式，需为 owner/repo 格式")
+	}
+	if (!buildNumber) {
+		throw new Error("构建号不能为空")
+	}
+
+	let baseUrl = buildResourceItemEndpoint("drone", "v1", "logs", buildNumber, namespace)
+	let url = baseUrl.includes("?") ? `${baseUrl}&repo=${encodeURIComponent(repo)}` : `${baseUrl}?repo=${encodeURIComponent(repo)}`
+	
+	if (stage !== undefined && step !== undefined) {
+		url += `&stage=${stage}&step=${step}`
+	}
+
+	const response = await fetchText(url)
+
+	return response
 }

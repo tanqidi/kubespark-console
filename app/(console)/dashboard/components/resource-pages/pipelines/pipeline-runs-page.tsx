@@ -15,26 +15,29 @@ import {
   type ColumnConfig,
 } from "@/app/(console)/dashboard/components/table/columns-factory"
 import {
-  createPipelineRun,
-  deletePipelineRun,
-  fetchPipelineYaml,
-  fetchPipelineRunRows,
-  type PipelineRunRow,
+	createPipelineRun,
+	deletePipelineRun,
+	fetchDroneBuildLogs,
+	fetchPipelineYaml,
+	fetchPipelineRunRows,
+	type PipelineRunRow,
+	type PipelineRunStage,
 } from "@/app/lib/kubespark/pipelines"
 import { fetchResourceByName } from "@/app/lib/kubespark/common"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
 } from "@/components/ui/dialog"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { LogViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/log-viewer-dialog"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -351,6 +354,17 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 PipelineRun 的 YAML 内容。")
+  const [logOpen, setLogOpen] = React.useState(false)
+  const [logLoading, setLogLoading] = React.useState(false)
+  const [logError, setLogError] = React.useState<string | null>(null)
+  const [logContent, setLogContent] = React.useState("")
+  const [logRealtime, setLogRealtime] = React.useState(false)
+  const [logTitle, setLogTitle] = React.useState("查看构建日志")
+  const [currentLogBuildNumber, setCurrentLogBuildNumber] = React.useState("")
+  const [currentLogRepository, setCurrentLogRepository] = React.useState("")
+  const [currentLogStages, setCurrentLogStages] = React.useState<PipelineRunStage[]>([])
+  const [currentLogStage, setCurrentLogStage] = React.useState<number | undefined>(undefined)
+  const [currentLogStep, setCurrentLogStep] = React.useState<number | undefined>(undefined)
 
   const loadRows = React.useCallback(
     async (silent: boolean) => {
@@ -487,6 +501,125 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       })
   }, [loadRows, normalizedPipelineName, runBranch, runDroneYaml, runRepository, runRepositoryLoading, running])
 
+  const handleViewLogs = React.useCallback(
+    (row: PipelineRunRow) => {
+      const buildNumber = row.buildNumber.trim()
+      if (!buildNumber || buildNumber === "-") {
+        return
+      }
+
+      const repository = row.repository.trim()
+      if (!repository || repository === "-") {
+        setLogOpen(true)
+        setLogLoading(false)
+        setLogError("无法获取仓库信息")
+        setLogContent("")
+        setLogTitle(`查看构建 ${buildNumber} 日志`)
+        setCurrentLogBuildNumber(buildNumber)
+        setCurrentLogRepository("")
+        setCurrentLogStages([])
+        setCurrentLogStage(undefined)
+        setCurrentLogStep(undefined)
+        return
+      }
+
+      setLogOpen(true)
+      setLogLoading(true)
+      setLogError(null)
+      setLogContent("")
+      setLogTitle(`查看构建 ${buildNumber} 日志`)
+      setCurrentLogBuildNumber(buildNumber)
+      setCurrentLogRepository(repository)
+      setCurrentLogStages(row.stages || [])
+      setCurrentLogStage(undefined)
+      setCurrentLogStep(undefined)
+
+      if (row.stages && row.stages.length > 0 && row.stages[0].steps.length > 0) {
+        const firstStage = row.stages[0]
+        const firstStep = firstStage.steps[0]
+        setCurrentLogStage(firstStage.number)
+        setCurrentLogStep(firstStep.number)
+        void fetchDroneBuildLogs(repository, buildNumber, firstStage.number, firstStep.number)
+          .then((logs) => {
+            setLogContent(logs || "(无日志输出)")
+          })
+          .catch((e: unknown) => {
+            setLogError(e instanceof Error ? e.message : "获取日志失败")
+          })
+          .finally(() => {
+            setLogLoading(false)
+          })
+      } else {
+        void fetchDroneBuildLogs(repository, buildNumber)
+          .then((logs) => {
+            setLogContent(logs || "(无日志输出)")
+          })
+          .catch((e: unknown) => {
+            setLogError(e instanceof Error ? e.message : "获取日志失败")
+          })
+          .finally(() => {
+            setLogLoading(false)
+          })
+      }
+    },
+    []
+  )
+
+  const handleDownloadLogs = React.useCallback(() => {
+    if (!logContent) return
+
+    const blob = new Blob([logContent], { type: "text/plain;charset=utf-8" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `build-${currentLogBuildNumber}-logs.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  }, [logContent, currentLogBuildNumber])
+
+  const handleLogStageStepChange = React.useCallback(
+    (stage: number, step: number) => {
+      if (!currentLogBuildNumber || !currentLogRepository) return
+
+      setCurrentLogStage(stage)
+      setCurrentLogStep(step)
+      setLogLoading(true)
+      setLogError(null)
+
+      void fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, stage, step)
+        .then((logs) => {
+          setLogContent(logs || "(无日志输出)")
+        })
+        .catch((e: unknown) => {
+          setLogError(e instanceof Error ? e.message : "获取日志失败")
+        })
+        .finally(() => {
+          setLogLoading(false)
+        })
+    },
+    [currentLogBuildNumber, currentLogRepository]
+  )
+
+  React.useEffect(() => {
+    if (!logOpen || !logRealtime || !currentLogBuildNumber || !currentLogRepository) return
+
+    const timer = window.setInterval(() => {
+      void fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, currentLogStage, currentLogStep)
+        .then((logs) => {
+          setLogContent(logs || "(无日志输出)")
+        })
+        .catch(() => {
+          // Ignore error for realtime refresh
+        })
+    }, 2000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [logOpen, logRealtime, currentLogBuildNumber, currentLogRepository, currentLogStage, currentLogStep])
+
   const columns = React.useMemo(
     () =>
       createColumns<PipelineRunRow>({
@@ -527,6 +660,15 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                   setYamlLoading(false)
                 })
             },
+          },
+          {
+            label: (
+              <>
+                <IconEye className="size-4" />
+                查看日志
+              </>
+            ),
+            onSelect: handleViewLogs,
           },
           {
             label: (
@@ -619,6 +761,22 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         value={yamlLoading ? "加载中..." : yamlContent}
         language="yaml"
         error={yamlError}
+      />
+      <LogViewerDialog
+        open={logOpen}
+        onOpenChange={setLogOpen}
+        title={logTitle}
+        realtime={logRealtime}
+        onRealtimeChange={setLogRealtime}
+        loading={logLoading}
+        error={logError}
+        content={logContent}
+        onDownload={handleDownloadLogs}
+        downloadDisabled={!logContent}
+        stages={currentLogStages}
+        currentStage={currentLogStage}
+        currentStep={currentLogStep}
+        onStageStepChange={handleLogStageStepChange}
       />
       <Dialog
         open={runDialogOpen}

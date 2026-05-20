@@ -20,6 +20,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+
+export type PipelineRunStage = {
+  id: number
+  name: string
+  number: number
+  status: string
+  steps: Array<{
+    id: number
+    name: string
+    number: number
+    status: string
+    image: string
+  }>
+}
 
 const LOG_TERMINAL_THEME = {
   background: "#1e1e1e",
@@ -44,6 +60,10 @@ type LogViewerDialogProps = {
   content: string
   onDownload?: () => void
   downloadDisabled?: boolean
+  stages?: PipelineRunStage[]
+  currentStage?: number
+  currentStep?: number
+  onStageStepChange?: (stage: number, step: number) => void
 }
 
 export function LogViewerDialog({
@@ -58,6 +78,10 @@ export function LogViewerDialog({
   content,
   onDownload,
   downloadDisabled = false,
+  stages = [],
+  currentStage,
+  currentStep,
+  onStageStepChange,
 }: LogViewerDialogProps) {
   const [terminalHost, setTerminalHost] = React.useState<HTMLDivElement | null>(null)
   const [fullscreen, setFullscreen] = React.useState(false)
@@ -238,6 +262,48 @@ export function LogViewerDialog({
             </Button>
           </div>
         </div>
+        {stages.length > 0 && (
+          <div className="flex border-b bg-muted/15">
+            <Tabs defaultValue={`stage-${currentStage}-step-${currentStep}`} className="w-full">
+              <TabsList className="mx-4 my-2 grid grid-cols-1 md:grid-cols-auto">
+                {stages.map((stage) =>
+                  stage.steps.map((step) => (
+                    <TabsTrigger
+                      key={`stage-${stage.number}-step-${step.number}`}
+                      value={`stage-${stage.number}-step-${step.number}`}
+                      onClick={() => onStageStepChange?.(stage.number, step.number)}
+                      className="flex items-center gap-2"
+                    >
+                      <span className="text-sm font-medium">{stage.name}</span>
+                      <span className="text-xs text-muted-foreground">/</span>
+                      <span className="text-sm">{step.name}</span>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${
+                          step.status === "success"
+                            ? "border-green-500/50 text-green-400"
+                            : step.status === "running"
+                            ? "border-blue-500/50 text-blue-400"
+                            : step.status === "failed"
+                            ? "border-red-500/50 text-red-400"
+                            : ""
+                        }`}
+                      >
+                        {step.status === "success"
+                          ? "成功"
+                          : step.status === "running"
+                          ? "运行中"
+                          : step.status === "failed"
+                          ? "失败"
+                          : step.status}
+                      </Badge>
+                    </TabsTrigger>
+                  ))
+                )}
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
         <div className="min-h-0 flex-1 overflow-hidden p-6">
           <div className="relative h-full overflow-hidden rounded-lg border border-slate-700/60 bg-[#1e1e1e] shadow-inner">
               <div ref={setTerminalHost} className="h-full w-full px-2 py-2" />
