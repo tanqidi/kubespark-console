@@ -21,7 +21,7 @@
 
 上游地址由服务端环境变量控制：
 
-- `KUBESPARK_API_BASE`（默认 `http://172.31.0.88:8080`）
+- `KUBESPARK_API_BASE`
 
 ## 3. 认证约定
 

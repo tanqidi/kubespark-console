@@ -8,7 +8,7 @@ const isDev = hasArg("--dev") || (!hasArg("--prod") && process.env.NODE_ENV !== 
 const hostname = "0.0.0.0"
 const port = Number(process.env.PORT || 3000)
 
-const upstreamBase = process.env.KUBESPARK_API_BASE || "http://172.31.0.88:8080"
+const upstreamBase = process.env.KUBESPARK_API_BASE || "http://127.0.0.1:8080"
 const wsUpstreamBase = upstreamBase.replace(/^http:/, "ws:").replace(/^https:/, "wss:")
 
 const app = next({ dev: isDev, hostname, port })

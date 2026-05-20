@@ -63,7 +63,7 @@ Open [http://localhost:3000](http://localhost:3000).
   - HTTP：`/api/kubespark/*`
   - WS：`/api/kubespark-ws/*`
 
-上游地址由 `KUBESPARK_API_BASE` 指定（默认：`http://172.31.0.88:8080`）。
+上游地址由 `KUBESPARK_API_BASE` 指定。
 
 ## 社区交流
 
