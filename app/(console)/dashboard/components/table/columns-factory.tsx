@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import {
@@ -66,6 +66,7 @@ export type ActionMenuItem<TData> = {
   variant?: "default" | "destructive"
   withSeparator?: boolean
   onSelect?: (row: TData) => void
+  disabled?: boolean | ((row: TData) => boolean)
 }
 
 const HEALTHY_STATUS_SET = new Set<string>([
@@ -271,17 +272,24 @@ export function createColumns<TData extends Record<string, unknown>>(
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-32">
                   <DropdownMenuGroup>
-                    {visibleActionItems.map((item, index) => (
-                        <React.Fragment key={`action-${index}`}>
-                          {item.withSeparator ? <DropdownMenuSeparator /> : null}
-                          <DropdownMenuItem
-                              variant={item.variant}
-                              onSelect={() => item.onSelect?.(row.original)}
-                          >
-                            {item.label}
-                          </DropdownMenuItem>
-                        </React.Fragment>
-                    ))}
+                    {visibleActionItems.map((item, index) => {
+                        const isDisabled = typeof item.disabled === "function" 
+                          ? item.disabled(row.original) 
+                          : !!item.disabled
+                        
+                        return (
+                          <React.Fragment key={`action-${index}`}>
+                            {item.withSeparator ? <DropdownMenuSeparator /> : null}
+                            <DropdownMenuItem
+                                variant={item.variant}
+                                disabled={isDisabled}
+                                onSelect={() => item.onSelect?.(row.original)}
+                            >
+                              {item.label}
+                            </DropdownMenuItem>
+                          </React.Fragment>
+                        )
+                    })}
                   </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>

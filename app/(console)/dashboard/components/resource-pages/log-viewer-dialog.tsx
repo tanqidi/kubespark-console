@@ -267,14 +267,7 @@ export function LogViewerDialog({
               stage.steps.map((step) => ({
                 id: `stage-${stage.number}-step-${step.number}`,
                 title: step.name,
-                status:
-                  step.status === "success"
-                    ? "已完成"
-                    : step.status === "running"
-                    ? "运行中"
-                    : step.status === "failed" || step.status === "failure"
-                    ? "失败"
-                    : step.status || "未开始",
+                status: step.status || "pending",
                 active: currentStage === stage.number && currentStep === step.number,
                 onClick: () => onStageStepChange?.(stage.number, step.number),
               }))

@@ -17,6 +17,7 @@ import {
 import {
 	createPipelineRun,
 	deletePipelineRun,
+	fetchDroneBuildInfo,
 	fetchDroneBuildLogs,
 	fetchPipelineYaml,
 	fetchPipelineRunRows,
@@ -512,16 +513,17 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       const repository = row.repository.trim()
       if (!repository || repository === "-") {
         setLogOpen(true)
-        setLogLoading(false)
-        setLogError("无法获取仓库信息")
-        setLogContent("")
-        setLogTitle("查看日志")
-        setLogSubtitle(`查看 Drone PipelineRun（${row.name}）的日志内容。`)
-        setCurrentLogBuildNumber(buildNumber)
-        setCurrentLogRepository("")
-        setCurrentLogStages([])
-        setCurrentLogStage(undefined)
-        setCurrentLogStep(undefined)
+      setLogLoading(false)
+      setLogError("无法获取仓库信息")
+      setLogContent("")
+      setLogTitle("查看日志")
+      setLogSubtitle(`查看 Drone PipelineRun（${row.name}）的日志内容。`)
+      setLogRealtime(true)
+      setCurrentLogBuildNumber(buildNumber)
+      setCurrentLogRepository("")
+      setCurrentLogStages([])
+      setCurrentLogStage(undefined)
+      setCurrentLogStep(undefined)
         return
       }
 
@@ -539,6 +541,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       setLogContent("")
       setLogTitle("查看日志")
       setLogSubtitle(`查看 Drone PipelineRun（${displayPath}）的日志内容。`)
+      setLogRealtime(true)
       setCurrentLogBuildNumber(buildNumber)
       setCurrentLogRepository(repository)
       setCurrentLogStages(row.stages || [])
@@ -553,9 +556,16 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         void fetchDroneBuildLogs(repository, buildNumber, firstStage.number, firstStep.number)
           .then((logs) => {
             setLogContent(logs || "(无日志输出)")
+            setLogError(null)
           })
           .catch((e: unknown) => {
-            setLogError(e instanceof Error ? e.message : "获取日志失败")
+            const errorMessage = e instanceof Error ? e.message : "获取日志失败"
+            if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
+              setLogContent("日志正在处理中...")
+              setLogError(null)
+            } else {
+              setLogError(errorMessage)
+            }
           })
           .finally(() => {
             setLogLoading(false)
@@ -564,9 +574,16 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         void fetchDroneBuildLogs(repository, buildNumber)
           .then((logs) => {
             setLogContent(logs || "(无日志输出)")
+            setLogError(null)
           })
           .catch((e: unknown) => {
-            setLogError(e instanceof Error ? e.message : "获取日志失败")
+            const errorMessage = e instanceof Error ? e.message : "获取日志失败"
+            if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
+              setLogContent("日志正在处理中...")
+              setLogError(null)
+            } else {
+              setLogError(errorMessage)
+            }
           })
           .finally(() => {
             setLogLoading(false)
@@ -602,9 +619,16 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       void fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, stage, step)
         .then((logs) => {
           setLogContent(logs || "(无日志输出)")
+          setLogError(null)
         })
         .catch((e: unknown) => {
-          setLogError(e instanceof Error ? e.message : "获取日志失败")
+          const errorMessage = e instanceof Error ? e.message : "获取日志失败"
+          if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
+            setLogContent("日志正在处理中...")
+            setLogError(null)
+          } else {
+            setLogError(errorMessage)
+          }
         })
         .finally(() => {
           setLogLoading(false)
@@ -616,14 +640,32 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   React.useEffect(() => {
     if (!logOpen || !logRealtime || !currentLogBuildNumber || !currentLogRepository) return
 
-    const timer = window.setInterval(() => {
-      void fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, currentLogStage, currentLogStep)
-        .then((logs) => {
-          setLogContent(logs || "(无日志输出)")
-        })
-        .catch(() => {
-          // Ignore error for realtime refresh
-        })
+    const timer = window.setInterval(async () => {
+      try {
+        await Promise.all([
+          fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, currentLogStage, currentLogStep)
+            .then((logs) => {
+              setLogContent(logs || "(无日志输出)")
+              setLogError(null)
+            })
+            .catch((e: unknown) => {
+              const errorMessage = e instanceof Error ? e.message : "获取日志失败"
+              if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
+                setLogContent("日志正在处理中...")
+                setLogError(null)
+              }
+            }),
+          
+          fetchDroneBuildInfo(currentLogRepository, currentLogBuildNumber)
+            .then((stages) => {
+              if (stages.length > 0) {
+                setCurrentLogStages(stages)
+              }
+            })
+            .catch(() => {}),
+        ])
+      } catch {
+      }
     }, 2000)
 
     return () => {
@@ -680,6 +722,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
               </>
             ),
             onSelect: handleViewLogs,
+            disabled: (row) => row.phase === "pending" || row.phase === "-" || !row.buildNumber || row.buildNumber === "-",
           },
           {
             label: (

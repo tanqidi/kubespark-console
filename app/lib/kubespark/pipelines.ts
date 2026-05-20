@@ -788,3 +788,50 @@ export async function fetchDroneBuildLogs(repository: string, buildNumber: strin
 
 	return response
 }
+
+export async function fetchDroneBuildInfo(repository: string, buildNumber: string): Promise<PipelineRunStage[]> {
+	if (!repository) {
+		throw new Error("仓库信息未配置")
+	}
+	const { namespace, repo } = resolveDroneRepoIdentity(repository)
+	if (!namespace || !repo) {
+		throw new Error("无效的仓库格式，需为 owner/repo 格式")
+	}
+	if (!buildNumber) {
+		throw new Error("构建号不能为空")
+	}
+
+	let baseUrl = buildResourceItemEndpoint("drone", "v1", "builds", buildNumber, namespace)
+	let url = baseUrl.includes("?") ? `${baseUrl}&repo=${encodeURIComponent(repo)}` : `${baseUrl}?repo=${encodeURIComponent(repo)}`
+
+	const response = await fetchJsonDeduped<unknown>(url)
+	const data = asRecord(response)
+	const stages = data.stages
+	
+	if (!Array.isArray(stages)) return []
+
+	return stages.map((stage: unknown) => {
+		const s = asRecord(stage)
+		const steps = s.steps
+		const stepList = Array.isArray(steps)
+			? steps.map((step: unknown) => {
+					const st = asRecord(step)
+					return {
+						id: typeof st.id === "number" ? Math.trunc(st.id) : 0,
+						name: readString(st.name),
+						number: typeof st.number === "number" ? Math.trunc(st.number) : 0,
+						status: readString(st.status),
+						image: readString(st.image),
+					}
+			  })
+			: []
+
+		return {
+			id: typeof s.id === "number" ? Math.trunc(s.id) : 0,
+			name: readString(s.name),
+			number: typeof s.number === "number" ? Math.trunc(s.number) : 0,
+			status: readString(s.status),
+			steps: stepList,
+		}
+	})
+}

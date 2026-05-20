@@ -1,0 +1,44 @@
+kind: pipeline
+type: kubernetes
+name: docker-aliyun
+
+trigger:
+  branch:
+    - dev
+  event:
+    - push
+    - custom
+
+steps:
+  # =========================
+  # 1️⃣ 构建验证
+  # =========================
+  - name: verify
+    image: node:20
+    commands:
+      - npm ci
+      - npm run lint
+      - NODE_ENV=production npm run build
+
+  # =========================
+  # 2️⃣ 构建 + 推送阿里云镜像
+  # =========================
+  - name: docker
+    image: plugins/docker
+    settings:
+      registry: registry.cn-hangzhou.aliyuncs.com   # 👈 阿里云
+      repo: registry.cn-hangzhou.aliyuncs.com/tanqidi-temp/kubespark-console
+      tags:
+        - dev
+      dockerfile: Dockerfile
+      context: .
+      platforms:
+        - linux/amd64
+        - linux/arm64
+
+      username:
+        from_secret: aliyun_username   # 👈 账号
+      password:
+        from_secret: aliyun_password   # 👈 密码
+    depends_on:
+      - verify

@@ -108,16 +108,21 @@ export function StepHeaderNav({
             !highlightByActiveOnly &&
             activeIndex >= 0 &&
             index < activeIndex &&
-            item.status.includes("已")
+            item.status === "success"
           const isProgressed = item.active || isDone
-          const isFailed = item.status.includes("失败") || item.status.includes("failure") || item.status.includes("failed")
+          const isFailed = item.status === "failure" || item.status === "failed"
           
           let shouldDisable = item.disabled || false
           if (disableOnSkippedAfterFailed) {
-            const failedBeforeIndex = items.slice(0, index).some(
-              (prev) => prev.status.includes("失败") || prev.status.includes("failure") || prev.status.includes("failed")
+            const hasFailedBefore = items.slice(0, index).some(
+              (prev) => prev.status === "failure" || prev.status === "failed"
             )
-            shouldDisable = shouldDisable || (failedBeforeIndex && item.status.includes("skipped"))
+            const allPreviousCompleted = items.slice(0, index).every(
+              (prev) => prev.status === "success" || 
+                        prev.status === "failure" || 
+                        prev.status === "failed"
+            )
+            shouldDisable = shouldDisable || hasFailedBefore || !allPreviousCompleted
           }
           
           const isDisabled = shouldDisable
