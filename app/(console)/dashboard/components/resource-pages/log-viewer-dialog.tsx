@@ -272,13 +272,14 @@ export function LogViewerDialog({
                     ? "已完成"
                     : step.status === "running"
                     ? "运行中"
-                    : step.status === "failed"
+                    : step.status === "failed" || step.status === "failure"
                     ? "失败"
                     : step.status || "未开始",
                 active: currentStage === stage.number && currentStep === step.number,
                 onClick: () => onStageStepChange?.(stage.number, step.number),
               }))
             )}
+            disableOnSkippedAfterFailed={true}
           />
         )}
         <div className="min-h-0 flex-1 overflow-hidden p-6">

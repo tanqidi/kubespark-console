@@ -527,13 +527,18 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
 
       const repoParts = repository.split("/")
       const displayRepo = repoParts.length >= 2 ? repoParts.slice(-2).join("/") : repository
+      
+      // Combine repo and name, then take last 2 segments
+      const fullPath = `${displayRepo}/${row.name}`
+      const fullPathParts = fullPath.split("/")
+      const displayPath = fullPathParts.length >= 2 ? fullPathParts.slice(-2).join("/") : fullPath
 
       setLogOpen(true)
       setLogLoading(true)
       setLogError(null)
       setLogContent("")
       setLogTitle("查看日志")
-      setLogSubtitle(`查看 Drone PipelineRun（${displayRepo}/${row.name}）的日志内容。`)
+      setLogSubtitle(`查看 Drone PipelineRun（${displayPath}）的日志内容。`)
       setCurrentLogBuildNumber(buildNumber)
       setCurrentLogRepository(repository)
       setCurrentLogStages(row.stages || [])
