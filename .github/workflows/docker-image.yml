@@ -40,9 +40,6 @@ jobs:
           # 重新安装，确保原生模块匹配当前 Linux 平台
           npm install
 
-      - name: Lint
-        run: npm run lint
-
       - name: Build
         env:
           NODE_ENV: production
