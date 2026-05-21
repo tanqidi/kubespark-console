@@ -269,10 +269,10 @@ export function LogViewerDialog({
                 title: step.name,
                 status: step.status || "pending",
                 active: currentStage === stage.number && currentStep === step.number,
+                disabled: false,
                 onClick: () => onStageStepChange?.(stage.number, step.number),
               }))
             )}
-            disableOnSkippedAfterFailed={true}
           />
         )}
         <div className="min-h-0 flex-1 overflow-hidden p-6">

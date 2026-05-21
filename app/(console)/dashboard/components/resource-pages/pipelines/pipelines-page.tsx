@@ -1067,32 +1067,32 @@ export function PipelinesPageClient({
             </div>
 
             {!createYamlMode && !createDroneYamlMode ? (
-                <StepHeaderNav
-                    items={[
-                      {
-                        id: "basic",
-                        title: "基本信息",
-                        status: createStep === "basic" ? "当前" : "已设置",
-                        active: createStep === "basic",
-                        icon: <IconSettings2 className="size-4"/>,
-                        disabled: creating,
-                        onClick: () => {
-                          if (creating) return
-                          setCreateStep("basic")
-                        },
-                      },
-                      {
-                        id: "advanced",
-                        title: "高级设置",
-                        status:
-                            createStep === "advanced"
-                                ? "当前"
-                                : hasUserProvidedMetadata(labelEntries, annotationEntries) ||
+            <StepHeaderNav
+                items={[
+                  {
+                    id: "basic",
+                    title: "基本信息",
+                    status: createStep === "basic" ? "当前" : "已设置",
+                    active: createStep === "basic",
+                    icon: <IconSettings2 className="size-4"/>,
+                    disabled: creating,
+                    onClick: () => {
+                      if (creating) return
+                      setCreateStep("basic")
+                    },
+                  },
+                  {
+                    id: "advanced",
+                    title: "高级设置",
+                    status:
+                        createStep === "advanced"
+                            ? "当前"
+                            : hasUserProvidedMetadata(labelEntries, annotationEntries) ||
                                 hasUserProvidedKeyValues(keyValueEntries)
-                                    ? "已设置"
-                                    : "可选",
-                        active: createStep === "advanced",
-                        icon: <IconSettings2 className="size-4" />,
+                                ? "已设置"
+                                : "可选",
+                    active: createStep === "advanced",
+                    icon: <IconSettings2 className="size-4" />,
                     disabled: creating,
                     onClick: () => {
                       if (creating) return
@@ -1101,7 +1101,7 @@ export function PipelinesPageClient({
                   },
                 ]}
               />
-            ) : null}
+          ) : null}
 
             <div className={createYamlMode || createDroneYamlMode ? "min-h-0 flex-1 p-6" : "min-h-0 flex-1 overflow-y-auto"}>
               {createYamlMode ? (
