@@ -739,7 +739,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           },
         ],
       }),
-    []
+    [handleViewLogs]
   )
 
   const handleDeleteSelectedRows = React.useCallback(
@@ -970,7 +970,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                         <FieldDescription>要构建的 Drone 仓库（owner/repo）</FieldDescription>
                       </Field>
                       <Field data-invalid={Boolean(runBranchError)}>
-                        <FieldLabel htmlFor="pipeline-run-branch" required>分支</FieldLabel>
+                        <FieldLabel htmlFor="pipeline-run-branch">分支</FieldLabel>
                         <Input
                           id="pipeline-run-branch"
                           value={runBranch}

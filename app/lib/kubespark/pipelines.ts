@@ -777,7 +777,7 @@ export async function fetchDroneBuildLogs(repository: string, buildNumber: strin
 		throw new Error("构建号不能为空")
 	}
 
-	let baseUrl = buildResourceItemEndpoint("drone", "v1", "logs", buildNumber, namespace)
+	const baseUrl = buildResourceItemEndpoint("drone", "v1", "logs", buildNumber, namespace)
 	let url = baseUrl.includes("?") ? `${baseUrl}&repo=${encodeURIComponent(repo)}` : `${baseUrl}?repo=${encodeURIComponent(repo)}`
 	
 	if (stage !== undefined && step !== undefined) {
@@ -801,8 +801,8 @@ export async function fetchDroneBuildInfo(repository: string, buildNumber: strin
 		throw new Error("构建号不能为空")
 	}
 
-	let baseUrl = buildResourceItemEndpoint("drone", "v1", "builds", buildNumber, namespace)
-	let url = baseUrl.includes("?") ? `${baseUrl}&repo=${encodeURIComponent(repo)}` : `${baseUrl}?repo=${encodeURIComponent(repo)}`
+	const baseUrl = buildResourceItemEndpoint("drone", "v1", "builds", buildNumber, namespace)
+	const url = baseUrl.includes("?") ? `${baseUrl}&repo=${encodeURIComponent(repo)}` : `${baseUrl}?repo=${encodeURIComponent(repo)}`
 
 	const response = await fetchJsonDeduped<unknown>(url)
 	const data = asRecord(response)
