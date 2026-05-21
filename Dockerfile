@@ -3,12 +3,12 @@
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 FROM node:20-bookworm-slim AS prod-deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
