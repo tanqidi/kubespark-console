@@ -6,7 +6,7 @@
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # -----------------------------
 # 安装生产依赖
@@ -14,7 +14,7 @@ RUN npm ci
 FROM node:20-bookworm-slim AS prod-deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # -----------------------------
 # 构建阶段（针对每个平台重新安装依赖）
@@ -25,7 +25,7 @@ ENV NODE_ENV=production
 
 # 针对当前架构重新安装依赖，避免跨平台 node_modules 问题
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # 复制源码
 COPY . .
