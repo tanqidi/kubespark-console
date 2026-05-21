@@ -29,10 +29,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          # 禁用缓存避免原生模块平台不匹配问题
+          # cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Clean install dependencies
+        run: |
+          # 清理旧的依赖和锁文件
+          rm -rf node_modules package-lock.json
+          npm cache clean --force
+          # 重新安装，确保原生模块匹配当前 Linux 平台
+          npm install
 
       - name: Lint
         run: npm run lint
@@ -63,15 +69,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and (optionally) push
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           pull: true
           push: true
-#          platforms: linux/amd64,linux/arm64
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           tags: ${{ vars.DOCKERHUB_IMAGE }}:dev
           cache-from: type=gha
           cache-to: type=gha,mode=max
