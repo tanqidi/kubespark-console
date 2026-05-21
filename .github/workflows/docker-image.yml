@@ -70,7 +70,8 @@ jobs:
           file: ./Dockerfile
           pull: true
           push: true
-          platforms: linux/amd64,linux/arm64
+#          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ${{ vars.DOCKERHUB_IMAGE }}:dev
           cache-from: type=gha
           cache-to: type=gha,mode=max
