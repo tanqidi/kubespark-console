@@ -471,6 +471,33 @@ export function ProjectsPageClient() {
     setCreateYamlError(null)
     setCreateStep("basic")
   }, [])
+
+  const handleCreateNextStep = React.useCallback(() => {
+    if (creating) return
+
+    const nextName = (editingRow?.name ?? createName).trim().toLowerCase()
+    const nextWorkspace = createWorkspace.trim()
+
+    const nameError = validateProjectName(nextName, t)
+    setCreateNameInvalid(Boolean(nameError))
+    setCreateNameError(nameError)
+
+    if (nameError) {
+      setCreateStep("basic")
+      return
+    }
+
+    if (!workspaceBindingExists && !nextWorkspace) {
+      setCreateWorkspaceInvalid(true)
+      setCreateWorkspaceError(t("projectsDialog.workspaceRequired"))
+      setCreateStep("basic")
+      return
+    }
+
+    setCreateWorkspaceInvalid(false)
+    setCreateWorkspaceError(null)
+    setCreateStep("advanced")
+  }, [creating, createName, createWorkspace, editingRow?.name, t, workspaceBindingExists])
   const resetPipelineDialogState = React.useCallback(() => {
     setPipelineProjectDialogMode("create")
     setPipelineProjectEditingName(null)
@@ -1432,6 +1459,10 @@ export function ProjectsPageClient() {
                     disabled: creating,
                     onClick: () => {
                       if (creating) return
+                      if (createStep === "basic") {
+                        void handleCreateNextStep()
+                        return
+                      }
                       setCreateStep("advanced")
                     },
                   },
