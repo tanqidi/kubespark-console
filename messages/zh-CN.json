@@ -1050,6 +1050,17 @@
     "deleteFailed": "删除失败",
     "editContextLost": "编辑上下文丢失，请重新打开编辑弹窗"
   },
+  "serviceAccountsDialog": {
+    "yamlSubtitle": "查看 Kubernetes ServiceAccount 的 YAML 内容。",
+    "yamlSubtitleWithName": "查看 Kubernetes ServiceAccount（{namespace}/{name}）的 YAML 内容。",
+    "loadYamlFailed": "加载 YAML 失败",
+    "deleteFailed": "删除失败",
+    "deleteTitle": "删除服务账号",
+    "deleteDesc": "确定删除服务账号 {name} 吗？",
+    "viewYaml": "查看 YAML",
+    "viewYamlTitle": "查看 YAML",
+    "delete": "删除"
+  },
   "secretsDialog": {
     "yamlSubtitle": "查看 Kubernetes Secret 的 YAML 内容。",
     "yamlSubtitleWithName": "查看 Kubernetes Secret ({namespace}/{name}) 的 YAML 内容。",
@@ -1073,5 +1084,8 @@
     "previousPage": "转到上一页",
     "nextPage": "转到下一页",
     "lastPage": "转到最后一页"
+  },
+  "dataTable": {
+    "noData": "暂无数据"
   }
 }

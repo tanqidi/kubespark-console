@@ -16,6 +16,27 @@ import { useTranslations } from "@/app/lib/i18n"
 
 type NodeRow = NodeResourceRow
 
+function getNodeColumns(t: (key: string) => string) {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value: unknown, row: NodeRow) => (
+        <div className="min-w-0">
+          <div className="truncate font-medium">{row.name}</div>
+          <div className="truncate text-sm text-muted-foreground">{row.ip || "-"}</div>
+        </div>
+      ),
+    },
+    { key: "status", label: t("table.columns.status"), render: "status" },
+    { key: "role", label: t("table.columns.role") },
+    { key: "pods", label: t("table.columns.pods") },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
+
 export function NodesPageClient() {
   const [rows, setRows] = React.useState<NodeRow[]>([])
   const [, setLoading] = React.useState(true)
@@ -49,26 +70,41 @@ export function NodesPageClient() {
       })
   }, [t])
 
-  const columns = React.useMemo(() => createColumns<NodeRow>({
-    columns: [
-      {
-        key: "name",
-        label: t("table.columns.name"),
-        enableHiding: false,
-        cell: (_value, row) => (
-          <div className="min-w-0">
-            <div className="truncate font-medium">{row.name}</div>
-            <div className="truncate text-sm text-muted-foreground">{row.ip || "-"}</div>
-          </div>
-        ),
-      },
-      { key: "status", label: t("table.columns.status"), render: "status" },
-      { key: "role", label: t("table.columns.role") },
-      { key: "pods", label: t("table.columns.pods") },
-      { key: "age", label: t("table.columns.age") },
-      { key: "updatedAt", label: t("table.columns.updatedAt") },
-    ],
-    actionItems: [
+  const loadRows = React.useCallback(async (silent: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
+    try {
+      const mapped = await fetchNodeResourceRows()
+      setRows(mapped)
+      setError(null)
+    } catch (e: unknown) {
+      if (!silent) {
+        setRows([])
+        setError(e instanceof Error ? e.message : "API request failed")
+      } else {
+        console.error("[Nodes] polling refresh failed", e)
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    void loadRows(false)
+    const timer = window.setInterval(() => {
+      void loadRows(true)
+    }, 3000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [loadRows])
+
+  const columns = React.useMemo(() => getNodeColumns(t), [])
+  const actionItems = React.useMemo(
+    () => [
       {
         label: (
           <>
@@ -76,49 +112,15 @@ export function NodesPageClient() {
             {t("actions.details")}
           </>
         ),
-        onSelect: (row) => {
-          handleViewDescribe(row)
-        },
+        onSelect: handleViewDescribe,
       },
     ],
-  }), [handleViewDescribe, t])
-
-  React.useEffect(() => {
-    let cancelled = false
-
-    const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const mapped = await fetchNodeResourceRows()
-        if (cancelled) return
-        setRows(mapped)
-        setError(null)
-      } catch (e: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setRows([])
-          setError(e instanceof Error ? e.message : t("actions.apiRequestFailed"))
-        } else {
-          console.error("[Nodes] polling refresh failed", e)
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
-    }
-
-    void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
-  }, [t])
+    [handleViewDescribe, t]
+  )
+  const tableColumns = React.useMemo(
+    () => createColumns<NodeRow>({ columns, actionItems }),
+    [columns, actionItems]
+  )
 
   if (error) {
     return (
@@ -157,7 +159,7 @@ export function NodesPageClient() {
         loading={describeLoading}
         error={describeError}
       />
-      <DataTable data={filteredRows} columns={columns} toolbarEnd={nodeFilters} />
+      <DataTable data={filteredRows} columns={tableColumns} toolbarEnd={nodeFilters} />
     </>
   )
 }

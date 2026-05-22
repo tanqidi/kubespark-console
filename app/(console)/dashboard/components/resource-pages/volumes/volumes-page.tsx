@@ -688,6 +688,70 @@ export function VolumesPageClient() {
     t,
   ])
 
+  const handleStepNavClick = React.useCallback(async (step: VolumeCreateStep) => {
+    if (creating || checkingCreateNext) return
+    if (step === "basic") {
+      setCreateStep("basic")
+      return
+    }
+    if (step === "storage") {
+      if (!validateBasicStep()) return
+      setCheckingCreateNext(true)
+      try {
+        const exists = await checkPersistentVolumeClaimExists({
+          name: createName.trim().toLowerCase(),
+          namespace: createNamespace.trim(),
+        })
+        if (exists) {
+          setCreateNameError(t("volumesDialog.nameExists"))
+          return
+        }
+        setCreateStep("storage")
+      } catch (error) {
+        setCreateSubmitError(error instanceof Error ? error.message : t("volumesDialog.nameValidationFailed"))
+      } finally {
+        setCheckingCreateNext(false)
+      }
+      return
+    }
+    if (step === "advanced") {
+      if (!validateBasicStep()) {
+        setCreateStep("basic")
+        return
+      }
+      setCheckingCreateNext(true)
+      try {
+        const exists = await checkPersistentVolumeClaimExists({
+          name: createName.trim().toLowerCase(),
+          namespace: createNamespace.trim(),
+        })
+        if (exists) {
+          setCreateNameError(t("volumesDialog.nameExists"))
+          setCreateStep("basic")
+          return
+        }
+        if (!validateStorageStep()) {
+          setCreateStep("storage")
+          return
+        }
+        setCreateStep("advanced")
+      } catch (error) {
+        setCreateSubmitError(error instanceof Error ? error.message : t("volumesDialog.nameValidationFailed"))
+        setCreateStep("basic")
+      } finally {
+        setCheckingCreateNext(false)
+      }
+    }
+  }, [
+    checkingCreateNext,
+    createName,
+    createNamespace,
+    creating,
+    validateBasicStep,
+    validateStorageStep,
+    t,
+  ])
+
   const handleCreateSubmit = React.useCallback(async () => {
     if (creating) return
     setCreateSubmitError(null)
@@ -1117,7 +1181,7 @@ export function VolumesPageClient() {
                     active: createStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: creating,
-                    onClick: () => setCreateStep("basic"),
+                    onClick: () => void handleStepNavClick("basic"),
                   },
                   {
                     id: "storage",
@@ -1131,7 +1195,7 @@ export function VolumesPageClient() {
                     active: createStep === "storage",
                     icon: <IconDatabase className="size-4" />,
                     disabled: creating,
-                    onClick: () => setCreateStep("storage"),
+                    onClick: () => void handleStepNavClick("storage"),
                   },
                   {
                     id: "advanced",
@@ -1145,7 +1209,7 @@ export function VolumesPageClient() {
                     active: createStep === "advanced",
                     icon: <IconAdjustments className="size-4" />,
                     disabled: creating,
-                    onClick: () => setCreateStep("advanced"),
+                    onClick: () => void handleStepNavClick("advanced"),
                   },
                 ]}
               />

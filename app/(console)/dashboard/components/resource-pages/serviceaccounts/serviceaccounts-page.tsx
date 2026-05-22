@@ -25,20 +25,19 @@ import { useTranslations } from "@/app/lib/i18n"
 
 type ServiceAccountRow = ServiceAccountResourceRow
 
-const serviceAccountColumns: ColumnConfig<ServiceAccountRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "namespace", label: "命名空间" },
-  // { key: "secrets", label: "Secrets"},
-  // { key: "imagePullSecrets", label: "拉取凭据"},
-  // { key: "automountToken", label: "自动挂载令牌" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getServiceAccountColumns(t: (key: string) => string): ColumnConfig<ServiceAccountRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "namespace", label: t("table.columns.namespace") },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
 
 export function ServiceAccountsPageClient() {
   const t = useTranslations()
@@ -52,7 +51,7 @@ export function ServiceAccountsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes ServiceAccount 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<ServiceAccountRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -61,7 +60,7 @@ export function ServiceAccountsPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes ServiceAccount（${row.namespace}/${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("serviceAccountsDialog.yamlSubtitleWithName", { namespace: row.namespace, name: row.name }))
 
     void fetchNamespacedResourceYaml("serviceaccounts", row.namespace, row.name, {
       group: "core",
@@ -71,13 +70,13 @@ export function ServiceAccountsPageClient() {
         setYamlContent(text)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("serviceAccountsDialog.loadYamlFailed")
         setYamlError(message)
       })
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const requestDelete = React.useCallback((row: ServiceAccountRow) => {
     setPendingDeleteRow(row)
@@ -92,34 +91,34 @@ export function ServiceAccountsPageClient() {
         setPendingDeleteRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("serviceAccountsDialog.deleteFailed")
         setError(message)
       })
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeleteRow])
+  }, [deleting, pendingDeleteRow, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: ServiceAccountRow[]) => {
     if (selectedRows.length === 0) return
     void Promise.all(selectedRows.map((row) => deleteServiceAccount(row.namespace, row.name))).catch(
       (e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("serviceAccountsDialog.deleteFailed")
         setError(message)
       }
     )
-  }, [])
+  }, [t])
 
   const columns = React.useMemo(
     () =>
       createColumns<ServiceAccountRow>({
-        columns: serviceAccountColumns,
+        columns: getServiceAccountColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"查看 YAML"}
+                {t("serviceAccountsDialog.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -130,7 +129,7 @@ export function ServiceAccountsPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {t("serviceAccountsDialog.delete")}
               </>
             ),
             variant: "destructive",
@@ -141,7 +140,7 @@ export function ServiceAccountsPageClient() {
           },
         ],
       }),
-    [handleViewYaml, requestDelete]
+    [handleViewYaml, requestDelete, t]
   )
 
   React.useEffect(() => {
@@ -209,7 +208,7 @@ export function ServiceAccountsPageClient() {
   return (
     <>
       <MonacoViewerDialog
-        title="查看YAML"
+        title={t("serviceAccountsDialog.viewYamlTitle")}
         subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
@@ -223,8 +222,8 @@ export function ServiceAccountsPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除服务账号"
-        description={pendingDeleteRow ? `确定删除服务账号 ${pendingDeleteRow.namespace}/${pendingDeleteRow.name} 吗？` : ""}
+        title={t("serviceAccountsDialog.deleteTitle")}
+        description={pendingDeleteRow ? t("serviceAccountsDialog.deleteDesc", { name: `${pendingDeleteRow.namespace}/${pendingDeleteRow.name}` }) : ""}
         deleting={deleting}
         onConfirm={handleConfirmDelete}
       />

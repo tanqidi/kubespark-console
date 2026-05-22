@@ -1049,6 +1049,17 @@
     "deleteFailed": "Delete failed",
     "editContextLost": "Editing context lost, please reopen the edit dialog"
   },
+  "serviceAccountsDialog": {
+    "yamlSubtitle": "View Kubernetes ServiceAccount YAML content.",
+    "yamlSubtitleWithName": "View Kubernetes ServiceAccount ({namespace}/{name}) YAML content.",
+    "loadYamlFailed": "Failed to load YAML",
+    "deleteFailed": "Delete failed",
+    "deleteTitle": "Delete Service Account",
+    "deleteDesc": "Are you sure you want to delete service account {name}?",
+    "viewYaml": "View YAML",
+    "viewYamlTitle": "View YAML",
+    "delete": "Delete"
+  },
   "secretsDialog": {
     "yamlSubtitle": "View Kubernetes Secret YAML content.",
     "yamlSubtitleWithName": "View Kubernetes Secret ({namespace}/{name}) YAML content.",
@@ -1072,5 +1083,8 @@
     "previousPage": "Go to previous page",
     "nextPage": "Go to next page",
     "lastPage": "Go to last page"
+  },
+  "dataTable": {
+    "noData": "No data"
   }
 }
