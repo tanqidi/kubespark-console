@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext, useContext, ReactNode } from "react";
 import zhCN from "@/messages/zh-CN.json";
 import enUS from "@/messages/en-US.json";
 
@@ -12,6 +12,13 @@ const messages = {
 };
 
 const LOCALE_STORAGE_KEY = "kubespark-locale";
+
+interface LocaleContextType {
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
+}
+
+const LocaleContext = createContext<LocaleContextType | undefined>(undefined);
 
 export function getBrowserLocale(): Locale {
   if (typeof window === "undefined") return "zh-CN";
@@ -36,11 +43,14 @@ export function getMessages(locale: Locale) {
   return messages[locale];
 }
 
-export function useLocale() {
-  const [locale, setLocale] = useState<Locale>(() => getBrowserLocale());
+export function LocaleProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocale] = useState<Locale>("zh-CN");
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    setLocale(getBrowserLocale());
+    const browserLocale = getBrowserLocale();
+    setLocale(browserLocale);
+    setIsHydrated(true);
   }, []);
 
   const handleSetLocale = (newLocale: Locale) => {
@@ -48,17 +58,37 @@ export function useLocale() {
     setLocale(newLocale);
   };
 
-  return { locale, setLocale: handleSetLocale };
+  // 水合完成前不渲染任何内容，避免闪烁
+  if (!isHydrated) {
+    return null;
+  }
+
+  return (
+    <LocaleContext.Provider value={{ locale, setLocale: handleSetLocale }}>
+      {children}
+    </LocaleContext.Provider>
+  );
+}
+
+export function useLocale() {
+  const context = useContext(LocaleContext);
+  
+  // 如果在 Provider 外使用，返回默认值
+  if (!context) {
+    return { locale: "zh-CN" as Locale, setLocale: saveLocale };
+  }
+  
+  return context;
 }
 
 export function useTranslations(namespace?: string) {
   const { locale } = useLocale();
-  const messages = getMessages(locale);
+  const currentMessages = getMessages(locale);
 
   return function t(key: string, params?: Record<string, string>) {
     const fullKey = namespace ? `${namespace}.${key}` : key;
     const keys = fullKey.split(".");
-    let value: any = messages;
+    let value: any = currentMessages;
     
     for (const k of keys) {
       if (value && typeof value === "object" && k in value) {
