@@ -101,47 +101,49 @@ const MONACO_OPTIONS: EditorProps["options"] = {
   wordWrap: "on",
 }
 
-const persistentVolumeColumns: ColumnConfig<PersistentVolumeRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "capacity", label: "容量" },
-  { key: "storageClass", label: "存储类" },
-  { key: "accessMode", label: "访问模式" },
-  { key: "reclaimPolicy", label: "回收策略" },
-  { key: "status", label: "状态", render: "status" },
-  { key: "node", label: "节点" },
-  { key: "age", label: "运行时间" },
-]
+function getPersistentVolumeColumns(t: (key: string) => string): ColumnConfig<PersistentVolumeRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "capacity", label: t("volumesDialog.capacity") },
+    { key: "storageClass", label: t("volumesDialog.storageClass") },
+    { key: "accessMode", label: t("volumesDialog.accessMode") },
+    { key: "reclaimPolicy", label: t("volumesDialog.reclaimPolicy") },
+    { key: "status", label: t("table.columns.status"), render: "status" },
+    { key: "node", label: t("table.columns.node") },
+    { key: "age", label: t("table.columns.age") },
+  ]
+}
 
-const persistentVolumeClaimColumns: ColumnConfig<PersistentVolumeClaimRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "namespace", label: "命名空间" },
-  { key: "capacity", label: "容量" },
-  { key: "storageClass", label: "存储类" },
-  { key: "accessMode", label: "访问模式" },
-  { key: "status", label: "状态", render: "status" },
-  { key: "boundPV", label: "绑定 PV" },
-  { key: "age", label: "运行时间" },
-]
+function getPersistentVolumeClaimColumns(t: (key: string) => string): ColumnConfig<PersistentVolumeClaimRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "namespace", label: t("table.columns.namespace") },
+    { key: "capacity", label: t("volumesDialog.capacity") },
+    { key: "storageClass", label: t("volumesDialog.storageClass") },
+    { key: "accessMode", label: t("volumesDialog.accessMode") },
+    { key: "status", label: t("table.columns.status"), render: "status" },
+    { key: "boundPV", label: t("volumesDialog.boundPV") },
+    { key: "age", label: t("table.columns.age") },
+  ]
+}
 
-const NAME_RULE_MESSAGE =
-  "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 const DESCRIPTION_MAX_LENGTH = 256
 
-function validateVolumeName(name: string): string | null {
+function validateVolumeName(name: string, t: (key: string) => string): string | null {
   const value = name.trim().toLowerCase()
-  if (!value) return "请输入名称"
-  if (value.length > 253) return NAME_RULE_MESSAGE
-  if (!/^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$/.test(value)) return NAME_RULE_MESSAGE
+  if (!value) return t("volumesDialog.nameRequired")
+  if (value.length > 253) return t("volumesDialog.nameRule")
+  if (!/^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$/.test(value)) return t("volumesDialog.nameRule")
   return null
 }
 
@@ -211,7 +213,7 @@ function parseStorageRequest(raw: string): { value: string; unit: string } {
   }
 }
 
-function parsePvcYamlText(yamlText: string): {
+function parsePvcYamlText(yamlText: string, t: (key: string) => string): {
   name: string
   namespace: string
   description: string
@@ -225,17 +227,17 @@ function parsePvcYamlText(yamlText: string): {
   volumeName: string
 } {
   const normalized = yamlText.trim()
-  if (!normalized) throw new Error("请输入 YAML 内容")
+  if (!normalized) throw new Error(t("volumesDialog.yamlRequired"))
   const parsed = parse(normalized)
   const root =
     typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null
-  if (!root) throw new Error("YAML 内容格式无效")
+  if (!root) throw new Error(t("volumesDialog.yamlInvalid"))
 
   const kind = typeof root.kind === "string" ? root.kind.trim() : ""
   if (kind && kind !== "PersistentVolumeClaim") {
-    throw new Error("YAML 资源类型必须是 PersistentVolumeClaim")
+    throw new Error(t("volumesDialog.yamlKindMustBe"))
   }
 
   const metadata =
@@ -308,7 +310,7 @@ function parsePvcYamlText(yamlText: string): {
   }
 }
 
-function resolveErrorMessage(error: unknown): string {
+function resolveErrorMessage(error: unknown, t: (key: string) => string): string {
   if (error instanceof Error && error.message) return error.message
   if (
     typeof error === "object" &&
@@ -318,7 +320,7 @@ function resolveErrorMessage(error: unknown): string {
   ) {
     return error.message
   }
-  return "API request failed"
+  return t("volumesDialog.loadFailed")
 }
 
 export function VolumesPageClient() {
@@ -337,7 +339,7 @@ export function VolumesPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Volume 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState(t("volumesDialog.yamlSubtitle"))
   const [pendingDeletePvcRow, setPendingDeletePvcRow] = React.useState<PersistentVolumeClaimRow | null>(null)
   const [pendingDeletePvRow, setPendingDeletePvRow] = React.useState<PersistentVolumeRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -374,7 +376,7 @@ export function VolumesPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes PersistentVolumeClaim（${row.namespace}/${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("volumesDialog.yamlSubtitleWithName", { name: `${row.namespace}/${row.name}` }))
 
     void fetchNamespacedResourceYaml("persistentvolumeclaims", row.namespace, row.name, {
       documentType: "persistentvolumeclaim",
@@ -387,7 +389,7 @@ export function VolumesPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("volumesDialog.loadYamlFailed")
         setYamlError(message)
         console.error("[Volumes] view yaml request failed", {
           pvc: { name: row.name, namespace: row.namespace },
@@ -397,14 +399,14 @@ export function VolumesPageClient() {
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const handleViewPvYaml = React.useCallback((row: PersistentVolumeRow) => {
     setYamlOpen(true)
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes PersistentVolume（${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("volumesDialog.yamlPvSubtitleWithName", { name: row.name }))
 
     void fetchNamespacedResourceYaml("persistentvolumes", "", row.name, {
       group: "core",
@@ -419,7 +421,7 @@ export function VolumesPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("volumesDialog.loadYamlFailed")
         setYamlError(message)
         console.error("[Volumes] view yaml request failed", {
           pv: { name: row.name },
@@ -429,7 +431,7 @@ export function VolumesPageClient() {
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const requestDeletePvc = React.useCallback((row: PersistentVolumeClaimRow) => {
     setPendingDeletePvcRow(row)
@@ -450,7 +452,7 @@ export function VolumesPageClient() {
         setPendingDeletePvcRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("volumesDialog.deleteFailed")
         setError(message)
         console.error("[Volumes] delete request failed", {
           target: {
@@ -464,7 +466,7 @@ export function VolumesPageClient() {
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeletePvcRow])
+  }, [deleting, pendingDeletePvcRow, t])
 
   const handleConfirmDeletePv = React.useCallback(() => {
     if (!pendingDeletePvRow || deleting) return
@@ -474,7 +476,7 @@ export function VolumesPageClient() {
         setPendingDeletePvRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("volumesDialog.deleteFailed")
         setError(message)
         console.error("[Volumes] delete request failed", {
           target: {
@@ -487,7 +489,7 @@ export function VolumesPageClient() {
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeletePvRow])
+  }, [deleting, pendingDeletePvRow, t])
 
   const handleDeleteSelectedPvcRows = React.useCallback(
     (selectedRows: PersistentVolumeClaimRow[]) => {
@@ -495,22 +497,22 @@ export function VolumesPageClient() {
       void Promise.all(
         selectedRows.map((row) => deletePersistentVolumeClaim(row.namespace, row.name))
       ).catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("volumesDialog.deleteFailed")
         setError(message)
         console.error("[Volumes] bulk delete request failed", e)
       })
     },
-    []
+    [t]
   )
 
   const handleDeleteSelectedPvRows = React.useCallback((selectedRows: PersistentVolumeRow[]) => {
     if (selectedRows.length === 0) return
     void Promise.all(selectedRows.map((row) => deletePersistentVolume(row.name))).catch((e: unknown) => {
-      const message = e instanceof Error ? e.message : "删除失败"
+      const message = e instanceof Error ? e.message : t("volumesDialog.deleteFailed")
       setError(message)
       console.error("[Volumes] bulk delete request failed", e)
     })
-  }, [])
+  }, [t])
 
   const resetCreateForm = React.useCallback(() => {
     setCreateStep("basic")
@@ -620,33 +622,33 @@ export function VolumesPageClient() {
   ])
 
   const validateBasicStep = React.useCallback(() => {
-    const nextNameError = validateVolumeName(createName)
-    const nextNamespaceError = createNamespace.trim() ? null : "请选择项目"
+    const nextNameError = validateVolumeName(createName, t)
+    const nextNamespaceError = createNamespace.trim() ? null : t("volumesDialog.namespaceRequired")
     setCreateNameError(nextNameError)
     setCreateNamespaceError(nextNamespaceError)
     return !nextNameError && !nextNamespaceError
-  }, [createName, createNamespace])
+  }, [createName, createNamespace, t])
 
   const validateStorageStep = React.useCallback(() => {
     if (!createStorageClassName.trim()) {
-      setCreateStorageClassError(storageClassOptions.length > 0 ? "请选择存储类" : "暂无可用存储类")
+      setCreateStorageClassError(storageClassOptions.length > 0 ? t("volumesDialog.storageClassRequired") : t("volumesDialog.noStorageClass"))
       return false
     }
     setCreateStorageClassError(null)
 
     const request = createStorageRequest.trim()
     if (!request) {
-      setCreateStorageError("请输入申请容量")
+      setCreateStorageError(t("volumesDialog.storageRequestRequired"))
       return false
     }
     const parsed = Number(request)
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      setCreateStorageError("申请容量必须大于 0")
+      setCreateStorageError(t("volumesDialog.storageRequestInvalid"))
       return false
     }
     setCreateStorageError(null)
     return true
-  }, [createStorageClassName, createStorageRequest, storageClassOptions.length])
+  }, [createStorageClassName, createStorageRequest, storageClassOptions.length, t])
 
   const handleCreateNext = React.useCallback(async () => {
     if (creating || checkingCreateNext) return
@@ -660,12 +662,12 @@ export function VolumesPageClient() {
           namespace: createNamespace.trim(),
         })
         if (exists) {
-          setCreateNameError("卷声明名称已存在，请更换后重试")
+          setCreateNameError(t("volumesDialog.nameExists"))
           return
         }
         setCreateStep("storage")
       } catch (error) {
-        setCreateSubmitError(error instanceof Error ? error.message : "卷声明名称校验失败，请稍后重试")
+        setCreateSubmitError(error instanceof Error ? error.message : t("volumesDialog.nameValidationFailed"))
       } finally {
         setCheckingCreateNext(false)
       }
@@ -683,6 +685,7 @@ export function VolumesPageClient() {
     creating,
     validateBasicStep,
     validateStorageStep,
+    t,
   ])
 
   const handleCreateSubmit = React.useCallback(async () => {
@@ -705,7 +708,7 @@ export function VolumesPageClient() {
 
     if (createYamlMode) {
       try {
-        nextState = parsePvcYamlText(createYamlText)
+        nextState = parsePvcYamlText(createYamlText, t)
         setCreateName(nextState.name)
         setCreateNamespace(nextState.namespace)
         setCreateDescription(nextState.description)
@@ -720,27 +723,27 @@ export function VolumesPageClient() {
         setCreateVolumeName(nextState.volumeName)
         setCreateYamlError(null)
       } catch (parseError: unknown) {
-        setCreateYamlError(parseError instanceof Error ? parseError.message : "YAML 解析失败")
+        setCreateYamlError(parseError instanceof Error ? parseError.message : t("volumesDialog.yamlParseFailed"))
         return
       }
     }
 
-    const validName = validateVolumeName(nextState.name)
-    const validNamespace = nextState.namespace.trim() ? null : "请选择项目"
+    const validName = validateVolumeName(nextState.name, t)
+    const validNamespace = nextState.namespace.trim() ? null : t("volumesDialog.namespaceRequired")
     const validDescription =
       nextState.description.trim().length <= DESCRIPTION_MAX_LENGTH
         ? null
-        : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
+        : t("volumesDialog.descriptionTooLong", { max: String(DESCRIPTION_MAX_LENGTH) })
     const storageNumber = Number(nextState.storageRequest.trim())
     const validStorage =
       nextState.storageRequest.trim() && Number.isFinite(storageNumber) && storageNumber > 0
         ? null
-        : "申请容量必须大于 0"
+        : t("volumesDialog.storageRequestInvalid")
     const validStorageClass = nextState.storageClassName.trim()
       ? null
       : storageClassOptions.length > 0
-        ? "请选择存储类"
-        : "暂无可用存储类"
+        ? t("volumesDialog.storageClassRequired")
+        : t("volumesDialog.noStorageClass")
 
     setCreateNameError(validName)
     setCreateNamespaceError(validNamespace)
@@ -767,7 +770,7 @@ export function VolumesPageClient() {
         namespace: nextState.namespace.trim(),
       })
       if (exists) {
-        const existsMessage = "卷声明名称已存在，请更换后重试"
+        const existsMessage = t("volumesDialog.nameExists")
         setCreateNameError(existsMessage)
         if (createYamlMode) setCreateYamlError(existsMessage)
         else setCreateStep("basic")
@@ -792,7 +795,7 @@ export function VolumesPageClient() {
       setCreateDialogOpen(false)
       resetCreateForm()
     } catch (submitError: unknown) {
-      const message = submitError instanceof Error ? submitError.message : "创建失败"
+      const message = submitError instanceof Error ? submitError.message : t("volumesDialog.createFailed")
       if (createYamlMode) {
         setCreateYamlError(message)
       } else {
@@ -818,6 +821,7 @@ export function VolumesPageClient() {
     createYamlText,
     creating,
     resetCreateForm,
+    t,
   ])
 
   const enterCreateYamlMode = React.useCallback(() => {
@@ -833,7 +837,7 @@ export function VolumesPageClient() {
 
   const confirmCreateYamlMode = React.useCallback(() => {
     try {
-      const parsed = parsePvcYamlText(createYamlText)
+      const parsed = parsePvcYamlText(createYamlText, t)
       setCreateName(parsed.name)
       setCreateNamespace(parsed.namespace)
       setCreateDescription(parsed.description)
@@ -849,105 +853,124 @@ export function VolumesPageClient() {
       setCreateYamlError(null)
       setCreateYamlMode(false)
     } catch (error) {
-      setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      setCreateYamlError(error instanceof Error ? error.message : t("volumesDialog.yamlParseFailed"))
     }
-  }, [createYamlText])
+  }, [createYamlText, t])
+
+  // 先获取翻译的字符串，避免在 React 元素内部直接调用 t 函数
+  const viewYamlText = t("actions.viewYaml")
+  const deleteText = t("actions.delete")
+
+  // 避免每次渲染重新创建 action items，防止下拉菜单重新挂载
+  const pvcActionItems = React.useMemo(() => [
+    {
+      label: (
+        <>
+          <IconEye className="size-4" />
+          {viewYamlText}
+        </>
+      ),
+      onSelect: (row: PersistentVolumeClaimRow) => {
+        handleViewPvcYaml(row)
+      },
+    },
+    {
+      label: (
+        <>
+          <IconTrash className="size-4" />
+          {deleteText}
+        </>
+      ),
+      variant: "destructive" as const,
+      withSeparator: true,
+      onSelect: (row: PersistentVolumeClaimRow) => {
+        requestDeletePvc(row)
+      },
+    },
+  ], [handleViewPvcYaml, requestDeletePvc, viewYamlText, deleteText])
 
   const pvcColumns = React.useMemo(
     () =>
       createColumns<PersistentVolumeClaimRow>({
-        columns: persistentVolumeClaimColumns,
-        actionItems: [
-          {
-            label: (
-              <>
-                <IconEye className="size-4" />
-                {"查看 YAML"}
-              </>
-            ),
-            onSelect: (row) => {
-              handleViewPvcYaml(row)
-            },
-          },
-          {
-            label: (
-              <>
-                <IconTrash className="size-4" />
-                {"删除"}
-              </>
-            ),
-            variant: "destructive",
-            withSeparator: true,
-            onSelect: (row) => {
-              requestDeletePvc(row)
-            },
-          },
-        ],
+        columns: getPersistentVolumeClaimColumns(t),
+        actionItems: pvcActionItems,
       }),
-    [handleViewPvcYaml, requestDeletePvc]
+    [pvcActionItems, t]
   )
+
+  // 同样处理 PV 的 action items
+  const pvActionItems = React.useMemo(() => [
+    {
+      label: (
+        <>
+          <IconEye className="size-4" />
+          {viewYamlText}
+        </>
+      ),
+      onSelect: (row: PersistentVolumeRow) => {
+        handleViewPvYaml(row)
+      },
+    },
+    {
+      label: (
+        <>
+          <IconTrash className="size-4" />
+          {deleteText}
+        </>
+      ),
+      variant: "destructive" as const,
+      withSeparator: true,
+      onSelect: (row: PersistentVolumeRow) => {
+        requestDeletePv(row)
+      },
+    },
+  ], [handleViewPvYaml, requestDeletePv, viewYamlText, deleteText])
 
   const pvColumns = React.useMemo(
     () =>
       createColumns<PersistentVolumeRow>({
-        columns: persistentVolumeColumns,
-        actionItems: [
-          {
-            label: (
-              <>
-                <IconEye className="size-4" />
-                {"查看 YAML"}
-              </>
-            ),
-            onSelect: (row) => {
-              handleViewPvYaml(row)
-            },
-          },
-          {
-            label: (
-              <>
-                <IconTrash className="size-4" />
-                {"删除"}
-              </>
-            ),
-            variant: "destructive",
-            withSeparator: true,
-            onSelect: (row) => {
-              requestDeletePv(row)
-            },
-          },
-        ],
+        columns: getPersistentVolumeColumns(t),
+        actionItems: pvActionItems,
       }),
-    [handleViewPvYaml, requestDeletePv]
+    [pvActionItems, t]
   )
+
+  // 提取成 useCallback，避免频繁重新创建导致的死循环
+  const refreshRows = React.useCallback(async (silent: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
+    try {
+      const { persistentVolumeClaims: pvcRows, persistentVolumes: pvRows } =
+        await fetchVolumeRows()
+      setPersistentVolumeClaims(pvcRows)
+      setPersistentVolumes(pvRows)
+      setError(null)
+    } catch (loadError: unknown) {
+      if (!silent) {
+        setPersistentVolumeClaims([])
+        setPersistentVolumes([])
+        // 这里我们仍然需要翻译错误信息，所以需要传递 t，但需要注意不直接把 t 放在依赖里
+        const message = 
+          loadError instanceof Error 
+            ? loadError.message 
+            : "API request failed"
+        setError(message)
+      } else {
+        console.error("[Volumes] polling refresh failed", loadError)
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [])
 
   React.useEffect(() => {
     let cancelled = false
 
     const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const { persistentVolumeClaims: pvcRows, persistentVolumes: pvRows } =
-          await fetchVolumeRows()
-        if (cancelled) return
-        setPersistentVolumeClaims(pvcRows)
-        setPersistentVolumes(pvRows)
-        setError(null)
-      } catch (loadError: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setPersistentVolumeClaims([])
-          setPersistentVolumes([])
-          setError(resolveErrorMessage(loadError))
-        } else {
-          console.error("[Volumes] polling refresh failed", loadError)
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
+      if (cancelled) return
+      await refreshRows(silent)
     }
 
     void loadRows(false)
@@ -959,7 +982,7 @@ export function VolumesPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [])
+  }, [refreshRows])
   // if (loading) {
   //   return <ResourceLoadingState />
   // } // kept for potential future use
@@ -975,7 +998,7 @@ export function VolumesPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{t("volumesDialog.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -985,8 +1008,8 @@ export function VolumesPageClient() {
   const volumeTabs = (
     <Tabs value={view} onValueChange={(value) => setView(value as "PVC" | "PV")} className="w-fit">
       <TabsList>
-        <TabsTrigger value="PVC">{"持久卷声明"}</TabsTrigger>
-        <TabsTrigger value="PV">{"持久卷"}</TabsTrigger>
+        <TabsTrigger value="PVC">{t("volumesDialog.pvcTab")}</TabsTrigger>
+        <TabsTrigger value="PV">{t("volumesDialog.pvTab")}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -1061,12 +1084,12 @@ export function VolumesPageClient() {
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
-                <DialogTitle>创建持久卷声明</DialogTitle>
-                <DialogDescription>使用 Kubernetes PersistentVolumeClaim 创建存储声明。</DialogDescription>
+                <DialogTitle>{t("volumesDialog.createTitle")}</DialogTitle>
+                <DialogDescription>{t("volumesDialog.createDesc")}</DialogDescription>
               </DialogHeader>
               <div className="h-full flex items-center me-20">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                  <span className="text-sm font-medium">编辑 YAML</span>
+                  <span className="text-sm font-medium">{t("volumesDialog.yamlMode")}</span>
                   <Switch
                     checked={createYamlMode}
                     onCheckedChange={(checked) => {
@@ -1078,7 +1101,7 @@ export function VolumesPageClient() {
                       cancelCreateYamlMode()
                     }}
                     disabled={creating}
-                    aria-label="编辑 YAML"
+                    aria-label={t("volumesDialog.yamlMode")}
                   />
                 </div>
               </div>
@@ -1089,8 +1112,8 @@ export function VolumesPageClient() {
                 items={[
                   {
                     id: "basic",
-                    title: "基本信息",
-                    status: createStep === "basic" ? "当前" : createName.trim() && createNamespace.trim() ? "已设置" : "未设置",
+                    title: t("volumesDialog.basicInfo"),
+                    status: createStep === "basic" ? t("volumesDialog.current") : createName.trim() && createNamespace.trim() ? t("volumesDialog.configured") : t("volumesDialog.notConfigured"),
                     active: createStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: creating,
@@ -1098,13 +1121,13 @@ export function VolumesPageClient() {
                   },
                   {
                     id: "storage",
-                    title: "存储设置",
+                    title: t("volumesDialog.storageSettings"),
                     status:
                       createStep === "storage"
-                        ? "当前"
+                        ? t("volumesDialog.current")
                         : createStorageRequest.trim()
-                          ? "已设置"
-                          : "未设置",
+                          ? t("volumesDialog.configured")
+                          : t("volumesDialog.notConfigured"),
                     active: createStep === "storage",
                     icon: <IconDatabase className="size-4" />,
                     disabled: creating,
@@ -1112,13 +1135,13 @@ export function VolumesPageClient() {
                   },
                   {
                     id: "advanced",
-                    title: "高级设置",
+                    title: t("volumesDialog.advancedSettings"),
                     status:
                       createStep === "advanced"
-                        ? "当前"
+                        ? t("volumesDialog.current")
                         : hasUserProvidedMetadata(labelEntries, annotationEntries)
-                          ? "已设置"
-                          : "未设置",
+                          ? t("volumesDialog.configured")
+                          : t("volumesDialog.notConfigured"),
                     active: createStep === "advanced",
                     icon: <IconAdjustments className="size-4" />,
                     disabled: creating,
@@ -1155,12 +1178,12 @@ export function VolumesPageClient() {
               ) : createStep === "basic" ? (
                 <div>
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">基本信息</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">填写卷声明名称、所属项目和描述信息。</p>
+                    <h3 className="text-[15px] font-semibold">{t("volumesDialog.basicInfo")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("volumesDialog.basicInfoDesc")}</p>
                   </div>
                   <FieldGroup className="grid gap-6 md:grid-cols-2">
                     <Field data-invalid={Boolean(createNameError)}>
-                      <FieldLabel htmlFor="volume-create-name">名称</FieldLabel>
+                      <FieldLabel htmlFor="volume-create-name">{t("volumesDialog.name")}</FieldLabel>
                       <Input
                         id="volume-create-name"
                         value={createName}
@@ -1168,7 +1191,7 @@ export function VolumesPageClient() {
                           setCreateName(event.target.value)
                           if (createNameError) setCreateNameError(null)
                         }}
-                        placeholder="请输入卷声明名称"
+                        placeholder={t("volumesDialog.namePlaceholder")}
                         autoComplete="off"
                         aria-invalid={Boolean(createNameError)}
                         disabled={creating}
@@ -1176,7 +1199,7 @@ export function VolumesPageClient() {
                       {createNameError ? (
                         <FieldError>{createNameError}</FieldError>
                       ) : (
-                        <FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>
+                        <FieldDescription>{t("volumesDialog.nameRule")}</FieldDescription>
                       )}
                     </Field>
 
@@ -1189,24 +1212,24 @@ export function VolumesPageClient() {
                         if (createNamespaceError) setCreateNamespaceError(null)
                       }}
                       error={createNamespaceError}
-                      description="选择卷声明所属项目。"
+                      description={t("volumesDialog.namespaceDesc")}
                       disabled={creating}
                       contentContainer={createDialogPopupLayerRef}
                     />
 
                     <Field className="md:col-span-2">
-                      <FieldLabel htmlFor="volume-create-description">描述</FieldLabel>
+                      <FieldLabel htmlFor="volume-create-description">{t("volumesDialog.description")}</FieldLabel>
                       <Textarea
                         id="volume-create-description"
                         value={createDescription}
                         onChange={(event) => setCreateDescription(event.target.value)}
-                        placeholder="请输入描述"
+                        placeholder={t("volumesDialog.descriptionPlaceholder")}
                         maxLength={DESCRIPTION_MAX_LENGTH}
                         className="min-h-24"
                         disabled={creating}
                       />
                       <FieldDescription>
-                        描述将写入资源注解 description，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                        {t("volumesDialog.descriptionRule", { max: String(DESCRIPTION_MAX_LENGTH) })}
                       </FieldDescription>
                     </Field>
                   </FieldGroup>
@@ -1214,12 +1237,12 @@ export function VolumesPageClient() {
               ) : createStep === "storage" ? (
                 <div>
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">存储设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">设置访问模式、申请容量和存储类。</p>
+                    <h3 className="text-[15px] font-semibold">{t("volumesDialog.storageSettings")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("volumesDialog.storageSettingsDesc")}</p>
                   </div>
                   <FieldGroup className="grid gap-6 md:grid-cols-2">
                     <Field className="md:col-span-2">
-                      <FieldLabel htmlFor="volume-create-storage-class">存储类</FieldLabel>
+                      <FieldLabel htmlFor="volume-create-storage-class">{t("volumesDialog.storageClass")}</FieldLabel>
                       <Select
                         value={createStorageClassName}
                         onValueChange={(value) => {
@@ -1229,7 +1252,7 @@ export function VolumesPageClient() {
                         disabled={creating}
                       >
                         <SelectTrigger id="volume-create-storage-class">
-                          <SelectValue placeholder="请选择存储类" />
+                          <SelectValue placeholder={t("volumesDialog.storageClassPlaceholder")} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
@@ -1241,7 +1264,7 @@ export function VolumesPageClient() {
                               ))
                             ) : (
                               <SelectItem value="__none__" disabled>
-                                暂无可用存储类
+                                {t("volumesDialog.noStorageClass")}
                               </SelectItem>
                             )}
                           </SelectGroup>
@@ -1251,7 +1274,7 @@ export function VolumesPageClient() {
                     </Field>
 
                     <Field>
-                      <FieldLabel htmlFor="volume-create-access-mode">访问模式</FieldLabel>
+                      <FieldLabel htmlFor="volume-create-access-mode">{t("volumesDialog.accessMode")}</FieldLabel>
                       <Select
                         value={createAccessMode}
                         onValueChange={(value) => {
@@ -1281,7 +1304,7 @@ export function VolumesPageClient() {
                     </Field>
 
                     <Field data-invalid={Boolean(createStorageError)}>
-                      <FieldLabel htmlFor="volume-create-storage-request">申请容量</FieldLabel>
+                      <FieldLabel htmlFor="volume-create-storage-request">{t("volumesDialog.storageRequest")}</FieldLabel>
                       <InputGroup>
                         <InputGroupInput
                           id="volume-create-storage-request"
@@ -1307,8 +1330,8 @@ export function VolumesPageClient() {
               ) : (
                 <div>
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">高级设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">补充标签与注解信息，便于检索、分类和后续治理。</p>
+                    <h3 className="text-[15px] font-semibold">{t("volumesDialog.advancedSettings")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("volumesDialog.advancedSettingsDesc")}</p>
                   </div>
                   <FieldGroup className="grid gap-6 md:grid-cols-2">
                     <Field className="md:col-span-2">
@@ -1336,12 +1359,12 @@ export function VolumesPageClient() {
                 {createYamlMode || createStep === "basic" ? (
                   createYamlMode ? (
                     <Button type="button" variant="outline" disabled={creating || checkingCreateNext} onClick={cancelCreateYamlMode}>
-                      取消
+                      {t("volumesDialog.cancel")}
                     </Button>
                   ) : (
                     <DialogClose asChild>
                       <Button type="button" variant="outline" disabled={creating || checkingCreateNext}>
-                        取消
+                        {t("volumesDialog.cancel")}
                       </Button>
                     </DialogClose>
                   )
@@ -1352,14 +1375,14 @@ export function VolumesPageClient() {
                     onClick={() => setCreateStep(createStep === "advanced" ? "storage" : "basic")}
                     disabled={creating || checkingCreateNext}
                   >
-                    上一步
+                    {t("volumesDialog.previousStep")}
                   </Button>
                 )}
 
                 {createYamlMode || createStep === "advanced" ? (
                   createYamlMode ? (
                     <Button type="button" onClick={confirmCreateYamlMode} disabled={creating || checkingCreateNext}>
-                      确认保存
+                      {t("volumesDialog.confirmSave")}
                     </Button>
                   ) : (
                     <Button
@@ -1367,12 +1390,12 @@ export function VolumesPageClient() {
                       onClick={() => void handleCreateSubmit()}
                       disabled={creating || checkingCreateNext}
                     >
-                      {creating ? "创建中..." : "创建"}
+                      {creating ? t("volumesDialog.creating") : t("volumesDialog.create")}
                     </Button>
                   )
                 ) : (
                   <Button type="button" onClick={() => void handleCreateNext()} disabled={creating || checkingCreateNext}>
-                    {checkingCreateNext && createStep === "basic" ? "校验中..." : "下一步"}
+                    {checkingCreateNext && createStep === "basic" ? t("volumesDialog.validating") : t("volumesDialog.nextStep")}
                   </Button>
                 )}
               </div>
@@ -1382,7 +1405,7 @@ export function VolumesPageClient() {
       </Dialog>
 
       <MonacoViewerDialog
-        title="查看YAML"
+        title={t("volumesDialog.viewYaml")}
         subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
@@ -1396,9 +1419,9 @@ export function VolumesPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeletePvcRow(null)
         }}
-        title="删除持久卷声明"
+        title={t("volumesDialog.deletePvcTitle")}
         description={
-          pendingDeletePvcRow ? `确定删除持久卷声明 ${pendingDeletePvcRow.name} 吗？` : ""
+          pendingDeletePvcRow ? t("volumesDialog.deletePvcDesc", { name: pendingDeletePvcRow.name }) : ""
         }
         deleting={deleting}
         onConfirm={handleConfirmDeletePvc}
@@ -1408,8 +1431,8 @@ export function VolumesPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeletePvRow(null)
         }}
-        title="删除持久卷"
-        description={pendingDeletePvRow ? `确定删除持久卷 ${pendingDeletePvRow.name} 吗？` : ""}
+        title={t("volumesDialog.deletePvTitle")}
+        description={pendingDeletePvRow ? t("volumesDialog.deletePvDesc", { name: pendingDeletePvRow.name }) : ""}
         deleting={deleting}
         onConfirm={handleConfirmDeletePv}
       />

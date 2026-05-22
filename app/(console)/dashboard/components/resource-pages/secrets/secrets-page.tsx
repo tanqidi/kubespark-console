@@ -91,7 +91,7 @@ export function SecretsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Secret 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState(t("secretsDialog.yamlSubtitle"))
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<SecretRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
@@ -99,12 +99,23 @@ export function SecretsPageClient() {
   const [editInitialValues, setEditInitialValues] = React.useState<KeyValueDialogInitialValues | null>(null)
   const isMountedRef = React.useRef(true)
 
+  // 先获取翻译的字符串，避免在 React 元素内直接调用 t 函数导致下拉菜单问题
+  const viewYamlText = t("actions.viewYaml")
+  const editText = t("actions.edit")
+  const deleteText = t("actions.delete")
+  const viewYamlTitle = t("secretsDialog.viewYamlTitle")
+  const deleteTitle = t("secretsDialog.deleteTitle")
+  const deleteDescription = t("secretsDialog.deleteDescription")
+  const editContextLost = t("secretsDialog.editContextLost")
+  const apiRequestFailed = t("secretsDialog.apiRequestFailed")
+  const loadFailedTitle = t("secretsDialog.loadFailedTitle")
+
   const handleViewYaml = React.useCallback((row: SecretRow) => {
     setYamlOpen(true)
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes Secret（${row.namespace}/${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("secretsDialog.yamlSubtitleWithName", { name: `${row.namespace}/${row.name}` }))
 
     void fetchNamespacedResourceYaml("secrets", row.namespace, row.name, {
       documentType: "secret",
@@ -117,7 +128,7 @@ export function SecretsPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("secretsDialog.loadYamlFailed")
         setYamlError(message)
         console.error("[Secrets] view yaml request failed", {
           secret: { name: row.name, namespace: row.namespace },
@@ -127,7 +138,7 @@ export function SecretsPageClient() {
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const requestDelete = React.useCallback((row: SecretRow) => {
     setPendingDeleteRow(row)
@@ -164,10 +175,10 @@ export function SecretsPageClient() {
         setEditDialogOpen(true)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载保密字典详情失败"
+        const message = e instanceof Error ? e.message : t("secretsDialog.loadDetailsFailed")
         setError(message)
       })
-  }, [])
+  }, [t])
 
   const handleConfirmDelete = React.useCallback(() => {
     if (!pendingDeleteRow || deleting) return
@@ -178,7 +189,7 @@ export function SecretsPageClient() {
         setPendingDeleteRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("secretsDialog.deleteFailed")
         setError(message)
         console.error("[Secrets] delete request failed", {
           secret: { name: pendingDeleteRow.name, namespace: pendingDeleteRow.namespace },
@@ -188,18 +199,18 @@ export function SecretsPageClient() {
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeleteRow])
+  }, [deleting, pendingDeleteRow, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: SecretRow[]) => {
     if (selectedRows.length === 0) return
     void Promise.all(
       selectedRows.map((row) => deleteSecret(row.namespace, row.name))
     ).catch((e: unknown) => {
-      const message = e instanceof Error ? e.message : "删除失败"
+      const message = e instanceof Error ? e.message : t("secretsDialog.deleteFailed")
       setError(message)
       console.error("[Secrets] bulk delete request failed", e)
     })
-  }, [])
+  }, [t])
 
   const columns = React.useMemo(
     () =>
@@ -210,7 +221,7 @@ export function SecretsPageClient() {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"查看 YAML"}
+                {viewYamlText}
               </>
             ),
             onSelect: (row) => {
@@ -221,7 +232,7 @@ export function SecretsPageClient() {
             label: (
               <>
                 <IconPencil className="size-4" />
-                {"编辑"}
+                {editText}
               </>
             ),
             onSelect: (row) => {
@@ -232,7 +243,7 @@ export function SecretsPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {deleteText}
               </>
             ),
             variant: "destructive",
@@ -243,7 +254,7 @@ export function SecretsPageClient() {
           },
         ],
       }),
-    [handleEdit, handleViewYaml, requestDelete]
+    [handleEdit, handleViewYaml, requestDelete, viewYamlText, editText, deleteText]
   )
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
@@ -269,14 +280,14 @@ export function SecretsPageClient() {
       if (!isMountedRef.current) return
       if (!silent) {
         setRows([])
-        setError(e instanceof Error ? e.message : "API request failed")
+        setError(e instanceof Error ? e.message : apiRequestFailed)
       } else {
         console.error("[Secrets] polling refresh failed", e)
       }
     } finally {
       if (!silent && isMountedRef.current) setLoading(false)
     }
-  }, [])
+  }, [apiRequestFailed])
 
   React.useEffect(() => {
     isMountedRef.current = true
@@ -320,7 +331,7 @@ export function SecretsPageClient() {
       items: Array<{ key: string; value: string }>
     }) => {
       if (!editInitialValues) {
-        throw new Error("编辑上下文丢失，请重新打开编辑弹窗")
+        throw new Error(editContextLost)
       }
 
       await updateSecret({
@@ -334,7 +345,7 @@ export function SecretsPageClient() {
       })
       await refreshRows(false)
     },
-    [editInitialValues, refreshRows]
+    [editInitialValues, refreshRows, editContextLost]
   )
 
   React.useEffect(() => {
@@ -361,7 +372,7 @@ export function SecretsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{loadFailedTitle}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -419,7 +430,7 @@ export function SecretsPageClient() {
         onSubmit={handleEditSubmit}
       />
       <MonacoViewerDialog
-        title="查看YAML"
+        title={viewYamlTitle}
         subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
@@ -433,10 +444,10 @@ export function SecretsPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除保密字典"
+        title={deleteTitle}
         description={
           pendingDeleteRow
-            ? `确定删除保密字典 ${pendingDeleteRow.name} 吗？`
+            ? t("secretsDialog.deleteDesc", { name: pendingDeleteRow.name })
             : ""
         }
         deleting={deleting}

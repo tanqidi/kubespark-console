@@ -95,7 +95,11 @@ export function CustomResourcesPageClient() {
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [yamlContent, setYamlContent] = React.useState("")
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState(t("customResourcesDialog.yamlSubtitle"))
+
+  // 先获取翻译的字符串，避免在 React 元素内直接调用 t 函数导致下拉菜单问题
+  const viewYamlText = t("actions.viewYaml")
+  const deleteText = t("actions.delete")
 
   const requestDelete = React.useCallback((row: CustomResourceRow) => {
     setPendingDeleteRow(row)
@@ -110,85 +114,89 @@ export function CustomResourcesPageClient() {
         setPendingDeleteRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("customResourcesDialog.deleteFailed")
         setError(message)
       })
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeleteRow])
+  }, [deleting, pendingDeleteRow, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: CustomResourceRow[]) => {
     if (selectedRows.length === 0) return
     void Promise.all(selectedRows.map((row) => deleteCustomResourceDefinition(row.name))).catch(
       (e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("customResourcesDialog.deleteFailed")
         setError(message)
       }
     )
-  }, [])
+  }, [t])
+
+  // 将 handleViewYaml 提取出来，避免在 actionItems 内联定义导致每次渲染重新创建
+  const handleViewYaml = React.useCallback((row: CustomResourceRow) => {
+    const name = row.name.trim()
+    if (!name || name === "-") return
+
+    setYamlOpen(true)
+    setYamlLoading(true)
+    setYamlError(null)
+    setYamlContent("")
+    setYamlSubtitle(t("customResourcesDialog.yamlSubtitleWithName", { name }))
+
+    void fetchResourceByName<unknown>(
+      "apiextensions.k8s.io",
+      "v1",
+      "customresourcedefinitions",
+      name
+    )
+      .then(({ payload }) => {
+        const sanitizedPayload = sanitizeCustomResourceDefinitionYamlPayload(payload)
+        setYamlContent(
+          stringify(sanitizedPayload, {
+            indent: 2,
+            lineWidth: 0,
+            sortMapEntries: false,
+          })
+        )
+      })
+      .catch((e: unknown) => {
+        setYamlError(e instanceof Error ? e.message : t("customResourcesDialog.loadYamlFailed"))
+      })
+      .finally(() => {
+        setYamlLoading(false)
+      })
+  }, [t])
+
+  // 单独提取 actionItems，避免下拉菜单重新挂载
+  const actionItems = React.useMemo(() => [
+    {
+      label: (
+        <>
+          <IconEye className="size-4" />
+          {viewYamlText}
+        </>
+      ),
+      onSelect: (row: CustomResourceRow) => handleViewYaml(row),
+    },
+    {
+      label: (
+        <>
+          <IconTrash className="size-4" />
+          {deleteText}
+        </>
+      ),
+      variant: "destructive" as const,
+      onSelect: (row: CustomResourceRow) => requestDelete(row),
+    },
+  ], [handleViewYaml, requestDelete, viewYamlText, deleteText])
 
   const columns = React.useMemo(
     () =>
       createColumns<CustomResourceRow>({
         columns: getCustomResourceColumns(t),
-        actionItems: [
-          {
-            label: (
-              <>
-                <IconEye className="size-4" />
-                {t("table.actions.viewYaml")}
-              </>
-            ),
-            onSelect: (row) => {
-              const name = row.name.trim()
-              if (!name || name === "-") return
-
-              setYamlOpen(true)
-              setYamlLoading(true)
-              setYamlError(null)
-              setYamlContent("")
-              setYamlSubtitle(`查看 CRD（${name}）的 YAML 内容。`)
-
-              void fetchResourceByName<unknown>(
-                "apiextensions.k8s.io",
-                "v1",
-                "customresourcedefinitions",
-                name
-              )
-                .then(({ payload }) => {
-                  const sanitizedPayload = sanitizeCustomResourceDefinitionYamlPayload(payload)
-                  setYamlContent(
-                    stringify(sanitizedPayload, {
-                      indent: 2,
-                      lineWidth: 0,
-                      sortMapEntries: false,
-                    })
-                  )
-                })
-                .catch((e: unknown) => {
-                  setYamlError(e instanceof Error ? e.message : "加载 YAML 失败")
-                })
-                .finally(() => {
-                  setYamlLoading(false)
-                })
-            },
-          },
-          {
-            label: (
-              <>
-                <IconTrash className="size-4" />
-                {t("table.actions.delete")}
-              </>
-            ),
-            variant: "destructive",
-            onSelect: (row) => {
-              requestDelete(row)
-            },
-          },
-        ],
+        actionItems,
       }),
-    [requestDelete, t]
+    [actionItems, t]
   )
 
   React.useEffect(() => {

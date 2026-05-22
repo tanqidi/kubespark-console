@@ -72,7 +72,7 @@ export function ConfigMapsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState(t("configMapsDialog.yamlSubtitle"))
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<ConfigMapRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
@@ -80,12 +80,17 @@ export function ConfigMapsPageClient() {
   const [editInitialValues, setEditInitialValues] = React.useState<KeyValueDialogInitialValues | null>(null)
   const isMountedRef = React.useRef(true)
 
+  // 先获取翻译的字符串，避免在 React 元素内直接调用 t 函数导致下拉菜单问题
+  const viewYamlText = t("actions.viewYaml")
+  const editText = t("actions.edit")
+  const deleteText = t("actions.delete")
+
   const handleViewYaml = React.useCallback((row: ConfigMapRow) => {
     setYamlOpen(true)
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes ConfigMap（${row.namespace}/${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("configMapsDialog.yamlSubtitleWithName", { name: `${row.namespace}/${row.name}` }))
 
     void fetchNamespacedResourceYaml("configmaps", row.namespace, row.name, {
       documentType: "configmap",
@@ -98,7 +103,7 @@ export function ConfigMapsPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("configMapsDialog.loadYamlFailed")
         setYamlError(message)
         console.error("[ConfigMaps] view yaml request failed", {
           configmap: { name: row.name, namespace: row.namespace },
@@ -108,7 +113,7 @@ export function ConfigMapsPageClient() {
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const requestDelete = React.useCallback((row: ConfigMapRow) => {
     setPendingDeleteRow(row)
@@ -144,10 +149,10 @@ export function ConfigMapsPageClient() {
         setEditDialogOpen(true)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载配置字典详情失败"
+        const message = e instanceof Error ? e.message : t("configMapsDialog.loadDetailsFailed")
         setError(message)
       })
-  }, [])
+  }, [t])
 
   const handleConfirmDelete = React.useCallback(() => {
     if (!pendingDeleteRow || deleting) return
@@ -158,7 +163,7 @@ export function ConfigMapsPageClient() {
         setPendingDeleteRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("configMapsDialog.deleteFailed")
         setError(message)
         console.error("[ConfigMaps] delete request failed", {
           configmap: { name: pendingDeleteRow.name, namespace: pendingDeleteRow.namespace },
@@ -168,62 +173,59 @@ export function ConfigMapsPageClient() {
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeleteRow])
+  }, [deleting, pendingDeleteRow, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: ConfigMapRow[]) => {
     if (selectedRows.length === 0) return
     void Promise.all(
       selectedRows.map((row) => deleteConfigMap(row.namespace, row.name))
     ).catch((e: unknown) => {
-      const message = e instanceof Error ? e.message : "删除失败"
+      const message = e instanceof Error ? e.message : t("configMapsDialog.deleteFailed")
       setError(message)
       console.error("[ConfigMaps] bulk delete request failed", e)
     })
-  }, [])
+  }, [t])
+
+  // 单独提取 actionItems，避免下拉菜单重新挂载
+  const actionItems = React.useMemo(() => [
+    {
+      label: (
+        <>
+          <IconEye className="size-4" />
+          {viewYamlText}
+        </>
+      ),
+      onSelect: (row: ConfigMapRow) => handleViewYaml(row),
+    },
+    {
+      label: (
+        <>
+          <IconPencil className="size-4" />
+          {editText}
+        </>
+      ),
+      onSelect: (row: ConfigMapRow) => handleEdit(row),
+    },
+    {
+      label: (
+        <>
+          <IconTrash className="size-4" />
+          {deleteText}
+        </>
+      ),
+      variant: "destructive" as const,
+      withSeparator: true,
+      onSelect: (row: ConfigMapRow) => requestDelete(row),
+    },
+  ], [handleEdit, handleViewYaml, requestDelete, viewYamlText, editText, deleteText])
 
   const columns = React.useMemo(
     () =>
       createColumns<ConfigMapRow>({
         columns: getConfigMapColumns(t),
-        actionItems: [
-          {
-            label: (
-              <>
-                <IconEye className="size-4" />
-                {t("table.actions.viewYaml")}
-              </>
-            ),
-            onSelect: (row) => {
-              handleViewYaml(row)
-            },
-          },
-          {
-            label: (
-              <>
-                <IconPencil className="size-4" />
-                {t("table.actions.edit")}
-              </>
-            ),
-            onSelect: (row) => {
-              handleEdit(row)
-            },
-          },
-          {
-            label: (
-              <>
-                <IconTrash className="size-4" />
-                {t("table.actions.delete")}
-              </>
-            ),
-            variant: "destructive",
-            withSeparator: true,
-            onSelect: (row) => {
-              requestDelete(row)
-            },
-          },
-        ],
+        actionItems,
       }),
-    [handleEdit, handleViewYaml, requestDelete, t]
+    [actionItems, t]
   )
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
@@ -297,7 +299,7 @@ export function ConfigMapsPageClient() {
       items: Array<{ key: string; value: string }>
     }) => {
       if (!editInitialValues) {
-        throw new Error("编辑上下文丢失，请重新打开编辑弹窗")
+        throw new Error(t("configMapsDialog.editContextLost"))
       }
 
       await updateConfigMap({
@@ -310,7 +312,7 @@ export function ConfigMapsPageClient() {
       })
       await refreshRows(false)
     },
-    [editInitialValues, refreshRows]
+    [editInitialValues, refreshRows, t]
   )
 
   React.useEffect(() => {

@@ -91,14 +91,14 @@ function getProjectColumns(t: (key: string) => string): ColumnConfig<NamespaceRo
   return [
     {
       key: "name",
-      label: t("projectsDialog.tableColumns.name"),
+      label: t("table.columns.name"),
       cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
       enableHiding: false,
     },
-    { key: "status", label: t("projectsDialog.tableColumns.status"), render: "status" },
-    { key: "workspace", label: t("projectsDialog.tableColumns.workspace") },
-    { key: "age", label: t("projectsDialog.tableColumns.age") },
-    { key: "updatedAt", label: t("projectsDialog.tableColumns.updatedAt") },
+    { key: "status", label: t("table.columns.status"), render: "status" },
+    { key: "workspace", label: t("table.columns.workspace") },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
   ]
 }
 
@@ -106,13 +106,13 @@ function getPipelineProjectColumns(t: (key: string) => string): ColumnConfig<Pip
   return [
     {
       key: "name",
-      label: t("projectsDialog.tableColumns.name"),
+      label: t("table.columns.name"),
       cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
       enableHiding: false,
     },
-    { key: "workspace", label: t("projectsDialog.tableColumns.workspace") },
-    { key: "age", label: t("projectsDialog.tableColumns.age") },
-    { key: "updatedAt", label: t("projectsDialog.tableColumns.updatedAt") },
+    { key: "workspace", label: t("table.columns.workspace") },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
   ]
 }
 
@@ -1231,36 +1231,41 @@ export function ProjectsPageClient() {
     [handleViewPipelineYaml, openPipelineProjectEditDialog, t]
   )
 
+  // 提取成 useCallback，避免频繁重新创建导致的死循环
+  const refreshRows = React.useCallback(async (silent: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
+    try {
+      const [namespaceRows, pipelineProjectItems] = await Promise.all([
+        fetchNamespaces(),
+        fetchPipelineProjectRows(),
+      ])
+      const items = await mergeRowsWithWorkspaceBindings(namespaceRows)
+      setRows(items)
+      setPipelineRows(pipelineProjectItems)
+      setError(null)
+    } catch (e: unknown) {
+      if (!silent) {
+        setRows([])
+        setPipelineRows([])
+        const message = e instanceof Error ? e.message : "API request failed"
+        setError(message)
+      } else {
+        console.error("[Projects] polling refresh failed", e)
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [mergeRowsWithWorkspaceBindings])
+
   React.useEffect(() => {
     let cancelled = false
 
     const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const [namespaceRows, pipelineProjectItems] = await Promise.all([
-          fetchNamespaces(),
-          fetchPipelineProjectRows(),
-        ])
-        const items = await mergeRowsWithWorkspaceBindings(namespaceRows)
-        if (cancelled) return
-        setRows(items)
-        setPipelineRows(pipelineProjectItems)
-        setError(null)
-      } catch (e: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setRows([])
-          setPipelineRows([])
-          setError(e instanceof Error ? e.message : t("projectsDialog.loadFailed"))
-        } else {
-          console.error("[Projects] polling refresh failed", e)
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
+      if (cancelled) return
+      await refreshRows(silent)
     }
 
     void loadRows(false)
@@ -1286,7 +1291,7 @@ export function ProjectsPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [mergeRowsWithWorkspaceBindings, t])
+  }, [refreshRows])
 
   const query = nameQuery.trim().toLowerCase()
   const selectedWorkspace = workspaceQuery.trim()
