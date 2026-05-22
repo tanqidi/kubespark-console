@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import {
@@ -360,7 +360,7 @@ export function CreateJobDialog({
         const message =
           error instanceof Error && error.message
             ? error.message
-            : "加载配置字典/保密字典失败"
+            : t("jobDialog.loadConfigFailed")
         setConfigResourceError(message)
         setConfigMapNameOptions([])
         setSecretNameOptions([])
@@ -799,61 +799,61 @@ export function CreateJobDialog({
             ) : isStrategyStep ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">策略设置</h3>
+                  <h3 className="text-[15px] font-semibold">{t("jobDialog.strategySettings")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    配置任务重试、并发与超时策略。全部为选填，留空将使用默认值。
+                    {t("jobDialog.strategySettingsDesc")}
                   </p>
                 </div>
 
                 <FieldGroup className="grid gap-6 md:grid-cols-2">
                   <Field>
-                    <FieldLabel htmlFor="create-job-backoff-limit">最大重试次数</FieldLabel>
+                    <FieldLabel htmlFor="create-job-backoff-limit">{t("jobDialog.backoffLimit")}</FieldLabel>
                     <Input
                       id="create-job-backoff-limit"
                       value={backoffLimit}
                       onChange={(event) => setBackoffLimit(normalizeIntegerInput(event.target.value))}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder="6"
+                      placeholder={t("jobDialog.backoffLimitPlaceholder")}
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      失败前最多可重试的次数。留空时按系统默认策略处理。
+                      {t("jobDialog.backoffLimitHint")}
                     </FieldDescription>
                   </Field>
 
                   <Field>
-                    <FieldLabel htmlFor="create-job-completions">容器组完成数量</FieldLabel>
+                    <FieldLabel htmlFor="create-job-completions">{t("jobDialog.completions")}</FieldLabel>
                     <Input
                       id="create-job-completions"
                       value={completions}
                       onChange={(event) => setCompletions(normalizeIntegerInput(event.target.value))}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder="1"
+                      placeholder={t("jobDialog.completionsPlaceholder")}
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      任务完成所需的成功执行次数。未填写则使用平台默认行为。
+                      {t("jobDialog.completionsHint")}
                     </FieldDescription>
                   </Field>
 
                   <Field>
-                    <FieldLabel htmlFor="create-job-parallelism">并行容器组数量</FieldLabel>
+                    <FieldLabel htmlFor="create-job-parallelism">{t("jobDialog.parallelism")}</FieldLabel>
                     <Input
                       id="create-job-parallelism"
                       value={parallelism}
                       onChange={(event) => setParallelism(normalizeIntegerInput(event.target.value))}
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder="1"
+                      placeholder={t("jobDialog.parallelismPlaceholder")}
                       disabled={isBusy}
                     />
-                    <FieldDescription>同一时刻允许并发运行的容器组数量。</FieldDescription>
+                    <FieldDescription>{t("jobDialog.parallelismHint")}</FieldDescription>
                   </Field>
 
                   <Field>
-                    <FieldLabel htmlFor="create-job-active-deadline">最大运行时间（s）</FieldLabel>
+                    <FieldLabel htmlFor="create-job-active-deadline">{t("jobDialog.activeDeadlineSeconds")}</FieldLabel>
                     <Input
                       id="create-job-active-deadline"
                       value={activeDeadlineSeconds}
@@ -862,11 +862,11 @@ export function CreateJobDialog({
                       }
                       inputMode="numeric"
                       autoComplete="off"
-                      placeholder="3600"
+                      placeholder={t("jobDialog.activeDeadlineSecondsPlaceholder")}
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      限制任务最长运行秒数，超时后任务会被系统终止。
+                      {t("jobDialog.activeDeadlineSecondsHint")}
                     </FieldDescription>
                   </Field>
                 </FieldGroup>
@@ -874,15 +874,15 @@ export function CreateJobDialog({
             ) : isPodStep ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">容器组设置</h3>
+                  <h3 className="text-[15px] font-semibold">{t("jobDialog.podSettings")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    配置容器组重启行为与容器镜像信息。至少可添加一条容器配置。
+                    {t("jobDialog.podSettingsDesc")}
                   </p>
                 </div>
 
                 <FieldGroup className="flex flex-col gap-6">
                   <Field>
-                    <FieldLabel htmlFor="create-job-restart-policy">重启策略</FieldLabel>
+                    <FieldLabel htmlFor="create-job-restart-policy">{t("jobDialog.restartPolicy")}</FieldLabel>
                     <Select
                       value={restartPolicy}
                       onValueChange={(value) => {
@@ -897,13 +897,13 @@ export function CreateJobDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="Never">重新创建容器组</SelectItem>
-                          <SelectItem value="OnFailure">重启容器</SelectItem>
+                          <SelectItem value="Never">{t("jobDialog.restartPolicyNever")}</SelectItem>
+                          <SelectItem value="OnFailure">{t("jobDialog.restartPolicyOnFailure")}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FieldDescription>
-                      容器退出后采用的处理方式。默认使用“重新创建容器组”。
+                      {t("jobDialog.restartPolicyHint")}
                     </FieldDescription>
                   </Field>
 
@@ -921,15 +921,15 @@ export function CreateJobDialog({
             ) : isStorageStep ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">存储设置</h3>
+                  <h3 className="text-[15px] font-semibold">{t("jobDialog.storageSettings")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    配置卷挂载与配置挂载，支持在当前页面直接录入并保存。
+                    {t("jobDialog.storageSettingsDesc")}
                   </p>
                 </div>
                 {isEditingStorageView ? (
                   <FieldGroup className="flex flex-col gap-6">
                     <Field>
-                      <FieldLabel>卷类型</FieldLabel>
+                      <FieldLabel>{t("jobDialog.volumeType")}</FieldLabel>
                       <Tabs
                         value={storageVolumeDraft.volumeKind}
                         onValueChange={(value) => {
@@ -941,9 +941,9 @@ export function CreateJobDialog({
                         }}
                       >
                         <TabsList className="grid w-full max-w-xl grid-cols-3">
-                          <TabsTrigger value="persistent">持久卷</TabsTrigger>
-                          <TabsTrigger value="ephemeral">临时卷</TabsTrigger>
-                          <TabsTrigger value="hostPath">HostPath 卷</TabsTrigger>
+                          <TabsTrigger value="persistent">{t("jobDialog.persistent")}</TabsTrigger>
+                          <TabsTrigger value="ephemeral">{t("jobDialog.ephemeral")}</TabsTrigger>
+                          <TabsTrigger value="hostPath">{t("jobDialog.hostPath")}</TabsTrigger>
                         </TabsList>
                       </Tabs>
                     </Field>
@@ -951,12 +951,12 @@ export function CreateJobDialog({
                     {storageVolumeDraft.volumeKind === "persistent" ? (
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <Field>
-                          <FieldLabel htmlFor="create-job-storage-volume-id">卷名称</FieldLabel>
+                          <FieldLabel htmlFor="create-job-storage-volume-id">{t("jobDialog.volumeName")}</FieldLabel>
                           <Input
                             id="create-job-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="volume-data"
+                            placeholder={t("jobDialog.volumeNamePlaceholder")}
                             autoComplete="off"
                             aria-invalid={
                               (storageSaveAttempted && isPersistentVolumeIdEmpty) ||
@@ -965,17 +965,17 @@ export function CreateJobDialog({
                           />
                           {hasDuplicateStorageSelection ? (
                             <FieldDescription className="text-destructive">
-                              卷名称已存在，请回到上方已添加条目中编辑。
+                              {t("jobDialog.volumeNameDuplicate")}
                             </FieldDescription>
                           ) : storageSaveAttempted && isPersistentVolumeIdEmpty ? (
                             <FieldDescription className="text-destructive">
-                              请输入卷名称，或点击取消返回。
+                              {t("jobDialog.volumeNameRequired")}
                             </FieldDescription>
                           ) : null}
                         </Field>
 
                         <Field>
-                          <FieldLabel htmlFor="create-job-storage-volume-name">选择 PVC</FieldLabel>
+                          <FieldLabel htmlFor="create-job-storage-volume-name">{t("jobDialog.selectPvc")}</FieldLabel>
                           <Select
                             value={storageVolumeDraft.volumeName}
                             onValueChange={(value) => {
@@ -995,8 +995,8 @@ export function CreateJobDialog({
                               <SelectValue
                                 placeholder={
                                   persistentVolumeNameLoading
-                                    ? "PVC 加载中..."
-                                    : "请选择 PVC"
+                                    ? t("jobDialog.pvcLoading")
+                                    : t("jobDialog.selectPvcPlaceholder")
                                 }
                               />
                             </SelectTrigger>
@@ -1017,22 +1017,22 @@ export function CreateJobDialog({
                             <FieldDescription className="text-destructive">{persistentVolumeNameError}</FieldDescription>
                           ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
                             <FieldDescription className="text-destructive">
-                              请选择 PVC，或点击取消返回。
+                              {t("jobDialog.pvcRequired")}
                             </FieldDescription>
                           ) : volumeNameOptions.length === 0 && !persistentVolumeNameLoading ? (
-                            <FieldDescription>当前命名空间暂无可选 PVC。</FieldDescription>
+                            <FieldDescription>{t("jobDialog.noPvc")}</FieldDescription>
                           ) : null}
                         </Field>
                       </div>
                     ) : storageVolumeDraft.volumeKind === "hostPath" ? (
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <Field>
-                          <FieldLabel htmlFor="create-job-storage-volume-id">卷名称</FieldLabel>
+                          <FieldLabel htmlFor="create-job-storage-volume-id">{t("jobDialog.volumeName")}</FieldLabel>
                           <Input
                             id="create-job-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="test3"
+                            placeholder={t("jobDialog.volumeNamePlaceholder")}
                             autoComplete="off"
                             aria-invalid={
                               (storageSaveAttempted && isHostPathVolumeIdEmpty) ||
@@ -1041,34 +1041,34 @@ export function CreateJobDialog({
                           />
                           {hasDuplicateStorageSelection ? (
                             <FieldDescription className="text-destructive">
-                              卷名称已存在，请回到上方已添加条目中编辑。
+                              {t("jobDialog.volumeNameDuplicate")}
                             </FieldDescription>
                           ) : storageSaveAttempted && isHostPathVolumeIdEmpty ? (
                             <FieldDescription className="text-destructive">
-                              请输入卷名称，或点击取消返回。
+                              {t("jobDialog.volumeNameRequired")}
                             </FieldDescription>
                           ) : null}
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="create-job-storage-volume-name">主机路径</FieldLabel>
+                          <FieldLabel htmlFor="create-job-storage-volume-name">{t("jobDialog.hostPath")}</FieldLabel>
                           <Input
                             id="create-job-storage-volume-name"
                             value={storageVolumeDraft.volumeName}
                             onChange={(event) => updateStorageVolumeDraft("volumeName", event.target.value)}
-                            placeholder="/test3"
+                            placeholder={t("jobDialog.hostPathPlaceholder")}
                             autoComplete="off"
                             aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                           />
                           {storageSaveAttempted && isStorageVolumeNameEmpty ? (
                             <FieldDescription className="text-destructive">
-                              请输入主机路径，或点击取消返回。
+                              {t("jobDialog.volumeNameRequired")}
                             </FieldDescription>
                           ) : null}
                         </Field>
                       </div>
                     ) : (
                       <Field>
-                        <FieldLabel htmlFor="create-job-storage-volume-name">卷名称</FieldLabel>
+                        <FieldLabel htmlFor="create-job-storage-volume-name">{t("jobDialog.volumeName")}</FieldLabel>
                         <Input
                           id="create-job-storage-volume-name"
                           value={storageVolumeDraft.volumeName}
@@ -1077,13 +1077,13 @@ export function CreateJobDialog({
                             updateStorageVolumeDraft("volumeName", value)
                             updateStorageVolumeDraft("volumeId", value)
                           }}
-                          placeholder="test2"
+                          placeholder={t("jobDialog.volumeNamePlaceholder")}
                           autoComplete="off"
                           aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                         />
                         {storageSaveAttempted && isStorageVolumeNameEmpty ? (
                           <FieldDescription className="text-destructive">
-                            请输入卷名称，或点击取消返回。
+                            {t("jobDialog.volumeNameRequired")}
                           </FieldDescription>
                         ) : null}
                       </Field>
@@ -1091,9 +1091,9 @@ export function CreateJobDialog({
 
                     <div className="flex flex-col gap-3">
                       <div className="grid grid-cols-3 gap-4">
-                        <FieldLabel>容器</FieldLabel>
-                        <FieldLabel>挂载模式</FieldLabel>
-                        <FieldLabel>挂载路径</FieldLabel>
+                        <FieldLabel>{t("jobDialog.container")}</FieldLabel>
+                        <FieldLabel>{t("jobDialog.mountMode")}</FieldLabel>
+                        <FieldLabel>{t("jobDialog.mountPath")}</FieldLabel>
                       </div>
                       <div className="flex flex-col gap-3">
                         {storageVolumeDraft.mounts.map((item, index) => (
@@ -1114,16 +1114,16 @@ export function CreateJobDialog({
                             >
                               <SelectTrigger
                                 id={`create-job-storage-mode-${index}`}
-                                aria-label="挂载模式"
+                                aria-label={t("jobDialog.mountMode")}
                                 className="w-full"
                               >
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
-                                  <SelectItem value="none">不挂载</SelectItem>
-                                  <SelectItem value="ro">只读</SelectItem>
-                                  <SelectItem value="rw">读写</SelectItem>
+                                  <SelectItem value="none">{t("jobDialog.notMounted")}</SelectItem>
+                                  <SelectItem value="ro">{t("jobDialog.readOnly")}</SelectItem>
+                                  <SelectItem value="rw">{t("jobDialog.readWrite")}</SelectItem>
                                 </SelectGroup>
                               </SelectContent>
                             </Select>
@@ -1133,7 +1133,7 @@ export function CreateJobDialog({
                               onChange={(event) =>
                                 updateStorageVolumeMount(item.containerName, "mountPath", event.target.value)
                               }
-                              placeholder="/etc/config"
+                              placeholder={t("jobDialog.mountPathPlaceholder")}
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1145,7 +1145,7 @@ export function CreateJobDialog({
                 ) : isEditingConfigMountView ? (
                   <FieldGroup className="flex flex-col gap-6">
                     <Field>
-                      <FieldLabel>挂载来源类型</FieldLabel>
+                      <FieldLabel>{t("jobDialog.mountSourceType")}</FieldLabel>
                       <Tabs
                         value={configMountDraft.sourceKind}
                         onValueChange={(value) => {
@@ -1156,15 +1156,15 @@ export function CreateJobDialog({
                         }}
                       >
                         <TabsList className="grid w-full max-w-xl grid-cols-2">
-                          <TabsTrigger value="configMap">配置字典</TabsTrigger>
-                          <TabsTrigger value="secret">保密字典</TabsTrigger>
+                          <TabsTrigger value="configMap">{t("jobDialog.configMap")}</TabsTrigger>
+                          <TabsTrigger value="secret">{t("jobDialog.secret")}</TabsTrigger>
                         </TabsList>
                       </Tabs>
                     </Field>
 
                     <Field>
                       <FieldLabel htmlFor="create-job-config-mount-name">
-                        {configMountDraft.sourceKind === "configMap" ? "选择配置字典" : "选择保密字典"}
+                        {configMountDraft.sourceKind === "configMap" ? t("jobDialog.selectConfigMap") : t("jobDialog.selectSecret")}
                       </FieldLabel>
                       <Select
                         value={configMountDraft.sourceName}
@@ -1181,10 +1181,10 @@ export function CreateJobDialog({
                           <SelectValue
                             placeholder={
                               configResourceLoading
-                                ? "资源加载中..."
+                                ? t("jobDialog.configLoading")
                                 : configMountDraft.sourceKind === "configMap"
-                                  ? "请选择配置字典"
-                                  : "请选择保密字典"
+                                  ? t("jobDialog.selectConfigMap")
+                                  : t("jobDialog.selectSecret")
                             }
                           />
                         </SelectTrigger>
@@ -1202,24 +1202,24 @@ export function CreateJobDialog({
                         <FieldDescription className="text-destructive">{configResourceError}</FieldDescription>
                       ) : configMountSaveAttempted && isConfigSourceNameEmpty ? (
                         <FieldDescription className="text-destructive">
-                          请选择资源，或点击取消返回。
+                          {t("jobDialog.configRequired")}
                         </FieldDescription>
                       ) : configSourceNameOptions.length === 0 && !configResourceLoading ? (
                         <FieldDescription>
-                          当前命名空间暂无可选{configMountDraft.sourceKind === "configMap" ? "配置字典" : "保密字典"}。
+                          {t("jobDialog.noConfig").replace("{type}", configMountDraft.sourceKind === "configMap" ? t("jobDialog.configMap") : t("jobDialog.secret"))}
                         </FieldDescription>
                       ) : (
                         <FieldDescription>
-                          将{configMountDraft.sourceKind === "configMap" ? "配置字典" : "保密字典"}挂载到容器。
+                          {t("jobDialog.mountHint").replace("{type}", configMountDraft.sourceKind === "configMap" ? t("jobDialog.configMap") : t("jobDialog.secret"))}
                         </FieldDescription>
                       )}
                     </Field>
 
                     <div className="flex flex-col gap-3">
                       <div className="grid grid-cols-3 gap-4">
-                        <FieldLabel>容器</FieldLabel>
-                        <FieldLabel>挂载模式</FieldLabel>
-                        <FieldLabel>挂载路径</FieldLabel>
+                        <FieldLabel>{t("jobDialog.container")}</FieldLabel>
+                        <FieldLabel>{t("jobDialog.mountMode")}</FieldLabel>
+                        <FieldLabel>{t("jobDialog.mountPath")}</FieldLabel>
                       </div>
                       <div className="flex flex-col gap-3">
                         {configMountDraft.mounts.map((item, index) => (
@@ -1240,15 +1240,15 @@ export function CreateJobDialog({
                             >
                               <SelectTrigger
                                 id={`create-job-config-mode-${index}`}
-                                aria-label="挂载模式"
+                                aria-label={t("jobDialog.mountMode")}
                                 className="w-full"
                               >
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
-                                  <SelectItem value="none">不挂载</SelectItem>
-                                  <SelectItem value="ro">只读</SelectItem>
+                                  <SelectItem value="none">{t("jobDialog.notMounted")}</SelectItem>
+                                  <SelectItem value="ro">{t("jobDialog.readOnly")}</SelectItem>
                                 </SelectGroup>
                               </SelectContent>
                             </Select>
@@ -1258,7 +1258,7 @@ export function CreateJobDialog({
                               onChange={(event) =>
                                 updateConfigMountDraftMount(item.containerName, "mountPath", event.target.value)
                               }
-                              placeholder="/etc/config"
+                              placeholder={t("jobDialog.mountPathPlaceholder")}
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1270,7 +1270,7 @@ export function CreateJobDialog({
                 ) : (
                   <FieldGroup className="flex flex-col gap-6">
                     <Field>
-                      <FieldLabel>挂载卷</FieldLabel>
+                      <FieldLabel>{t("jobDialog.addStorage")}</FieldLabel>
                       <StorageVolumeList
                         items={savedStorageVolumes}
                         onEdit={startEditStorageVolume}
@@ -1281,7 +1281,7 @@ export function CreateJobDialog({
                     </Field>
 
                     <Field>
-                      <FieldLabel>挂载配置字典或保密字典</FieldLabel>
+                      <FieldLabel>{t("jobDialog.addConfigMount")}</FieldLabel>
                       <div className="flex flex-col gap-3">
                         {savedConfigMounts.length > 0 ? (
                           savedConfigMounts.map((item, index) => (
@@ -1294,9 +1294,9 @@ export function CreateJobDialog({
                               <ItemContent className="min-w-0">
                                 <ItemTitle className="min-w-0 truncate">{item.sourceName}</ItemTitle>
                                 <ItemDescription className="min-w-0 truncate">
-                                  {(item.sourceKind === "configMap" ? "配置字典" : "保密字典") +
+                                  {(item.sourceKind === "configMap" ? t("jobDialog.configMap") : t("jobDialog.secret")) +
                                     " · " +
-                                    `${item.mounts.filter((mount) => mount.mountMode !== "none" && mount.mountPath.trim().length > 0).length} 个容器已配置`}
+                                    `${item.mounts.filter((mount) => mount.mountMode !== "none" && mount.mountPath.trim().length > 0).length} ${t("jobDialog.configMounted")}`}
                                 </ItemDescription>
                               </ItemContent>
                               <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
@@ -1311,7 +1311,7 @@ export function CreateJobDialog({
                                   disabled={isBusy}
                                 >
                                   <IconPencil data-icon="inline-start" />
-                                  编辑
+                                  {t("actions.edit")}
                                 </Button>
                                 <Button
                                   type="button"
@@ -1324,16 +1324,16 @@ export function CreateJobDialog({
                                   disabled={isBusy}
                                 >
                                   <IconTrash data-icon="inline-start" />
-                                  删除
+                                  {t("actions.delete")}
                                 </Button>
                               </ItemActions>
                             </Item>
                           ))
                         ) : (
                           <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                            <div className="text-sm font-semibold">暂无配置挂载</div>
+                            <div className="text-sm font-semibold">{t("jobDialog.noConfigMounts")}</div>
                             <div className="mt-1 text-sm text-muted-foreground">
-                              可挂载配置字典或保密字典内容到容器。
+                              {t("jobDialog.addConfigMountDesc")}
                             </div>
                           </div>
                         )}
@@ -1344,9 +1344,9 @@ export function CreateJobDialog({
                           onClick={startAddConfigMount}
                           disabled={isBusy}
                         >
-                          <span className="text-sm font-semibold">添加配置挂载</span>
+                          <span className="text-sm font-semibold">{t("jobDialog.addConfigMountLabel")}</span>
                           <span className="mt-1 text-sm text-muted-foreground">
-                            新增一条配置字典/保密字典挂载配置。
+                            {t("jobDialog.addConfigMountDesc2")}
                           </span>
                         </button>
                       </div>
@@ -1357,7 +1357,7 @@ export function CreateJobDialog({
             ) : (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">高级设置</h3>
+                  <h3 className="text-[15px] font-semibold">{t("jobDialog.advancedSettings")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
                 </div>
                 <FieldGroup className="grid gap-4 md:grid-cols-2">
@@ -1372,7 +1372,7 @@ export function CreateJobDialog({
                       description={description}
                       setDescription={setDescription}
                       disabled={isBusy}
-                      titleText="统一管理任务的标签与注解信息。"
+                      titleText={t("workloadDialog.advancedSettingsDesc")}
                     />
                   </Field>
                 </FieldGroup>
@@ -1388,10 +1388,10 @@ export function CreateJobDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelYamlMode} disabled={isBusy}>
-                  取消
+                  {t("jobDialog.cancel")}
                 </Button>
                 <Button type="button" onClick={confirmYamlMode} disabled={isBusy}>
-                  确认保存
+                  {t("jobDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1399,14 +1399,14 @@ export function CreateJobDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelEditStorageVolume} disabled={isBusy}>
-                  取消
+                  {t("jobDialog.cancel")}
                 </Button>
                 <Button
                   type="button"
                   onClick={handleConfirmStorageSave}
                   disabled={isBusy || hasDuplicateStorageSelection}
                 >
-                  确认保存
+                  {t("jobDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1414,14 +1414,14 @@ export function CreateJobDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelEditConfigMount} disabled={isBusy}>
-                  取消
+                  {t("jobDialog.cancel")}
                 </Button>
                 <Button
                   type="button"
                   onClick={confirmEditConfigMount}
                   disabled={isBusy || isConfigSourceNameEmpty}
                 >
-                  确认保存
+                  {t("jobDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1430,11 +1430,11 @@ export function CreateJobDialog({
               <div className="flex w-full items-center justify-between gap-3">
                 <DialogClose asChild>
                   <Button type="button" variant="outline" disabled={isBusy}>
-                    取消
+                    {t("jobDialog.cancel")}
                   </Button>
                 </DialogClose>
                 <Button type="button" onClick={() => void goNext()} disabled={isBusy}>
-                  {checkingNext ? "校验中..." : "下一步"}
+                  {checkingNext ? t("jobDialog.checking") : t("jobDialog.nextStep")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1442,10 +1442,10 @@ export function CreateJobDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={goPrev} disabled={isBusy}>
-                  上一步
+                  {t("jobDialog.previousStep")}
                 </Button>
                 <Button type="button" onClick={() => void handleCreate(savedConfigMounts)} disabled={isBusy}>
-                  {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  {creating ? (isEditMode ? t("jobDialog.saving") : t("jobDialog.creating")) : isEditMode ? t("jobDialog.save") : t("jobDialog.create")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1453,10 +1453,10 @@ export function CreateJobDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={goPrev} disabled={!canNavigateStorageView}>
-                  上一步
+                  {t("jobDialog.previousStep")}
                 </Button>
                 <Button type="button" onClick={() => void goNext()} disabled={!canNavigateStorageView}>
-                  下一步
+                  {t("jobDialog.nextStep")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1511,10 +1511,10 @@ export function CreateJobDialog({
           onOpenChange={(nextOpen) => {
             if (!nextOpen) setPendingDeleteContainerId(null)
           }}
-          title="删除容器"
+          title={t("jobDialog.deleteContainer")}
           description={
             pendingDeleteContainer
-              ? `确定删除容器 ${pendingDeleteContainer.name.trim() || "未命名容器"} 吗？`
+              ? t("jobDialog.confirmDeleteContainer").replace("{name}", pendingDeleteContainer.name.trim() || t("jobDialog.unnamedContainer"))
               : ""
           }
           deleting={isBusy}
@@ -1529,10 +1529,10 @@ export function CreateJobDialog({
           onOpenChange={(nextOpen) => {
             if (!nextOpen) setPendingDeleteStorageIndex(null)
           }}
-          title="删除挂载卷"
+          title={t("jobDialog.deleteMountVolume")}
           description={
             pendingDeleteStorageIndex !== null
-              ? `确定删除挂载卷 ${(savedStorageVolumes[pendingDeleteStorageIndex]?.volumeId || savedStorageVolumes[pendingDeleteStorageIndex]?.volumeName || "未命名卷").trim()} 吗？`
+              ? t("jobDialog.confirmDeleteMountVolume").replace("{name}", (savedStorageVolumes[pendingDeleteStorageIndex]?.volumeId || savedStorageVolumes[pendingDeleteStorageIndex]?.volumeName || t("jobDialog.unnamedVolume")).trim())
               : ""
           }
           deleting={isBusy}
@@ -1547,10 +1547,10 @@ export function CreateJobDialog({
           onOpenChange={(nextOpen) => {
             if (!nextOpen) setPendingDeleteConfigMountIndex(null)
           }}
-          title="删除配置挂载"
+          title={t("jobDialog.deleteConfigMount")}
           description={
             pendingDeleteConfigMountIndex !== null
-              ? `确定删除配置挂载 ${(savedConfigMounts[pendingDeleteConfigMountIndex]?.sourceName || "未命名配置").trim()} 吗？`
+              ? t("jobDialog.confirmDeleteConfigMount").replace("{name}", (savedConfigMounts[pendingDeleteConfigMountIndex]?.sourceName || t("jobDialog.unnamedConfig")).trim())
               : ""
           }
           deleting={isBusy}
@@ -1564,3 +1564,6 @@ export function CreateJobDialog({
     </Dialog>
   )
 }
+
+
+

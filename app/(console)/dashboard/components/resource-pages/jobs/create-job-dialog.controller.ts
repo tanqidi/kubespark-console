@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { useTranslations } from "@/app/lib/i18n"
 import { resolveFirstInvalidFieldId, scrollAndFocusFieldById } from "@/app/lib/kubespark/form-validation"
 import { checkJobExists } from "@/app/lib/kubespark/jobs"
 import type {
@@ -82,6 +83,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     onSubmit,
   } = props
   const isEditMode = mode === "edit"
+  const t = useTranslations()
   const [activeStep, setActiveStep] = React.useState<CreateStep>("basic")
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
@@ -171,19 +173,19 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
   const dialogTitle = isEditMode
     ? kind === "CronJob"
-      ? "编辑定时任务"
-      : "编辑任务"
+      ? t("jobDialog.editCronJobTitle")
+      : t("jobDialog.editTitle")
     : kind === "CronJob"
-      ? "创建定时任务"
-      : "创建任务"
+      ? t("jobDialog.createCronJobTitle")
+      : t("jobDialog.createTitle")
   const dialogDescription =
     isEditMode
       ? kind === "CronJob"
-        ? "编辑 Kubernetes CronJob 的配置内容。"
-        : "编辑 Kubernetes Job 的配置内容。"
+        ? t("jobDialog.editCronJobDescription")
+        : t("jobDialog.editDescription")
       : kind === "CronJob"
-        ? "使用 Kubernetes CronJob 创建按周期执行的任务。"
-        : "使用 Kubernetes Job 创建一次性任务。"
+        ? t("jobDialog.createCronJobDescription")
+        : t("jobDialog.createDescription")
 
   React.useEffect(() => {
     if (!open) {

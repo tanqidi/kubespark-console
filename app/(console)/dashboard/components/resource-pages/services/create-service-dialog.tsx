@@ -1664,7 +1664,7 @@ export function CreateServiceDialog({
                           onClick={() => setWorkloadPickerOpen(true)}
                           disabled={isBusy || !namespace.trim()}
                       >
-                        指定工作负载
+                        {t("serviceDialog.specifyWorkload")}
                       </Button>
                     </div>
                     <div className="mt-3 flex flex-col gap-3">
@@ -1676,7 +1676,7 @@ export function CreateServiceDialog({
                                     onChange={(event) =>
                                         updateSelectorItem(item.id, "key", event.target.value)
                                     }
-                                    placeholder="键"
+                                    placeholder={t("serviceDialog.selectorKey")}
                                     disabled={isBusy}
                                 />
                                 <Input
@@ -1684,7 +1684,7 @@ export function CreateServiceDialog({
                                     onChange={(event) =>
                                         updateSelectorItem(item.id, "value", event.target.value)
                                     }
-                                    placeholder="值"
+                                    placeholder={t("serviceDialog.selectorValue")}
                                     disabled={isBusy}
                                 />
                                 <Button
@@ -1694,7 +1694,7 @@ export function CreateServiceDialog({
                                     disabled={isBusy}
                                 >
                                   <IconTrash data-icon="inline-start" />
-                                  删除
+                                  {t("serviceDialog.deleteSelector")}
                                 </Button>
                               </div>
                           ))
@@ -1712,7 +1712,7 @@ export function CreateServiceDialog({
                       <div className="flex justify-end">
                         <Button type="button" variant="outline" onClick={addSelectorItem} disabled={isBusy}>
                           <IconPlus data-icon="inline-start" />
-                          添加
+                          {t("serviceDialog.addSelector")}
                         </Button>
                       </div>
                     </div>
@@ -1721,8 +1721,8 @@ export function CreateServiceDialog({
                   <Field>
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-1">
-                        <FieldLabel>端口</FieldLabel>
-                        <FieldDescription className="mt-0">配置服务端口与容器端口映射，容器端口建议使用纯数字以联动。</FieldDescription>
+                        <FieldLabel>{t("serviceDialog.servicePorts")}</FieldLabel>
+                        <FieldDescription className="mt-0">{t("serviceDialog.portSettingsHint")}</FieldDescription>
                       </div>
                       <div className="hidden h-9 shrink-0 md:block" aria-hidden />
                     </div>
@@ -1748,7 +1748,7 @@ export function CreateServiceDialog({
                                   disabled={isBusy}
                               >
                                 <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="协议" />
+                                  <SelectValue placeholder={t("serviceDialog.protocol")} />
                                 </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
@@ -1761,7 +1761,7 @@ export function CreateServiceDialog({
                               <div className="flex min-w-0 flex-col gap-1">
                                 <InputGroup>
                                   <InputGroupAddon>
-                                    <InputGroupText>名称</InputGroupText>
+                                    <InputGroupText>{t("serviceDialog.portName")}</InputGroupText>
                                   </InputGroupAddon>
                                   <InputGroupInput
                                     id={`service-port-${item.id}-name`}
@@ -1778,7 +1778,7 @@ export function CreateServiceDialog({
                               <div className="flex min-w-0 flex-col gap-1">
                                 <InputGroup>
                                   <InputGroupAddon>
-                                    <InputGroupText>容器端口</InputGroupText>
+                                    <InputGroupText>{t("serviceDialog.targetPort")}</InputGroupText>
                                   </InputGroupAddon>
                                   <InputGroupInput
                                     id={`service-port-${item.id}-target-port`}
@@ -1803,7 +1803,7 @@ export function CreateServiceDialog({
                               <div className="flex min-w-0 flex-col gap-1">
                                 <InputGroup>
                                   <InputGroupAddon>
-                                    <InputGroupText>服务端口</InputGroupText>
+                                    <InputGroupText>{t("serviceDialog.servicePort")}</InputGroupText>
                                   </InputGroupAddon>
                                   <InputGroupInput
                                     id={`service-port-${item.id}-service-port`}
@@ -1832,7 +1832,7 @@ export function CreateServiceDialog({
                                 <div className="flex min-w-0 flex-col gap-1">
                                   <InputGroup>
                                     <InputGroupAddon>
-                                      <InputGroupText>外部端口</InputGroupText>
+                                      <InputGroupText>{t("serviceDialog.nodePort")}</InputGroupText>
                                     </InputGroupAddon>
                                     <InputGroupInput
                                       id={`service-port-${item.id}-node-port`}
@@ -1863,9 +1863,9 @@ export function CreateServiceDialog({
                                   variant="ghost"
                                   onClick={() => removePortItem(item.id)}
                                   disabled={isBusy}
-                              >
+                                >
                                 <IconTrash data-icon="inline-start" />
-                                删除
+                                {t("serviceDialog.deletePort")}
                               </Button>
                             </div>
                           )
@@ -1884,7 +1884,7 @@ export function CreateServiceDialog({
                       <div className="flex justify-end">
                         <Button type="button" variant="outline" onClick={addPortItem} disabled={isBusy}>
                           <IconPlus data-icon="inline-start" />
-                          添加
+                          {t("serviceDialog.addPort")}
                         </Button>
                       </div>
                     </div>
@@ -1980,10 +1980,10 @@ export function CreateServiceDialog({
               <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
                 <div className="flex w-full items-center justify-between gap-3">
                   <Button type="button" variant="outline" disabled={isBusy} onClick={cancelYamlMode}>
-                    取消
+                    {t("serviceDialog.cancel")}
                   </Button>
                   <Button type="button" onClick={confirmYamlMode} disabled={isBusy}>
-                    确认保存
+                    {t("serviceDialog.confirmSave")}
                   </Button>
                 </div>
               </DialogFooter>
@@ -1992,11 +1992,11 @@ export function CreateServiceDialog({
                 <div className="flex w-full items-center justify-between gap-3">
                   <DialogClose asChild>
                     <Button type="button" variant="outline" disabled={isBusy}>
-                      取消
+                      {t("serviceDialog.cancel")}
                     </Button>
                   </DialogClose>
                   <Button type="button" onClick={() => void handleBasicNext()} disabled={isBusy}>
-                    {checkingNext ? "校验中..." : "下一步"}
+                    {checkingNext ? t("serviceDialog.checking") : t("serviceDialog.nextStep")}
                   </Button>
                 </div>
               </DialogFooter>
@@ -2009,10 +2009,10 @@ export function CreateServiceDialog({
                       onClick={() => setActiveStep("basic")}
                       disabled={isBusy}
                   >
-                    上一步
+                    {t("serviceDialog.previousStep")}
                   </Button>
                   <Button type="button" onClick={handleServiceNext} disabled={isBusy}>
-                    下一步
+                    {t("serviceDialog.nextStep")}
                   </Button>
                 </div>
               </DialogFooter>
@@ -2025,10 +2025,10 @@ export function CreateServiceDialog({
                       onClick={() => setActiveStep("service")}
                       disabled={isBusy}
                   >
-                    上一步
+                    {t("serviceDialog.previousStep")}
                   </Button>
                   <Button type="button" onClick={() => void handleCreateSubmit()} disabled={isBusy}>
-                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                    {creating ? (isEditMode ? t("serviceDialog.saving") : t("serviceDialog.creating")) : isEditMode ? t("serviceDialog.save") : t("serviceDialog.create")}
                   </Button>
                 </div>
               </DialogFooter>
@@ -2074,15 +2074,15 @@ export function CreateServiceDialog({
         <AlertDialog open={selectorAddPromptOpen} onOpenChange={setSelectorAddPromptOpen}>
           <AlertDialogContent size="sm">
             <AlertDialogHeader>
-              <AlertDialogTitle>手动添加选择器</AlertDialogTitle>
+              <AlertDialogTitle>{t("serviceDialog.addSelectorManually")}</AlertDialogTitle>
               <AlertDialogDescription>
-                建议优先使用“指定工作负载”自动回填标签选择器，是否继续手动添加？
+                {t("serviceDialog.addSelectorManuallyDesc")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isBusy}>取消</AlertDialogCancel>
+              <AlertDialogCancel disabled={isBusy}>{t("serviceDialog.cancel")}</AlertDialogCancel>
               <AlertDialogAction disabled={isBusy} onClick={handleConfirmSelectorAdd}>
-                确定
+                {t("serviceDialog.confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -64,7 +64,7 @@ import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 type CreateStep = "basic" | "pod" | "storage" | "advanced"
 const STEP_ORDER: CreateStep[] = ["basic", "pod", "storage", "advanced"]
-const POD_REQUIRED_MESSAGE = "请至少添加一个容器配置"
+const POD_REQUIRED_MESSAGE = t("podDialog.podRequired")
 const DESCRIPTION_MAX_LENGTH = 256
 
 type PodDialogSnapshot = {
@@ -150,7 +150,7 @@ function resolveResourceNames(items: unknown[]): string[] {
 
 function validateName(value: string): string | null {
   const text = value.trim().toLowerCase()
-  if (!text) return "请输入名称"
+  if (!text) return t("podDialog.pleaseEnterName")
   if (text.length > 253) return NAME_RULE_MESSAGE
   if (!/^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$/.test(text)) return NAME_RULE_MESSAGE
   return null
@@ -190,20 +190,20 @@ function buildYamlText(
   )
 }
 
-function parseYamlText(yamlText: string): {
+function parseYamlText(yamlText: string, t: ReturnType<typeof useTranslations>): {
   snapshot: PodDialogSnapshot
   containers: NonNullable<ReturnType<typeof parseJobYamlText>["pod"]["containers"]>
 } {
   const normalized = yamlText.trim()
-  if (!normalized) throw new Error("请输入 YAML 内容")
+  if (!normalized) throw new Error(t("podDialog.pleaseEnterYaml"))
   const parsed = parse(normalized)
   const root =
     typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null
-  if (!root) throw new Error("YAML 内容格式无效")
+  if (!root) throw new Error(t("podDialog.yamlContentInvalid"))
   const kind = typeof root.kind === "string" ? root.kind.trim() : ""
-  if (kind && kind !== "Pod") throw new Error("YAML 资源类型必须是 Pod")
+  if (kind && kind !== "Pod") throw new Error(t("podDialog.yamlKindMustBePod"))
 
   const metadata = asObject(root.metadata)
   const annotations = asObject(metadata.annotations)
@@ -474,7 +474,7 @@ export function CreatePodDialog({
 
   const validateBasic = React.useCallback(() => {
     const nextNameError = validateName(name)
-    const nextNamespaceError = namespace.trim() ? null : "请选择项目"
+    const nextNamespaceError = namespace.trim() ? null : t("podDialog.nameRequired")
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
     return !nextNameError && !nextNamespaceError
@@ -590,7 +590,7 @@ export function CreatePodDialog({
   React.useEffect(() => {
     if (!open || !isEditMode || !initialYamlText) return
     try {
-      const parsed = parseYamlText(initialYamlText)
+      const parsed = parseYamlText(initialYamlText, t)
       lockedIdentityRef.current = {
         name: parsed.snapshot.name.trim(),
         namespace: parsed.snapshot.namespace.trim(),
@@ -600,9 +600,9 @@ export function CreatePodDialog({
       setYamlError(null)
       setSubmitError(null)
     } catch (error) {
-      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      setYamlError(error instanceof Error ? error.message : t("podDialog.yamlParseError"))
     }
-  }, [applySnapshot, initialYamlText, isEditMode, open, setSubmitError, withLockedIdentity])
+  }, [applySnapshot, initialYamlText, isEditMode, open, setSubmitError, t, withLockedIdentity])
 
   const resolveStorageContainerNames = React.useCallback(() => {
     const names =
@@ -755,7 +755,7 @@ export function CreatePodDialog({
       })
       .catch((error: unknown) => {
         if (cancelled) return
-        setPersistentVolumeNameError(error instanceof Error && error.message ? error.message : "加载 PVC 失败")
+        setPersistentVolumeNameError(error instanceof Error && error.message ? error.message : t("podDialog.loadPvcFailed"))
         setPersistentVolumeNameOptions([])
       })
       .finally(() => {
@@ -790,7 +790,7 @@ export function CreatePodDialog({
       })
       .catch((error: unknown) => {
         if (cancelled) return
-        setConfigResourceError(error instanceof Error && error.message ? error.message : "加载配置资源失败")
+        setConfigResourceError(error instanceof Error && error.message ? error.message : t("podDialog.loadConfigFailed"))
         setConfigMapNameOptions([])
         setSecretNameOptions([])
       })
@@ -942,7 +942,7 @@ export function CreatePodDialog({
     if (creating) return
     const normalizedDescription = description.trim()
     if (normalizedDescription.length > DESCRIPTION_MAX_LENGTH) {
-      const message = `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
+      const message = t("podDialog.descriptionTooLong", { maxLength: DESCRIPTION_MAX_LENGTH })
       if (yamlMode) setYamlError(message)
       setSubmitError(message)
       setActiveStep("basic")
@@ -1016,14 +1016,14 @@ export function CreatePodDialog({
 
   const confirmYamlMode = React.useCallback(() => {
     try {
-      const parsed = parseYamlText(yamlText)
+      const parsed = parseYamlText(yamlText, t)
       applySnapshot(withLockedIdentity(parsed.snapshot), parsed.containers)
       setYamlError(null)
       setYamlMode(false)
     } catch (error) {
-      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      setYamlError(error instanceof Error ? error.message : t("podDialog.yamlParseError"))
     }
-  }, [applySnapshot, withLockedIdentity, yamlText])
+  }, [applySnapshot, t, withLockedIdentity, yamlText])
 
   return (
     <Dialog
@@ -1200,8 +1200,8 @@ export function CreatePodDialog({
             ) : activeStep === "pod" ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">容器组设置</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">配置容器镜像信息，仅支持录入一个容器。</p>
+                  <h3 className="text-[15px] font-semibold">{t("podDialog.podSettings")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("podDialog.podSettingsDesc")}</p>
                 </div>
                 <ContainerListPanel
                   items={configuredContainers}
@@ -1222,13 +1222,13 @@ export function CreatePodDialog({
             ) : activeStep === "storage" ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">存储设置</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">配置卷挂载与配置挂载，支持在当前页面直接录入并保存。</p>
+                  <h3 className="text-[15px] font-semibold">{t("podDialog.storageSettings")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("podDialog.storageSettingsDesc")}</p>
                 </div>
                 {isEditingStorageView ? (
                   <FieldGroup className="flex flex-col gap-6">
                     <Field>
-                      <FieldLabel>卷类型</FieldLabel>
+                      <FieldLabel>{t("podDialog.volumeType")}</FieldLabel>
                       <Tabs
                         value={storageVolumeDraft.volumeKind}
                         onValueChange={(value) => {
@@ -1240,9 +1240,9 @@ export function CreatePodDialog({
                         }}
                       >
                         <TabsList className="grid w-full max-w-xl grid-cols-3">
-                          <TabsTrigger value="persistent">持久卷</TabsTrigger>
-                          <TabsTrigger value="ephemeral">临时卷</TabsTrigger>
-                          <TabsTrigger value="hostPath">HostPath 卷</TabsTrigger>
+                          <TabsTrigger value="persistent">{t("podDialog.persistent")}</TabsTrigger>
+                          <TabsTrigger value="ephemeral">{t("podDialog.ephemeral")}</TabsTrigger>
+                          <TabsTrigger value="hostPath">{t("podDialog.hostPath")}</TabsTrigger>
                         </TabsList>
                       </Tabs>
                     </Field>
@@ -1250,7 +1250,7 @@ export function CreatePodDialog({
                     {storageVolumeDraft.volumeKind === "persistent" ? (
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <Field>
-                          <FieldLabel htmlFor="create-pod-storage-volume-id">卷名称</FieldLabel>
+                          <FieldLabel htmlFor="create-pod-storage-volume-id">{t("podDialog.volumeName")}</FieldLabel>
                           <Input
                             id="create-pod-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
@@ -1260,14 +1260,14 @@ export function CreatePodDialog({
                             aria-invalid={(storageSaveAttempted && isPersistentVolumeIdEmpty) || hasDuplicateStorageSelection}
                           />
                           {hasDuplicateStorageSelection ? (
-                            <FieldDescription className="text-destructive">卷名称已存在，请回到上方已添加条目中编辑。</FieldDescription>
+                            <FieldDescription className="text-destructive">{t("podDialog.volumeNameDuplicate")}</FieldDescription>
                           ) : storageSaveAttempted && isPersistentVolumeIdEmpty ? (
-                            <FieldDescription className="text-destructive">请输入卷名称，或点击取消返回。</FieldDescription>
+                            <FieldDescription className="text-destructive">{t("podDialog.volumeNameRequired")}</FieldDescription>
                           ) : null}
                         </Field>
 
                         <Field>
-                          <FieldLabel htmlFor="create-pod-storage-volume-name">选择 PVC</FieldLabel>
+                          <FieldLabel htmlFor="create-pod-storage-volume-name">{t("podDialog.selectPvc")}</FieldLabel>
                           <Select
                             value={storageVolumeDraft.volumeName}
                             onValueChange={(value) => {
@@ -1281,7 +1281,7 @@ export function CreatePodDialog({
                             disabled={persistentVolumeNameLoading || volumeNameOptions.length === 0}
                           >
                             <SelectTrigger id="create-pod-storage-volume-name" aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}>
-                              <SelectValue placeholder={persistentVolumeNameLoading ? "PVC 加载中..." : "请选择 PVC"} />
+                              <SelectValue placeholder={persistentVolumeNameLoading ? t("podDialog.pvcLoading") : t("podDialog.selectPvcPlaceholder")} />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectGroup>
@@ -1296,16 +1296,16 @@ export function CreatePodDialog({
                           {persistentVolumeNameError ? (
                             <FieldDescription className="text-destructive">{persistentVolumeNameError}</FieldDescription>
                           ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
-                            <FieldDescription className="text-destructive">请选择 PVC，或点击取消返回。</FieldDescription>
+                            <FieldDescription className="text-destructive">{t("podDialog.pvcRequired")}</FieldDescription>
                           ) : volumeNameOptions.length === 0 && !persistentVolumeNameLoading ? (
-                            <FieldDescription>当前命名空间暂无可选 PVC。</FieldDescription>
+                            <FieldDescription>{t("podDialog.noPvc")}</FieldDescription>
                           ) : null}
                         </Field>
                       </div>
                     ) : storageVolumeDraft.volumeKind === "hostPath" ? (
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <Field>
-                          <FieldLabel htmlFor="create-pod-storage-volume-id">卷名称</FieldLabel>
+                          <FieldLabel htmlFor="create-pod-storage-volume-id">{t("podDialog.volumeName")}</FieldLabel>
                           <Input
                             id="create-pod-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
@@ -1315,29 +1315,29 @@ export function CreatePodDialog({
                             aria-invalid={(storageSaveAttempted && isHostPathVolumeIdEmpty) || hasDuplicateStorageSelection}
                           />
                           {hasDuplicateStorageSelection ? (
-                            <FieldDescription className="text-destructive">卷名称已存在，请回到上方已添加条目中编辑。</FieldDescription>
+                            <FieldDescription className="text-destructive">{t("podDialog.volumeNameDuplicate")}</FieldDescription>
                           ) : storageSaveAttempted && isHostPathVolumeIdEmpty ? (
-                            <FieldDescription className="text-destructive">请输入卷名称，或点击取消返回。</FieldDescription>
+                            <FieldDescription className="text-destructive">{t("podDialog.volumeNameRequired")}</FieldDescription>
                           ) : null}
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="create-pod-storage-volume-name">主机路径</FieldLabel>
+                          <FieldLabel htmlFor="create-pod-storage-volume-name">{t("podDialog.hostPath")}</FieldLabel>
                           <Input
                             id="create-pod-storage-volume-name"
                             value={storageVolumeDraft.volumeName}
                             onChange={(event) => updateStorageVolumeDraft("volumeName", event.target.value)}
-                            placeholder="/test3"
+                            placeholder={t("podDialog.hostPathPlaceholder")}
                             autoComplete="off"
                             aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                           />
                           {storageSaveAttempted && isStorageVolumeNameEmpty ? (
-                            <FieldDescription className="text-destructive">请输入主机路径，或点击取消返回。</FieldDescription>
+                            <FieldDescription className="text-destructive">{t("podDialog.volumeNameRequired")}</FieldDescription>
                           ) : null}
                         </Field>
                       </div>
                     ) : (
                       <Field>
-                        <FieldLabel htmlFor="create-pod-storage-volume-name">卷名称</FieldLabel>
+                        <FieldLabel htmlFor="create-pod-storage-volume-name">{t("podDialog.volumeName")}</FieldLabel>
                         <Input
                           id="create-pod-storage-volume-name"
                           value={storageVolumeDraft.volumeName}
@@ -1351,16 +1351,16 @@ export function CreatePodDialog({
                           aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                         />
                         {storageSaveAttempted && isStorageVolumeNameEmpty ? (
-                          <FieldDescription className="text-destructive">请输入卷名称，或点击取消返回。</FieldDescription>
+                          <FieldDescription className="text-destructive">{t("podDialog.volumeNameRequired")}</FieldDescription>
                         ) : null}
                       </Field>
                     )}
 
                     <div className="flex flex-col gap-3">
                       <div className="grid grid-cols-3 gap-4">
-                        <FieldLabel>容器</FieldLabel>
-                        <FieldLabel>挂载模式</FieldLabel>
-                        <FieldLabel>挂载路径</FieldLabel>
+                        <FieldLabel>{t("podDialog.container")}</FieldLabel>
+                        <FieldLabel>{t("podDialog.mountMode")}</FieldLabel>
+                        <FieldLabel>{t("podDialog.mountPath")}</FieldLabel>
                       </div>
                       <div className="flex flex-col gap-3">
                         {storageVolumeDraft.mounts.map((item, index) => (
@@ -1374,14 +1374,14 @@ export function CreatePodDialog({
                                 }
                               }}
                             >
-                              <SelectTrigger id={`create-pod-storage-mode-${index}`} aria-label="挂载模式" className="w-full">
+                              <SelectTrigger id={`create-pod-storage-mode-${index}`} aria-label={t("podDialog.mountMode")} className="w-full">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
-                                  <SelectItem value="none">不挂载</SelectItem>
-                                  <SelectItem value="ro">只读</SelectItem>
-                                  <SelectItem value="rw">读写</SelectItem>
+                                  <SelectItem value="none">{t("podDialog.notMounted")}</SelectItem>
+                                  <SelectItem value="ro">{t("podDialog.readOnly")}</SelectItem>
+                                  <SelectItem value="rw">{t("podDialog.readWrite")}</SelectItem>
                                 </SelectGroup>
                               </SelectContent>
                             </Select>
@@ -1389,7 +1389,7 @@ export function CreatePodDialog({
                               id={`create-pod-storage-path-${index}`}
                               value={item.mountPath}
                               onChange={(event) => updateStorageVolumeMount(item.containerName, "mountPath", event.target.value)}
-                              placeholder="/etc/config"
+                              placeholder={t("podDialog.mountPathPlaceholder")}
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1401,7 +1401,7 @@ export function CreatePodDialog({
                 ) : isEditingConfigMountView ? (
                   <FieldGroup className="flex flex-col gap-6">
                     <Field>
-                      <FieldLabel>资源类型</FieldLabel>
+                      <FieldLabel>{t("podDialog.mountSourceType")}</FieldLabel>
                       <Tabs
                         value={configMountDraft.sourceKind}
                         onValueChange={(value) => {
@@ -1412,16 +1412,16 @@ export function CreatePodDialog({
                         }}
                       >
                         <TabsList className="grid w-full max-w-md grid-cols-2">
-                          <TabsTrigger value="configMap">配置字典</TabsTrigger>
-                          <TabsTrigger value="secret">保密字典</TabsTrigger>
+                          <TabsTrigger value="configMap">{t("podDialog.configMap")}</TabsTrigger>
+                          <TabsTrigger value="secret">{t("podDialog.secret")}</TabsTrigger>
                         </TabsList>
                       </Tabs>
                     </Field>
                     <Field>
-                      <FieldLabel>选择资源</FieldLabel>
+                      <FieldLabel>{t("podDialog.selectConfigPlaceholder")}</FieldLabel>
                       <Select value={configMountDraft.sourceName} onValueChange={(value) => updateConfigMountDraft("sourceName", value)}>
                         <SelectTrigger aria-invalid={configMountSaveAttempted && isConfigSourceNameEmpty}>
-                          <SelectValue placeholder={configResourceLoading ? "资源加载中..." : "请选择资源"} />
+                          <SelectValue placeholder={configResourceLoading ? t("podDialog.configLoading") : t("podDialog.selectConfigPlaceholder")} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
@@ -1436,17 +1436,17 @@ export function CreatePodDialog({
                       {configResourceError ? (
                         <FieldDescription className="text-destructive">{configResourceError}</FieldDescription>
                       ) : configMountSaveAttempted && isConfigSourceNameEmpty ? (
-                        <FieldDescription className="text-destructive">请选择资源，或点击取消返回。</FieldDescription>
+                        <FieldDescription className="text-destructive">{t("podDialog.configRequired")}</FieldDescription>
                       ) : configSourceNameOptions.length === 0 && !configResourceLoading ? (
-                        <FieldDescription>当前命名空间暂无可选资源。</FieldDescription>
+                        <FieldDescription>{t("podDialog.noConfig")}</FieldDescription>
                       ) : null}
                     </Field>
 
                     <div className="flex flex-col gap-3">
                       <div className="grid grid-cols-3 gap-4">
-                        <FieldLabel>容器</FieldLabel>
-                        <FieldLabel>挂载模式</FieldLabel>
-                        <FieldLabel>挂载路径</FieldLabel>
+                        <FieldLabel>{t("podDialog.container")}</FieldLabel>
+                        <FieldLabel>{t("podDialog.mountMode")}</FieldLabel>
+                        <FieldLabel>{t("podDialog.mountPath")}</FieldLabel>
                       </div>
                       <div className="flex flex-col gap-3">
                         {configMountDraft.mounts.map((item, index) => (
@@ -1460,13 +1460,13 @@ export function CreatePodDialog({
                                 }
                               }}
                             >
-                              <SelectTrigger id={`create-pod-config-mode-${index}`} aria-label="挂载模式" className="w-full">
+                              <SelectTrigger id={`create-pod-config-mode-${index}`} aria-label={t("podDialog.mountMode")} className="w-full">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
-                                  <SelectItem value="none">不挂载</SelectItem>
-                                  <SelectItem value="ro">只读</SelectItem>
+                                  <SelectItem value="none">{t("podDialog.notMounted")}</SelectItem>
+                                  <SelectItem value="ro">{t("podDialog.readOnly")}</SelectItem>
                                 </SelectGroup>
                               </SelectContent>
                             </Select>
@@ -1474,7 +1474,7 @@ export function CreatePodDialog({
                               id={`create-pod-config-path-${index}`}
                               value={item.mountPath}
                               onChange={(event) => updateConfigMountDraftMount(item.containerName, "mountPath", event.target.value)}
-                              placeholder="/etc/config"
+                              placeholder={t("podDialog.mountPathPlaceholder")}
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1486,7 +1486,7 @@ export function CreatePodDialog({
                 ) : (
                   <FieldGroup className="flex flex-col gap-6">
                     <Field>
-                      <FieldLabel>挂载卷</FieldLabel>
+                      <FieldLabel>{t("podDialog.addConfigMount")}</FieldLabel>
                       <StorageVolumeList
                         items={savedStorageVolumes}
                         onEdit={startEditStorageVolume}
@@ -1496,7 +1496,7 @@ export function CreatePodDialog({
                       />
                     </Field>
                     <Field>
-                      <FieldLabel>挂载配置字典或保密字典</FieldLabel>
+                      <FieldLabel>{t("podDialog.addConfigMount")}</FieldLabel>
                       <div className="flex flex-col gap-3">
                         {savedConfigMounts.length > 0 ? (
                           savedConfigMounts.map((item, index) => (
@@ -1504,27 +1504,27 @@ export function CreatePodDialog({
                               <ItemContent className="min-w-0">
                                 <ItemTitle className="min-w-0 truncate">{item.sourceName}</ItemTitle>
                                 <ItemDescription className="min-w-0 truncate">
-                                  {(item.sourceKind === "configMap" ? "配置字典" : "保密字典") +
+                                  {(item.sourceKind === "configMap" ? t("podDialog.configMap") : t("podDialog.secret")) +
                                     " · " +
-                                    `${item.mounts.filter((mount) => mount.mountMode !== "none" && mount.mountPath.trim().length > 0).length} 个容器已配置`}
+                                    `${item.mounts.filter((mount) => mount.mountMode !== "none" && mount.mountPath.trim().length > 0).length} ${t("podDialog.configMounted")}`}
                                 </ItemDescription>
                               </ItemContent>
                               <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
                                 <Button type="button" variant="outline" size="sm" onClick={() => startEditConfigMount(index)} disabled={isBusy}>
                                   <IconPencil data-icon="inline-start" />
-                                  编辑
+                                  {t("actions.edit")}
                                 </Button>
                                 <Button type="button" size="sm" variant="outline" onClick={() => setPendingDeleteConfigMountIndex(index)} disabled={isBusy}>
                                   <IconTrash data-icon="inline-start" />
-                                  删除
+                                  {t("actions.delete")}
                                 </Button>
                               </ItemActions>
                             </Item>
                           ))
                         ) : (
                           <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                            <div className="text-sm font-semibold">暂无配置挂载</div>
-                            <div className="mt-1 text-sm text-muted-foreground">可挂载配置字典或保密字典内容到容器。</div>
+                            <div className="text-sm font-semibold">{t("podDialog.noConfigMounts")}</div>
+                            <div className="mt-1 text-sm text-muted-foreground">{t("podDialog.addConfigMountDesc")}</div>
                           </div>
                         )}
                         <button
@@ -1533,8 +1533,8 @@ export function CreatePodDialog({
                           onClick={startAddConfigMount}
                           disabled={isBusy}
                         >
-                          <span className="text-sm font-semibold">添加配置挂载</span>
-                          <span className="mt-1 text-sm text-muted-foreground">新增一条配置字典/保密字典挂载配置。</span>
+                          <span className="text-sm font-semibold">{t("podDialog.addConfigMountLabel")}</span>
+                          <span className="mt-1 text-sm text-muted-foreground">{t("podDialog.addConfigMountDesc2")}</span>
                         </button>
                       </div>
                     </Field>
@@ -1544,8 +1544,8 @@ export function CreatePodDialog({
             ) : (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">高级设置</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">补充标签与注解信息，便于检索、分类和后续治理。</p>
+                  <h3 className="text-[15px] font-semibold">{t("podDialog.advancedSettings")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("podDialog.advancedSettingsDesc")}</p>
                 </div>
                 <FieldGroup className="grid gap-6 md:grid-cols-2">
                   <Field className="md:col-span-2">
@@ -1570,10 +1570,10 @@ export function CreatePodDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelYamlMode} disabled={isBusy}>
-                  取消
+                  {t("podDialog.cancel")}
                 </Button>
                 <Button type="button" onClick={confirmYamlMode} disabled={isBusy}>
-                  确认保存
+                  {t("podDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1581,10 +1581,10 @@ export function CreatePodDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelEditStorageVolume} disabled={isBusy}>
-                  取消
+                  {t("podDialog.cancel")}
                 </Button>
                 <Button type="button" onClick={handleConfirmStorageSave} disabled={isBusy || hasDuplicateStorageSelection}>
-                  确认保存
+                  {t("podDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1592,10 +1592,10 @@ export function CreatePodDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelEditConfigMount} disabled={isBusy}>
-                  取消
+                  {t("podDialog.cancel")}
                 </Button>
                 <Button type="button" onClick={confirmEditConfigMount} disabled={isBusy || isConfigSourceNameEmpty}>
-                  确认保存
+                  {t("podDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1604,11 +1604,11 @@ export function CreatePodDialog({
               <div className="flex w-full items-center justify-between gap-3">
                 <DialogClose asChild>
                   <Button type="button" variant="outline" disabled={isBusy}>
-                    取消
+                    {t("podDialog.cancel")}
                   </Button>
                 </DialogClose>
                 <Button type="button" onClick={handleNext} disabled={isBusy}>
-                  下一步
+                  {t("podDialog.nextStep")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1621,10 +1621,10 @@ export function CreatePodDialog({
                   onClick={() => setActiveStep(STEP_ORDER[currentStepIndex - 1] ?? "basic")}
                   disabled={activeStep === "storage" ? !canNavigateStorageView : isBusy}
                 >
-                  上一步
+                  {t("podDialog.previousStep")}
                 </Button>
                 <Button type="button" onClick={handleNext} disabled={activeStep === "storage" ? !canNavigateStorageView : isBusy}>
-                  下一步
+                  {t("podDialog.nextStep")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1637,10 +1637,10 @@ export function CreatePodDialog({
                   onClick={() => setActiveStep("storage")}
                   disabled={isBusy}
                 >
-                  上一步
+                  {t("podDialog.previousStep")}
                 </Button>
                 <Button type="button" onClick={() => void handleCreate()} disabled={isBusy}>
-                  {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  {creating ? (isEditMode ? t("podDialog.saving") : t("podDialog.creating")) : isEditMode ? t("podDialog.save") : t("podDialog.create")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1698,10 +1698,10 @@ export function CreatePodDialog({
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setPendingDeleteContainerId(null)
         }}
-        title="删除容器"
+        title={t("podDialog.deleteContainer")}
         description={
           pendingDeleteContainer
-            ? `确定删除容器 ${pendingDeleteContainer.name.trim() || "未命名容器"} 吗？`
+            ? t("podDialog.confirmDeleteContainer", { name: pendingDeleteContainer.name.trim() || t("podDialog.unnamedContainer") })
             : ""
         }
         deleting={false}
@@ -1714,10 +1714,10 @@ export function CreatePodDialog({
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setPendingDeleteStorageIndex(null)
         }}
-        title="删除挂载卷"
+        title={t("podDialog.deleteMountVolume")}
         description={
           pendingDeleteStorageIndex !== null
-            ? `确定删除挂载卷 ${(savedStorageVolumes[pendingDeleteStorageIndex]?.volumeId || savedStorageVolumes[pendingDeleteStorageIndex]?.volumeName || "未命名卷").trim()} 吗？`
+            ? t("podDialog.confirmDeleteMountVolume", { name: (savedStorageVolumes[pendingDeleteStorageIndex]?.volumeId || savedStorageVolumes[pendingDeleteStorageIndex]?.volumeName || t("podDialog.unnamedVolume")).trim() })
             : ""
         }
         deleting={false}
@@ -1732,10 +1732,10 @@ export function CreatePodDialog({
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setPendingDeleteConfigMountIndex(null)
         }}
-        title="删除配置挂载"
+        title={t("podDialog.deleteConfigMount")}
         description={
           pendingDeleteConfigMountIndex !== null
-            ? `确定删除配置挂载 ${(savedConfigMounts[pendingDeleteConfigMountIndex]?.sourceName || "未命名资源").trim()} 吗？`
+            ? t("podDialog.confirmDeleteConfigMount", { name: (savedConfigMounts[pendingDeleteConfigMountIndex]?.sourceName || t("podDialog.unnamedConfig")).trim() })
             : ""
         }
         deleting={false}
