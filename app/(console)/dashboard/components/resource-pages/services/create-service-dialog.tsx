@@ -1509,8 +1509,16 @@ export function CreateServiceDialog({
                               : t("workloadDialog.notConfigured"),
                   active: activeStep === "service",
                   icon: <IconAdjustmentsHorizontal className="size-4" />,
-                  disabled: isBusy || !canNavigateService,
-                  onClick: () => setActiveStep("service"),
+                  disabled: isBusy,
+                  onClick: () => {
+                    if (isBusy) return
+                    if (activeStep === "service") return
+                    if (activeStep === "basic") {
+                      void handleBasicNext()
+                      return
+                    }
+                    setActiveStep("service")
+                  },
                 },
                 {
                   id: "advanced",
@@ -1523,8 +1531,20 @@ export function CreateServiceDialog({
                         : t("workloadDialog.notConfigured"),
                   active: activeStep === "advanced",
                   icon: <IconAdjustments className="size-4" />,
-                  disabled: isBusy || !canNavigateAdvanced,
-                  onClick: () => setActiveStep("advanced"),
+                  disabled: isBusy,
+                  onClick: () => {
+                    if (isBusy) return
+                    if (activeStep === "advanced") return
+                    if (activeStep === "basic") {
+                      void handleBasicNext()
+                      return
+                    }
+                    if (activeStep === "service") {
+                      handleServiceNext()
+                      return
+                    }
+                    setActiveStep("advanced")
+                  },
                 },
               ]}
             />
