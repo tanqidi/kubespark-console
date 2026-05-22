@@ -226,21 +226,22 @@ export function WorkspacesPageClient() {
   React.useEffect(() => {
     let cancelled = false
 
-    const run = async (silent: boolean) => {
+    // 初始加载
+    void (async () => {
       if (cancelled) return
-      await loadRows(silent)
-    }
+      await loadRows(false)
+    })()
 
-    void run(false)
     const timer = window.setInterval(() => {
-      void run(true)
+      if (cancelled) return
+      void loadRows(true)
     }, 3000)
 
     return () => {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [loadRows])
+  }, []) // 空依赖，只执行一次
 
   const resetCreateState = React.useCallback(() => {
     setDialogMode("create")
