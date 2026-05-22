@@ -77,12 +77,12 @@ export function ServicesPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Service 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
   const [describeOpen, setDescribeOpen] = React.useState(false)
   const [describeContent, setDescribeContent] = React.useState("")
   const [describeLoading, setDescribeLoading] = React.useState(false)
   const [describeError, setDescribeError] = React.useState<string | null>(null)
-  const [describeSubtitle, setDescribeSubtitle] = React.useState("查看 Kubernetes Service 的详情内容。")
+  const [describeSubtitle, setDescribeSubtitle] = React.useState("")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<ServiceRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -91,7 +91,7 @@ export function ServicesPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes Service（${row.namespace}/${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("serviceDialog.yamlSubtitleWithName", { namespace: row.namespace, name: row.name }))
 
     void fetchNamespacedResourceYaml("services", row.namespace, row.name, {
       documentType: "service",
@@ -104,7 +104,7 @@ export function ServicesPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("serviceDialog.loadYamlFailed")
         setYamlError(message)
         console.error("[Services] view yaml request failed", {
           service: { name: row.name, namespace: row.namespace },
@@ -114,27 +114,27 @@ export function ServicesPageClient() {
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const handleViewDescribe = React.useCallback((row: ServiceRow) => {
     setDescribeOpen(true)
     setDescribeError(null)
     setDescribeLoading(true)
     setDescribeContent("")
-    setDescribeSubtitle(`查看 Kubernetes Service（${row.namespace}/${row.name}）的详情内容。`)
+    setDescribeSubtitle(t("serviceDialog.describeSubtitleWithName", { namespace: row.namespace, name: row.name }))
 
     void fetchResourceDescribe("core", "v1", "services", row.name, row.namespace)
       .then(({ text }) => {
-        setDescribeContent(text || "(无详情输出)")
+        setDescribeContent(text || t("serviceDialog.describeNoContent"))
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载详情失败"
+        const message = e instanceof Error ? e.message : t("serviceDialog.loadDetailsFailed")
         setDescribeError(message)
       })
       .finally(() => {
         setDescribeLoading(false)
       })
-  }, [])
+  }, [t])
 
   const requestDelete = React.useCallback((row: ServiceRow) => {
     setPendingDeleteRow(row)
@@ -456,7 +456,7 @@ export function ServicesPageClient() {
         onSubmitted={() => void refreshRows(false)}
       />
       <DescribeViewerDialog
-        title="查看详情"
+        title={t("serviceDialog.viewDetailsTitle")}
         subtitle={describeSubtitle}
         open={describeOpen}
         onOpenChange={setDescribeOpen}
@@ -465,7 +465,7 @@ export function ServicesPageClient() {
         error={describeError}
       />
       <MonacoViewerDialog
-        title="查看YAML"
+        title={t("serviceDialog.viewYamlTitle")}
         subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}

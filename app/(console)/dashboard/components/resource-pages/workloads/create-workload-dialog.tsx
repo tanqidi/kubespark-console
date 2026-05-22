@@ -130,6 +130,7 @@ export function CreateWorkloadDialog({
     checkingNext,
     clearContainerEnv,
     confirmEditStorageVolume,
+    completions,
     configuredContainers,
     containerDialogOpen,
     creating,
@@ -144,6 +145,7 @@ export function CreateWorkloadDialog({
     setAnnotationEntries,
     dialogDescription,
     dialogTitle,
+    namePlaceholder,
     editingContainer,
     editingEnvDuplicateIds,
     editingImageError,
@@ -781,7 +783,7 @@ export function CreateWorkloadDialog({
                         if (nameError) setNameError(null)
                         if (submitError) setSubmitError(null)
                       }}
-                      placeholder={t("workloadDialog.namePlaceholder", { kind })}
+                      placeholder={namePlaceholder}
                       autoComplete="off"
                       aria-invalid={Boolean(nameError)}
                       disabled={isBusy || isEditMode}

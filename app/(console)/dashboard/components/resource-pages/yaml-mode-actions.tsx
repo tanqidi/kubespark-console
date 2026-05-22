@@ -6,6 +6,7 @@ import { IconDownload, IconUpload } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { useTranslations } from "@/app/lib/i18n"
 
 type YamlModeActionsProps = {
   checked: boolean
@@ -28,6 +29,7 @@ export function YamlModeActions({
   uploadDisabled = false,
   downloadDisabled = false,
 }: YamlModeActionsProps) {
+  const t = useTranslations()
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const switchId = React.useId()
 
@@ -66,11 +68,11 @@ export function YamlModeActions({
             className="rounded-full"
             onClick={handleTriggerUpload}
             disabled={disabled || uploadDisabled}
-            aria-label="上传 YAML"
-            title="上传 YAML"
+            aria-label={t("common.uploadYaml")}
+            title={t("common.uploadYaml")}
           >
             <IconUpload />
-            <span className="sr-only">上传 YAML</span>
+            <span className="sr-only">{t("common.uploadYaml")}</span>
           </Button>
           <Button
             type="button"
@@ -79,11 +81,11 @@ export function YamlModeActions({
             className="rounded-full"
             onClick={onDownloadYaml}
             disabled={disabled || downloadDisabled}
-            aria-label="下载 YAML"
-            title="下载 YAML"
+            aria-label={t("common.downloadYaml")}
+            title={t("common.downloadYaml")}
           >
             <IconDownload />
-            <span className="sr-only">下载 YAML</span>
+            <span className="sr-only">{t("common.downloadYaml")}</span>
           </Button>
         </>
       ) : null}
@@ -94,9 +96,9 @@ export function YamlModeActions({
           checked={checked}
           onCheckedChange={onCheckedChange}
           disabled={disabled}
-          aria-label="编辑 YAML"
+          aria-label={t("common.editYaml")}
         />
-        <Label htmlFor={switchId}>编辑 YAML</Label>
+        <Label htmlFor={switchId}>{t("common.editYaml")}</Label>
       </div>
 
       <input

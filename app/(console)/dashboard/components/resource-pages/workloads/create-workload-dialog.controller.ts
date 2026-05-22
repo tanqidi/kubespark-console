@@ -176,10 +176,70 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const isEditingStorageView = isStorageStep && editingStorageVolume
   const canNavigateStep = !isBusy && !isEditingPodView && !isEditingStorageView
 
-  const dialogTitle = isEditMode ? t("workloadDialog.editTitle", { kind }) : t("workloadDialog.createTitle", { kind })
-  const dialogDescription = isEditMode
-    ? t("workloadDialog.editDescription", { kind })
-    : t("workloadDialog.createDescription", { kind })
+  const dialogTitle = React.useMemo(() => {
+    if (isEditMode) {
+      switch (kind) {
+        case "Deployment":
+          return t("workloadDialog.editTitleDeployment")
+        case "StatefulSet":
+          return t("workloadDialog.editTitleStatefulSet")
+        case "DaemonSet":
+          return t("workloadDialog.editTitleDaemonSet")
+        default:
+          return t("workloadDialog.editTitle", { kind })
+      }
+    } else {
+      switch (kind) {
+        case "Deployment":
+          return t("workloadDialog.createTitleDeployment")
+        case "StatefulSet":
+          return t("workloadDialog.createTitleStatefulSet")
+        case "DaemonSet":
+          return t("workloadDialog.createTitleDaemonSet")
+        default:
+          return t("workloadDialog.createTitle", { kind })
+      }
+    }
+  }, [kind, isEditMode, t])
+
+  const dialogDescription = React.useMemo(() => {
+    if (isEditMode) {
+      switch (kind) {
+        case "Deployment":
+          return t("workloadDialog.editDescriptionDeployment")
+        case "StatefulSet":
+          return t("workloadDialog.editDescriptionStatefulSet")
+        case "DaemonSet":
+          return t("workloadDialog.editDescriptionDaemonSet")
+        default:
+          return t("workloadDialog.editDescription", { kind })
+      }
+    } else {
+      switch (kind) {
+        case "Deployment":
+          return t("workloadDialog.createDescriptionDeployment")
+        case "StatefulSet":
+          return t("workloadDialog.createDescriptionStatefulSet")
+        case "DaemonSet":
+          return t("workloadDialog.createDescriptionDaemonSet")
+        default:
+          return t("workloadDialog.createDescription", { kind })
+      }
+    }
+  }, [kind, isEditMode, t])
+
+  const namePlaceholder = React.useMemo(() => {
+    switch (kind) {
+      case "Deployment":
+        return t("workloadDialog.namePlaceholderDeployment")
+      case "StatefulSet":
+        return t("workloadDialog.namePlaceholderStatefulSet")
+      case "DaemonSet":
+        return t("workloadDialog.namePlaceholderDaemonSet")
+      default:
+        return t("workloadDialog.namePlaceholder", { kind })
+    }
+  }, [kind, t])
 
   React.useEffect(() => {
     if (!open) {
@@ -910,6 +970,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     description,
     dialogDescription,
     dialogTitle,
+    namePlaceholder,
     editingContainer,
     editingEnvDuplicateIds,
     editingImageError,
