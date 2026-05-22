@@ -309,14 +309,8 @@ export function WorkloadsPageClient() {
     }
 
     void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
+    // 移除定时刷新，避免导致弹出菜单自动关闭
+    // 如需定时刷新，可以在没有对话框或菜单打开时暂停刷新
   }, [refreshRows])
 
   const namespaceOptions = React.useMemo(

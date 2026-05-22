@@ -1631,9 +1631,9 @@ export function replaceProtocolPrefixInName(
   return `${resolveProtocolNamePrefix(nextProtocol)}-${tail}`
 }
 
-export function validateName(value: string): string | null {
+export function validateName(value: string, t?: (key: string) => string): string | null {
   const next = value.trim().toLowerCase()
-  if (!next) return "请输入名称"
+  if (!next) return t ? t("workloadDialog.nameRequired") : "请输入名称"
   if (next.length > 253) return NAME_RULE_MESSAGE
   if (!/^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$/.test(next)) {
     return NAME_RULE_MESSAGE

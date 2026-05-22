@@ -1731,9 +1731,9 @@ export function ProjectsPageClient() {
       <Dialog
         open={pipelineProjectCreateOpen}
         onOpenChange={(open) => {
-          if (!open && pipelineProjectCreating) return
-          setPipelineProjectCreateOpen(open)
-          if (!open) resetPipelineDialogState()
+          if (!open && pipelineProjectCreating) return;
+          setPipelineProjectCreateOpen(open);
+          if (!open) resetPipelineDialogState();
         }}
       >
         <DialogContent
@@ -1744,11 +1744,10 @@ export function ProjectsPageClient() {
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
-                <DialogTitle>{isPipelineProjectEditMode ? t("projectsDialog.editTitle") : t("projectsDialog.createTitle")}</DialogTitle>
+                <DialogTitle>{isPipelineProjectEditMode ? t("projectsDialog.editPipelineTitle") : t("projectsDialog.createPipelineTitle")}</DialogTitle>
                 <DialogDescription>
-                  {isPipelineProjectEditMode ? t("projectsDialog.editDesc") : t("projectsDialog.createDesc")}
-                </DialogDescription>
-              </DialogHeader>
+                  {isPipelineProjectEditMode ? t("projectsDialog.editPipelineDesc") : t("projectsDialog.createPipelineDesc")}</DialogDescription>
+                </DialogHeader>
               <div className="h-full flex items-center me-20">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
                   <span className="text-sm font-medium">{t("projectsDialog.yamlMode")}</span>
@@ -1865,7 +1864,7 @@ export function ProjectsPageClient() {
                 <div className="p-6">
                   <div className="mb-4">
                     <h3 className="text-[15px] font-semibold">{t("projectsDialog.basicInfo")}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{t("projectsDialog.basicInfoDesc")}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("projectsDialog.basicPipelineInfoDesc")}</p>
                   </div>
                   <FieldGroup className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

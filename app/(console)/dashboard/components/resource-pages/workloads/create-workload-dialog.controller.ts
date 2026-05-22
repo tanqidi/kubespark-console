@@ -703,7 +703,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const runBasicValidation = React.useCallback(async (source?: Pick<WorkloadDialogSnapshot, "name" | "namespace">) => {
     const nextName = (lockedIdentity?.name ?? source?.name ?? name).trim().toLowerCase()
     const nextNamespace = (lockedIdentity?.namespace ?? source?.namespace ?? namespace).trim()
-    const nextNameError = validateName(nextName)
+    const nextNameError = validateName(nextName, t)
     const nextNamespaceError = nextNamespace ? null : t("workloadDialog.pleaseSelectNamespace")
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
@@ -794,7 +794,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         const normalizedName = (lockedIdentity?.name ?? source.name).trim().toLowerCase()
         const normalizedNamespace = (lockedIdentity?.namespace ?? source.namespace).trim()
         const normalizedDescription = source.description.trim()
-        const nextNameError = validateName(normalizedName)
+        const nextNameError = validateName(normalizedName, t)
         const nextNamespaceError = normalizedNamespace ? null : t("workloadDialog.pleaseSelectNamespace")
         const nextDescriptionError =
           normalizedDescription.length <= DESCRIPTION_MAX_LENGTH
