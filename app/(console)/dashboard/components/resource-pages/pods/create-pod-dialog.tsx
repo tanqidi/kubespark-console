@@ -64,7 +64,6 @@ import { fetchResourceCollection } from "@/app/lib/kubespark/common"
 
 type CreateStep = "basic" | "pod" | "storage" | "advanced"
 const STEP_ORDER: CreateStep[] = ["basic", "pod", "storage", "advanced"]
-const POD_REQUIRED_MESSAGE = t("podDialog.podRequired")
 const DESCRIPTION_MAX_LENGTH = 256
 
 type PodDialogSnapshot = {
@@ -482,7 +481,7 @@ export function CreatePodDialog({
 
   const validatePod = React.useCallback(() => {
     if (configuredContainers.length === 0) {
-      setSubmitError(POD_REQUIRED_MESSAGE)
+      setSubmitError(t("podDialog.podRequired"))
       return false
     }
     return true
@@ -960,7 +959,7 @@ export function CreatePodDialog({
     const item = configuredContainers[0]
     if (!item || !item.image.trim()) {
       setActiveStep("pod")
-      setSubmitError(POD_REQUIRED_MESSAGE)
+      setSubmitError(t("podDialog.podRequired"))
       return
     }
     const podSpec = buildPodSpecFromContainers("Never", configuredContainers, savedStorageVolumes, savedConfigMounts)
@@ -1207,7 +1206,7 @@ export function CreatePodDialog({
                   items={configuredContainers}
                   isBusy={isBusy}
                   submitError={submitError}
-                  podRequiredMessage={POD_REQUIRED_MESSAGE}
+                  podRequiredMessage={t("podDialog.podRequired")}
                   onEdit={beginEditContainer}
                   onRequestDelete={setPendingDeleteContainerId}
                   onAdd={() => {

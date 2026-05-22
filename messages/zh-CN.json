@@ -112,7 +112,12 @@
       "namespace": "命名空间",
       "status": "状态",
       "kind": "类型"
-    }
+    },
+    "customizeColumns": "自定义列",
+    "create": "创建",
+    "delete": "删除",
+    "batchDelete": "批量删除",
+    "batchDeleteDesc": "此操作不可撤销，将删除已选中的 {count} 条数据。"
   },
   "nodes": {
     "describeSubtitle": "查看 Kubernetes Node ({name}) 的详情内容。"
@@ -152,6 +157,13 @@
     "deleteWorkloadDescription": "确定删除工作负载 {name} 吗？",
     "cluster": "集群",
     "dev": "开发测试"
+  },
+  "search": {
+    "namespace": "命名空间",
+    "namespacePlaceholder": "命名空间",
+    "name": "名称",
+    "namePlaceholder": "名称",
+    "notFound": "未找到"
   },
   "workloadDialog": {
     "basicInfo": "基本信息",

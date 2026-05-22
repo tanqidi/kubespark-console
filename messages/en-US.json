@@ -113,7 +113,12 @@
       "namespace": "Namespace",
       "status": "Status",
       "kind": "Kind"
-    }
+    },
+    "customizeColumns": "Custom Columns",
+    "create": "Create",
+    "delete": "Delete",
+    "batchDelete": "Batch Delete",
+    "batchDeleteDesc": "This operation cannot be undone. It will delete the selected {count} items."
   },
   "nodes": {
     "describeSubtitle": "View Kubernetes Node ({name}) details."
@@ -153,6 +158,13 @@
     "deleteWorkloadDescription": "Are you sure you want to delete workload {name}?",
     "cluster": "Cluster",
     "dev": "Development"
+  },
+  "search": {
+    "namespace": "Namespace",
+    "namespacePlaceholder": "Namespace",
+    "name": "Name",
+    "namePlaceholder": "Name",
+    "notFound": "Not found"
   },
   "workloadDialog": {
     "basicInfo": "Basic Information",

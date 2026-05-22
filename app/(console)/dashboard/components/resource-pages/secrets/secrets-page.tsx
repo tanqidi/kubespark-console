@@ -28,6 +28,7 @@ import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { useTranslations } from "@/app/lib/i18n"
 
 type SecretRow = SecretResourceRow
 type JsonObject = Record<string, unknown>
@@ -75,6 +76,7 @@ const secretColumns: ColumnConfig<SecretRow>[] = [
 ]
 
 export function SecretsPageClient() {
+  const t = useTranslations()
   const [rows, setRows] = React.useState<SecretRow[]>([])
   const [namespaceOptions, setNamespaceOptions] = React.useState<
     Array<{ id: string; name: string }>
@@ -378,14 +380,14 @@ export function SecretsPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"命名空间"}
-        emptyText={"未找到命名空间"}
+        placeholder={t("search.namespacePlaceholder")}
+        emptyText={`${t("search.notFound")} ${t("search.namespace")}`}
         className="w-40"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"名称"}
+        placeholder={t("search.namePlaceholder")}
         className="h-9 w-40"
       />
     </>

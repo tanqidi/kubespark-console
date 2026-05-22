@@ -60,6 +60,7 @@ import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useTranslations } from "@/app/lib/i18n"
 import {
   InputGroup,
   InputGroupAddon,
@@ -321,6 +322,7 @@ function resolveErrorMessage(error: unknown): string {
 }
 
 export function VolumesPageClient() {
+  const t = useTranslations()
   const [persistentVolumes, setPersistentVolumes] = React.useState<PersistentVolumeRow[]>([])
   const [persistentVolumeClaims, setPersistentVolumeClaims] = React.useState<
     PersistentVolumeClaimRow[]
@@ -1010,14 +1012,14 @@ export function VolumesPageClient() {
         options={pvcNamespaceOptions}
         value={pvcNamespaceQuery}
         onValueChange={setPvcNamespaceQuery}
-        placeholder={"命名空间"}
-        emptyText={"未找到命名空间"}
+        placeholder={t("search.namespacePlaceholder")}
+        emptyText={`${t("search.notFound")} ${t("search.namespace")}`}
         className="w-40"
       />
       <Input
         value={pvcNameQuery}
         onChange={(event) => setPvcNameQuery(event.target.value)}
-        placeholder={"名称"}
+        placeholder={t("search.namePlaceholder")}
         className="h-9 w-40"
       />
     </>
@@ -1026,7 +1028,7 @@ export function VolumesPageClient() {
       {/*<FilterCombobox
         options={[]}
         value=""
-        placeholder={"命名空间"}
+        placeholder={t("search.namespacePlaceholder")}
         className="w-40"
         disabled
         onValueChange={() => {}}
@@ -1034,7 +1036,7 @@ export function VolumesPageClient() {
       <Input
         value={pvNameQuery}
         onChange={(event) => setPvNameQuery(event.target.value)}
-        placeholder={"名称"}
+        placeholder={t("search.namePlaceholder")}
         className="h-9 w-40"
       />
     </>

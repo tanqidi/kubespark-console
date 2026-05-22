@@ -1,10 +1,11 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import { IconChevronDown, IconLayoutColumns, IconPlus, IconTrash } from "@tabler/icons-react"
 import { type Column, type Table } from "@tanstack/react-table"
 
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
+import { useTranslations } from "@/app/lib/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -39,6 +40,7 @@ export function TableToolbar<TData>({
   onDeleteSelected?: () => void
   showColumnCustomizer?: boolean
 }) {
+  const t = useTranslations()
   const selectedCount = table.getFilteredSelectedRowModel().rows.length
   const showDelete = selectedCount > 0 && Boolean(onDeleteSelected)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
@@ -75,8 +77,8 @@ export function TableToolbar<TData>({
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="transition-none">
                   <IconLayoutColumns />
-                  <span className="hidden lg:inline">自定义列</span>
-                  <span className="lg:hidden">自定义列</span>
+                  <span className="hidden lg:inline">{t("table.customizeColumns")}</span>
+                  <span className="lg:hidden">{t("table.customizeColumns")}</span>
                   <IconChevronDown />
                 </Button>
               </DropdownMenuTrigger>
@@ -116,7 +118,7 @@ export function TableToolbar<TData>({
               type="button"
             >
               <IconPlus />
-              <span className="hidden lg:inline">创建</span>
+              <span className="hidden lg:inline">{t("table.create")}</span>
             </Button>
           ) : null}
         </div>
@@ -136,14 +138,14 @@ export function TableToolbar<TData>({
           onClick={() => setDeleteDialogOpen(true)}
         >
           <IconTrash />
-          <span className="hidden lg:inline">删除</span>
+          <span className="hidden lg:inline">{t("table.delete")}</span>
         </Button>
 
         <DeleteConfirmDialog
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
-          title="批量删除"
-          description={`此操作不可撤销，将删除已选中的 ${selectedCount} 条数据。`}
+          title={t("table.batchDelete")}
+          description={t("table.batchDeleteDesc", { count: selectedCount })}
           onConfirm={() => {
             onDeleteSelected?.()
             setDeleteDialogOpen(false)

@@ -423,14 +423,14 @@ export function ServicesPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"命名空间"}
-        emptyText={"未找到命名空间"}
+        placeholder={t("search.namespacePlaceholder")}
+        emptyText={`${t("search.notFound")} ${t("search.namespace")}`}
         className="w-40"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"名称"}
+        placeholder={t("search.namePlaceholder")}
         className="h-9 w-40"
       />
     </>
