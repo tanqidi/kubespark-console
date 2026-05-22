@@ -28,6 +28,7 @@ import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { useTranslations } from "@/app/lib/i18n"
 
 type ConfigMapRow = ConfigMapResourceRow
 type JsonObject = Record<string, unknown>
@@ -42,20 +43,23 @@ function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback
 }
 
-const configMapColumns: ColumnConfig<ConfigMapRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "namespace", label: "命名空间" },
-  // { key: "dataItems", label: "数据项"},
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getConfigMapColumns(t: (key: string) => string): ColumnConfig<ConfigMapRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "namespace", label: t("table.columns.namespace") },
+    // { key: "dataItems", label: t("table.columns.dataItems")},
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
 
 export function ConfigMapsPageClient() {
+  const t = useTranslations()
   const [rows, setRows] = React.useState<ConfigMapRow[]>([])
   const [namespaceOptions, setNamespaceOptions] = React.useState<
     Array<{ id: string; name: string }>
@@ -68,7 +72,7 @@ export function ConfigMapsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes ConfigMap 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<ConfigMapRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
@@ -180,13 +184,13 @@ export function ConfigMapsPageClient() {
   const columns = React.useMemo(
     () =>
       createColumns<ConfigMapRow>({
-        columns: configMapColumns,
+        columns: getConfigMapColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"查看 YAML"}
+                {t("table.actions.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -197,7 +201,7 @@ export function ConfigMapsPageClient() {
             label: (
               <>
                 <IconPencil className="size-4" />
-                {"编辑"}
+                {t("table.actions.edit")}
               </>
             ),
             onSelect: (row) => {
@@ -208,7 +212,7 @@ export function ConfigMapsPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {t("table.actions.delete")}
               </>
             ),
             variant: "destructive",
@@ -219,7 +223,7 @@ export function ConfigMapsPageClient() {
           },
         ],
       }),
-    [handleEdit, handleViewYaml, requestDelete]
+    [handleEdit, handleViewYaml, requestDelete, t]
   )
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
@@ -333,7 +337,7 @@ export function ConfigMapsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{t("table.alerts.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -354,14 +358,14 @@ export function ConfigMapsPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"命名空间"}
-        emptyText={"未找到命名空间"}
+        placeholder={t("table.filters.namespace")}
+        emptyText={t("table.filters.noNamespaceFound")}
         className="w-40"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"名称"}
+        placeholder={t("table.filters.name")}
         className="h-9 w-40"
       />
     </>
@@ -391,7 +395,7 @@ export function ConfigMapsPageClient() {
         onSubmit={handleEditSubmit}
       />
       <MonacoViewerDialog
-        title="查看YAML"
+        title={t("dialogs.viewYaml.title")}
         subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
@@ -405,10 +409,10 @@ export function ConfigMapsPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除配置字典"
+        title={t("dialogs.deleteConfirm.configmap.title")}
         description={
           pendingDeleteRow
-            ? `确定删除配置字典 ${pendingDeleteRow.name} 吗？`
+            ? t("dialogs.deleteConfirm.configmap.description", { name: pendingDeleteRow.name })
             : ""
         }
         deleting={deleting}

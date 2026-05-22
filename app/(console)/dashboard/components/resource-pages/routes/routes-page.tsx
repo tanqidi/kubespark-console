@@ -85,6 +85,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { useTranslations } from "@/app/lib/i18n"
 
 type RouteRow = RouteResourceRow
 type RouteCreateStep = "basic" | "rule" | "advanced"
@@ -122,19 +123,21 @@ const MONACO_OPTIONS: EditorProps["options"] = {
   wordWrap: "on",
 }
 
-const routeColumns: ColumnConfig<RouteRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "namespace", label: "命名空间" },
-  // { key: "path", label: "路径" },
-  // { key: "service", label: "服务" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新日期" },
-]
+function getRouteColumns(t: (key: string) => string): ColumnConfig<RouteRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "namespace", label: t("table.columns.namespace") },
+    // { key: "path", label: t("table.columns.path") },
+    // { key: "service", label: t("table.columns.service") },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
 
 const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字和连字符（-），必须以小写字母或数字开头和结尾，最长 253 个字符。"
@@ -416,6 +419,7 @@ function resolveErrorMessage(error: unknown): string {
   return "API request failed"
 }
 export function RoutesPageClient() {
+  const t = useTranslations()
   const createDialogContainerRef = React.useRef<HTMLDivElement | null>(null)
   const createDialogPopupLayerRef = React.useRef<HTMLDivElement | null>(null)
   const [rows, setRows] = React.useState<RouteRow[]>([])
@@ -1422,13 +1426,13 @@ export function RoutesPageClient() {
   const columns = React.useMemo(
     () =>
       createColumns<RouteRow>({
-        columns: routeColumns,
+        columns: getRouteColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"查看 YAML"}
+                {t("actions.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -1439,7 +1443,7 @@ export function RoutesPageClient() {
             label: (
               <>
                 <IconPencil className="size-4" />
-                {"编辑"}
+                {t("actions.edit")}
               </>
             ),
             onSelect: (row) => {
@@ -1450,7 +1454,7 @@ export function RoutesPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {t("actions.delete")}
               </>
             ),
             variant: "destructive",
@@ -1461,7 +1465,7 @@ export function RoutesPageClient() {
           },
         ],
       }),
-    [handleViewYaml, requestDelete, requestEdit]
+    [handleViewYaml, requestDelete, requestEdit, t]
   )
 
   React.useEffect(() => {
@@ -1514,7 +1518,7 @@ export function RoutesPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{t("actions.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -1535,14 +1539,14 @@ export function RoutesPageClient() {
         options={listNamespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"命名空间"}
-        emptyText={"未找到命名空间"}
+        placeholder={t("table.columns.namespace")}
+        emptyText={t("actions.noNamespaceFound")}
         className="w-40"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"名称"}
+        placeholder={t("table.columns.name")}
         className="h-9 w-40"
       />
     </>
@@ -2146,7 +2150,7 @@ export function RoutesPageClient() {
         </DialogContent>
       </Dialog>
 
-      <MonacoViewerDialog title="查看YAML" subtitle={yamlSubtitle} open={yamlOpen} onOpenChange={setYamlOpen} value={yamlContent} language="yaml" loading={yamlLoading} error={yamlError} />
+      <MonacoViewerDialog title={t("actions.viewYamlTitle")} subtitle={yamlSubtitle} open={yamlOpen} onOpenChange={setYamlOpen} value={yamlContent} language="yaml" loading={yamlLoading} error={yamlError} />
       <DeleteConfirmDialog
         open={pendingDeleteRuleHostKey !== null}
         onOpenChange={(open) => {

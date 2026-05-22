@@ -21,23 +21,26 @@ import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
+import { useTranslations } from "@/app/lib/i18n"
 
 type CustomResourceRow = CustomResourceDefinitionRow
 
-const customResourceColumns: ColumnConfig<CustomResourceRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "group", label: "分组" },
-  { key: "kind", label: "类型" },
-  { key: "scope", label: "作用域" },
-  { key: "versions", label: "版本" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getCustomResourceColumns(t: (key: string) => string): ColumnConfig<CustomResourceRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "group", label: t("table.columns.group") },
+    { key: "kind", label: t("table.columns.kind") },
+    { key: "scope", label: t("table.columns.scope") },
+    { key: "versions", label: t("table.columns.versions") },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
 
 function sanitizeCustomResourceDefinitionYamlPayload(payload: unknown): unknown {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload
@@ -79,6 +82,7 @@ function sanitizeCustomResourceDefinitionYamlPayload(payload: unknown): unknown 
 }
 
 export function CustomResourcesPageClient() {
+  const t = useTranslations()
   const [rows, setRows] = React.useState<CustomResourceRow[]>([])
   const [, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -91,7 +95,7 @@ export function CustomResourcesPageClient() {
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [yamlContent, setYamlContent] = React.useState("")
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 CRD 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
 
   const requestDelete = React.useCallback((row: CustomResourceRow) => {
     setPendingDeleteRow(row)
@@ -127,13 +131,13 @@ export function CustomResourcesPageClient() {
   const columns = React.useMemo(
     () =>
       createColumns<CustomResourceRow>({
-        columns: customResourceColumns,
+        columns: getCustomResourceColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                查看 YAML
+                {t("table.actions.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -174,7 +178,7 @@ export function CustomResourcesPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {t("table.actions.delete")}
               </>
             ),
             variant: "destructive",
@@ -184,7 +188,7 @@ export function CustomResourcesPageClient() {
           },
         ],
       }),
-    [requestDelete]
+    [requestDelete, t]
   )
 
   React.useEffect(() => {
@@ -241,7 +245,7 @@ export function CustomResourcesPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{t("table.alerts.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -263,7 +267,7 @@ export function CustomResourcesPageClient() {
       <MonacoViewerDialog
         open={yamlOpen}
         onOpenChange={setYamlOpen}
-        title="查看 YAML"
+        title={t("dialogs.viewYaml.title")}
         subtitle={yamlSubtitle}
         value={yamlContent}
         language="yaml"
@@ -275,8 +279,8 @@ export function CustomResourcesPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除自定义资源定义"
-        description={pendingDeleteRow ? `确定删除自定义资源定义 ${pendingDeleteRow.name} 吗？` : ""}
+        title={t("dialogs.deleteConfirm.customResource.title")}
+        description={pendingDeleteRow ? t("dialogs.deleteConfirm.customResource.description", { name: pendingDeleteRow.name }) : ""}
         deleting={deleting}
         onConfirm={handleConfirmDelete}
       />
@@ -292,22 +296,22 @@ export function CustomResourcesPageClient() {
               options={groupOptions}
               value={groupQuery}
               onValueChange={setGroupQuery}
-              placeholder={"分组"}
-              emptyText={"未找到分组"}
+              placeholder={t("table.filters.group")}
+              emptyText={t("table.filters.noGroupFound")}
               className="w-40"
             />
             <FilterCombobox
               options={scopeOptions}
               value={scopeQuery}
               onValueChange={setScopeQuery}
-              placeholder={"作用域"}
-              emptyText={"未找到作用域"}
+              placeholder={t("table.filters.scope")}
+              emptyText={t("table.filters.noScopeFound")}
               className="w-40"
             />
             <Input
               value={nameQuery}
               onChange={(event) => setNameQuery(event.target.value)}
-              placeholder={"名称"}
+              placeholder={t("table.filters.name")}
               className="h-9 w-40"
             />
           </>

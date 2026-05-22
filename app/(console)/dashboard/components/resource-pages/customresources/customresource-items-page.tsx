@@ -21,6 +21,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
+import { useTranslations } from "@/app/lib/i18n"
 
 type CustomResourceItemsPageClientProps = {
   definitionName: string
@@ -43,18 +44,21 @@ function sanitizeCustomResourceYamlPayload(payload: unknown): unknown {
   }
 }
 
-const itemColumns: ColumnConfig<CustomResourceItemRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getItemColumns(t: (key: string) => string): ColumnConfig<CustomResourceItemRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
 
 export function CustomResourceItemsPageClient({ definitionName }: CustomResourceItemsPageClientProps) {
+  const t = useTranslations()
   const normalizedName = definitionName.trim()
   const [definition, setDefinition] = React.useState<CustomResourceDefinitionRow | null>(null)
   const [rows, setRows] = React.useState<CustomResourceItemRow[]>([])
@@ -70,13 +74,13 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
   const columns = React.useMemo(
     () =>
       createColumns<CustomResourceItemRow>({
-        columns: itemColumns,
+        columns: getItemColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                查看 YAML
+                {t("table.actions.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -117,7 +121,7 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
             label: (
               <>
                 <IconTrash className="size-4" />
-                删除
+                {t("table.actions.delete")}
               </>
             ),
             variant: "destructive",
@@ -128,7 +132,7 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
           },
         ],
       }),
-    [definition]
+    [definition, t]
   )
 
   const loadRows = React.useCallback(async (silent: boolean) => {
@@ -222,7 +226,7 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>加载失败</AlertTitle>
+          <AlertTitle>{t("table.alerts.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -239,8 +243,8 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
     <div className="flex flex-1 flex-col gap-4">
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
-        title="删除自定义资源实例"
-        description={pendingDeleteRow ? `确定删除 ${pendingDeleteRow.name} 吗？` : ""}
+        title={t("dialogs.deleteConfirm.customResourceItem.title")}
+        description={pendingDeleteRow ? t("dialogs.deleteConfirm.customResourceItem.description", { name: pendingDeleteRow.name }) : ""}
         deleting={deleting}
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
@@ -250,7 +254,7 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
       <MonacoViewerDialog
         open={yamlOpen}
         onOpenChange={setYamlOpen}
-        title="查看 YAML"
+        title={t("dialogs.viewYaml.title")}
         value={yamlContent}
         language="yaml"
         loading={yamlLoading}
@@ -264,7 +268,7 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
           <Input
             value={nameQuery}
             onChange={(event) => setNameQuery(event.target.value)}
-            placeholder="名称"
+            placeholder={t("table.filters.name")}
             className="h-9 w-40"
           />
         }

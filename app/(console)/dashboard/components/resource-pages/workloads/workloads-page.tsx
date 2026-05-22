@@ -30,23 +30,26 @@ import { DescribeViewerDialog } from "@/app/(console)/dashboard/components/resou
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useTranslations } from "@/app/lib/i18n"
 
 type WorkloadRow = WorkloadResourceRow
 
-const workloadColumns: ColumnConfig<WorkloadRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "status", label: "状态", render: "status" as const },
-  { key: "namespace", label: "命名空间" },
-  // { key: "desired", label: "期望" },
-  // { key: "ready", label: "就绪" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getWorkloadColumns(t: (key: string) => string): ColumnConfig<WorkloadRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "status", label: t("table.columns.status"), render: "status" as const },
+    { key: "namespace", label: t("table.columns.namespace") },
+    // { key: "desired", label: "期望" },
+    // { key: "ready", label: "就绪" },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
 
 const WORKLOAD_RESOURCE_BY_KIND: Record<WorkloadRow["kind"], string> = {
   Deployment: "deployments",
@@ -61,6 +64,7 @@ const WORKLOAD_DOCUMENT_BY_KIND: Record<WorkloadRow["kind"], ResourceDocumentTyp
 }
 
 export function WorkloadsPageClient() {
+  const t = useTranslations()
   const [rows, setRows] = React.useState<WorkloadRow[]>([])
   const [createNamespaceOptions, setCreateNamespaceOptions] = React.useState<Array<{ id: string; name: string }>>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
@@ -243,13 +247,13 @@ export function WorkloadsPageClient() {
   const columns = React.useMemo(
     () =>
       createColumns<WorkloadRow>({
-        columns: workloadColumns,
+        columns: getWorkloadColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"查看 YAML"}
+                {t("actions.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -260,7 +264,7 @@ export function WorkloadsPageClient() {
             label: (
               <>
                 <IconInfoCircle className="size-4" />
-                {"详情"}
+                {t("actions.details")}
               </>
             ),
             onSelect: (row) => {
@@ -271,7 +275,7 @@ export function WorkloadsPageClient() {
             label: (
               <>
                 <IconPencil className="size-4" />
-                {"编辑"}
+                {t("actions.edit")}
               </>
             ),
             onSelect: (row) => {
@@ -282,7 +286,7 @@ export function WorkloadsPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {t("actions.delete")}
               </>
             ),
             variant: "destructive",
@@ -293,7 +297,7 @@ export function WorkloadsPageClient() {
           },
         ],
       }),
-    [handleEdit, handleViewDescribe, handleViewYaml, requestDelete]
+    [handleEdit, handleViewDescribe, handleViewYaml, requestDelete, t]
   )
 
   React.useEffect(() => {
@@ -328,7 +332,7 @@ export function WorkloadsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{t("actions.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -347,9 +351,9 @@ export function WorkloadsPageClient() {
   const workloadTabs = (
     <Tabs value={typeFilter} onValueChange={(value) => setTypeFilter(value as WorkloadRow["kind"])} className="w-fit">
       <TabsList>
-        <TabsTrigger value="Deployment">{"部署"}</TabsTrigger>
-        <TabsTrigger value="StatefulSet">{"有状态副本集"}</TabsTrigger>
-        <TabsTrigger value="DaemonSet">{"守护进程集"}</TabsTrigger>
+        <TabsTrigger value="Deployment">{t("actions.deployment")}</TabsTrigger>
+        <TabsTrigger value="StatefulSet">{t("actions.statefulSet")}</TabsTrigger>
+        <TabsTrigger value="DaemonSet">{t("actions.daemonSet")}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -360,14 +364,14 @@ export function WorkloadsPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"命名空间"}
-        emptyText={"未找到命名空间"}
+        placeholder={t("table.columns.namespace")}
+        emptyText={t("actions.noNamespaceFound")}
         className="w-40"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"名称"}
+        placeholder={t("table.columns.name")}
         className="h-9 w-40"
       />
     </>
@@ -397,7 +401,7 @@ export function WorkloadsPageClient() {
         onSubmit={handleEditSubmit}
       />
       <DescribeViewerDialog
-        title="查看详情"
+        title={t("actions.viewDetailsTitle")}
         subtitle={describeSubtitle}
         open={describeOpen}
         onOpenChange={setDescribeOpen}
@@ -406,7 +410,7 @@ export function WorkloadsPageClient() {
         error={describeError}
       />
       <MonacoViewerDialog
-        title="查看YAML"
+        title={t("actions.viewYamlTitle")}
         subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
@@ -420,7 +424,7 @@ export function WorkloadsPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除工作负载"
+        title={t("actions.deleteWorkloadTitle")}
         description={
           pendingDeleteRow
             ? `确定删除工作负载 ${pendingDeleteRow.name} 吗？`

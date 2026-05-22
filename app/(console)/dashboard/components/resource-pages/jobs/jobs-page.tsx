@@ -37,23 +37,26 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useTranslations } from "@/app/lib/i18n"
 
 type JobRow = JobResourceRow
 
-const jobColumns: ColumnConfig<JobRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "status", label: "状态", render: "status" as const },
-  { key: "namespace", label: "命名空间" },
-  { key: "duration", label: "时长" },
-  { key: "retry", label: "重试" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getJobColumns(t: (key: string) => string): ColumnConfig<JobRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "status", label: t("table.columns.status"), render: "status" as const },
+    { key: "namespace", label: t("table.columns.namespace") },
+    { key: "duration", label: t("table.columns.duration") },
+    { key: "retry", label: t("table.columns.retry") },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
 
 const JOB_RESOURCE_BY_KIND: Record<JobRow["kind"], string> = {
   Job: "jobs",
@@ -476,6 +479,7 @@ function parseJobInitialValues(kind: JobRow["kind"], row: JobRow, payload: unkno
 }
 
 export function JobsPageClient() {
+  const t = useTranslations()
   const [rows, setRows] = React.useState<JobRow[]>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
@@ -493,12 +497,12 @@ export function JobsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes 任务的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState(t("actions.viewYamlSubtitle"))
   const [describeOpen, setDescribeOpen] = React.useState(false)
   const [describeContent, setDescribeContent] = React.useState("")
   const [describeLoading, setDescribeLoading] = React.useState(false)
   const [describeError, setDescribeError] = React.useState<string | null>(null)
-  const [describeSubtitle, setDescribeSubtitle] = React.useState("查看 Kubernetes 任务的详情内容。")
+  const [describeSubtitle, setDescribeSubtitle] = React.useState(t("actions.viewDetailsSubtitle"))
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<JobRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -529,7 +533,7 @@ export function JobsPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("actions.loadYamlFailed")
         setYamlError(message)
         console.error("[Jobs] view yaml request failed", {
           kind: row.kind,
@@ -541,7 +545,7 @@ export function JobsPageClient() {
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const handleViewDescribe = React.useCallback((row: JobRow) => {
     const resource = JOB_RESOURCE_BY_KIND[row.kind]
@@ -553,16 +557,16 @@ export function JobsPageClient() {
 
     void fetchResourceDescribe("batch", "v1", resource, row.name, row.namespace)
       .then(({ text }) => {
-        setDescribeContent(text || "(无详情输出)")
+        setDescribeContent(text || t("actions.noOutput"))
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载详情失败"
+        const message = e instanceof Error ? e.message : t("actions.loadDetailsFailed")
         setDescribeError(message)
       })
       .finally(() => {
         setDescribeLoading(false)
       })
-  }, [])
+  }, [t])
 
   const requestDelete = React.useCallback((row: JobRow) => {
     setPendingDeleteRow(row)
@@ -577,7 +581,7 @@ export function JobsPageClient() {
         setPendingDeleteRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("actions.deleteFailed")
         setError(message)
         console.error("[Jobs] delete request failed", {
           kind: pendingDeleteRow.kind,
@@ -588,18 +592,18 @@ export function JobsPageClient() {
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeleteRow])
+  }, [deleting, pendingDeleteRow, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: JobRow[]) => {
     if (selectedRows.length === 0) return
     void Promise.all(
       selectedRows.map((row) => deleteJob(row.kind, row.namespace, row.name))
     ).catch((e: unknown) => {
-      const message = e instanceof Error ? e.message : "删除失败"
+      const message = e instanceof Error ? e.message : t("actions.deleteFailed")
       setError(message)
       console.error("[Jobs] bulk delete request failed", e)
     })
-  }, [])
+  }, [t])
 
   const handleEdit = React.useCallback((row: JobRow) => {
     const resource = JOB_RESOURCE_BY_KIND[row.kind]
@@ -612,14 +616,14 @@ export function JobsPageClient() {
         setEditDialogOpen(true)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载任务详情失败"
+        const message = e instanceof Error ? e.message : t("actions.loadDetailsFailed")
         setError(message)
       })
-  }, [])
+  }, [t])
 
   const columns = React.useMemo(() => {
     const baseColumns = createColumns<JobRow>({
-      columns: jobColumns,
+      columns: getJobColumns(t),
       includeActions: false,
     })
 
@@ -646,16 +650,16 @@ export function JobsPageClient() {
               <DropdownMenuGroup>
                 <DropdownMenuItem onSelect={() => handleViewYaml(current)}>
                   <IconEye className="size-4" />
-                  {"查看 YAML"}
+                  {t("actions.viewYaml")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => handleViewDescribe(current)}>
                   <IconInfoCircle className="size-4" />
-                  详情
+                  {t("actions.details")}
                 </DropdownMenuItem>
                 {current.kind === "CronJob" ? (
                   <DropdownMenuItem onSelect={() => handleEdit(current)}>
                     <IconPencil className="size-4" />
-                    编辑
+                    {t("actions.edit")}
                   </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuSeparator />
@@ -664,7 +668,7 @@ export function JobsPageClient() {
                   onSelect={() => requestDelete(current)}
                 >
                   <IconTrash className="size-4" />
-                  {"删除"}
+                  {t("actions.delete")}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -674,7 +678,7 @@ export function JobsPageClient() {
     }
 
     return [...baseColumns, actionColumn]
-  }, [handleEdit, handleViewDescribe, handleViewYaml, requestDelete])
+  }, [handleEdit, handleViewDescribe, handleViewYaml, requestDelete, t])
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
     if (!silent) {
@@ -754,7 +758,7 @@ export function JobsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{t("actions.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -773,8 +777,8 @@ export function JobsPageClient() {
   const jobTabs = (
     <Tabs value={jobType} onValueChange={(value) => setJobType(value as JobRow["kind"])} className="w-fit">
       <TabsList>
-        <TabsTrigger value="Job">{"任务"}</TabsTrigger>
-        <TabsTrigger value="CronJob">{"定时任务"}</TabsTrigger>
+        <TabsTrigger value="Job">{t("actions.job")}</TabsTrigger>
+        <TabsTrigger value="CronJob">{t("actions.cronJob")}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -785,14 +789,14 @@ export function JobsPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"命名空间"}
-        emptyText={"未找到命名空间"}
+        placeholder={t("table.columns.namespace")}
+        emptyText={t("actions.noNamespaceFound")}
         className="w-40"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"名称"}
+        placeholder={t("table.columns.name")}
         className="h-9 w-40"
       />
     </>
@@ -822,7 +826,7 @@ export function JobsPageClient() {
         onSubmit={handleEditSubmit}
       />
       <DescribeViewerDialog
-        title="查看详情"
+        title={t("actions.viewDetailsTitle")}
         subtitle={describeSubtitle}
         open={describeOpen}
         onOpenChange={setDescribeOpen}
@@ -831,7 +835,7 @@ export function JobsPageClient() {
         error={describeError}
       />
       <MonacoViewerDialog
-        title="查看YAML"
+        title={t("actions.viewYamlTitle")}
         subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
@@ -845,7 +849,7 @@ export function JobsPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除任务"
+        title={t("actions.deleteJobTitle")}
         description={
           pendingDeleteRow
             ? `确定删除任务 ${pendingDeleteRow.name} 吗？`

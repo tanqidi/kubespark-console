@@ -1,12 +1,13 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { IconCloudBolt } from "@tabler/icons-react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import * as React from "react";
+import { IconCloudBolt } from "@tabler/icons-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-import { SidebarAboutDialog } from "@/app/(console)/dashboard/components/sidebar-about-dialog"
-import type { SidebarMenuItem as KSMenuItem } from "@/app/(console)/dashboard/components/sidebar-data"
+import { SidebarAboutDialog } from "@/app/(console)/dashboard/components/sidebar-about-dialog";
+import type { SidebarMenuItem as KSMenuItem } from "@/app/(console)/dashboard/components/sidebar-data";
+import { useTranslations, useLocale } from "@/app/lib/i18n";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -16,20 +17,32 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 function toDashboardPath(path?: string) {
-  if (!path) return "/dashboard"
-  return `/dashboard${path}`
+  if (!path) return "/dashboard";
+  return `/dashboard${path}`;
 }
 
 export function NavMain({
   items,
 }: {
-  items: KSMenuItem[]
+  items: KSMenuItem[];
 }) {
-  const pathname = usePathname()
-  const [aboutOpen, setAboutOpen] = React.useState(false)
+  const pathname = usePathname();
+  const t = useTranslations("menu");
+  const { locale } = useLocale();
+  const [aboutOpen, setAboutOpen] = React.useState(false);
+
+  const getTranslatedTitle = (item: KSMenuItem) => {
+    if (item.labelKey) {
+      const translated = t(item.labelKey);
+      if (translated !== item.labelKey) {
+        return translated;
+      }
+    }
+    return item.title;
+  };
 
   return (
     <SidebarGroup>
@@ -40,16 +53,9 @@ export function NavMain({
               asChild
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
             >
-              {/*<Link href="/dashboard/nodes">*/}
-              {/*<Link href="#">
-                <IconCloudBolt />
-                <span>KubeSpark 控制台</span>
-                <span>DEV开发测试集群</span>
-              </Link>*/}
               <div>
                 <IconCloudBolt />
-                {/*<span>KubeSpark 控制台</span>*/}
-                <span>开发测试集群</span>
+                <span>{locale === "zh-CN" ? "开发测试集群" : "Development Cluster"}</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -57,56 +63,59 @@ export function NavMain({
 
         <SidebarMenu>
           {items.map((item) => {
+            const translatedTitle = getTranslatedTitle(item);
+            
             if (item.children?.length) {
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton>
                     {item.icon && <item.icon />}
-                    <span>{item.title}</span>
+                    <span>{translatedTitle}</span>
                   </SidebarMenuButton>
                   <SidebarMenuSub>
                     {item.children.map((child) => {
-                      const targetPath = toDashboardPath(child.path)
+                      const targetPath = toDashboardPath(child.path);
+                      const childTranslatedTitle = getTranslatedTitle(child);
                       return (
                         <SidebarMenuSubItem key={`${item.title}-${child.title}`}>
                           <SidebarMenuSubButton asChild isActive={pathname === targetPath}>
-                            <Link href={targetPath}>{child.title}</Link>
+                            <Link href={targetPath}>{childTranslatedTitle}</Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
-                      )
+                      );
                     })}
                   </SidebarMenuSub>
                 </SidebarMenuItem>
-              )
+              );
             }
 
-            const targetPath = toDashboardPath(item.path)
+            const targetPath = toDashboardPath(item.path);
             return (
               <SidebarMenuItem key={item.title}>
                 {item.labelKey === "about" ? (
                   <SidebarMenuButton
                     isActive={aboutOpen}
-                    tooltip={item.title}
+                    tooltip={translatedTitle}
                     onClick={() => setAboutOpen(true)}
                   >
                     {item.icon && <item.icon />}
-                    <span>{item.title}</span>
+                    <span>{translatedTitle}</span>
                   </SidebarMenuButton>
                 ) : (
-                  <SidebarMenuButton asChild isActive={pathname === targetPath} tooltip={item.title}>
+                  <SidebarMenuButton asChild isActive={pathname === targetPath} tooltip={translatedTitle}>
                     <Link href={targetPath}>
                       {item.icon && <item.icon />}
-                      <span>{item.title}</span>
+                      <span>{translatedTitle}</span>
                     </Link>
                   </SidebarMenuButton>
                 )}
               </SidebarMenuItem>
-            )
+            );
           })}
         </SidebarMenu>
 
         <SidebarAboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
       </SidebarGroupContent>
     </SidebarGroup>
-  )
+  );
 }

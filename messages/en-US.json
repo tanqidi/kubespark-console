@@ -1,0 +1,161 @@
+{
+  "login": {
+    "title": "Sign in to your account",
+    "username": {
+      "label": "Username",
+      "placeholder": "Enter your username"
+    },
+    "password": {
+      "label": "Password",
+      "placeholder": "Enter your password",
+      "toggle": {
+        "show": "Show password",
+        "hide": "Hide password"
+      }
+    },
+    "remember": "Remember me on this device",
+    "actions": {
+      "submit": "Sign in",
+      "submitting": "Signing in..."
+    },
+    "errors": {
+      "missingToken": "Login succeeded but no token was returned",
+      "failed": "Login failed. Please check your username and password"
+    },
+    "footer": "KubeSpark Cluster Management"
+  },
+  "header": {
+    "nav": {
+      "platform": "Platform",
+      "store": "App Store",
+      "pipeline": "Pipelines"
+    },
+    "userMenu": {
+      "status": "Status",
+      "profile": "Profile",
+      "feedback": "Feedback",
+      "about": "About",
+      "settings": "Settings",
+      "logout": "Sign out"
+    },
+    "aria": {
+      "openUserMenu": "Open user menu"
+    }
+  },
+  "menu": {
+    "overview": "Overview",
+    "nodes": "Nodes",
+    "projects": "Projects",
+    "pipelines": "Pipelines",
+    "workspaces": "Enterprise Workspaces",
+    "workloadsGroup": "Application Workloads",
+    "workloads": "Workloads",
+    "jobs": "Jobs",
+    "pods": "Pods",
+    "services": "Services",
+    "routes": "Routes",
+    "config": "Configuration",
+    "configmaps": "Config Maps",
+    "secrets": "Secrets",
+    "serviceaccounts": "Service Accounts",
+    "customresources": "Custom Resources",
+    "storage": "Storage",
+    "storageclasses": "Storage Classes",
+    "volumes": "Volumes",
+    "settings": "Cluster Settings",
+    "about": "About"
+  },
+  "table": {
+    "columns": {
+      "name": "Name",
+      "status": "Status",
+      "role": "Role",
+      "pods": "Pods",
+      "age": "Age",
+      "updated": "Updated",
+      "updatedAt": "Updated",
+      "namespace": "Namespace",
+      "node": "Node",
+      "ip": "IP",
+      "kind": "Kind",
+      "version": "Version",
+      "size": "Size",
+      "type": "Type",
+      "duration": "Duration",
+      "retry": "Retry",
+      "serviceAccount": "Service Account",
+      "createdAt": "Created",
+      "description": "Description",
+      "scope": "Scope",
+      "clusterScope": "Cluster Scoped",
+      "resourceQuota": "Resource Quota",
+      "limitRange": "Limit Range",
+      "provider": "Provider",
+      "reclaimPolicy": "Reclaim Policy",
+      "bindingMode": "Binding Mode",
+      "allowVolumeExpansion": "Allow Volume Expansion",
+      "volumeBindingMode": "Volume Binding Mode",
+      "default": "Default",
+      "yes": "Yes",
+      "no": "No",
+      "provisioner": "Provisioner",
+      "selector": "Selector",
+      "targetPort": "Target Port",
+      "clusterIP": "Cluster IP",
+      "externalIP": "External IP",
+      "sessionAffinity": "Session Affinity",
+      "type": "Type",
+      "internalAccess": "Internal Access",
+      "externalAccess": "External Access"
+    },
+    "filters": {
+      "name": "Name",
+      "namespace": "Namespace",
+      "status": "Status",
+      "kind": "Kind"
+    }
+  },
+  "nodes": {
+    "describeSubtitle": "View Kubernetes Node ({name}) details."
+  },
+  "actions": {
+    "details": "Details",
+    "edit": "Edit",
+    "delete": "Delete",
+    "viewYaml": "View YAML",
+    "logs": "Logs",
+    "terminal": "Terminal",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "loadFailed": "Load failed",
+    "apiRequestFailed": "API request failed",
+    "noOutput": "(No output)",
+    "name": "Name",
+    "noNamespaceFound": "No namespace found",
+    "deployment": "Deployment",
+    "statefulSet": "StatefulSet",
+    "daemonSet": "DaemonSet",
+    "job": "Job",
+    "cronJob": "CronJob",
+    "confirmDelete": "Confirm delete",
+    "deleteFailed": "Delete failed",
+    "loadDetailsFailed": "Load details failed",
+    "loadYamlFailed": "Load YAML failed",
+    "viewYamlTitle": "View YAML",
+    "viewDetailsTitle": "View Details",
+    "viewYamlSubtitle": "View Kubernetes resource YAML content.",
+    "viewDetailsSubtitle": "View Kubernetes resource details.",
+    "viewYamlSubtitleWithName": "View Kubernetes {kind} ({namespace}/{name}) YAML content.",
+    "viewDetailsSubtitleWithName": "View Kubernetes {kind} ({namespace}/{name}) details.",
+    "deleteJobTitle": "Delete Job",
+    "deleteJobDescription": "Are you sure you want to delete job {name}?",
+    "deleteWorkloadTitle": "Delete Workload",
+    "deleteWorkloadDescription": "Are you sure you want to delete workload {name}?",
+    "cluster": "Cluster",
+    "dev": "Development"
+  },
+  "pagination": {
+    "itemsPerPage": "{count} / page",
+    "total": "Total {count} records"
+  }
+}

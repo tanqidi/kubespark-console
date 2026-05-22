@@ -4,7 +4,6 @@ import * as React from "react"
 import { IconInfoCircle } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
-// import { ResourceLoadingState } from "@/app/(console)/dashboard/components/resource-pages/loading-state" // disabled: avoid layout jitter during loading
 import {
   createColumns,
 } from "@/app/(console)/dashboard/components/table/columns-factory"
@@ -13,6 +12,7 @@ import { fetchResourceDescribe } from "@/app/lib/kubespark/common"
 import { DescribeViewerDialog } from "@/app/(console)/dashboard/components/resource-pages/describe-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { useTranslations } from "@/app/lib/i18n"
 
 type NodeRow = NodeResourceRow
 
@@ -25,55 +25,55 @@ export function NodesPageClient() {
   const [describeContent, setDescribeContent] = React.useState("")
   const [describeLoading, setDescribeLoading] = React.useState(false)
   const [describeError, setDescribeError] = React.useState<string | null>(null)
-  const [describeSubtitle, setDescribeSubtitle] = React.useState("查看 Kubernetes Node 的详情内容。")
+  const [describeSubtitle, setDescribeSubtitle] = React.useState("")
+
+  const t = useTranslations()
 
   const handleViewDescribe = React.useCallback((row: NodeRow) => {
     setDescribeOpen(true)
     setDescribeError(null)
     setDescribeLoading(true)
     setDescribeContent("")
-    setDescribeSubtitle(`查看 Kubernetes Node（${row.name}）的详情内容。`)
+    setDescribeSubtitle(t("nodes.describeSubtitle", { name: row.name }))
 
     void fetchResourceDescribe("core", "v1", "nodes", row.name)
       .then(({ text }) => {
-        setDescribeContent(text || "(无详情输出)")
+        setDescribeContent(text || t("actions.noOutput"))
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载详情失败"
+        const message = e instanceof Error ? e.message : t("actions.loadDetailsFailed")
         setDescribeError(message)
       })
       .finally(() => {
         setDescribeLoading(false)
       })
-  }, [])
+  }, [t])
 
   const columns = React.useMemo(() => createColumns<NodeRow>({
     columns: [
-    {
-      key: "name",
-      label: "名称",
-      enableHiding: false,
-      cell: (_, row) => (
-        <div className="min-w-0">
-          <div className="truncate font-medium">{row.name}</div>
-          <div className="truncate text-sm text-muted-foreground">{row.ip || "-"}</div>
-        </div>
-      ),
-    },
-    { key: "status", label: "状态", render: "status" },
-    { key: "role", label: "角色" },
-    // { key: "cpuUsage", label: "CPU 使用率"},
-    // { key: "memoryUsage", label: "内存使用率"},
-    { key: "pods", label: "容器组"},
-    { key: "age", label: "运行时间" },
-    { key: "updatedAt", label: "更新时间" },
-  ],
+      {
+        key: "name",
+        label: t("table.columns.name"),
+        enableHiding: false,
+        cell: (_value, row) => (
+          <div className="min-w-0">
+            <div className="truncate font-medium">{row.name}</div>
+            <div className="truncate text-sm text-muted-foreground">{row.ip || "-"}</div>
+          </div>
+        ),
+      },
+      { key: "status", label: t("table.columns.status"), render: "status" },
+      { key: "role", label: t("table.columns.role") },
+      { key: "pods", label: t("table.columns.pods") },
+      { key: "age", label: t("table.columns.age") },
+      { key: "updatedAt", label: t("table.columns.updatedAt") },
+    ],
     actionItems: [
       {
         label: (
           <>
             <IconInfoCircle className="size-4" />
-            {"详情"}
+            {t("actions.details")}
           </>
         ),
         onSelect: (row) => {
@@ -81,7 +81,7 @@ export function NodesPageClient() {
         },
       },
     ],
-  }), [handleViewDescribe])
+  }), [handleViewDescribe, t])
 
   React.useEffect(() => {
     let cancelled = false
@@ -100,7 +100,7 @@ export function NodesPageClient() {
         if (cancelled) return
         if (!silent) {
           setRows([])
-          setError(e instanceof Error ? e.message : "API request failed")
+          setError(e instanceof Error ? e.message : t("actions.apiRequestFailed"))
         } else {
           console.error("[Nodes] polling refresh failed", e)
         }
@@ -118,13 +118,13 @@ export function NodesPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [])
-  // if (loading) return <ResourceLoadingState /> // kept for potential future use
+  }, [t])
+
   if (error) {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{t("actions.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -141,7 +141,7 @@ export function NodesPageClient() {
     <Input
       value={nameQuery}
       onChange={(event) => setNameQuery(event.target.value)}
-      placeholder={"名称"}
+      placeholder={t("actions.name")}
       className="h-9 w-40"
     />
   )
@@ -149,7 +149,7 @@ export function NodesPageClient() {
   return (
     <>
       <DescribeViewerDialog
-        title="查看详情"
+        title={t("actions.viewDetailsTitle")}
         subtitle={describeSubtitle}
         open={describeOpen}
         onOpenChange={setDescribeOpen}

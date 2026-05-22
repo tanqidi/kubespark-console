@@ -33,10 +33,29 @@ import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { useTranslations } from "@/app/lib/i18n"
 
 type PodRow = PodResourceRow
 
+function getPodColumns(t: (key: string) => string) {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "status", label: t("table.columns.status"), render: "status" },
+    { key: "namespace", label: t("table.columns.namespace") },
+    { key: "node", label: t("table.columns.node") },
+    { key: "ip", label: t("table.columns.ip") },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
+
 export function PodsPageClient() {
+  const t = useTranslations()
   const [rows, setRows] = React.useState<PodRow[]>([])
   const [createNamespaceOptions, setCreateNamespaceOptions] = React.useState<Array<{ id: string; name: string }>>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
@@ -50,10 +69,10 @@ export function PodsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Pod 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
   const [logsOpen, setLogsOpen] = React.useState(false)
-  const [logsTitle, setLogsTitle] = React.useState("查看日志")
-  const [logsSubtitle, setLogsSubtitle] = React.useState("查看 Kubernetes Pod 的日志内容。")
+  const [logsTitle, setLogsTitle] = React.useState("")
+  const [logsSubtitle, setLogsSubtitle] = React.useState("")
   const [logsContent, setLogsContent] = React.useState("")
   const [logsLoading, setLogsLoading] = React.useState(false)
   const [logsError, setLogsError] = React.useState<string | null>(null)
@@ -66,8 +85,8 @@ export function PodsPageClient() {
   const [realtimeLogs, setRealtimeLogs] = React.useState(false)
   const [logsDownloading, setLogsDownloading] = React.useState(false)
   const [terminalOpen, setTerminalOpen] = React.useState(false)
-  const [terminalTitle, setTerminalTitle] = React.useState("容器终端")
-  const [terminalSubtitle, setTerminalSubtitle] = React.useState("连接 Kubernetes Pod 的终端会话。")
+  const [terminalTitle, setTerminalTitle] = React.useState("")
+  const [terminalSubtitle, setTerminalSubtitle] = React.useState("")
   const [terminalWsUrl, setTerminalWsUrl] = React.useState<string | null>(null)
   const logsAbortRef = React.useRef<AbortController | null>(null)
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PodRow | null>(null)
@@ -103,21 +122,21 @@ export function PodsPageClient() {
 
   const handleViewLogs = React.useCallback((row: PodRow) => {
     setLogsOpen(true)
-    setLogsTitle("查看日志")
+    setLogsTitle(t("table.actions.logs"))
     setLogsSubtitle(`查看 Kubernetes Pod（${row.namespace}/${row.name}）的日志内容。`)
     setLogsTarget({ name: row.name, namespace: row.namespace })
     setLogsContent("")
-  }, [])
+  }, [t])
 
   const handleOpenTerminal = React.useCallback((row: PodRow) => {
     const wsUrl = buildPodExecWsEndpoint(row.namespace, row.name, {
       command: ["/bin/sh"],
     })
-    setTerminalTitle("容器终端")
+    setTerminalTitle(t("table.actions.terminal"))
     setTerminalSubtitle(`连接 Kubernetes Pod（${row.namespace}/${row.name}）的终端会话。`)
     setTerminalWsUrl(wsUrl)
     setTerminalOpen(true)
-  }, [])
+  }, [t])
 
   const handleViewDescribe = React.useCallback((row: PodRow) => {
     setDescribeOpen(true)
@@ -285,26 +304,13 @@ export function PodsPageClient() {
   const columns = React.useMemo(
     () =>
       createColumns<PodRow>({
-        columns: [
-          {
-            key: "name",
-            label: "名称",
-            enableHiding: false,
-            cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-          },
-          { key: "status", label: "状态", render: "status" },
-          { key: "namespace", label: "命名空间" },
-          { key: "node", label: "节点" },
-          { key: "ip", label: "IP" },
-          { key: "age", label: "运行时间" },
-          { key: "updatedAt", label: "更新时间" },
-        ],
+        columns: getPodColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"查看 YAML"}
+                {t("actions.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -315,7 +321,7 @@ export function PodsPageClient() {
             label: (
               <>
                 <IconFileText className="size-4" />
-                {"日志"}
+                {t("actions.logs")}
               </>
             ),
             onSelect: (row) => {
@@ -326,7 +332,7 @@ export function PodsPageClient() {
             label: (
               <>
                 <IconInfoCircle className="size-4" />
-                {"详情"}
+                {t("actions.details")}
               </>
             ),
             onSelect: (row) => {
@@ -337,7 +343,7 @@ export function PodsPageClient() {
             label: (
               <>
                 <IconTerminal2 className="size-4" />
-                {"终端"}
+                {t("actions.terminal")}
               </>
             ),
             onSelect: (row) => {
@@ -348,7 +354,7 @@ export function PodsPageClient() {
             label: (
               <>
                 <IconPencil className="size-4" />
-                {"编辑"}
+                {t("actions.edit")}
               </>
             ),
             onSelect: (row) => {
@@ -359,7 +365,7 @@ export function PodsPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {t("actions.delete")}
               </>
             ),
             variant: "destructive",
@@ -370,7 +376,7 @@ export function PodsPageClient() {
           },
         ],
       }),
-    [handleOpenTerminal, handleViewDescribe, handleViewLogs, handleViewYaml, requestDelete]
+    [handleOpenTerminal, handleViewDescribe, handleViewLogs, handleViewYaml, requestDelete, t]
   )
 
   const refreshRows = React.useCallback(async () => {
@@ -445,7 +451,7 @@ export function PodsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>{"加载失败"}</AlertTitle>
+          <AlertTitle>{t("table.alerts.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -466,14 +472,14 @@ export function PodsPageClient() {
         options={namespaceOptions}
         value={namespaceQuery}
         onValueChange={setNamespaceQuery}
-        placeholder={"命名空间"}
-        emptyText={"未找到命名空间"}
+        placeholder={t("table.filters.namespace")}
+        emptyText={t("table.filters.noNamespaces")}
         className="w-40"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder={"名称"}
+        placeholder={t("table.filters.name")}
         className="h-9 w-40"
       />
     </>
@@ -505,7 +511,7 @@ export function PodsPageClient() {
         }}
       />
       <MonacoViewerDialog
-        title="查看YAML"
+        title={t("dialogs.viewYaml.title")}
         subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
@@ -515,8 +521,8 @@ export function PodsPageClient() {
         error={yamlError}
       />
       <DescribeViewerDialog
-        title="查看详情"
-        subtitle={describeTarget ? `查看 Kubernetes Pod（${describeTarget.namespace}/${describeTarget.name}）的详情内容。` : "查看 Kubernetes Pod 的详情内容。"}
+        title={t("dialogs.viewDetails.title")}
+        subtitle={describeTarget ? `查看 Kubernetes Pod（${describeTarget.namespace}/${describeTarget.name}）的详情内容。` : ""}
         open={describeOpen}
         onOpenChange={(open) => {
           setDescribeOpen(open)
@@ -560,10 +566,10 @@ export function PodsPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除容器组"
+        title={t("dialogs.delete.title")}
         description={
           pendingDeleteRow
-            ? `确定删除容器组 ${pendingDeleteRow.name} 吗？`
+            ? `${t("dialogs.delete.description")} ${pendingDeleteRow.name} 吗？`
             : ""
         }
         deleting={deleting}

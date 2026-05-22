@@ -28,36 +28,40 @@ import { FilterCombobox } from "@/components/ui/filter-combobox"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { useTranslations } from "@/app/lib/i18n"
 
 type ServiceRow = ServiceResourceRow
 
-const serviceColumns: ColumnConfig<ServiceRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "namespace", label: "命名空间" },
-  {
-    key: "internalAccess",
-    label: "内部访问",
-    cell: (_value, row) =>
-      // renderNameDescriptionCell(row.internalAccess, row.internalAccessType),
-      renderNameDescriptionCell(row.internalAccess, null),
-  },
-  {
-    key: "externalAccess",
-    label: "外部访问",
-    cell: (_value, row) =>
-      // renderNameDescriptionCell(row.externalAccess, row.externalAccessType),
-      renderNameDescriptionCell(row.externalAccess, null),
-  },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getServiceColumns(t: (key: string) => string): ColumnConfig<ServiceRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "namespace", label: t("table.columns.namespace") },
+    {
+      key: "internalAccess",
+      label: t("table.columns.internalAccess"),
+      cell: (_value, row) =>
+        // renderNameDescriptionCell(row.internalAccess, row.internalAccessType),
+        renderNameDescriptionCell(row.internalAccess, null),
+    },
+    {
+      key: "externalAccess",
+      label: t("table.columns.externalAccess"),
+      cell: (_value, row) =>
+        // renderNameDescriptionCell(row.externalAccess, row.externalAccessType),
+        renderNameDescriptionCell(row.externalAccess, null),
+    },
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
 
 export function ServicesPageClient() {
+  const t = useTranslations()
   const [rows, setRows] = React.useState<ServiceRow[]>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [editDialogOpen, setEditDialogOpen] = React.useState(false)
@@ -284,13 +288,13 @@ export function ServicesPageClient() {
   const columns = React.useMemo(
     () =>
       createColumns<ServiceRow>({
-        columns: serviceColumns,
+        columns: getServiceColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"查看 YAML"}
+                {t("actions.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -301,7 +305,7 @@ export function ServicesPageClient() {
             label: (
               <>
                 <IconInfoCircle className="size-4" />
-                {"详情"}
+                {t("actions.details")}
               </>
             ),
             onSelect: (row) => {
@@ -312,7 +316,7 @@ export function ServicesPageClient() {
             label: (
               <>
                 <IconPencil className="size-4" />
-                {"编辑"}
+                {t("actions.edit")}
               </>
             ),
             onSelect: (row) => {
@@ -323,7 +327,7 @@ export function ServicesPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {t("actions.delete")}
               </>
             ),
             variant: "destructive",
@@ -334,7 +338,7 @@ export function ServicesPageClient() {
           },
         ],
       }),
-    [handleEdit, handleViewDescribe, handleViewYaml, requestDelete]
+    [handleEdit, handleViewDescribe, handleViewYaml, requestDelete, t]
   )
 
   const refreshRows = React.useCallback(async (silent: boolean) => {

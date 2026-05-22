@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+
 type ColumnRender = "text" | "badge" | "status" | "input"
 
 export function renderNameDescriptionCell(name: unknown, description?: unknown) {
@@ -43,7 +44,8 @@ export function renderNameDescriptionCell(name: unknown, description?: unknown) 
 
 export type ColumnConfig<TData> = {
   key: keyof TData & string
-  label: React.ReactNode
+  label?: React.ReactNode
+  labelKey?: string
   header?: React.ReactNode
   align?: "left" | "center" | "right"
   enableHiding?: boolean
@@ -215,6 +217,7 @@ export function createColumns<TData extends Record<string, unknown>>(
             typeof rawHeader === "boolean"
                 ? ""
                 : rawHeader
+        
         const headerTemplate: ColumnDef<TData>["header"] =
             typeof normalizedHeader === "string"
                 ? normalizedHeader
@@ -244,7 +247,6 @@ export function createColumns<TData extends Record<string, unknown>>(
   if (includeActions) {
     defs.push({
       id: "actions",
-      // header: "操作",
       header: "",
       cell: ({ row }) =>
           visibleActionItems.length === 0 ? (
