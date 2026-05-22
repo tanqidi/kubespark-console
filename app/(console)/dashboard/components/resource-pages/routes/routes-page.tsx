@@ -1619,8 +1619,12 @@ export function RoutesPageClient() {
                           : t("routesDialog.notConfigured"),
                     active: createStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
-                    disabled: !canNavigateCreateSteps,
-                    onClick: () => setCreateStep("basic"),
+                    disabled: creating || checkingCreateNext,
+                    onClick: () => {
+                      if (creating || checkingCreateNext) return
+                      setCreateStep("basic")
+                      setCreateSubmitError(null)
+                    },
                   },
                   {
                     id: "rule",
@@ -1633,8 +1637,20 @@ export function RoutesPageClient() {
                           : t("routesDialog.notConfigured"),
                     active: createStep === "rule",
                     icon: <IconRoute2 className="size-4" />,
-                    disabled: !canNavigateCreateSteps,
-                    onClick: () => setCreateStep("rule"),
+                    disabled: creating || checkingCreateNext,
+                    onClick: () => {
+                      if (creating || checkingCreateNext) return
+                      if (createStep === "rule") {
+                        setCreateSubmitError(null)
+                        return
+                      }
+                      if (createStep === "basic") {
+                        void handleCreateNext()
+                        return
+                      }
+                      setCreateStep("rule")
+                      setCreateSubmitError(null)
+                    },
                   },
                   {
                     id: "advanced",
@@ -1647,8 +1663,24 @@ export function RoutesPageClient() {
                           : t("routesDialog.notConfigured"),
                     active: createStep === "advanced",
                     icon: <IconAdjustments className="size-4" />,
-                    disabled: !canNavigateCreateSteps,
-                    onClick: () => setCreateStep("advanced"),
+                    disabled: creating || checkingCreateNext,
+                    onClick: () => {
+                      if (creating || checkingCreateNext) return
+                      if (createStep === "advanced") {
+                        setCreateSubmitError(null)
+                        return
+                      }
+                      if (createStep === "basic") {
+                        void handleCreateNext()
+                        return
+                      }
+                      if (createStep === "rule") {
+                        void handleCreateNext()
+                        return
+                      }
+                      setCreateStep("advanced")
+                      setCreateSubmitError(null)
+                    },
                   },
                 ]}
               />

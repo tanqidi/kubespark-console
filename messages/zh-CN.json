@@ -314,7 +314,7 @@
     "yamlParseFailed": "YAML 解析失败",
     "yamlMode": "编辑 YAML",
     "workloadExists": "工作负载名称已存在，请更换后重试",
-    "nameRequired": "请选择项目",
+    "nameRequired": "请输入名称",
     "pleaseSelectNamespace": "请选择项目",
     "nameAlreadyExists": "工作负载名称已存在，请更换后重试",
     "nameValidationFailed": "名称校验失败",
@@ -557,7 +557,7 @@
     "yamlMode": "编辑 YAML",
     "jobExists": "任务名称已存在，请更换后重试",
     "cronJobExists": "定时任务名称已存在，请更换后重试",
-    "nameRequired": "请选择项目",
+    "nameRequired": "请输入名称",
     "pleaseSelectNamespace": "请选择项目",
     "pleaseEnterName": "请输入名称",
     "nameAlreadyExists": "任务名称已存在，请更换后重试",
@@ -619,6 +619,7 @@
     "namespace": "项目",
     "namespacePlaceholder": "请选择项目",
     "namespaceSelect": "选择容器组所属项目。",
+    "namespaceRequired": "请选择项目",
     "description": "描述",
     "descriptionPlaceholder": "请输入描述",
     "descriptionHint": "描述将写入资源注解 description，最长 256 个字符。",
@@ -669,7 +670,7 @@
     "configMounted": "个容器已配置",
     "yamlParseFailed": "YAML 解析失败",
     "yamlMode": "编辑 YAML",
-    "nameRequired": "请选择项目",
+    "nameRequired": "请输入名称",
     "pleaseSelectNamespace": "请选择项目",
     "pleaseEnterName": "请输入名称",
     "nameValidationFailed": "名称校验失败",
@@ -1018,6 +1019,13 @@
   },
   "pagination": {
     "itemsPerPage": "{count}条/页",
-    "total": "共 {count} 条记录"
+    "total": "共 {count} 条记录",
+    "selected": "已选中",
+    "rowsPerPage": "每页行数",
+    "page": "第 {current} 页，共 {total}",
+    "firstPage": "转到第一页",
+    "previousPage": "转到上一页",
+    "nextPage": "转到下一页",
+    "lastPage": "转到最后一页"
   }
 }

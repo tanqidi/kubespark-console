@@ -315,7 +315,7 @@
     "yamlParseFailed": "YAML parse failed",
     "yamlMode": "Edit YAML",
     "workloadExists": "Workload name already exists, please try another.",
-    "nameRequired": "Please select a project",
+    "nameRequired": "Please enter a name",
     "pleaseSelectNamespace": "Please select a project",
     "nameAlreadyExists": "Workload name already exists, please try another",
     "nameValidationFailed": "Name validation failed",
@@ -558,7 +558,7 @@
     "yamlMode": "Edit YAML",
     "jobExists": "Job name already exists, please try another.",
     "cronJobExists": "CronJob name already exists, please try another.",
-    "nameRequired": "Please select a project",
+    "nameRequired": "Please enter a name",
     "pleaseSelectNamespace": "Please select a project",
     "pleaseEnterName": "Please enter a name",
     "nameValidationFailed": "Name validation failed",
@@ -619,6 +619,7 @@
     "namespace": "Project",
     "namespacePlaceholder": "Select project",
     "namespaceSelect": "Select the project that the pod belongs to.",
+    "namespaceRequired": "Please select project",
     "description": "Description",
     "descriptionPlaceholder": "Enter description",
     "descriptionHint": "Description will be written to resource annotation description, up to 256 characters.",
@@ -669,7 +670,7 @@
     "configMounted": "containers configured",
     "yamlParseFailed": "YAML parse failed",
     "yamlMode": "Edit YAML",
-    "nameRequired": "Please select a project",
+    "nameRequired": "Please enter a name",
     "pleaseSelectNamespace": "Please select a project",
     "pleaseEnterName": "Please enter a name",
     "nameValidationFailed": "Name validation failed",
@@ -740,7 +741,7 @@
     "noSecretAvailable": "No Secret available in the current project",
     "noServiceAvailable": "No service available in the current project",
     "noPortFound": "Port not found, you can enter directly",
-    "NameRequired": "Please enter name",
+    "nameRequired": "Please enter name",
     "namespaceRequired": "Please select project",
     "hostRequired": "Please enter domain",
     "pathRequired": "Please enter path",
@@ -1018,6 +1019,13 @@
   },
   "pagination": {
     "itemsPerPage": "{count} / page",
-    "total": "Total {count} records"
+    "total": "Total {count} records",
+    "selected": "Selected",
+    "rowsPerPage": "Rows per page",
+    "page": "Page {current} of {total}",
+    "firstPage": "Go to first page",
+    "previousPage": "Go to previous page",
+    "nextPage": "Go to next page",
+    "lastPage": "Go to last page"
   }
 }

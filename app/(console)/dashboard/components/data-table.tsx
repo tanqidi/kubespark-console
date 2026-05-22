@@ -1,7 +1,8 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "@/app/lib/i18n"
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -128,6 +129,7 @@ export function DataTable<TData extends Record<string, unknown>>({
   onDeleteSelectedRows,
   showColumnCustomizer = true,
 }: DataTableProps<TData>) {
+  const t = useTranslations()
   const router = useRouter()
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
@@ -288,13 +290,13 @@ export function DataTable<TData extends Record<string, unknown>>({
         </div>
         <div className="flex items-center justify-between px-4">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-            已选中 {table.getFilteredSelectedRowModel().rows.length} /{" "}
-            {table.getFilteredRowModel().rows.length} 条。
+            {t("pagination.selected")} {table.getFilteredSelectedRowModel().rows.length} /{" "}
+            {table.getFilteredRowModel().rows.length}
           </div>
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
               <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                每页行数
+                {t("pagination.rowsPerPage")}
               </Label>
               <Select
                 value={`${table.getState().pagination.pageSize}`}
@@ -319,8 +321,10 @@ export function DataTable<TData extends Record<string, unknown>>({
               </Select>
             </div>
             <div className="flex w-fit items-center justify-center text-sm font-medium">
-              第 {table.getState().pagination.pageIndex + 1} 页，共{" "}
-              {table.getPageCount()}
+              {t("pagination.page", {
+                current: table.getState().pagination.pageIndex + 1,
+                total: table.getPageCount(),
+              })}
             </div>
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
               <Button
@@ -329,7 +333,7 @@ export function DataTable<TData extends Record<string, unknown>>({
                 onClick={() => table.setPageIndex(0)}
                 disabled={!table.getCanPreviousPage()}
               >
-                <span className="sr-only">转到第一页</span>
+                <span className="sr-only">{t("pagination.firstPage")}</span>
                 <IconChevronsLeft />
               </Button>
               <Button
@@ -339,7 +343,7 @@ export function DataTable<TData extends Record<string, unknown>>({
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
               >
-                <span className="sr-only">转到上一页</span>
+                <span className="sr-only">{t("pagination.previousPage")}</span>
                 <IconChevronLeft />
               </Button>
               <Button
@@ -349,7 +353,7 @@ export function DataTable<TData extends Record<string, unknown>>({
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
               >
-                <span className="sr-only">转到下一页</span>
+                <span className="sr-only">{t("pagination.nextPage")}</span>
                 <IconChevronRight />
               </Button>
               <Button
@@ -359,7 +363,7 @@ export function DataTable<TData extends Record<string, unknown>>({
                 onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                 disabled={!table.getCanNextPage()}
               >
-                <span className="sr-only">转到最后一页</span>
+                <span className="sr-only">{t("pagination.lastPage")}</span>
                 <IconChevronsRight />
               </Button>
             </div>
