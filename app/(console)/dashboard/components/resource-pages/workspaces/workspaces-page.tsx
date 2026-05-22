@@ -628,6 +628,11 @@ export function WorkspacesPageClient() {
                     disabled: submitting || loadingEditData,
                     onClick: () => {
                       if (submitting || loadingEditData) return
+                      if (createStep === "advanced") return
+                      if (createStep === "basic") {
+                        handleNextStep()
+                        return
+                      }
                       setCreateStep("advanced")
                     },
                   },

@@ -610,9 +610,9 @@ export function CreateJobDialog({
                 status: activeStep === "basic" ? t("workloadDialog.current") : t("workloadDialog.configured"),
                 active: activeStep === "basic",
                 icon: <IconSettings2 className="size-4" />,
-                disabled: !canNavigateStorageView,
+                disabled: isBusy,
                 onClick: () => {
-                  if (!canNavigateStorageView) return
+                  if (isBusy) return
                   setActiveStep("basic")
                   setSubmitError(null)
                 },
@@ -623,15 +623,19 @@ export function CreateJobDialog({
                 status: activeStep === "strategy" ? t("workloadDialog.current") : currentStepIndex > 1 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "strategy",
                 icon: <IconAdjustments className="size-4" />,
-                disabled: !canNavigateStorageView,
+                disabled: isBusy,
                 onClick: () => {
-                  if (!canNavigateStorageView) return
-                  if (currentStepIndex >= 1) {
-                    setActiveStep("strategy")
+                  if (isBusy) return
+                  if (activeStep === "strategy") {
                     setSubmitError(null)
                     return
                   }
-                  void goNext()
+                  if (activeStep === "basic") {
+                    void goNext()
+                    return
+                  }
+                  setActiveStep("strategy")
+                  setSubmitError(null)
                 },
               },
               {
@@ -640,9 +644,21 @@ export function CreateJobDialog({
                 status: activeStep === "pod" ? t("workloadDialog.current") : currentStepIndex > 2 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "pod",
                 icon: <IconBraces className="size-4" />,
-                disabled: !canNavigateStorageView,
+                disabled: isBusy,
                 onClick: () => {
-                  if (!canNavigateStorageView || currentStepIndex < 1) return
+                  if (isBusy) return
+                  if (activeStep === "pod") {
+                    setSubmitError(null)
+                    return
+                  }
+                  if (activeStep === "basic") {
+                    void goNext()
+                    return
+                  }
+                  if (activeStep === "strategy") {
+                    void goNext()
+                    return
+                  }
                   setActiveStep("pod")
                   setSubmitError(null)
                 },
@@ -653,9 +669,21 @@ export function CreateJobDialog({
                 status: activeStep === "storage" ? t("workloadDialog.current") : currentStepIndex > 3 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "storage",
                 icon: <IconDatabase className="size-4" />,
-                disabled: !canNavigateStorageView,
+                disabled: isBusy,
                 onClick: () => {
-                  if (!canNavigateStorageView || currentStepIndex < 2) return
+                  if (isBusy) return
+                  if (activeStep === "storage") {
+                    setSubmitError(null)
+                    return
+                  }
+                  if (activeStep === "basic") {
+                    void goNext()
+                    return
+                  }
+                  if (activeStep === "strategy") {
+                    void goNext()
+                    return
+                  }
                   if (activeStep === "pod") {
                     const passed = runPodValidation()
                     if (!passed) return
@@ -675,9 +703,25 @@ export function CreateJobDialog({
                       : t("workloadDialog.notConfigured"),
                 active: activeStep === "advanced",
                 icon: <IconStack2 className="size-4" />,
-                disabled: !canNavigateStorageView,
+                disabled: isBusy,
                 onClick: () => {
-                  if (!canNavigateStorageView || currentStepIndex < 3) return
+                  if (isBusy) return
+                  if (activeStep === "advanced") {
+                    setSubmitError(null)
+                    return
+                  }
+                  if (activeStep === "basic") {
+                    void goNext()
+                    return
+                  }
+                  if (activeStep === "strategy") {
+                    void goNext()
+                    return
+                  }
+                  if (activeStep === "pod") {
+                    const passed = runPodValidation()
+                    if (!passed) return
+                  }
                   setActiveStep("advanced")
                   setSubmitError(null)
                 },

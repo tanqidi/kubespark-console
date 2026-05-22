@@ -654,9 +654,9 @@ export function CreateWorkloadDialog({
                 status: activeStep === "basic" ? t("workloadDialog.current") : t("workloadDialog.configured"),
                 active: activeStep === "basic",
                 icon: <IconSettings2 className="size-4" />,
-                disabled: !canNavigateStorageView,
+                disabled: isBusy,
                 onClick: () => {
-                  if (!canNavigateStorageView) return
+                  if (isBusy) return
                   setActiveStep("basic")
                   setSubmitError(null)
                 },
@@ -667,9 +667,17 @@ export function CreateWorkloadDialog({
                 status: activeStep === "pod" ? t("workloadDialog.current") : currentStepIndex > 1 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "pod",
                 icon: <IconBraces className="size-4" />,
-                disabled: !canNavigateStorageView,
+                disabled: isBusy,
                 onClick: () => {
-                  if (!canNavigateStorageView || currentStepIndex < 1) return
+                  if (isBusy) return
+                  if (activeStep === "pod") {
+                    setSubmitError(null)
+                    return
+                  }
+                  if (activeStep === "basic") {
+                    void goNext()
+                    return
+                  }
                   setActiveStep("pod")
                   setSubmitError(null)
                 },
@@ -680,9 +688,17 @@ export function CreateWorkloadDialog({
                 status: activeStep === "storage" ? t("workloadDialog.current") : currentStepIndex > 2 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "storage",
                 icon: <IconDatabase className="size-4" />,
-                disabled: !canNavigateStorageView,
+                disabled: isBusy,
                 onClick: () => {
-                  if (!canNavigateStorageView || currentStepIndex < 2) return
+                  if (isBusy) return
+                  if (activeStep === "storage") {
+                    setSubmitError(null)
+                    return
+                  }
+                  if (activeStep === "basic") {
+                    void goNext()
+                    return
+                  }
                   if (activeStep === "pod") {
                     const passed = runPodValidation()
                     if (!passed) return
@@ -704,9 +720,21 @@ export function CreateWorkloadDialog({
                       : t("workloadDialog.notConfigured"),
                 active: activeStep === "advanced",
                 icon: <IconStack2 className="size-4" />,
-                disabled: !canNavigateStorageView,
+                disabled: isBusy,
                 onClick: () => {
-                  if (!canNavigateStorageView || currentStepIndex < 2) return
+                  if (isBusy) return
+                  if (activeStep === "advanced") {
+                    setSubmitError(null)
+                    return
+                  }
+                  if (activeStep === "basic") {
+                    void goNext()
+                    return
+                  }
+                  if (activeStep === "pod") {
+                    const passed = runPodValidation()
+                    if (!passed) return
+                  }
                   setActiveStep("advanced")
                   setSubmitError(null)
                 },

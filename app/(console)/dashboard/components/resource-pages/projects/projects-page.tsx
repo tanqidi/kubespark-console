@@ -482,22 +482,17 @@ export function ProjectsPageClient() {
     setCreateNameInvalid(Boolean(nameError))
     setCreateNameError(nameError)
 
-    if (nameError) {
+    const workspaceError = !nextWorkspace ? t("projectsDialog.workspaceRequired") : null
+    setCreateWorkspaceInvalid(Boolean(workspaceError))
+    setCreateWorkspaceError(workspaceError)
+
+    if (nameError || workspaceError) {
       setCreateStep("basic")
       return
     }
 
-    if (!workspaceBindingExists && !nextWorkspace) {
-      setCreateWorkspaceInvalid(true)
-      setCreateWorkspaceError(t("projectsDialog.workspaceRequired"))
-      setCreateStep("basic")
-      return
-    }
-
-    setCreateWorkspaceInvalid(false)
-    setCreateWorkspaceError(null)
     setCreateStep("advanced")
-  }, [creating, createName, createWorkspace, editingRow?.name, t, workspaceBindingExists])
+  }, [creating, createName, createWorkspace, editingRow?.name, t])
   const resetPipelineDialogState = React.useCallback(() => {
     setPipelineProjectDialogMode("create")
     setPipelineProjectEditingName(null)
@@ -971,21 +966,19 @@ export function ProjectsPageClient() {
 
       setCreateNameInvalid(false)
       setCreateNameError(null)
-      if (!workspaceBindingExists) {
-        const selectedWorkspace = nextWorkspace.trim()
-        if (!selectedWorkspace) {
-          setCreateWorkspaceInvalid(true)
-          setCreateWorkspaceError(t("projectsDialog.workspaceRequired"))
-          if (createYamlMode) setCreateYamlError(t("projectsDialog.workspaceRequired"))
-          return
-        }
-        const existsInOptions = workspaceOptions.some((option) => option.id === selectedWorkspace)
-        if (!existsInOptions) {
-          setCreateWorkspaceInvalid(true)
-          setCreateWorkspaceError(t("projectsDialog.workspaceInvalid"))
-          if (createYamlMode) setCreateYamlError(t("projectsDialog.workspaceInvalid"))
-          return
-        }
+      const selectedWorkspace = nextWorkspace.trim()
+      if (!selectedWorkspace) {
+        setCreateWorkspaceInvalid(true)
+        setCreateWorkspaceError(t("projectsDialog.workspaceRequired"))
+        if (createYamlMode) setCreateYamlError(t("projectsDialog.workspaceRequired"))
+        return
+      }
+      const existsInOptions = workspaceOptions.some((option) => option.id === selectedWorkspace)
+      if (!existsInOptions) {
+        setCreateWorkspaceInvalid(true)
+        setCreateWorkspaceError(t("projectsDialog.workspaceInvalid"))
+        if (createYamlMode) setCreateYamlError(t("projectsDialog.workspaceInvalid"))
+        return
       }
       setCreateWorkspaceInvalid(false)
       setCreateWorkspaceError(null)
@@ -1808,6 +1801,33 @@ export function ProjectsPageClient() {
                     disabled: pipelineProjectCreating,
                     onClick: () => {
                       if (pipelineProjectCreating) return
+                      if (pipelineProjectCreateStep === "advanced") return
+                      if (pipelineProjectCreateStep === "basic") {
+                        const nextName = pipelineProjectCreateName.trim()
+                        const validationMessage = validateProjectName(nextName, t)
+                        setPipelineProjectCreateNameInvalid(Boolean(validationMessage))
+                        setPipelineProjectCreateNameError(validationMessage)
+
+                        const allPipelineProjectNames = pipelineRows.map((row) => row.name.trim())
+                        const nameExists = allPipelineProjectNames.includes(nextName)
+                        const duplicateError = !isPipelineProjectEditMode && nameExists ? t("projectsDialog.pipelineNameExists") : null
+                        if (duplicateError) {
+                          setPipelineProjectCreateNameInvalid(true)
+                          setPipelineProjectCreateNameError(duplicateError)
+                        }
+
+                        const selectedWorkspace = pipelineProjectCreateWorkspace.trim()
+                        const workspaceError = !selectedWorkspace ? t("projectsDialog.workspaceRequired") : null
+                        setPipelineProjectCreateWorkspaceInvalid(Boolean(workspaceError))
+                        setPipelineProjectCreateWorkspaceError(workspaceError)
+
+                        if (validationMessage || duplicateError || workspaceError) {
+                          return
+                        }
+
+                        setPipelineProjectCreateStep("advanced")
+                        return
+                      }
                       setPipelineProjectCreateStep("advanced")
                     },
                   },
@@ -1986,30 +2006,26 @@ export function ProjectsPageClient() {
                     onClick={() => {
                       const nextName = pipelineProjectCreateName.trim()
                       const validationMessage = validateProjectName(nextName, t)
-                      if (validationMessage) {
-                        setPipelineProjectCreateNameInvalid(true)
-                        setPipelineProjectCreateNameError(validationMessage)
-                        return
-                      }
+                      setPipelineProjectCreateNameInvalid(Boolean(validationMessage))
+                      setPipelineProjectCreateNameError(validationMessage)
 
                       const allPipelineProjectNames = pipelineRows.map((row) => row.name.trim())
                       const nameExists = allPipelineProjectNames.includes(nextName)
-                      if (!isPipelineProjectEditMode && nameExists) {
+                      const duplicateError = !isPipelineProjectEditMode && nameExists ? t("projectsDialog.pipelineNameExists") : null
+                      if (duplicateError) {
                         setPipelineProjectCreateNameInvalid(true)
-                        setPipelineProjectCreateNameError(t("projectsDialog.pipelineNameExists"))
+                        setPipelineProjectCreateNameError(duplicateError)
+                      }
+
+                      const selectedWorkspace = pipelineProjectCreateWorkspace.trim()
+                      const workspaceError = !selectedWorkspace ? t("projectsDialog.workspaceRequired") : null
+                      setPipelineProjectCreateWorkspaceInvalid(Boolean(workspaceError))
+                      setPipelineProjectCreateWorkspaceError(workspaceError)
+
+                      if (validationMessage || duplicateError || workspaceError) {
                         return
                       }
 
-                      setPipelineProjectCreateNameInvalid(false)
-                      setPipelineProjectCreateNameError(null)
-                      const selectedWorkspace = pipelineProjectCreateWorkspace.trim()
-                      if (!selectedWorkspace) {
-                        setPipelineProjectCreateWorkspaceInvalid(true)
-                        setPipelineProjectCreateWorkspaceError(t("projectsDialog.workspaceRequired"))
-                        return
-                      }
-                      setPipelineProjectCreateWorkspaceInvalid(false)
-                      setPipelineProjectCreateWorkspaceError(null)
                       setPipelineProjectCreateStep("advanced")
                     }}
                   >
