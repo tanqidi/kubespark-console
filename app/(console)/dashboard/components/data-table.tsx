@@ -245,7 +245,8 @@ export function DataTable<TData extends Record<string, unknown>>({
         onDeleteSelected={onDeleteSelectedRows ? handleDeleteSelected : undefined}
         showColumnCustomizer={showColumnCustomizer}
       />
-      <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+      {/*<div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">*/}
+      <div className="relative flex flex-col gap-4 px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
           <Table>
             <TableHeader className="bg-muted sticky top-0 z-10">
