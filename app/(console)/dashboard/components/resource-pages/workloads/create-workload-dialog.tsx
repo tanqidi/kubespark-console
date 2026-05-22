@@ -32,6 +32,7 @@ import {
   MonacoEditor,
   MONACO_OPTIONS,
   normalizeIntegerInput,
+  POD_REQUIRED_MESSAGE,
   resolveStepDescription,
 } from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog.logic"
 import {

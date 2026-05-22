@@ -1158,9 +1158,9 @@ export function CreateServiceDialog({
     const nextDescriptionError =
       normalizedDescription.length <= DESCRIPTION_MAX_LENGTH
         ? null
-        : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
-    const nextNameError = validateName(normalizedName)
-    const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
+        : t("serviceDialog.descriptionTooLong", { maxLength: String(DESCRIPTION_MAX_LENGTH) })
+    const nextNameError = validateName(normalizedName, t)
+    const nextNamespaceError = normalizedNamespace ? null : t("serviceDialog.pleaseSelectNamespace")
     const {
       nextSelectorError,
       nextPortError,
@@ -1607,7 +1607,7 @@ export function CreateServiceDialog({
                     disabled={isBusy}
                   />
                   <FieldDescription>
-                    {t("serviceDialog.descriptionHint", { maxLength: DESCRIPTION_MAX_LENGTH })}
+                    {t("serviceDialog.descriptionHint", { maxLength: String(DESCRIPTION_MAX_LENGTH) })}
                   </FieldDescription>
                 </Field>
               </FieldGroup>

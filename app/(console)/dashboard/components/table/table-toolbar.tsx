@@ -145,7 +145,7 @@ export function TableToolbar<TData>({
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
           title={t("table.batchDelete")}
-          description={t("table.batchDeleteDesc", { count: selectedCount })}
+          description={t("table.batchDeleteDesc", { count: String(selectedCount) })}
           onConfirm={() => {
             onDeleteSelected?.()
             setDeleteDialogOpen(false)

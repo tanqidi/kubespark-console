@@ -147,11 +147,11 @@ function resolveResourceNames(items: unknown[]): string[] {
   return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))
 }
 
-function validateName(value: string): string | null {
+function validateName(value: string, t: ReturnType<typeof useTranslations>): string | null {
   const text = value.trim().toLowerCase()
   if (!text) return t("podDialog.pleaseEnterName")
-  if (text.length > 253) return NAME_RULE_MESSAGE
-  if (!/^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$/.test(text)) return NAME_RULE_MESSAGE
+  if (text.length > 253) return t("podDialog.nameRule")
+  if (!/^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$/.test(text)) return t("podDialog.nameRule")
   return null
 }
 
@@ -472,12 +472,12 @@ export function CreatePodDialog({
   }, [isEditMode])
 
   const validateBasic = React.useCallback(() => {
-    const nextNameError = validateName(name)
-    const nextNamespaceError = namespace.trim() ? null : t("podDialog.nameRequired")
+    const nextNameError = validateName(name, t)
+    const nextNamespaceError = namespace.trim() ? null : t("podDialog.namespaceRequired")
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
     return !nextNameError && !nextNamespaceError
-  }, [name, namespace])
+  }, [name, namespace, t])
 
   const validatePod = React.useCallback(() => {
     if (configuredContainers.length === 0) {
@@ -941,7 +941,7 @@ export function CreatePodDialog({
     if (creating) return
     const normalizedDescription = description.trim()
     if (normalizedDescription.length > DESCRIPTION_MAX_LENGTH) {
-      const message = t("podDialog.descriptionTooLong", { maxLength: DESCRIPTION_MAX_LENGTH })
+      const message = t("podDialog.descriptionTooLong", { maxLength: String(DESCRIPTION_MAX_LENGTH) })
       if (yamlMode) setYamlError(message)
       setSubmitError(message)
       setActiveStep("basic")
@@ -1191,8 +1191,8 @@ export function CreatePodDialog({
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      {t("podDialog.descriptionHint", { maxLength: DESCRIPTION_MAX_LENGTH })}
-                    </FieldDescription>
+                        {t("podDialog.descriptionHint", { maxLength: String(DESCRIPTION_MAX_LENGTH) })}
+                      </FieldDescription>
                   </Field>
                 </FieldGroup>
               </div>

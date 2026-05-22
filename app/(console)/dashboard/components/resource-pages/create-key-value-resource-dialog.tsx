@@ -11,6 +11,7 @@ import {
 } from "@tabler/icons-react"
 import { parse, stringify } from "yaml"
 
+import { useTranslations } from "@/app/lib/i18n"
 import { checkConfigMapExists } from "@/app/lib/kubespark/configmaps"
 import { checkSecretExists } from "@/app/lib/kubespark/secrets"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
@@ -151,42 +152,38 @@ const SECRET_TYPE_OPTIONS = [
   { value: "kubernetes.io/tls", label: "TLS" },
 ]
 
-const NAME_RULE_MESSAGE =
-  "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
-const DATA_ITEM_REQUIRED_MESSAGE = "请至少添加一个数据项"
-const DESCRIPTION_MAX_LENGTH = 256
-
-function validateName(value: string): string | null {
-  if (!value) return "请输入名称"
-  if (value.length > 253) return NAME_RULE_MESSAGE
-  if (!/^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$/.test(value)) {
-    return NAME_RULE_MESSAGE
+function validateDataItemKey(key: string, t: ReturnType<typeof useTranslations>): string | null {
+  const trimmedKey = key.trim()
+  if (!trimmedKey) {
+    return t("keyValueDialog.keyRequired")
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(trimmedKey)) {
+    return t("keyValueDialog.keyInvalid")
   }
   return null
 }
 
-function validateDataItemKey(value: string): string | null {
-  const nextKey = value.trim()
-  if (!nextKey) return "请输入数据项键名"
-  if (!/^[A-Za-z0-9._-]+$/.test(nextKey)) {
-    return "数据项键名格式无效，仅支持字母、数字、点、短横线和下划线"
+function validateName(value: string, t: ReturnType<typeof useTranslations>): string | null {
+  const next = value.trim().toLowerCase()
+  if (!next) return t("keyValueDialog.nameRequired")
+  if (next.length > 253) return t("keyValueDialog.nameRule")
+  if (!/^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$/.test(next)) {
+    return t("keyValueDialog.nameRule")
   }
   return null
 }
 
-function resolveSubmitErrorMessage(error: unknown, kind: ResourceKind): string {
+function resolveSubmitErrorMessage(error: unknown, kind: ResourceKind, t: ReturnType<typeof useTranslations>): string {
   const raw = error instanceof Error ? error.message : ""
   const text = raw.toLowerCase()
-
   if (text.includes("already exists") || text.includes("状态码 409")) {
-    return kind === "configmap"
-      ? "配置字典名称已存在，请更换后重试"
-      : "保密字典名称已存在，请更换后重试"
+    const type = kind === "secret" ? t("keyValueDialog.secret") : t("keyValueDialog.configMap")
+    return t("keyValueDialog.nameExists", { type })
   }
-
-  if (raw) return raw
-  return kind === "configmap" ? "创建配置字典失败" : "创建保密字典失败"
+  return raw || t("keyValueDialog.createFailed", { type: kind === "secret" ? t("keyValueDialog.secret") : t("keyValueDialog.configMap") })
 }
+
+const DESCRIPTION_MAX_LENGTH = 256
 
 function asObject(value: unknown): JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -244,22 +241,22 @@ function buildYamlText(kind: ResourceKind, snapshot: DialogSnapshot) {
   })
 }
 
-function parseYamlText(kind: ResourceKind, yamlText: string): DialogSnapshot {
+function parseYamlText(kind: ResourceKind, yamlText: string, t: ReturnType<typeof useTranslations>): DialogSnapshot {
   const normalizedText = yamlText.trim()
   if (!normalizedText) {
-    throw new Error("请输入 YAML 内容")
+    throw new Error(t("keyValueDialog.yamlRequired"))
   }
 
   const parsed = parse(normalizedText)
   const root = asObject(parsed)
   if (Object.keys(root).length === 0) {
-    throw new Error("YAML 内容格式无效")
+    throw new Error(t("keyValueDialog.yamlInvalid"))
   }
 
   const expectedKind = kind === "secret" ? "Secret" : "ConfigMap"
   const actualKind = asString(root.kind)
   if (actualKind && actualKind !== expectedKind) {
-    throw new Error(`YAML 资源类型必须是 ${expectedKind}`)
+    throw new Error(t("keyValueDialog.yamlKindMustBe", { kind: expectedKind }))
   }
 
   const metadata = asObject(root.metadata)
@@ -312,6 +309,7 @@ export function CreateKeyValueResourceDialog({
   initialValues = null,
   onSubmit,
 }: CreateKeyValueResourceDialogProps) {
+  const t = useTranslations()
   const [name, setName] = React.useState("")
   const [namespace, setNamespace] = React.useState("")
   const [description, setDescription] = React.useState("")
@@ -342,20 +340,19 @@ export function CreateKeyValueResourceDialog({
   const isSecret = kind === "secret"
   const title = isEditMode
     ? isSecret
-      ? "编辑保密字典"
-      : "编辑配置字典"
+      ? t("keyValueDialog.editSecret")
+      : t("keyValueDialog.editConfigMap")
     : isSecret
-      ? "创建保密字典"
-      : "创建配置字典"
+      ? t("keyValueDialog.createSecret")
+      : t("keyValueDialog.createConfigMap")
   const descriptionText = isEditMode
     ? isSecret
-      ? "编辑 Kubernetes Secret 的描述与数据项内容。"
-      : "编辑 Kubernetes ConfigMap 的描述与数据项内容。"
+      ? t("keyValueDialog.editSecretDesc")
+      : t("keyValueDialog.editConfigMapDesc")
     : isSecret
-      ? "使用 Kubernetes Secret 创建保密数据，数据项将通过 stringData 写入。"
-      : "使用 Kubernetes ConfigMap 创建配置数据，数据项将以键值对形式写入。"
-  // const valueLabel = isSecret ? "密文内容" : "值"
-  const valueLabel = "值"
+      ? t("keyValueDialog.createSecretDesc")
+      : t("keyValueDialog.createConfigMapDesc")
+  const valueLabel = t("keyValueDialog.value")
   const filledItems = React.useMemo(
     () => items.filter((item) => item.key.trim() || item.value.trim()),
     [items]
@@ -573,7 +570,7 @@ export function CreateKeyValueResourceDialog({
     }
 
     const nextKey = editingItem.key.trim()
-    const keyError = validateDataItemKey(editingItem.key)
+    const keyError = validateDataItemKey(editingItem.key, t)
     if (keyError) {
       setEditingKeyError(keyError)
       return
@@ -584,7 +581,7 @@ export function CreateKeyValueResourceDialog({
     )
 
     if (duplicateExists) {
-      setEditingKeyError(`数据项键名 ${nextKey} 已存在，请更换后重试`)
+      setEditingKeyError(t("keyValueDialog.keyDuplicate", { key: nextKey }))
       return
     }
 
@@ -592,7 +589,7 @@ export function CreateKeyValueResourceDialog({
     setItemsError(null)
     setDataViewMode("list")
     setEditingItemId(null)
-  }, [editingItem, items])
+  }, [editingItem, items, t])
 
   const cancelEditItem = React.useCallback(() => {
     setEditingKeyError(null)
@@ -612,7 +609,7 @@ export function CreateKeyValueResourceDialog({
     setSubmitError(null)
   }, [])
 
-  const validateDataItems = React.useCallback((draftItems: KeyValueItem[]) => {
+  const validateDataItems = React.useCallback((draftItems: KeyValueItem[], t: ReturnType<typeof useTranslations>) => {
     const cleanedItems = draftItems
       .map((item) => ({
         key: item.key.trim(),
@@ -624,21 +621,21 @@ export function CreateKeyValueResourceDialog({
     const seen = new Set<string>()
 
     if (cleanedItems.length === 0) {
-      resolvedItemsError = DATA_ITEM_REQUIRED_MESSAGE
+      resolvedItemsError = t("keyValueDialog.itemsRequired")
     }
 
     cleanedItems.forEach((item, index) => {
       if (resolvedItemsError) return
       if (!item.key) {
-        resolvedItemsError = `第 ${index + 1} 个数据项缺少键名`
+        resolvedItemsError = t("keyValueDialog.itemMissingKey", { index: String(index + 1) })
         return
       }
       if (!/^[A-Za-z0-9._-]+$/.test(item.key)) {
-        resolvedItemsError = `数据项键名 ${item.key} 格式无效`
+        resolvedItemsError = t("keyValueDialog.itemKeyInvalid", { key: item.key })
         return
       }
       if (seen.has(item.key)) {
-        resolvedItemsError = `数据项键名 ${item.key} 重复`
+        resolvedItemsError = t("keyValueDialog.itemKeyDuplicate", { key: item.key })
         return
       }
       seen.add(item.key)
@@ -649,7 +646,7 @@ export function CreateKeyValueResourceDialog({
 
   const goToAdvancedStep = React.useCallback(() => {
     if (creating || checkingNext) return
-    const { resolvedItemsError } = validateDataItems(items)
+    const { resolvedItemsError } = validateDataItems(items, t)
     setItemsError(resolvedItemsError)
     if (resolvedItemsError) {
       setActiveTab("data")
@@ -659,7 +656,7 @@ export function CreateKeyValueResourceDialog({
     setActiveTab("advanced")
     setDataViewMode("list")
     setSubmitError(null)
-  }, [checkingNext, creating, items, validateDataItems])
+  }, [checkingNext, creating, items, t, validateDataItems])
 
   const handleYamlModeChange = React.useCallback(
     (checked: boolean) => {
@@ -673,12 +670,12 @@ export function CreateKeyValueResourceDialog({
       }
 
       try {
-        const snapshot = withLockedIdentity(parseYamlText(kind, yamlText))
+        const snapshot = withLockedIdentity(parseYamlText(kind, yamlText, t))
         applySnapshot(snapshot)
         clearInlineErrors()
         setYamlMode(false)
       } catch (error) {
-        setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+        setYamlError(error instanceof Error ? error.message : t("keyValueDialog.yamlParseFailed"))
       }
     },
     [
@@ -688,6 +685,7 @@ export function CreateKeyValueResourceDialog({
       creating,
       getSnapshot,
       kind,
+      t,
       withLockedIdentity,
       yamlText,
     ]
@@ -704,15 +702,15 @@ export function CreateKeyValueResourceDialog({
 
   const confirmYamlMode = React.useCallback(() => {
     try {
-      const snapshot = withLockedIdentity(parseYamlText(kind, yamlText))
+      const snapshot = withLockedIdentity(parseYamlText(kind, yamlText, t))
       applySnapshot(snapshot)
       clearInlineErrors()
       setYamlError(null)
       setYamlMode(false)
     } catch (error) {
-      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      setYamlError(error instanceof Error ? error.message : t("keyValueDialog.yamlParseFailed"))
     }
-  }, [applySnapshot, clearInlineErrors, kind, withLockedIdentity, yamlText])
+  }, [applySnapshot, clearInlineErrors, kind, t, withLockedIdentity, yamlText])
 
   const handleNextStep = React.useCallback(async (event?: React.MouseEvent<HTMLButtonElement>) => {
     event?.preventDefault()
@@ -721,8 +719,8 @@ export function CreateKeyValueResourceDialog({
 
     const nextName = name.trim().toLowerCase()
     const nextNamespace = namespace.trim()
-    const resolvedNameError = validateName(nextName)
-    const resolvedNamespaceError = nextNamespace ? null : "请选择项目"
+    const resolvedNameError = validateName(nextName, t)
+    const resolvedNamespaceError = nextNamespace ? null : t("keyValueDialog.namespaceRequired")
 
     setNameError(resolvedNameError)
     setNamespaceError(resolvedNamespaceError)
@@ -745,7 +743,7 @@ export function CreateKeyValueResourceDialog({
       const exists = await checkResourceExists(kind, nextName, nextNamespace)
 
       if (exists) {
-        setNameError(isSecret ? "保密字典名称已存在，请更换后重试" : "配置字典名称已存在，请更换后重试")
+        setNameError(t("keyValueDialog.nameExists", { type: isSecret ? t("keyValueDialog.secret") : t("keyValueDialog.configMap") }))
         setActiveTab("basic")
         return
       }
@@ -753,12 +751,12 @@ export function CreateKeyValueResourceDialog({
       setActiveTab("data")
       setDataViewMode("list")
     } catch (error) {
-      setNameError(error instanceof Error ? error.message : "名称校验失败，请稍后重试")
+      setNameError(error instanceof Error ? error.message : t("keyValueDialog.nameValidationFailed"))
       setActiveTab("basic")
     } finally {
       setCheckingNext(false)
     }
-  }, [checkingNext, creating, isEditMode, isSecret, kind, name, namespace])
+  }, [checkingNext, creating, isEditMode, isSecret, kind, name, namespace, t])
 
   const handleSubmit = React.useCallback(
     async () => {
@@ -769,11 +767,11 @@ export function CreateKeyValueResourceDialog({
 
       if (yamlMode) {
         try {
-          draft = withLockedIdentity(parseYamlText(kind, yamlText))
+          draft = withLockedIdentity(parseYamlText(kind, yamlText, t))
           applySnapshot(draft)
           setYamlError(null)
         } catch (error) {
-          setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+          setYamlError(error instanceof Error ? error.message : t("keyValueDialog.yamlParseFailed"))
           return
         }
       }
@@ -782,12 +780,12 @@ export function CreateKeyValueResourceDialog({
       const nextNamespace = draft.namespace.trim()
       const nextDescription = draft.description.trim()
 
-      const resolvedNameError = validateName(nextName)
-      const resolvedNamespaceError = nextNamespace ? null : "请选择项目"
+      const resolvedNameError = validateName(nextName, t)
+      const resolvedNamespaceError = nextNamespace ? null : t("keyValueDialog.namespaceRequired")
       const resolvedDescriptionError =
-        nextDescription.length <= DESCRIPTION_MAX_LENGTH ? null : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
+        nextDescription.length <= DESCRIPTION_MAX_LENGTH ? null : t("keyValueDialog.descriptionTooLong", { maxLength: String(DESCRIPTION_MAX_LENGTH) })
 
-      const { cleanedItems, resolvedItemsError } = validateDataItems(draft.items)
+      const { cleanedItems, resolvedItemsError } = validateDataItems(draft.items, t)
 
       setNameError(resolvedNameError)
       setNamespaceError(resolvedNamespaceError)
@@ -820,13 +818,13 @@ export function CreateKeyValueResourceDialog({
         try {
           const exists = await checkResourceExists(kind, nextName, nextNamespace)
           if (exists) {
-            const message = isSecret ? "保密字典名称已存在，请更换后重试" : "配置字典名称已存在，请更换后重试"
+            const message = t("keyValueDialog.nameExists", { type: isSecret ? t("keyValueDialog.secret") : t("keyValueDialog.configMap") })
             setNameError(message)
             setYamlError(message)
             return
           }
         } catch (error) {
-          setYamlError(error instanceof Error ? error.message : "名称校验失败，请稍后重试")
+          setYamlError(error instanceof Error ? error.message : t("keyValueDialog.nameValidationFailed"))
           return
         } finally {
           setCheckingNext(false)
@@ -847,7 +845,7 @@ export function CreateKeyValueResourceDialog({
         })
         onOpenChange(false)
       } catch (error) {
-        const message = resolveSubmitErrorMessage(error, kind)
+        const message = resolveSubmitErrorMessage(error, kind, t)
         const normalized = message.toLowerCase()
 
         if (yamlMode) {
@@ -882,6 +880,7 @@ export function CreateKeyValueResourceDialog({
       activeTab,
       onOpenChange,
       onSubmit,
+      t,
       withLockedIdentity,
       yamlMode,
       yamlText,
@@ -915,7 +914,7 @@ export function CreateKeyValueResourceDialog({
             </DialogHeader>
             <div className="h-full flex items-center me-20">
               <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                <span className="text-sm font-medium">编辑 YAML</span>
+                <span className="text-sm font-medium">{t("keyValueDialog.yamlMode")}</span>
                 <Switch
                   id={`${kind}-yaml-mode`}
                   checked={yamlMode}
@@ -927,7 +926,7 @@ export function CreateKeyValueResourceDialog({
                     cancelYamlMode()
                   }}
                   disabled={isBusy}
-                  aria-label="编辑 YAML"
+                  aria-label={t("keyValueDialog.yamlMode")}
                 />
               </div>
             </div>
@@ -938,8 +937,8 @@ export function CreateKeyValueResourceDialog({
               items={[
                 {
                   id: "basic",
-                  title: "基本信息",
-                  status: activeTab === "basic" ? "当前" : "已设置",
+                  title: t("keyValueDialog.basicInfo"),
+                  status: activeTab === "basic" ? t("keyValueDialog.current") : t("keyValueDialog.configured"),
                   active: activeTab === "basic",
                   icon: <IconSettings2 className="size-4" />,
                   disabled: !canNavigateStep,
@@ -947,13 +946,13 @@ export function CreateKeyValueResourceDialog({
                 },
                 {
                   id: "data",
-                  title: "数据设置",
+                  title: t("keyValueDialog.dataItems"),
                   status:
                     activeTab === "data"
-                      ? "当前"
+                      ? t("keyValueDialog.current")
                       : filledItems.length > 0
-                        ? "已设置"
-                        : "未设置",
+                        ? t("keyValueDialog.configured")
+                        : t("keyValueDialog.notConfigured"),
                   active: activeTab === "data",
                   icon: <IconAdjustmentsHorizontal className="size-4" />,
                   disabled: !canNavigateStep,
@@ -972,13 +971,13 @@ export function CreateKeyValueResourceDialog({
                 },
                 {
                   id: "advanced",
-                  title: "高级设置",
+                  title: t("keyValueDialog.advancedSettings"),
                   status:
                     activeTab === "advanced"
-                      ? "当前"
+                      ? t("keyValueDialog.current")
                       : hasUserProvidedMetadata(labelEntries, annotationEntries)
-                        ? "已设置"
-                        : "未设置",
+                        ? t("keyValueDialog.configured")
+                        : t("keyValueDialog.notConfigured"),
                   active: activeTab === "advanced",
                   icon: <IconAdjustmentsHorizontal className="size-4" />,
                   disabled: !canNavigateStep,
@@ -1036,15 +1035,15 @@ export function CreateKeyValueResourceDialog({
             ) : activeTab === "basic" ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">基本信息</h3>
+                  <h3 className="text-[15px] font-semibold">{t("keyValueDialog.basicInfo")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    填写资源名称、所属项目以及描述信息。
+                    {t("keyValueDialog.basicInfoDesc")}
                   </p>
                 </div>
 
                 <FieldGroup className="grid gap-6 md:grid-cols-2">
                   <Field data-invalid={Boolean(nameError)}>
-                    <FieldLabel htmlFor={`${kind}-create-name`}>名称</FieldLabel>
+                    <FieldLabel htmlFor={`${kind}-create-name`}>{t("keyValueDialog.name")}</FieldLabel>
                     <Input
                       id={`${kind}-create-name`}
                       value={name}
@@ -1054,7 +1053,7 @@ export function CreateKeyValueResourceDialog({
                         if (submitError) setSubmitError(null)
                         if (yamlError) setYamlError(null)
                       }}
-                      placeholder={isSecret ? "请输入保密字典名称" : "请输入配置字典名称"}
+                      placeholder={isSecret ? t("keyValueDialog.namePlaceholder") : t("keyValueDialog.namePlaceholder")}
                       autoComplete="off"
                       aria-invalid={Boolean(nameError)}
                       disabled={creating || isEditMode}
@@ -1062,7 +1061,7 @@ export function CreateKeyValueResourceDialog({
                     {nameError ? (
                       <FieldError>{nameError}</FieldError>
                     ) : (
-                      <FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>
+                      <FieldDescription>{t("keyValueDialog.nameRule")}</FieldDescription>
                     )}
                   </Field>
 
@@ -1077,14 +1076,14 @@ export function CreateKeyValueResourceDialog({
                       if (yamlError) setYamlError(null)
                     }}
                     error={namespaceError}
-                    description="选择资源所属项目。"
+                    description={t("keyValueDialog.namespaceSelect")}
                     disabled={creating || isEditMode}
                     contentContainer={createDialogPopupLayerRef}
                   />
 
                   {isSecret ? (
                     <Field>
-                      <FieldLabel htmlFor="secret-create-type">类型</FieldLabel>
+                      <FieldLabel htmlFor="secret-create-type">{t("keyValueDialog.type")}</FieldLabel>
                       <Select
                         value={secretType}
                         onValueChange={(value) => {
@@ -1094,7 +1093,7 @@ export function CreateKeyValueResourceDialog({
                         disabled={creating || isEditMode}
                       >
                         <SelectTrigger id="secret-create-type">
-                          <SelectValue placeholder="请选择 Secret 类型" />
+                          <SelectValue placeholder={t("keyValueDialog.selectSecretType")} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
@@ -1106,13 +1105,13 @@ export function CreateKeyValueResourceDialog({
                           </SelectGroup>
                         </SelectContent>
                       </Select>
-                      <FieldDescription>默认使用 Opaque 类型。</FieldDescription>
+                      <FieldDescription>{t("keyValueDialog.typeDefault")}</FieldDescription>
                     </Field>
                   ) : null}
 
                   <Field className={isSecret ? "" : "md:col-span-2"}>
                     <FieldLabel htmlFor={`${kind}-create-description`}>
-                      描述
+                      {t("keyValueDialog.description")}
                     </FieldLabel>
                     <Textarea
                       id={`${kind}-create-description`}
@@ -1122,7 +1121,7 @@ export function CreateKeyValueResourceDialog({
                         if (descriptionError) setDescriptionError(null)
                         if (yamlError) setYamlError(null)
                       }}
-                      placeholder="请输入描述"
+                      placeholder={t("keyValueDialog.descriptionPlaceholder")}
                       maxLength={DESCRIPTION_MAX_LENGTH}
                       className="min-h-24"
                       disabled={creating}
@@ -1131,7 +1130,7 @@ export function CreateKeyValueResourceDialog({
                       <FieldError>{descriptionError}</FieldError>
                     ) : (
                       <FieldDescription>
-                        描述将写入资源注解 description，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                        {t("keyValueDialog.descriptionHint")}
                       </FieldDescription>
                     )}
                   </Field>
@@ -1143,9 +1142,9 @@ export function CreateKeyValueResourceDialog({
                   <>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex flex-col gap-1">
-                        <h3 className="text-[15px] font-semibold">数据</h3>
+                        <h3 className="text-[15px] font-semibold">{t("keyValueDialog.dataItems")}</h3>
                         <p className="text-sm text-muted-foreground">
-                          管理资源中的键值对数据，可随时新增或编辑。
+                          {t("keyValueDialog.dataItemsDesc")}
                         </p>
                       </div>
                     </div>
@@ -1158,7 +1157,7 @@ export function CreateKeyValueResourceDialog({
                               <Item key={item.id} variant="outline" size="sm" className="hover:bg-muted">
                                 <ItemContent className="min-w-0">
                                   <ItemTitle className="min-w-0 truncate">
-                                    {item.key.trim() || "未命名数据项"}
+                                    {item.key.trim() || t("keyValueDialog.unnamedItem")}
                                   </ItemTitle>
                                   <ItemDescription className="min-w-0 truncate">
                                     {item.value.trim() || "-"}
@@ -1174,7 +1173,7 @@ export function CreateKeyValueResourceDialog({
                                     disabled={creating}
                                   >
                                     <IconPencil data-icon="inline-start" />
-                                    编辑
+                                    {t("actions.edit")}
                                   </Button>
                                   <Button
                                     type="button"
@@ -1184,7 +1183,7 @@ export function CreateKeyValueResourceDialog({
                                     disabled={creating}
                                   >
                                     <IconTrash data-icon="inline-start" />
-                                    删除
+                                    {t("actions.delete")}
                                   </Button>
                                 </ItemActions>
                               </Item>
@@ -1192,13 +1191,15 @@ export function CreateKeyValueResourceDialog({
                           </ItemGroup>
                         ) : (
                           <div
-                            className={`rounded-lg border border-dashed px-4 py-10 text-center ${itemsError === DATA_ITEM_REQUIRED_MESSAGE ? "border-destructive" : ""}`}
+                            className={`rounded-lg border border-dashed px-4 py-10 text-center ${itemsError === t("keyValueDialog.itemsRequired") ? "border-destructive" : ""}`}
                           >
-                            <div className={`text-sm font-semibold ${itemsError === DATA_ITEM_REQUIRED_MESSAGE ? "text-destructive" : ""}`}>暂无数据项</div>
+                            <div className={`text-sm font-semibold ${itemsError === t("keyValueDialog.itemsRequired") ? "text-destructive" : ""}`}>
+                              {t("keyValueDialog.dataItems")}
+                            </div>
                             <div
-                              className={`mt-1 text-sm ${itemsError === DATA_ITEM_REQUIRED_MESSAGE ? "text-destructive" : "text-muted-foreground"}`}
+                              className={`mt-1 text-sm ${itemsError === t("keyValueDialog.itemsRequired") ? "text-destructive" : "text-muted-foreground"}`}
                             >
-                              先添加一组键值对，再继续创建资源。
+                              {t("keyValueDialog.dataItemsDesc")}
                             </div>
                           </div>
                         )}
@@ -1209,13 +1210,13 @@ export function CreateKeyValueResourceDialog({
                           onClick={addItem}
                           disabled={creating}
                         >
-                          <span className="text-sm font-semibold">添加数据</span>
+                          <span className="text-sm font-semibold">{t("keyValueDialog.addItem")}</span>
                           <span className="mt-1 text-sm text-muted-foreground">
-                            添加新的键值对数据项。
+                            {t("keyValueDialog.addItemDesc")}
                           </span>
                         </button>
 
-                        {itemsError && itemsError !== DATA_ITEM_REQUIRED_MESSAGE ? (
+                        {itemsError && itemsError !== t("keyValueDialog.itemsRequired") ? (
                           <FieldError className="mt-4">{itemsError}</FieldError>
                         ) : null}
                         {submitError ? <FieldError className="mt-4">{submitError}</FieldError> : null}
@@ -1229,27 +1230,18 @@ export function CreateKeyValueResourceDialog({
                         <div className="flex min-h-0 flex-1 flex-col gap-5 pb-4">
                           <FieldGroup className="flex min-h-0 flex-1 flex-col gap-5">
                             <Field data-invalid={Boolean(editingKeyError)}>
-                              <FieldLabel htmlFor={`${editingItem.id}-key`}>键</FieldLabel>
+                              <FieldLabel htmlFor={`${editingItem.id}-key`}>{t("keyValueDialog.key")}</FieldLabel>
                               <Input
                                 id={`${editingItem.id}-key`}
                                 value={editingItem.key}
                                 onChange={(event) =>
                                   updateItem(editingItem.id, "key", event.target.value)
                                 }
-                                placeholder="application.yaml"
+                                placeholder={t("keyValueDialog.keyPlaceholder")}
                                 aria-invalid={Boolean(editingKeyError)}
                                 disabled={creating}
                               />
-                              {/*{editingKeyError ? (
-                                <FieldError>{editingKeyError}</FieldError>
-                              ) : (
-                                <FieldDescription>
-                                  支持字母、数字、点、短横线和下划线。
-                                </FieldDescription>
-                              )}*/}
                             </Field>
-
-                            {/*<Separator />*/}
 
                             <Field className="min-h-0 flex-1">
                               <FieldLabel htmlFor={`${editingItem.id}-value`}>
@@ -1267,7 +1259,7 @@ export function CreateKeyValueResourceDialog({
                                   height="100%"
                                   loading={
                                     <div className="flex h-full items-center justify-center text-sm text-slate-300">
-                                      编辑器加载中...
+                                      {t("keyValueDialog.editorLoading")}
                                     </div>
                                   }
                                 />
@@ -1284,9 +1276,9 @@ export function CreateKeyValueResourceDialog({
             ) : (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">高级设置</h3>
+                  <h3 className="text-[15px] font-semibold">{t("keyValueDialog.advancedSettings")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    补充标签与注解信息，便于检索、分类和后续治理。
+                    {t("keyValueDialog.advancedSettingsDesc")}
                   </p>
                 </div>
                 <FieldGroup className="grid gap-4 md:grid-cols-2">
@@ -1301,7 +1293,7 @@ export function CreateKeyValueResourceDialog({
                       description={description}
                       setDescription={setDescription}
                       disabled={isBusy}
-                      titleText="统一管理资源的标签与注解信息。"
+                      titleText={t("keyValueDialog.metadataTitle")}
                     />
                   </Field>
                 </FieldGroup>
@@ -1314,10 +1306,10 @@ export function CreateKeyValueResourceDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelEditItem} disabled={isBusy}>
-                  取消
+                  {t("keyValueDialog.cancel")}
                 </Button>
                 <Button type="button" onClick={returnToList} disabled={isBusy}>
-                  确认保存
+                  {t("keyValueDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1325,10 +1317,10 @@ export function CreateKeyValueResourceDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelYamlMode} disabled={isBusy}>
-                  取消
+                  {t("keyValueDialog.cancel")}
                 </Button>
                 <Button type="button" onClick={confirmYamlMode} disabled={isBusy}>
-                  确认保存
+                  {t("keyValueDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1337,7 +1329,7 @@ export function CreateKeyValueResourceDialog({
               <div className="flex w-full items-center justify-between gap-3">
                 <DialogClose asChild>
                   <Button type="button" variant="outline" disabled={isBusy}>
-                    取消
+                    {t("keyValueDialog.cancel")}
                   </Button>
                 </DialogClose>
                 <Button
@@ -1345,7 +1337,7 @@ export function CreateKeyValueResourceDialog({
                   onClick={(event) => handleNextStep(event)}
                   disabled={isBusy}
                 >
-                  {checkingNext ? "校验中..." : "下一步"}
+                  {checkingNext ? t("keyValueDialog.checking") : t("keyValueDialog.nextStep")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1358,14 +1350,14 @@ export function CreateKeyValueResourceDialog({
                   onClick={goToBasicStep}
                   disabled={isBusy}
                 >
-                  上一步
+                  {t("keyValueDialog.previousStep")}
                 </Button>
                 <Button
                   type="button"
                   onClick={goToAdvancedStep}
                   disabled={isBusy}
                 >
-                  下一步
+                  {t("keyValueDialog.nextStep")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1378,10 +1370,10 @@ export function CreateKeyValueResourceDialog({
                   onClick={goToDataStep}
                   disabled={isBusy}
                 >
-                  上一步
+                  {t("keyValueDialog.previousStep")}
                 </Button>
                 <Button type="button" onClick={() => void handleSubmit()} disabled={isBusy}>
-                  {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  {creating ? (isEditMode ? t("keyValueDialog.saving") : t("keyValueDialog.creating")) : isEditMode ? t("keyValueDialog.save") : t("keyValueDialog.create")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1390,11 +1382,11 @@ export function CreateKeyValueResourceDialog({
 
         <DeleteConfirmDialog
           open={Boolean(pendingDeleteItem)}
-          title="删除数据项"
+          title={t("keyValueDialog.deleteItem")}
           description={
             pendingDeleteItem?.key.trim()
-              ? `确定要删除数据项 ${pendingDeleteItem.key.trim()} 吗？`
-              : "确定要删除该数据项吗？"
+              ? t("keyValueDialog.confirmDeleteItem", { key: pendingDeleteItem.key.trim() })
+              : t("keyValueDialog.confirmDeleteUnnamedItem")
           }
           deleting={false}
           onOpenChange={(nextOpen) => {

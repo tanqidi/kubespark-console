@@ -40,17 +40,17 @@ type PodRow = PodResourceRow
 function getPodColumns(t: (key: string) => string) {
   return [
     {
-      key: "name",
+      key: "name" as const,
       label: t("table.columns.name"),
       enableHiding: false,
-      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+      cell: (_value: unknown, row: PodResourceRow) => renderNameDescriptionCell(row.name, row.description),
     },
-    { key: "status", label: t("table.columns.status"), render: "status" },
-    { key: "namespace", label: t("table.columns.namespace") },
-    { key: "node", label: t("table.columns.node") },
-    { key: "ip", label: t("table.columns.ip") },
-    { key: "age", label: t("table.columns.age") },
-    { key: "updatedAt", label: t("table.columns.updatedAt") },
+    { key: "status" as const, label: t("table.columns.status"), render: "status" as const },
+    { key: "namespace" as const, label: t("table.columns.namespace") },
+    { key: "node" as const, label: t("table.columns.node") },
+    { key: "ip" as const, label: t("table.columns.ip") },
+    { key: "age" as const, label: t("table.columns.age") },
+    { key: "updatedAt" as const, label: t("table.columns.updatedAt") },
   ]
 }
 
