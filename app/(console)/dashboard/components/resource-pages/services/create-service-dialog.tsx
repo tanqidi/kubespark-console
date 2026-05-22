@@ -11,6 +11,7 @@ import {
   IconTrash,
 } from "@tabler/icons-react"
 import { parse, stringify } from "yaml"
+import { useTranslations } from "@/app/lib/i18n"
 
 import { checkServiceExists, createService, updateService } from "@/app/lib/kubespark/services"
 import { createRuntimeId } from "@/app/lib/kubespark/id"
@@ -161,15 +162,13 @@ const MONACO_OPTIONS: EditorProps["options"] = {
   wordWrap: "on",
 }
 
-const NAME_RULE_MESSAGE =
-  "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 const DESCRIPTION_MAX_LENGTH = 256
 
-function validateName(value: string): string | null {
-  if (!value) return "请输入名称"
-  if (value.length > 253) return NAME_RULE_MESSAGE
+function validateName(value: string, t: ReturnType<typeof useTranslations>): string | null {
+  if (!value) return t("serviceDialog.pleaseEnterName")
+  if (value.length > 253) return t("serviceDialog.nameRule")
   if (!/^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$/.test(value)) {
-    return NAME_RULE_MESSAGE
+    return t("serviceDialog.nameRule")
   }
   return null
 }
@@ -692,11 +691,12 @@ export function CreateServiceDialog({
   const lastFocusedPortErrorFieldRef = React.useRef<string>("")
   const createDialogPopupLayerRef = React.useRef<HTMLDivElement | null>(null)
   const isBusy = checkingNext || creating
+  const t = useTranslations()
 
-  const title = isEditMode ? "编辑服务" : "创建服务"
+  const title = isEditMode ? t("serviceDialog.editTitle") : t("serviceDialog.createTitle")
   const descriptionText = isEditMode
-    ? "编辑 Kubernetes Service 的配置内容。"
-    : "使用 Kubernetes Service 创建网络访问入口。"
+    ? t("serviceDialog.editDesc")
+    : t("serviceDialog.createDesc")
 
   React.useEffect(() => {
     if (!open) {
@@ -920,8 +920,8 @@ export function CreateServiceDialog({
 
     const normalizedName = (isEditMode && initialValues ? initialValues.name : name).trim().toLowerCase()
     const normalizedNamespace = (isEditMode && initialValues ? initialValues.namespace : namespace).trim()
-    const nextNameError = validateName(normalizedName)
-    const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
+    const nextNameError = validateName(normalizedName, t)
+    const nextNamespaceError = normalizedNamespace ? null : t("serviceDialog.pleaseSelectNamespace")
 
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
@@ -942,18 +942,18 @@ export function CreateServiceDialog({
         namespace: normalizedNamespace,
       })
       if (exists) {
-        setNameError("服务名称已存在，请更换后重试")
+        setNameError(t("serviceDialog.serviceNameExists"))
         return
       }
 
       setBasicCompleted(true)
       setActiveStep("service")
     } catch (error) {
-      setStepError(error instanceof Error ? error.message : "服务名称校验失败，请稍后重试")
+      setStepError(error instanceof Error ? error.message : t("serviceDialog.nameValidationFailed"))
     } finally {
       setCheckingNext(false)
     }
-  }, [checkingNext, initialValues, isEditMode, name, namespace])
+  }, [checkingNext, initialValues, isEditMode, name, namespace, t])
 
   const handleServiceNext = React.useCallback(() => {
     const normalizedSelectors = selectorItems.map((item) => ({
@@ -1469,7 +1469,7 @@ export function CreateServiceDialog({
             </DialogHeader>
             <div className="h-full flex items-center me-20">
               <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                <span className="text-sm font-medium">编辑 YAML</span>
+                <span className="text-sm font-medium">{t("serviceDialog.yamlMode")}</span>
                 <Switch
                   checked={yamlMode}
                   onCheckedChange={(checked) => {
@@ -1480,7 +1480,7 @@ export function CreateServiceDialog({
                     cancelYamlMode()
                   }}
                   disabled={isBusy}
-                  aria-label="编辑 YAML"
+                  aria-label={t("serviceDialog.yamlMode")}
                 />
               </div>
             </div>
@@ -1491,8 +1491,8 @@ export function CreateServiceDialog({
               items={[
                 {
                   id: "basic",
-                  title: "基本信息",
-                  status: activeStep === "basic" ? "当前" : basicCompleted ? "已设置" : "未设置",
+                  title: t("serviceDialog.basicInfo"),
+                  status: activeStep === "basic" ? t("workloadDialog.current") : basicCompleted ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                   active: activeStep === "basic",
                   icon: <IconSettings2 className="size-4" />,
                   disabled: isBusy,
@@ -1500,13 +1500,13 @@ export function CreateServiceDialog({
                 },
                 {
                   id: "service",
-                  title: "服务设置",
+                  title: t("serviceDialog.serviceSettings"),
                   status:
                       activeStep === "service"
-                          ? "当前"
+                          ? t("workloadDialog.current")
                           : serviceCompleted
-                              ? "已设置"
-                              : "未设置",
+                              ? t("workloadDialog.configured")
+                              : t("workloadDialog.notConfigured"),
                   active: activeStep === "service",
                   icon: <IconAdjustmentsHorizontal className="size-4" />,
                   disabled: isBusy || !canNavigateService,
@@ -1514,13 +1514,13 @@ export function CreateServiceDialog({
                 },
                 {
                   id: "advanced",
-                  title: "高级设置",
+                  title: t("serviceDialog.advancedSettings"),
                   status:
                     activeStep === "advanced"
-                      ? "当前"
+                      ? t("workloadDialog.current")
                       : enableNodePort || enableSessionAffinity || hasUserProvidedMetadata(labelEntries, annotationEntries)
-                        ? "已设置"
-                        : "未设置",
+                        ? t("workloadDialog.configured")
+                        : t("workloadDialog.notConfigured"),
                   active: activeStep === "advanced",
                   icon: <IconAdjustments className="size-4" />,
                   disabled: isBusy || !canNavigateAdvanced,
@@ -1551,14 +1551,14 @@ export function CreateServiceDialog({
           ) : activeStep === "basic" ? (
             <div>
               <div className="mb-4">
-                <h3 className="text-[15px] font-semibold">基本信息</h3>
+                <h3 className="text-[15px] font-semibold">{t("serviceDialog.basicInfo")}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  填写服务名称、所属项目和描述信息。
+                  {t("serviceDialog.basicInfoDesc")}
                 </p>
               </div>
               <FieldGroup className="grid gap-6 md:grid-cols-2">
                 <Field data-invalid={Boolean(nameError)}>
-                  <FieldLabel htmlFor="service-create-name">名称</FieldLabel>
+                  <FieldLabel htmlFor="service-create-name">{t("serviceDialog.name")}</FieldLabel>
                   <Input
                     id="service-create-name"
                     value={name}
@@ -1567,7 +1567,7 @@ export function CreateServiceDialog({
                       if (nameError) setNameError(null)
                       if (stepError) setStepError(null)
                     }}
-                    placeholder="请输入服务名称"
+                    placeholder={t("serviceDialog.namePlaceholder")}
                     autoComplete="off"
                     aria-invalid={Boolean(nameError)}
                     disabled={isBusy || isEditMode}
@@ -1575,7 +1575,7 @@ export function CreateServiceDialog({
                   {nameError ? (
                     <FieldError>{nameError}</FieldError>
                   ) : (
-                    <FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>
+                    <FieldDescription>{t("serviceDialog.nameRule")}</FieldDescription>
                   )}
                 </Field>
 
@@ -1590,24 +1590,24 @@ export function CreateServiceDialog({
                     if (stepError) setStepError(null)
                   }}
                   error={namespaceError}
-                  description="选择服务所属项目。"
+                  description={t("serviceDialog.namespaceSelect")}
                   disabled={isBusy || isEditMode}
                   contentContainer={createDialogPopupLayerRef}
                 />
 
                 <Field className="md:col-span-2">
-                  <FieldLabel htmlFor="service-create-description">描述</FieldLabel>
+                  <FieldLabel htmlFor="service-create-description">{t("serviceDialog.description")}</FieldLabel>
                   <Textarea
                     id="service-create-description"
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
-                    placeholder="请输入描述"
+                    placeholder={t("serviceDialog.descriptionPlaceholder")}
                     maxLength={DESCRIPTION_MAX_LENGTH}
                     className="min-h-24"
                     disabled={isBusy}
                   />
                   <FieldDescription>
-                    描述将写入资源注解 description，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                    {t("serviceDialog.descriptionHint", { maxLength: DESCRIPTION_MAX_LENGTH })}
                   </FieldDescription>
                 </Field>
               </FieldGroup>
@@ -1615,14 +1615,14 @@ export function CreateServiceDialog({
           ) : activeStep === "service" ? (
             <div>
               <div className="mb-4">
-                <h3 className="text-[15px] font-semibold">服务设置</h3>
+                <h3 className="text-[15px] font-semibold">{t("serviceDialog.serviceSettings")}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  设置内部访问模式、工作负载选择器和服务端口。
+                  {t("serviceDialog.serviceSettingsDesc")}
                 </p>
               </div>
               <div className="flex flex-col gap-6">
                   <Field>
-                    <FieldLabel htmlFor="service-access-mode">内部访问模式</FieldLabel>
+                    <FieldLabel htmlFor="service-access-mode">{t("serviceDialog.internalAccess")}</FieldLabel>
                     <Select
                         value={internalAccessMode}
                         onValueChange={(value) => {
@@ -1633,28 +1633,28 @@ export function CreateServiceDialog({
                         disabled={isBusy || isEditMode}
                     >
                       <SelectTrigger id="service-access-mode">
-                        <SelectValue placeholder="请选择内部访问模式" />
+                        <SelectValue placeholder={t("serviceDialog.pleaseSelectType")} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="virtual-ip">虚拟 IP 地址（VirtualIP）</SelectItem>
-                          <SelectItem value="headless">无头服务（Headless）</SelectItem>
+                          <SelectItem value="virtual-ip">{t("serviceDialog.virtualIp")}</SelectItem>
+                          <SelectItem value="headless">{t("serviceDialog.headless")}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FieldDescription>
                       {internalAccessMode === "headless"
-                          ? "无头服务不会分配虚拟 IP，客户端将直接访问后端 Pod。"
-                          : "为服务分配虚拟 IP，可在集群内部通过虚拟 IP 访问服务。"}
+                          ? t("serviceDialog.headlessDesc")
+                          : t("serviceDialog.virtualIpDesc")}
                     </FieldDescription>
                   </Field>
 
                   <Field>
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-1">
-                        <FieldLabel>工作负载选择器</FieldLabel>
+                        <FieldLabel>{t("serviceDialog.workloadSelector")}</FieldLabel>
                         <FieldDescription className="mt-0">
-                          通过标签筛选关联工作负载，建议优先使用“指定工作负载”自动回填标签。
+                          {t("serviceDialog.workloadSelectorDesc")}
                         </FieldDescription>
                       </div>
                       <Button

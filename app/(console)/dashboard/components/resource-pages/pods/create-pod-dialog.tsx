@@ -3,6 +3,7 @@
 import * as React from "react"
 import { IconBraces, IconDatabase, IconPencil, IconSettings2, IconStack2, IconTrash } from "@tabler/icons-react"
 import { parse, stringify } from "yaml"
+import { useTranslations } from "@/app/lib/i18n"
 import { ContainerListPanel } from "@/app/(console)/dashboard/components/resource-pages/container-list-panel"
 import { CreateContainerDialog } from "@/app/(console)/dashboard/components/resource-pages/create-container-dialog"
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
@@ -330,6 +331,7 @@ export function CreatePodDialog({
   const [configMapNameOptions, setConfigMapNameOptions] = React.useState<string[]>([])
   const [secretNameOptions, setSecretNameOptions] = React.useState<string[]>([])
   const [configResourceLoading, setConfigResourceLoading] = React.useState(false)
+  const t = useTranslations()
   const [configResourceError, setConfigResourceError] = React.useState<string | null>(null)
   const [configMountSaveAttempted, setConfigMountSaveAttempted] = React.useState(false)
   const [configMountDraft, setConfigMountDraft] = React.useState<ConfigMountDraft>(EMPTY_CONFIG_MOUNT_DRAFT)
@@ -1040,16 +1042,16 @@ export function CreatePodDialog({
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-start justify-between border-b bg-muted/15">
             <DialogHeader className="px-6 py-4">
-              <DialogTitle>{isEditMode ? "编辑容器组" : "创建容器组"}</DialogTitle>
+              <DialogTitle>{isEditMode ? t("podDialog.editTitle") : t("podDialog.createTitle")}</DialogTitle>
               <DialogDescription>
                 {isEditMode
-                  ? "编辑 Kubernetes Pod 的配置内容。"
-                  : "使用 Kubernetes Pod 创建一次性容器组。"}
+                  ? t("podDialog.editDescription")
+                  : t("podDialog.createDescription")}
               </DialogDescription>
             </DialogHeader>
             <div className="h-full flex items-center me-20">
               <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                <span className="text-sm font-medium">编辑 YAML</span>
+                <span className="text-sm font-medium">{t("podDialog.yamlMode")}</span>
                 <Switch
                   checked={yamlMode}
                   onCheckedChange={(checked) => {
@@ -1061,7 +1063,7 @@ export function CreatePodDialog({
                     cancelYamlMode()
                   }}
                   disabled={isBusy}
-                  aria-label="编辑 YAML"
+                  aria-label={t("podDialog.yamlMode")}
                 />
               </div>
             </div>
@@ -1072,8 +1074,8 @@ export function CreatePodDialog({
               items={[
                 {
                   id: "basic",
-                  title: "基本信息",
-                  status: activeStep === "basic" ? "当前" : "已设置",
+                  title: t("podDialog.basicInfo"),
+                  status: activeStep === "basic" ? t("workloadDialog.current") : t("workloadDialog.configured"),
                   active: activeStep === "basic",
                   icon: <IconSettings2 className="size-4" />,
                   disabled: isBusy,
@@ -1081,8 +1083,8 @@ export function CreatePodDialog({
                 },
                 {
                   id: "pod",
-                  title: "容器组设置",
-                  status: activeStep === "pod" ? "当前" : currentStepIndex > 1 ? "已设置" : "未设置",
+                  title: t("podDialog.podSettings"),
+                  status: activeStep === "pod" ? t("workloadDialog.current") : currentStepIndex > 1 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                   active: activeStep === "pod",
                   icon: <IconBraces className="size-4" />,
                   disabled: isBusy,
@@ -1093,8 +1095,8 @@ export function CreatePodDialog({
                 },
                 {
                   id: "storage",
-                  title: "存储设置",
-                  status: activeStep === "storage" ? "当前" : currentStepIndex > 2 ? "已设置" : "未设置",
+                  title: t("podDialog.storageSettings"),
+                  status: activeStep === "storage" ? t("workloadDialog.current") : currentStepIndex > 2 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                   active: activeStep === "storage",
                   icon: <IconDatabase className="size-4" />,
                   disabled: isBusy,
@@ -1105,8 +1107,8 @@ export function CreatePodDialog({
                 },
                 {
                   id: "advanced",
-                  title: "高级设置",
-                  status: activeStep === "advanced" ? "当前" : hasUserProvidedMetadata(labelEntries, annotationEntries) ? "已设置" : "未设置",
+                  title: t("podDialog.advancedSettings"),
+                  status: activeStep === "advanced" ? t("workloadDialog.current") : hasUserProvidedMetadata(labelEntries, annotationEntries) ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                   active: activeStep === "advanced",
                   icon: <IconStack2 className="size-4" />,
                   disabled: isBusy,
@@ -1140,12 +1142,12 @@ export function CreatePodDialog({
             ) : activeStep === "basic" ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">基本信息</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">填写容器组名称、所属项目和描述信息。</p>
+                  <h3 className="text-[15px] font-semibold">{t("podDialog.basicInfo")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("podDialog.basicInfoDesc")}</p>
                 </div>
                 <FieldGroup className="grid gap-6 md:grid-cols-2">
                   <Field data-invalid={Boolean(nameError)}>
-                    <FieldLabel htmlFor="create-pod-name">名称</FieldLabel>
+                    <FieldLabel htmlFor="create-pod-name">{t("podDialog.name")}</FieldLabel>
                     <Input
                       id="create-pod-name"
                       value={name}
@@ -1154,12 +1156,12 @@ export function CreatePodDialog({
                         if (nameError) setNameError(null)
                         if (submitError) setSubmitError(null)
                       }}
-                      placeholder="请输入容器组名称"
+                      placeholder={t("podDialog.namePlaceholder")}
                       autoComplete="off"
                       aria-invalid={Boolean(nameError)}
                       disabled={isBusy || isEditMode}
                     />
-                    {nameError ? <FieldError>{nameError}</FieldError> : <FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>}
+                    {nameError ? <FieldError>{nameError}</FieldError> : <FieldDescription>{t("podDialog.nameRule")}</FieldDescription>}
                   </Field>
 
                   <ProjectNamespaceField
@@ -1173,24 +1175,24 @@ export function CreatePodDialog({
                       if (submitError) setSubmitError(null)
                     }}
                     error={namespaceError}
-                    description="选择容器组所属项目。"
+                    description={t("podDialog.namespaceSelect")}
                     disabled={isBusy || isEditMode}
                     contentContainer={createDialogPopupLayerRef}
                   />
 
                   <Field className="md:col-span-2">
-                    <FieldLabel htmlFor="create-pod-description">描述</FieldLabel>
+                    <FieldLabel htmlFor="create-pod-description">{t("podDialog.description")}</FieldLabel>
                     <Textarea
                       id="create-pod-description"
                       value={description}
                       onChange={(event) => setDescription(event.target.value)}
-                      placeholder="请输入描述"
+                      placeholder={t("podDialog.descriptionPlaceholder")}
                       maxLength={DESCRIPTION_MAX_LENGTH}
                       className="min-h-24"
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      描述将写入资源注解 description，最长 {DESCRIPTION_MAX_LENGTH} 个字符。
+                      {t("podDialog.descriptionHint", { maxLength: DESCRIPTION_MAX_LENGTH })}
                     </FieldDescription>
                   </Field>
                 </FieldGroup>

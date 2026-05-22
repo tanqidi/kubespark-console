@@ -10,6 +10,7 @@ import {
   IconStack2,
   IconTrash,
 } from "@tabler/icons-react"
+import { useTranslations } from "@/app/lib/i18n"
 
 import { DeleteConfirmDialog } from "@/app/(console)/dashboard/components/resource-pages/delete-confirm-dialog"
 import { StepHeaderNav } from "@/app/(console)/dashboard/components/resource-pages/step-header-nav"
@@ -221,6 +222,7 @@ export function CreateJobDialog({
   const [configMapNameOptions, setConfigMapNameOptions] = React.useState<string[]>([])
   const [secretNameOptions, setSecretNameOptions] = React.useState<string[]>([])
   const [configResourceLoading, setConfigResourceLoading] = React.useState(false)
+  const t = useTranslations()
   const [configResourceError, setConfigResourceError] = React.useState<string | null>(null)
   const [configMountSaveAttempted, setConfigMountSaveAttempted] = React.useState(false)
   const [configMountDraft, setConfigMountDraft] = React.useState<ConfigMountDraft>(EMPTY_CONFIG_MOUNT_DRAFT)
@@ -584,7 +586,7 @@ export function CreateJobDialog({
             </DialogHeader>
             <div className="h-full flex items-center me-20">
               <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                <span className="text-sm font-medium">编辑 YAML</span>
+                <span className="text-sm font-medium">{t("jobDialog.yamlMode")}</span>
                 <Switch
                   checked={yamlMode}
                   onCheckedChange={(checked) => {
@@ -595,7 +597,7 @@ export function CreateJobDialog({
                     cancelYamlMode()
                   }}
                   disabled={isBusy}
-                  aria-label="编辑 YAML"
+                  aria-label={t("jobDialog.yamlMode")}
                 />
               </div>
             </div>
@@ -606,8 +608,8 @@ export function CreateJobDialog({
               items={[
               {
                 id: "basic",
-                title: "基本信息",
-                status: activeStep === "basic" ? "当前" : "已设置",
+                title: t("jobDialog.basicInfo"),
+                status: activeStep === "basic" ? t("workloadDialog.current") : t("workloadDialog.configured"),
                 active: activeStep === "basic",
                 icon: <IconSettings2 className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -619,8 +621,8 @@ export function CreateJobDialog({
               },
               {
                 id: "strategy",
-                title: "策略设置",
-                status: activeStep === "strategy" ? "当前" : currentStepIndex > 1 ? "已设置" : "未设置",
+                title: t("jobDialog.strategySettings"),
+                status: activeStep === "strategy" ? t("workloadDialog.current") : currentStepIndex > 1 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "strategy",
                 icon: <IconAdjustments className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -636,8 +638,8 @@ export function CreateJobDialog({
               },
               {
                 id: "pod",
-                title: "容器组设置",
-                status: activeStep === "pod" ? "当前" : currentStepIndex > 2 ? "已设置" : "未设置",
+                title: t("jobDialog.podSettings"),
+                status: activeStep === "pod" ? t("workloadDialog.current") : currentStepIndex > 2 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "pod",
                 icon: <IconBraces className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -649,8 +651,8 @@ export function CreateJobDialog({
               },
               {
                 id: "storage",
-                title: "存储设置",
-                status: activeStep === "storage" ? "当前" : currentStepIndex > 3 ? "已设置" : "未设置",
+                title: t("jobDialog.storageSettings"),
+                status: activeStep === "storage" ? t("workloadDialog.current") : currentStepIndex > 3 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "storage",
                 icon: <IconDatabase className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -666,13 +668,13 @@ export function CreateJobDialog({
               },
               {
                 id: "advanced",
-                title: "高级设置",
+                title: t("jobDialog.advancedSettings"),
                 status:
                   activeStep === "advanced"
-                    ? "当前"
+                    ? t("workloadDialog.current")
                     : hasUserProvidedMetadata(labelEntries, annotationEntries)
-                      ? "已设置"
-                      : "未设置",
+                      ? t("workloadDialog.configured")
+                      : t("workloadDialog.notConfigured"),
                 active: activeStep === "advanced",
                 icon: <IconStack2 className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -707,15 +709,15 @@ export function CreateJobDialog({
             ) : isBasicStep ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">基本信息</h3>
+                  <h3 className="text-[15px] font-semibold">{t("jobDialog.basicInfo")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    填写任务名称、所属项目以及描述信息。
+                    {t("jobDialog.basicInfoDesc")}
                   </p>
                 </div>
 
                 <FieldGroup className="grid gap-6 md:grid-cols-2">
                   <Field data-invalid={Boolean(nameError)}>
-                    <FieldLabel htmlFor="create-job-name">名称</FieldLabel>
+                    <FieldLabel htmlFor="create-job-name">{t("jobDialog.name")}</FieldLabel>
                     <Input
                       id="create-job-name"
                       value={name}
@@ -724,7 +726,7 @@ export function CreateJobDialog({
                         if (nameError) setNameError(null)
                         if (submitError) setSubmitError(null)
                       }}
-                      placeholder={kind === "CronJob" ? "请输入定时任务名称" : "请输入任务名称"}
+                      placeholder={kind === "CronJob" ? t("jobDialog.cronJobNamePlaceholder") : t("jobDialog.namePlaceholder")}
                       autoComplete="off"
                       aria-invalid={Boolean(nameError)}
                       disabled={isBusy || isEditMode}
@@ -732,7 +734,7 @@ export function CreateJobDialog({
                     {nameError ? (
                       <FieldError>{nameError}</FieldError>
                     ) : (
-                      <FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>
+                      <FieldDescription>{t("jobDialog.nameRule")}</FieldDescription>
                     )}
                   </Field>
 
@@ -747,14 +749,14 @@ export function CreateJobDialog({
                       if (submitError) setSubmitError(null)
                     }}
                     error={namespaceError}
-                    description="选择任务所属项目。"
+                    description={t("jobDialog.namespaceSelect")}
                     disabled={isBusy || isEditMode}
                     contentContainer={createDialogPopupLayerRef}
                   />
 
                   {kind === "CronJob" ? (
                     <Field data-invalid={Boolean(scheduleError)}>
-                      <FieldLabel htmlFor="create-job-schedule">定时计划</FieldLabel>
+                      <FieldLabel htmlFor="create-job-schedule">{t("jobDialog.schedule")}</FieldLabel>
                       <Input
                         id="create-job-schedule"
                         value={schedule}
@@ -763,7 +765,7 @@ export function CreateJobDialog({
                           if (scheduleError) setScheduleError(null)
                           if (submitError) setSubmitError(null)
                         }}
-                        placeholder="0 0 1 * *（每月）"
+                        placeholder={t("jobDialog.schedulePlaceholder")}
                         autoComplete="off"
                         aria-invalid={Boolean(scheduleError)}
                         disabled={isBusy}
@@ -772,24 +774,24 @@ export function CreateJobDialog({
                         <FieldError>{scheduleError}</FieldError>
                       ) : (
                         <FieldDescription>
-                          为定时任务设置 Cron 表达式，例如 `0 0 1 * *`（每月执行）。
+                          {t("jobDialog.scheduleHint")}
                         </FieldDescription>
                       )}
                     </Field>
                   ) : null}
                   <Field className={kind === "CronJob" ? "" : "md:col-span-2"}>
-                    <FieldLabel htmlFor="create-job-description">描述</FieldLabel>
+                    <FieldLabel htmlFor="create-job-description">{t("jobDialog.description")}</FieldLabel>
                     <Textarea
                       id="create-job-description"
                       value={description}
                       onChange={(event) => setDescription(event.target.value)}
-                      placeholder="请输入描述"
+                      placeholder={t("jobDialog.descriptionPlaceholder")}
                       maxLength={256}
                       className="min-h-24"
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      描述将写入资源注解 description，最长 256 个字符。
+                      {t("jobDialog.descriptionHint")}
                     </FieldDescription>
                   </Field>
                 </FieldGroup>
