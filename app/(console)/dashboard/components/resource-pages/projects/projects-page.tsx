@@ -71,6 +71,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { FilterCombobox, type FilterComboboxOption } from "@/components/ui/filter-combobox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useTranslations } from "@/app/lib/i18n"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -86,45 +87,49 @@ const MONACO_OPTIONS: EditorProps["options"] = {
   wordWrap: "on",
 }
 
-const projectColumns: ColumnConfig<NamespaceRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-    enableHiding: false,
-  },
-  { key: "status", label: "状态", render: "status" },
-  { key: "workspace", label: "企业空间" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getProjectColumns(t: (key: string) => string): ColumnConfig<NamespaceRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("projectsDialog.tableColumns.name"),
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+      enableHiding: false,
+    },
+    { key: "status", label: t("projectsDialog.tableColumns.status"), render: "status" },
+    { key: "workspace", label: t("projectsDialog.tableColumns.workspace") },
+    { key: "age", label: t("projectsDialog.tableColumns.age") },
+    { key: "updatedAt", label: t("projectsDialog.tableColumns.updatedAt") },
+  ]
+}
 
-const pipelineProjectColumns: ColumnConfig<PipelineProjectRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-    enableHiding: false,
-  },
-  { key: "workspace", label: "企业空间" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getPipelineProjectColumns(t: (key: string) => string): ColumnConfig<PipelineProjectRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("projectsDialog.tableColumns.name"),
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+      enableHiding: false,
+    },
+    { key: "workspace", label: t("projectsDialog.tableColumns.workspace") },
+    { key: "age", label: t("projectsDialog.tableColumns.age") },
+    { key: "updatedAt", label: t("projectsDialog.tableColumns.updatedAt") },
+  ]
+}
 
-function resolveCreateProjectErrorMessage(error: unknown): string {
+function resolveCreateProjectErrorMessage(error: unknown, t: (key: string) => string): string {
   const raw = error instanceof Error ? error.message : ""
   const text = raw.toLowerCase()
 
   if (text.includes("already exists")) {
-    return "项目名称已存在，请更换后重试"
+    return t("projectsDialog.nameExists")
   }
 
   if (text.includes("状态码 409") || text.includes("status 409")) {
-    return "项目名称已存在，请更换后重试"
+    return t("projectsDialog.nameExists")
   }
 
   if (raw) return raw
-  return "创建项目失败，请稍后重试"
+  return t("projectsDialog.createFailed")
 }
 
 function isNameRelatedCreateError(error: unknown): boolean {
@@ -139,17 +144,13 @@ function isNameRelatedCreateError(error: unknown): boolean {
   )
 }
 
-const PROJECT_NAME_RULE_MESSAGE =
-  "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 const PROJECT_WORKSPACE_ANNOTATION = "tanqidi.com/workspace"
-const PROJECT_WORKSPACE_REQUIRED_MESSAGE = "请选择企业空间"
-const PROJECT_WORKSPACE_INVALID_MESSAGE = "企业空间无效，请从下拉列表中选择"
 
-function validateProjectName(name: string): string | null {
-  if (!name) return "请输入项目名称"
-  if (name.length > 63) return PROJECT_NAME_RULE_MESSAGE
+function validateProjectName(name: string, t: (key: string) => string): string | null {
+  if (!name) return t("projectsDialog.nameRequired")
+  if (name.length > 63) return t("projectsDialog.nameRule")
   if (!/^[a-z](?:[-a-z0-9]*[a-z0-9])?$/.test(name)) {
-    return PROJECT_NAME_RULE_MESSAGE
+    return t("projectsDialog.nameRule")
   }
   return null
 }
@@ -211,24 +212,24 @@ function buildProjectYamlText(params: {
   )
 }
 
-function parseProjectYamlText(yamlText: string): {
+function parseProjectYamlText(yamlText: string, t: (key: string) => string): {
   name: string
   description: string
   labels: MetadataEntry[]
   annotations: MetadataEntry[]
 } {
   const normalized = yamlText.trim()
-  if (!normalized) throw new Error("请输入 YAML 内容")
+  if (!normalized) throw new Error(t("projectsDialog.yamlRequired"))
 
   const parsed = parse(normalized)
   const root =
     typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null
-  if (!root) throw new Error("YAML 内容格式无效")
+  if (!root) throw new Error(t("projectsDialog.yamlInvalid"))
 
   const kind = typeof root.kind === "string" ? root.kind.trim() : ""
-  if (kind && kind !== "Namespace") throw new Error("YAML 资源类型必须是 Namespace")
+  if (kind && kind !== "Namespace") throw new Error(t("projectsDialog.yamlKindMustBe"))
 
   const metadata =
     typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
@@ -295,7 +296,7 @@ function buildPipelineProjectYamlText(params: {
   )
 }
 
-function parsePipelineProjectYamlText(yamlText: string): {
+function parsePipelineProjectYamlText(yamlText: string, t: (key: string) => string): {
   name: string
   description: string
   labels: MetadataEntry[]
@@ -303,15 +304,15 @@ function parsePipelineProjectYamlText(yamlText: string): {
   workspaceName: string
 } {
   const normalized = yamlText.trim()
-  if (!normalized) throw new Error("请输入 YAML 内容")
+  if (!normalized) throw new Error(t("projectsDialog.yamlRequired"))
   const parsed = parse(normalized)
   const root =
     typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null
-  if (!root) throw new Error("YAML 内容格式无效")
+  if (!root) throw new Error(t("projectsDialog.yamlInvalid"))
   const kind = typeof root.kind === "string" ? root.kind.trim() : ""
-  if (kind && kind !== "PipelineProject") throw new Error("YAML 资源类型必须是 PipelineProject")
+  if (kind && kind !== "PipelineProject") throw new Error(t("projectsDialog.yamlKindMustBePipeline"))
 
   const metadata =
     typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
@@ -365,6 +366,7 @@ function parsePipelineProjectYamlText(yamlText: string): {
 export function ProjectsPageClient() {
   type ProjectDialogStep = "basic" | "advanced"
   type ProjectTab = "projects" | "pipelineProjects"
+  const t = useTranslations()
   const [rows, setRows] = React.useState<NamespaceRow[]>([])
   const [pipelineRows, setPipelineRows] = React.useState<PipelineProjectRow[]>([])
   const [activeTab, setActiveTab] = React.useState<ProjectTab>("projects")
@@ -376,12 +378,12 @@ export function ProjectsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes Namespace 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState(t("projectsDialog.yamlSubtitle"))
   const [describeOpen, setDescribeOpen] = React.useState(false)
   const [describeContent, setDescribeContent] = React.useState("")
   const [describeLoading, setDescribeLoading] = React.useState(false)
   const [describeError, setDescribeError] = React.useState<string | null>(null)
-  const [describeSubtitle, setDescribeSubtitle] = React.useState("查看 Kubernetes Namespace 的详情内容。")
+  const [describeSubtitle, setDescribeSubtitle] = React.useState(t("projectsDialog.describeSubtitle"))
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<NamespaceRow | null>(null)
   const [pendingPipelineDeleteRow, setPendingPipelineDeleteRow] = React.useState<PipelineProjectRow | null>(null)
   const [editingRow, setEditingRow] = React.useState<NamespaceRow | null>(null)
@@ -430,10 +432,10 @@ export function ProjectsPageClient() {
   const [creating, setCreating] = React.useState(false)
   const [createStep, setCreateStep] = React.useState<ProjectDialogStep>("basic")
   const isEditMode = Boolean(editingRow)
-  const dialogTitle = isEditMode ? "编辑项目" : "创建项目"
+  const dialogTitle = isEditMode ? t("projectsDialog.editTitle") : t("projectsDialog.createTitle")
   const dialogDescription = isEditMode
-    ? "编辑项目描述信息。"
-    : "创建项目以对资源进行分组并控制不同用户的权限。"
+    ? t("projectsDialog.editDesc")
+    : t("projectsDialog.createDesc")
   const mergeRowsWithWorkspaceBindings = React.useCallback(
     async (namespaceRows: NamespaceRow[]): Promise<NamespaceRow[]> => {
       const bindings = await fetchWorkspaceNamespaceBindings(1000)
@@ -493,7 +495,7 @@ export function ProjectsPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes Namespace（${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("projectsDialog.yamlSubtitleWithName", { name: row.name }))
 
     void fetchNamespaceYaml(row.name)
       .then(({ payload, text }) => {
@@ -504,7 +506,7 @@ export function ProjectsPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("projectsDialog.loadFailed")
         setYamlError(message)
         console.error("[Projects] view yaml request failed", {
           namespace: row.name,
@@ -514,7 +516,7 @@ export function ProjectsPageClient() {
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
   const handleViewPipelineYaml = React.useCallback((row: PipelineProjectRow) => {
     const pipelineProjectName = row.name.trim()
     if (!pipelineProjectName || pipelineProjectName === "-") return
@@ -522,7 +524,7 @@ export function ProjectsPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 PipelineProject（${pipelineProjectName}）的 YAML 内容。`)
+    setYamlSubtitle(t("projectsDialog.yamlPipelineSubtitle", { name: pipelineProjectName }))
 
     void fetchResourceByName<Record<string, unknown>>(
       "tanqidi.com",
@@ -539,33 +541,33 @@ export function ProjectsPageClient() {
         setYamlContent(text)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("projectsDialog.loadFailed")
         setYamlError(message)
       })
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const handleViewDescribe = React.useCallback((row: NamespaceRow) => {
     setDescribeOpen(true)
     setDescribeError(null)
     setDescribeLoading(true)
     setDescribeContent("")
-    setDescribeSubtitle(`查看 Kubernetes Namespace（${row.name}）的详情内容。`)
+    setDescribeSubtitle(t("projectsDialog.describeSubtitleWithName", { name: row.name }))
 
     void fetchResourceDescribe("core", "v1", "namespaces", row.name)
       .then(({ text }) => {
-        setDescribeContent(text || "(无详情输出)")
+        setDescribeContent(text || t("projectsDialog.describeNoContent"))
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载详情失败"
+        const message = e instanceof Error ? e.message : t("projectsDialog.loadDetailFailed")
         setDescribeError(message)
       })
       .finally(() => {
         setDescribeLoading(false)
       })
-  }, [])
+  }, [t])
 
   const requestDelete = React.useCallback((row: NamespaceRow) => {
     setPendingDeleteRow(row)
@@ -646,10 +648,10 @@ export function ProjectsPageClient() {
         setCreateDialogOpen(true)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载项目详情失败"
+        const message = e instanceof Error ? e.message : t("projectsDialog.loadDetailFailed")
         setError(message)
       })
-  }, [])
+  }, [t])
 
   const handleConfirmDelete = React.useCallback(() => {
     if (!pendingDeleteRow || deleting) return
@@ -660,7 +662,7 @@ export function ProjectsPageClient() {
         setPendingDeleteRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("projectsDialog.deleteFailed")
         setError(message)
         console.error("[Projects] delete request failed", {
           namespace: pendingDeleteRow.name,
@@ -670,16 +672,16 @@ export function ProjectsPageClient() {
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeleteRow])
+  }, [deleting, pendingDeleteRow, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: NamespaceRow[]) => {
     if (selectedRows.length === 0) return
     void Promise.all(selectedRows.map((row) => deleteNamespace(row.name))).catch((e: unknown) => {
-      const message = e instanceof Error ? e.message : "删除失败"
+      const message = e instanceof Error ? e.message : t("projectsDialog.deleteFailed")
       setError(message)
       console.error("[Projects] bulk delete request failed", e)
     })
-  }, [])
+  }, [t])
   const handlePipelineDeleteSelectedRows = React.useCallback((selectedRows: PipelineProjectRow[]) => {
     if (selectedRows.length === 0) return
     const names = selectedRows
@@ -692,11 +694,11 @@ export function ProjectsPageClient() {
         setPipelineRows(items)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("projectsDialog.deleteFailed")
         setError(message)
         console.error("[Projects] bulk delete pipeline project failed", e)
       })
-  }, [])
+  }, [t])
   const openPipelineProjectCreateDialog = React.useCallback(() => {
     resetPipelineDialogState()
     setPipelineProjectDialogMode("create")
@@ -731,10 +733,10 @@ export function ProjectsPageClient() {
           setPipelineProjectCreateOpen(true)
         })
         .catch((e: unknown) =>
-          setError(e instanceof Error ? e.message : "加载流水线项目详情失败")
+          setError(e instanceof Error ? e.message : t("projectsDialog.loadPipelineDetailFailed"))
         )
     },
-    [resetPipelineDialogState]
+    [resetPipelineDialogState, t]
   )
   const handlePipelineProjectCreateSubmit = React.useCallback(() => {
     if (pipelineProjectCreating) return
@@ -749,7 +751,7 @@ export function ProjectsPageClient() {
 
     if (pipelineProjectCreateYamlMode) {
       try {
-        const parsed = parsePipelineProjectYamlText(pipelineProjectCreateYamlText)
+        const parsed = parsePipelineProjectYamlText(pipelineProjectCreateYamlText, t)
         nextName = parsed.name.trim()
         nextDescription = parsed.description.trim()
         nextLabels = metadataEntriesToRecord(parsed.labels)
@@ -764,12 +766,12 @@ export function ProjectsPageClient() {
         setPipelineProjectCreateMetadataEnabled(false)
         setPipelineProjectCreateYamlError(null)
       } catch (error) {
-        setPipelineProjectCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+        setPipelineProjectCreateYamlError(error instanceof Error ? error.message : t("projectsDialog.yamlParseFailed"))
         return
       }
     }
 
-    const validationMessage = validateProjectName(nextName)
+    const validationMessage = validateProjectName(nextName, t)
     if (validationMessage) {
       setPipelineProjectCreateNameInvalid(true)
       setPipelineProjectCreateNameError(validationMessage)
@@ -779,7 +781,7 @@ export function ProjectsPageClient() {
 
     const nameExists = allPipelineProjectNames.includes(nextName)
     if (!isPipelineProjectEditMode && nameExists) {
-      const duplicatedNameMessage = "流水线项目名称已存在，请更换后重试"
+      const duplicatedNameMessage = t("projectsDialog.pipelineNameExists")
       setPipelineProjectCreateNameInvalid(true)
       setPipelineProjectCreateNameError(duplicatedNameMessage)
       if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(duplicatedNameMessage)
@@ -787,7 +789,7 @@ export function ProjectsPageClient() {
     }
 
     if (isPipelineProjectEditMode && pipelineProjectEditingName && nextName !== pipelineProjectEditingName) {
-      const lockedNameError = "编辑模式不允许修改名称"
+      const lockedNameError = t("projectsDialog.nameLocked")
       setPipelineProjectCreateNameInvalid(true)
       setPipelineProjectCreateNameError(lockedNameError)
       if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(lockedNameError)
@@ -797,7 +799,7 @@ export function ProjectsPageClient() {
       const originWorkspace =
         pipelineRows.find((row) => row.name.trim() === pipelineProjectEditingName)?.workspace.trim() || ""
       if (originWorkspace && nextWorkspace !== originWorkspace) {
-        const lockedWorkspaceError = "当前在编辑模式操作，企业空间固定，不可修改。"
+        const lockedWorkspaceError = t("projectsDialog.workspaceLocked")
         setPipelineProjectCreateWorkspaceInvalid(true)
         setPipelineProjectCreateWorkspaceError(lockedWorkspaceError)
         if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(lockedWorkspaceError)
@@ -807,8 +809,8 @@ export function ProjectsPageClient() {
 
     if (!nextWorkspace) {
       setPipelineProjectCreateWorkspaceInvalid(true)
-      setPipelineProjectCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
-      if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+      setPipelineProjectCreateWorkspaceError(t("projectsDialog.workspaceRequired"))
+      if (pipelineProjectCreateYamlMode) setPipelineProjectCreateYamlError(t("projectsDialog.workspaceRequired"))
       return
     }
 
@@ -848,7 +850,7 @@ export function ProjectsPageClient() {
         setError(null)
       })
       .catch((e: unknown) => {
-        const message = resolveCreateProjectErrorMessage(e)
+        const message = resolveCreateProjectErrorMessage(e, t)
         const isNameError = isNameRelatedCreateError(e)
         setPipelineProjectCreateNameInvalid(isNameError)
         setPipelineProjectCreateNameError(isNameError ? message : null)
@@ -872,6 +874,7 @@ export function ProjectsPageClient() {
     pipelineProjectEditingName,
     pipelineRows,
     resetPipelineDialogState,
+    t,
   ])
   const handleConfirmPipelineDelete = React.useCallback(() => {
     if (!pendingPipelineDeleteRow || pipelineDeleting) return
@@ -885,13 +888,13 @@ export function ProjectsPageClient() {
         setPipelineRows(items)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("projectsDialog.deleteFailed")
         setError(message)
       })
       .finally(() => {
         setPipelineDeleting(false)
       })
-  }, [pendingPipelineDeleteRow, pipelineDeleting])
+  }, [pendingPipelineDeleteRow, pipelineDeleting, t])
 
   const handleCreateSubmit = React.useCallback(
     () => {
@@ -905,7 +908,7 @@ export function ProjectsPageClient() {
 
       if (createYamlMode) {
         try {
-          const parsed = parseProjectYamlText(createYamlText)
+          const parsed = parseProjectYamlText(createYamlText, t)
           nextName = isEditMode ? (editingRow?.name ?? "").trim() : parsed.name.trim()
           nextDescription = parsed.description.trim()
           nextLabels = metadataEntriesToRecord(parsed.labels)
@@ -926,12 +929,12 @@ export function ProjectsPageClient() {
           setMetadataEnabled(false)
           setCreateYamlError(null)
         } catch (error) {
-          setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+          setCreateYamlError(error instanceof Error ? error.message : t("projectsDialog.yamlParseFailed"))
           return
         }
       }
 
-      const validationMessage = validateProjectName(nextName)
+      const validationMessage = validateProjectName(nextName, t)
       if (validationMessage) {
         setCreateNameInvalid(true)
         setCreateNameError(validationMessage)
@@ -945,15 +948,15 @@ export function ProjectsPageClient() {
         const selectedWorkspace = nextWorkspace.trim()
         if (!selectedWorkspace) {
           setCreateWorkspaceInvalid(true)
-          setCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
-          if (createYamlMode) setCreateYamlError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+          setCreateWorkspaceError(t("projectsDialog.workspaceRequired"))
+          if (createYamlMode) setCreateYamlError(t("projectsDialog.workspaceRequired"))
           return
         }
         const existsInOptions = workspaceOptions.some((option) => option.id === selectedWorkspace)
         if (!existsInOptions) {
           setCreateWorkspaceInvalid(true)
-          setCreateWorkspaceError(PROJECT_WORKSPACE_INVALID_MESSAGE)
-          if (createYamlMode) setCreateYamlError(PROJECT_WORKSPACE_INVALID_MESSAGE)
+          setCreateWorkspaceError(t("projectsDialog.workspaceInvalid"))
+          if (createYamlMode) setCreateYamlError(t("projectsDialog.workspaceInvalid"))
           return
         }
       }
@@ -1000,7 +1003,7 @@ export function ProjectsPageClient() {
           setError(null)
         })
         .catch((e: unknown) => {
-          const message = resolveCreateProjectErrorMessage(e)
+          const message = resolveCreateProjectErrorMessage(e, t)
           const isNameError = isNameRelatedCreateError(e)
           setCreateNameInvalid(isNameError)
           setCreateNameError(isNameError ? message : null)
@@ -1026,6 +1029,7 @@ export function ProjectsPageClient() {
       workspaceOptions,
       workspaceBindingExists,
       mergeRowsWithWorkspaceBindings,
+      t,
     ]
   )
 
@@ -1056,7 +1060,7 @@ export function ProjectsPageClient() {
 
   const confirmCreateYamlMode = React.useCallback(() => {
     try {
-      const parsed = parseProjectYamlText(createYamlText)
+      const parsed = parseProjectYamlText(createYamlText, t)
       if (!isEditMode) {
         setCreateName(parsed.name)
       }
@@ -1072,9 +1076,9 @@ export function ProjectsPageClient() {
       setCreateYamlError(null)
       setCreateYamlMode(false)
     } catch (error) {
-      setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      setCreateYamlError(error instanceof Error ? error.message : t("projectsDialog.yamlParseFailed"))
     }
-  }, [createWorkspace, createYamlText, isEditMode])
+  }, [createWorkspace, createYamlText, isEditMode, t])
 
   const enterPipelineProjectCreateYamlMode = React.useCallback(() => {
     const annotationsForYaml = metadataEntriesToRecord(pipelineProjectCreateAnnotationEntries)
@@ -1110,7 +1114,7 @@ export function ProjectsPageClient() {
 
   const confirmPipelineProjectCreateYamlMode = React.useCallback(() => {
     try {
-      const parsed = parsePipelineProjectYamlText(pipelineProjectCreateYamlText)
+      const parsed = parsePipelineProjectYamlText(pipelineProjectCreateYamlText, t)
       setPipelineProjectCreateName(parsed.name)
       setPipelineProjectCreateDescription(parsed.description)
       const nextWorkspace = parsed.workspaceName.trim() || pipelineProjectCreateWorkspace.trim()
@@ -1122,20 +1126,20 @@ export function ProjectsPageClient() {
       setPipelineProjectCreateYamlError(null)
       setPipelineProjectCreateYamlMode(false)
     } catch (error) {
-      setPipelineProjectCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      setPipelineProjectCreateYamlError(error instanceof Error ? error.message : t("projectsDialog.yamlParseFailed"))
     }
-  }, [pipelineProjectCreateWorkspace, pipelineProjectCreateYamlText])
+  }, [pipelineProjectCreateWorkspace, pipelineProjectCreateYamlText, t])
 
   const projectTableColumns = React.useMemo(
     () =>
       createColumns<NamespaceRow>({
-        columns: projectColumns,
+        columns: getProjectColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"查看 YAML"}
+                {t("projectsDialog.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -1146,7 +1150,7 @@ export function ProjectsPageClient() {
             label: (
               <>
                 <IconInfoCircle className="size-4" />
-                {"详情"}
+                {t("projectsDialog.viewDetails")}
               </>
             ),
             onSelect: (row) => {
@@ -1157,7 +1161,7 @@ export function ProjectsPageClient() {
             label: (
               <>
                 <IconPencil className="size-4" />
-                {"编辑"}
+                {t("projectsDialog.edit")}
               </>
             ),
             onSelect: (row) => {
@@ -1168,7 +1172,7 @@ export function ProjectsPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {t("projectsDialog.delete")}
               </>
             ),
             variant: "destructive",
@@ -1179,19 +1183,19 @@ export function ProjectsPageClient() {
           },
         ],
       }),
-    [handleViewDescribe, handleViewYaml, requestDelete, requestEdit]
+    [handleViewDescribe, handleViewYaml, requestDelete, requestEdit, t]
   )
 
   const pipelineTableColumns = React.useMemo(
     () =>
       createColumns<PipelineProjectRow>({
-        columns: pipelineProjectColumns,
+        columns: getPipelineProjectColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                {"查看 YAML"}
+                {t("projectsDialog.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -1202,7 +1206,7 @@ export function ProjectsPageClient() {
             label: (
               <>
                 <IconPencil className="size-4" />
-                {"编辑"}
+                {t("projectsDialog.edit")}
               </>
             ),
             onSelect: (row) => {
@@ -1213,7 +1217,7 @@ export function ProjectsPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                {"删除"}
+                {t("projectsDialog.delete")}
               </>
             ),
             variant: "destructive",
@@ -1224,7 +1228,7 @@ export function ProjectsPageClient() {
           },
         ],
       }),
-    [handleViewPipelineYaml, openPipelineProjectEditDialog]
+    [handleViewPipelineYaml, openPipelineProjectEditDialog, t]
   )
 
   React.useEffect(() => {
@@ -1250,7 +1254,7 @@ export function ProjectsPageClient() {
         if (!silent) {
           setRows([])
           setPipelineRows([])
-          setError(e instanceof Error ? e.message : "API request failed")
+          setError(e instanceof Error ? e.message : t("projectsDialog.loadFailed"))
         } else {
           console.error("[Projects] polling refresh failed", e)
         }
@@ -1282,7 +1286,7 @@ export function ProjectsPageClient() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [mergeRowsWithWorkspaceBindings])
+  }, [mergeRowsWithWorkspaceBindings, t])
 
   const query = nameQuery.trim().toLowerCase()
   const selectedWorkspace = workspaceQuery.trim()
@@ -1318,7 +1322,7 @@ export function ProjectsPageClient() {
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>加载失败</AlertTitle>
+          <AlertTitle>{t("projectsDialog.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -1331,14 +1335,14 @@ export function ProjectsPageClient() {
         options={workspaceFilterOptions}
         value={workspaceQuery}
         onValueChange={setWorkspaceQuery}
-        placeholder="企业空间"
-        emptyText="暂无企业空间"
+        placeholder={t("projectsDialog.workspaceFilterPlaceholder")}
+        emptyText={t("projectsDialog.workspaceFilterEmpty")}
         className="w-40"
       />
       <Input
         value={nameQuery}
         onChange={(event) => setNameQuery(event.target.value)}
-        placeholder="名称"
+        placeholder={t("projectsDialog.nameFilterPlaceholder")}
         className="h-9 w-40"
       />
     </>
@@ -1347,8 +1351,8 @@ export function ProjectsPageClient() {
   const projectTabs = (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ProjectTab)} className="w-fit">
       <TabsList>
-        <TabsTrigger value="projects">项目</TabsTrigger>
-        <TabsTrigger value="pipelineProjects">流水线项目</TabsTrigger>
+        <TabsTrigger value="projects">{t("projectsDialog.projectsTab")}</TabsTrigger>
+        <TabsTrigger value="pipelineProjects">{t("projectsDialog.pipelineProjectsTab")}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -1376,7 +1380,7 @@ export function ProjectsPageClient() {
               </DialogHeader>
               <div className="h-full flex items-center me-20">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                  <span className="text-sm font-medium">编辑 YAML</span>
+                  <span className="text-sm font-medium">{t("projectsDialog.yamlMode")}</span>
                   <Switch
                     checked={createYamlMode}
                     onCheckedChange={(checked) => {
@@ -1388,7 +1392,7 @@ export function ProjectsPageClient() {
                       cancelCreateYamlMode()
                     }}
                     disabled={creating}
-                    aria-label="编辑 YAML"
+                    aria-label={t("projectsDialog.yamlMode")}
                   />
                 </div>
               </div>
@@ -1399,8 +1403,8 @@ export function ProjectsPageClient() {
                 items={[
                   {
                     id: "basic",
-                    title: "基本信息",
-                    status: createStep === "basic" ? "当前" : "已设置",
+                    title: t("projectsDialog.basicInfo"),
+                    status: createStep === "basic" ? t("projectsDialog.current") : t("projectsDialog.configured"),
                     active: createStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: creating,
@@ -1411,13 +1415,13 @@ export function ProjectsPageClient() {
                   },
                   {
                     id: "advanced",
-                    title: "高级设置",
+                    title: t("projectsDialog.advancedSettings"),
                     status:
                       createStep === "advanced"
-                        ? "当前"
+                        ? t("projectsDialog.current")
                         : hasUserProvidedMetadata(labelEntries, annotationEntries)
-                          ? "已设置"
-                          : "未设置",
+                          ? t("projectsDialog.configured")
+                          : t("projectsDialog.notConfigured"),
                     active: createStep === "advanced",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: creating,
@@ -1453,15 +1457,15 @@ export function ProjectsPageClient() {
               ) : createStep === "basic" ? (
                 <div className="p-6">
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">基本信息</h3>
+                    <h3 className="text-[15px] font-semibold">{t("projectsDialog.basicInfo")}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      填写项目名称与描述信息。
+                      {t("projectsDialog.basicInfoDesc")}
                     </p>
                   </div>
                   <FieldGroup className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <Field data-invalid={createNameInvalid}>
-                        <FieldLabel htmlFor="project-create-name">名称</FieldLabel>
+                        <FieldLabel htmlFor="project-create-name">{t("projectsDialog.name")}</FieldLabel>
                         <Input
                           id="project-create-name"
                           name="name"
@@ -1472,7 +1476,7 @@ export function ProjectsPageClient() {
                             if (createNameInvalid) setCreateNameInvalid(false)
                             if (createNameError) setCreateNameError(null)
                           }}
-                          placeholder="请输入项目名称"
+                          placeholder={t("projectsDialog.namePlaceholder")}
                           autoComplete="off"
                           aria-invalid={createNameInvalid}
                           disabled={creating || isEditMode}
@@ -1480,12 +1484,12 @@ export function ProjectsPageClient() {
                         {createNameError ? (
                           <FieldError>{createNameError}</FieldError>
                         ) : (
-                          <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
+                          <FieldDescription>{t("projectsDialog.nameRule")}</FieldDescription>
                         )}
                       </Field>
 
                       <Field data-invalid={createWorkspaceInvalid}>
-                        <FieldLabel htmlFor="project-create-workspace">企业空间</FieldLabel>
+                        <FieldLabel htmlFor="project-create-workspace">{t("projectsDialog.workspace")}</FieldLabel>
                         <FilterCombobox
                           options={workspaceOptions}
                           value={createWorkspace}
@@ -1498,8 +1502,8 @@ export function ProjectsPageClient() {
                             if (createWorkspaceInvalid) setCreateWorkspaceInvalid(false)
                             if (createWorkspaceError) setCreateWorkspaceError(null)
                           }}
-                          placeholder="请选择企业空间"
-                          emptyText="暂无企业空间"
+                          placeholder={t("projectsDialog.workspacePlaceholder")}
+                          emptyText={t("projectsDialog.workspaceFilterEmpty")}
                           className="h-10"
                           ariaInvalid={createWorkspaceInvalid}
                           disabled={creating || (isEditMode && workspaceBindingExists)}
@@ -1509,8 +1513,8 @@ export function ProjectsPageClient() {
                         ) : (
                           <FieldDescription>
                             {isEditMode && workspaceBindingExists
-                              ? "已存在项目与企业空间绑定关系，如需调整请先删除对应 binding。"
-                              : `必选，保存到注解 ${PROJECT_WORKSPACE_ANNOTATION}。`}
+                              ? t("projectsDialog.workspaceLocked")
+                              : t("projectsDialog.workspaceRequiredDesc", { annotation: PROJECT_WORKSPACE_ANNOTATION })}
                           </FieldDescription>
                         )}
                       </Field>
@@ -1518,20 +1522,20 @@ export function ProjectsPageClient() {
 
                     <Field>
                       <FieldLabel htmlFor="project-create-description">
-                        描述
+                        {t("projectsDialog.description")}
                       </FieldLabel>
                       <Textarea
                         id="project-create-description"
                         name="description"
                         value={createDescription}
                         onChange={(event) => setCreateDescription(event.target.value)}
-                        placeholder="请输入描述"
+                        placeholder={t("projectsDialog.descriptionPlaceholder")}
                         maxLength={256}
                         className="min-h-28"
                         disabled={creating}
                       />
                       <FieldDescription>
-                        描述将写入资源注解 description，最长 256 个字符。
+                        {t("projectsDialog.descriptionRule")}
                       </FieldDescription>
                     </Field>
                   </FieldGroup>
@@ -1539,9 +1543,9 @@ export function ProjectsPageClient() {
               ) : (
                 <div className="p-6">
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">高级设置</h3>
+                    <h3 className="text-[15px] font-semibold">{t("projectsDialog.advancedSettings")}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      补充标签与注解信息，便于检索、分类和后续治理。
+                      {t("projectsDialog.advancedSettingsDesc")}
                     </p>
                   </div>
                   <FieldGroup className="flex flex-col gap-4">
@@ -1574,17 +1578,17 @@ export function ProjectsPageClient() {
               {createYamlMode ? (
                 <div className="flex w-full items-center justify-between gap-3">
                   <Button type="button" variant="outline" disabled={creating} onClick={cancelCreateYamlMode}>
-                    取消
+                    {t("projectsDialog.cancel")}
                   </Button>
                   <Button type="button" onClick={confirmCreateYamlMode} disabled={creating}>
-                    确认保存
+                    {t("projectsDialog.confirmSave")}
                   </Button>
                 </div>
               ) : createStep === "basic" ? (
                 <div className="flex w-full items-center justify-between gap-3">
                   <DialogClose asChild>
                     <Button type="button" variant="outline" disabled={creating}>
-                      取消
+                      {t("projectsDialog.cancel")}
                     </Button>
                   </DialogClose>
                   <Button
@@ -1592,7 +1596,7 @@ export function ProjectsPageClient() {
                     disabled={creating}
                     onClick={() => {
                       const nextName = (editingRow?.name ?? createName).trim()
-                      const nameValidationMessage = validateProjectName(nextName)
+                      const nameValidationMessage = validateProjectName(nextName, t)
                       if (nameValidationMessage) {
                         setCreateNameInvalid(true)
                         setCreateNameError(nameValidationMessage)
@@ -1603,7 +1607,7 @@ export function ProjectsPageClient() {
                         const nameExists = rows.some((row) => row.name === nextName)
                         if (nameExists) {
                           setCreateNameInvalid(true)
-                          setCreateNameError("项目名称已存在，请更换后重试")
+                          setCreateNameError(t("projectsDialog.nameExists"))
                           return
                         }
                       }
@@ -1615,13 +1619,13 @@ export function ProjectsPageClient() {
                         const selectedWorkspace = createWorkspace.trim()
                         if (!selectedWorkspace) {
                           setCreateWorkspaceInvalid(true)
-                          setCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+                          setCreateWorkspaceError(t("projectsDialog.workspaceRequired"))
                           return
                         }
                         const existsInOptions = workspaceOptions.some((option) => option.id === selectedWorkspace)
                         if (!existsInOptions) {
                           setCreateWorkspaceInvalid(true)
-                          setCreateWorkspaceError(PROJECT_WORKSPACE_INVALID_MESSAGE)
+                          setCreateWorkspaceError(t("projectsDialog.workspaceInvalid"))
                           return
                         }
                       }
@@ -1630,16 +1634,16 @@ export function ProjectsPageClient() {
                       setCreateStep("advanced")
                     }}
                   >
-                    下一步
+                    {t("projectsDialog.nextStep")}
                   </Button>
                 </div>
               ) : (
                 <div className="flex w-full items-center justify-between gap-3">
                   <Button type="button" variant="outline" disabled={creating} onClick={() => setCreateStep("basic")}>
-                    上一步
+                    {t("projectsDialog.previousStep")}
                   </Button>
                   <Button type="button" onClick={() => handleCreateSubmit()} disabled={creating}>
-                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                    {creating ? (isEditMode ? t("projectsDialog.saving") : t("projectsDialog.creating")) : isEditMode ? t("projectsDialog.save") : t("projectsDialog.create")}
                   </Button>
                 </div>
               )}
@@ -1649,7 +1653,7 @@ export function ProjectsPageClient() {
       </Dialog>
 
       <DescribeViewerDialog
-        title="查看详情"
+        title={t("projectsDialog.viewDetails")}
         subtitle={describeSubtitle}
         open={describeOpen}
         onOpenChange={setDescribeOpen}
@@ -1658,7 +1662,7 @@ export function ProjectsPageClient() {
         error={describeError}
       />
       <MonacoViewerDialog
-        title="查看YAML"
+        title={t("projectsDialog.viewYaml")}
         subtitle={yamlSubtitle}
         open={yamlOpen}
         onOpenChange={setYamlOpen}
@@ -1672,10 +1676,10 @@ export function ProjectsPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除项目"
+        title={t("projectsDialog.deleteTitle")}
         description={
           pendingDeleteRow
-            ? `确定删除项目 ${pendingDeleteRow.name} 吗？`
+            ? t("projectsDialog.deleteDesc", { name: pendingDeleteRow.name })
             : ""
         }
         deleting={deleting}
@@ -1686,10 +1690,10 @@ export function ProjectsPageClient() {
         onOpenChange={(open) => {
           if (!open && !pipelineDeleting) setPendingPipelineDeleteRow(null)
         }}
-        title="删除流水线项目"
+        title={t("projectsDialog.deletePipelineTitle")}
         description={
           pendingPipelineDeleteRow
-            ? `确定删除流水线项目 ${pendingPipelineDeleteRow.name} 吗？`
+            ? t("projectsDialog.deletePipelineDesc", { name: pendingPipelineDeleteRow.name })
             : ""
         }
         deleting={pipelineDeleting}
@@ -1711,14 +1715,14 @@ export function ProjectsPageClient() {
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
-                <DialogTitle>{isPipelineProjectEditMode ? "编辑流水线项目" : "创建流水线项目"}</DialogTitle>
+                <DialogTitle>{isPipelineProjectEditMode ? t("projectsDialog.editTitle") : t("projectsDialog.createTitle")}</DialogTitle>
                 <DialogDescription>
-                  {isPipelineProjectEditMode ? "编辑流水线项目并更新描述信息。" : "创建流水线项目并归属到指定企业空间。"}
+                  {isPipelineProjectEditMode ? t("projectsDialog.editDesc") : t("projectsDialog.createDesc")}
                 </DialogDescription>
               </DialogHeader>
               <div className="h-full flex items-center me-20">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                  <span className="text-sm font-medium">编辑 YAML</span>
+                  <span className="text-sm font-medium">{t("projectsDialog.yamlMode")}</span>
                   <Switch
                     checked={pipelineProjectCreateYamlMode}
                     onCheckedChange={(checked) => {
@@ -1730,7 +1734,7 @@ export function ProjectsPageClient() {
                       cancelPipelineProjectCreateYamlMode()
                     }}
                     disabled={pipelineProjectCreating}
-                    aria-label="编辑 YAML"
+                    aria-label={t("projectsDialog.yamlMode")}
                   />
                 </div>
               </div>
@@ -1741,8 +1745,8 @@ export function ProjectsPageClient() {
                 items={[
                   {
                     id: "basic",
-                    title: "基本信息",
-                    status: pipelineProjectCreateStep === "basic" ? "当前" : "已设置",
+                    title: t("projectsDialog.basicInfo"),
+                    status: pipelineProjectCreateStep === "basic" ? t("projectsDialog.current") : t("projectsDialog.configured"),
                     active: pipelineProjectCreateStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: pipelineProjectCreating,
@@ -1753,16 +1757,16 @@ export function ProjectsPageClient() {
                   },
                   {
                     id: "advanced",
-                    title: "高级设置",
+                    title: t("projectsDialog.advancedSettings"),
                     status:
                       pipelineProjectCreateStep === "advanced"
-                        ? "当前"
+                        ? t("projectsDialog.current")
                         : hasUserProvidedMetadata(
                             pipelineProjectCreateLabelEntries,
                             pipelineProjectCreateAnnotationEntries
                           )
-                          ? "已设置"
-                          : "未设置",
+                          ? t("projectsDialog.configured")
+                          : t("projectsDialog.notConfigured"),
                     active: pipelineProjectCreateStep === "advanced",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: pipelineProjectCreating,
@@ -1804,13 +1808,13 @@ export function ProjectsPageClient() {
               ) : pipelineProjectCreateStep === "basic" ? (
                 <div className="p-6">
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">基本信息</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">填写流水线项目名称与描述信息。</p>
+                    <h3 className="text-[15px] font-semibold">{t("projectsDialog.basicInfo")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("projectsDialog.basicInfoDesc")}</p>
                   </div>
                   <FieldGroup className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <Field data-invalid={pipelineProjectCreateNameInvalid}>
-                        <FieldLabel htmlFor="project-pipeline-project-create-name">名称</FieldLabel>
+                        <FieldLabel htmlFor="project-pipeline-project-create-name">{t("projectsDialog.name")}</FieldLabel>
                         <Input
                           id="project-pipeline-project-create-name"
                           value={pipelineProjectCreateName}
@@ -1819,7 +1823,7 @@ export function ProjectsPageClient() {
                             if (pipelineProjectCreateNameInvalid) setPipelineProjectCreateNameInvalid(false)
                             if (pipelineProjectCreateNameError) setPipelineProjectCreateNameError(null)
                           }}
-                          placeholder="请输入流水线项目名称"
+                          placeholder={t("projectsDialog.namePlaceholder")}
                           autoComplete="off"
                           aria-invalid={pipelineProjectCreateNameInvalid}
                           disabled={pipelineProjectCreating || isPipelineProjectEditMode}
@@ -1827,11 +1831,11 @@ export function ProjectsPageClient() {
                         {pipelineProjectCreateNameError ? (
                           <FieldError>{pipelineProjectCreateNameError}</FieldError>
                         ) : (
-                          <FieldDescription>{PROJECT_NAME_RULE_MESSAGE}</FieldDescription>
+                          <FieldDescription>{t("projectsDialog.nameRule")}</FieldDescription>
                         )}
                       </Field>
                       <Field data-invalid={pipelineProjectCreateWorkspaceInvalid}>
-                        <FieldLabel htmlFor="project-pipeline-project-create-workspace">企业空间</FieldLabel>
+                        <FieldLabel htmlFor="project-pipeline-project-create-workspace">{t("projectsDialog.workspace")}</FieldLabel>
                         <FilterCombobox
                           options={workspaceOptions}
                           value={pipelineProjectCreateWorkspace}
@@ -1844,8 +1848,8 @@ export function ProjectsPageClient() {
                             if (pipelineProjectCreateWorkspaceInvalid) setPipelineProjectCreateWorkspaceInvalid(false)
                             if (pipelineProjectCreateWorkspaceError) setPipelineProjectCreateWorkspaceError(null)
                           }}
-                          placeholder="请选择企业空间"
-                          emptyText="暂无企业空间"
+                          placeholder={t("projectsDialog.workspacePlaceholder")}
+                          emptyText={t("projectsDialog.workspaceFilterEmpty")}
                           className="h-10"
                           ariaInvalid={pipelineProjectCreateWorkspaceInvalid}
                           disabled={pipelineProjectCreating || isPipelineProjectEditMode}
@@ -1855,32 +1859,32 @@ export function ProjectsPageClient() {
                         ) : (
                           <FieldDescription>
                             {isPipelineProjectEditMode
-                              ? `当前在编辑模式操作，企业空间固定为 ${pipelineProjectCreateWorkspace || "-"}。`
-                              : "必选，用于归属企业空间。"}
+                              ? t("projectsDialog.pipelineWorkspaceLocked", { workspace: pipelineProjectCreateWorkspace || "-" })
+                              : t("projectsDialog.workspaceRequired")}
                           </FieldDescription>
                         )}
                       </Field>
                     </div>
                     <Field>
-                      <FieldLabel htmlFor="project-pipeline-project-create-description">描述</FieldLabel>
+                      <FieldLabel htmlFor="project-pipeline-project-create-description">{t("projectsDialog.description")}</FieldLabel>
                       <Textarea
                         id="project-pipeline-project-create-description"
                         value={pipelineProjectCreateDescription}
                         onChange={(event) => setPipelineProjectCreateDescription(event.target.value)}
-                        placeholder="请输入描述"
+                        placeholder={t("projectsDialog.descriptionPlaceholder")}
                         maxLength={256}
                         className="min-h-28"
                         disabled={pipelineProjectCreating}
                       />
-                      <FieldDescription>描述将写入资源注解 description，最长 256 个字符。</FieldDescription>
+                      <FieldDescription>{t("projectsDialog.descriptionRule")}</FieldDescription>
                     </Field>
                   </FieldGroup>
                 </div>
               ) : (
                 <div className="p-6">
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">高级设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">补充标签与注解信息，便于检索、分类和后续治理。</p>
+                    <h3 className="text-[15px] font-semibold">{t("projectsDialog.advancedSettings")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("projectsDialog.advancedSettingsDesc")}</p>
                   </div>
                   <FieldGroup className="flex flex-col gap-4">
                     <Field>
@@ -1920,14 +1924,14 @@ export function ProjectsPageClient() {
                     disabled={pipelineProjectCreating}
                     onClick={cancelPipelineProjectCreateYamlMode}
                   >
-                    取消
+                    {t("projectsDialog.cancel")}
                   </Button>
                   <Button
                     type="button"
                     onClick={confirmPipelineProjectCreateYamlMode}
                     disabled={pipelineProjectCreating}
                   >
-                    确认保存
+                    {t("projectsDialog.confirmSave")}
                   </Button>
                 </div>
               ) : pipelineProjectCreateStep === "basic" ? (
@@ -1938,14 +1942,14 @@ export function ProjectsPageClient() {
                     disabled={pipelineProjectCreating}
                     onClick={() => setPipelineProjectCreateOpen(false)}
                   >
-                    取消
+                    {t("projectsDialog.cancel")}
                   </Button>
                   <Button
                     type="button"
                     disabled={pipelineProjectCreating}
                     onClick={() => {
                       const nextName = pipelineProjectCreateName.trim()
-                      const validationMessage = validateProjectName(nextName)
+                      const validationMessage = validateProjectName(nextName, t)
                       if (validationMessage) {
                         setPipelineProjectCreateNameInvalid(true)
                         setPipelineProjectCreateNameError(validationMessage)
@@ -1956,7 +1960,7 @@ export function ProjectsPageClient() {
                       const nameExists = allPipelineProjectNames.includes(nextName)
                       if (!isPipelineProjectEditMode && nameExists) {
                         setPipelineProjectCreateNameInvalid(true)
-                        setPipelineProjectCreateNameError("流水线项目名称已存在，请更换后重试")
+                        setPipelineProjectCreateNameError(t("projectsDialog.pipelineNameExists"))
                         return
                       }
 
@@ -1965,7 +1969,7 @@ export function ProjectsPageClient() {
                       const selectedWorkspace = pipelineProjectCreateWorkspace.trim()
                       if (!selectedWorkspace) {
                         setPipelineProjectCreateWorkspaceInvalid(true)
-                        setPipelineProjectCreateWorkspaceError(PROJECT_WORKSPACE_REQUIRED_MESSAGE)
+                        setPipelineProjectCreateWorkspaceError(t("projectsDialog.workspaceRequired"))
                         return
                       }
                       setPipelineProjectCreateWorkspaceInvalid(false)
@@ -1973,7 +1977,7 @@ export function ProjectsPageClient() {
                       setPipelineProjectCreateStep("advanced")
                     }}
                   >
-                    下一步
+                    {t("projectsDialog.nextStep")}
                   </Button>
                 </div>
               ) : (
@@ -1984,7 +1988,7 @@ export function ProjectsPageClient() {
                     disabled={pipelineProjectCreating}
                     onClick={() => setPipelineProjectCreateStep("basic")}
                   >
-                    上一步
+                    {t("projectsDialog.previousStep")}
                   </Button>
                   <Button
                     type="button"
@@ -1993,11 +1997,11 @@ export function ProjectsPageClient() {
                   >
                     {pipelineProjectCreating
                       ? isPipelineProjectEditMode
-                        ? "保存中..."
-                        : "创建中..."
+                        ? t("projectsDialog.saving")
+                        : t("projectsDialog.creating")
                       : isPipelineProjectEditMode
-                        ? "保存"
-                        : "创建"}
+                        ? t("projectsDialog.save")
+                        : t("projectsDialog.create")}
                   </Button>
                 </div>
               )}

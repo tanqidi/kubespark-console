@@ -61,19 +61,21 @@ function decodeBase64ToUtf8(value: string): string {
   return value
 }
 
-const secretColumns: ColumnConfig<SecretRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "namespace", label: "命名空间" },
-  { key: "type", label: "类型", render: "badge" },
-  // { key: "dataItems", label: "数据项"},
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
+function getSecretColumns(t: (key: string) => string): ColumnConfig<SecretRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("table.columns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "namespace", label: t("table.columns.namespace") },
+    { key: "type", label: t("table.columns.type"), render: "badge" },
+    // { key: "dataItems", label: "数据项"},
+    { key: "age", label: t("table.columns.age") },
+    { key: "updatedAt", label: t("table.columns.updatedAt") },
+  ]
+}
 
 export function SecretsPageClient() {
   const t = useTranslations()
@@ -202,7 +204,7 @@ export function SecretsPageClient() {
   const columns = React.useMemo(
     () =>
       createColumns<SecretRow>({
-        columns: secretColumns,
+        columns: getSecretColumns(t),
         actionItems: [
           {
             label: (

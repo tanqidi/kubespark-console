@@ -44,6 +44,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { useTranslations } from "@/app/lib/i18n"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -63,26 +64,24 @@ type WorkspaceDialogStep = "basic" | "advanced"
 
 type WorkspaceDialogMode = "create" | "edit"
 
-const WORKSPACE_NAME_RULE_MESSAGE =
-  "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
-const WORKSPACE_OWNER_RULE_MESSAGE = "负责人为必填项。"
+function getWorkspaceColumns(t: (key: string) => string): ColumnConfig<WorkspaceRow>[] {
+  return [
+    {
+      key: "name",
+      label: t("workspacesDialog.tableColumns.name"),
+      enableHiding: false,
+      cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+    },
+    { key: "owner", label: t("workspacesDialog.tableColumns.owner") },
+    { key: "age", label: t("workspacesDialog.tableColumns.age") },
+    { key: "updatedAt", label: t("workspacesDialog.tableColumns.updatedAt") },
+  ]
+}
 
-const workspaceColumns: ColumnConfig<WorkspaceRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "owner", label: "负责人" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
-
-function validateWorkspaceName(name: string): string | null {
-  if (!name) return "请输入企业空间名称"
-  if (name.length > 63) return WORKSPACE_NAME_RULE_MESSAGE
-  if (!/^[a-z](?:[-a-z0-9]*[a-z0-9])?$/.test(name)) return WORKSPACE_NAME_RULE_MESSAGE
+function validateWorkspaceName(name: string, t: (key: string) => string): string | null {
+  if (!name) return t("workspacesDialog.nameRequired")
+  if (name.length > 63) return t("workspacesDialog.nameRule")
+  if (!/^[a-z](?:[-a-z0-9]*[a-z0-9])?$/.test(name)) return t("workspacesDialog.nameRule")
   return null
 }
 
@@ -131,7 +130,7 @@ function buildWorkspaceYamlText(params: {
   )
 }
 
-function parseWorkspaceYamlText(yamlText: string): {
+function parseWorkspaceYamlText(yamlText: string, t: (key: string) => string): {
   name: string
   description: string
   owner: string
@@ -140,17 +139,17 @@ function parseWorkspaceYamlText(yamlText: string): {
   annotationEntries: MetadataEntry[]
 } {
   const normalized = yamlText.trim()
-  if (!normalized) throw new Error("请输入 YAML 内容")
+  if (!normalized) throw new Error(t("workspacesDialog.yamlRequired"))
 
   const parsed = parse(normalized)
   const root =
     typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null
-  if (!root) throw new Error("YAML 内容格式无效")
+  if (!root) throw new Error(t("workspacesDialog.yamlInvalid"))
 
   const kind = typeof root.kind === "string" ? root.kind.trim() : ""
-  if (kind && kind !== "Workspace") throw new Error("YAML 资源类型必须是 Workspace")
+  if (kind && kind !== "Workspace") throw new Error(t("workspacesDialog.yamlKindMustBeWorkspace"))
 
   const metadata =
     typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
@@ -177,6 +176,7 @@ function parseWorkspaceYamlText(yamlText: string): {
 }
 
 export function WorkspacesPageClient() {
+  const t = useTranslations()
   const [rows, setRows] = React.useState<WorkspaceRow[]>([])
   const [error, setError] = React.useState<string | null>(null)
   const [nameQuery, setNameQuery] = React.useState("")
@@ -218,10 +218,10 @@ export function WorkspacesPageClient() {
     } catch (e: unknown) {
       if (!silent) {
         setRows([])
-        setError(e instanceof Error ? e.message : "加载企业空间失败")
+        setError(e instanceof Error ? e.message : t("workspacesDialog.loadFailed"))
       }
     }
-  }, [])
+  }, [t])
 
   React.useEffect(() => {
     let cancelled = false
@@ -288,11 +288,11 @@ export function WorkspacesPageClient() {
       setAnnotationEntries(annotations)
       setMetadataEnabled(false)
     } catch (e: unknown) {
-      setSubmitError(e instanceof Error ? e.message : "加载企业空间详情失败")
+      setSubmitError(e instanceof Error ? e.message : t("workspacesDialog.loadDetailFailed"))
     } finally {
       setLoadingEditData(false)
     }
-  }, [resetCreateState])
+  }, [resetCreateState, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: WorkspaceRow[]) => {
     if (selectedRows.length === 0) return
@@ -303,13 +303,13 @@ export function WorkspacesPageClient() {
         await loadRows(false)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("workspacesDialog.deleteFailed")
         setError(message)
       })
       .finally(() => {
         setDeleting(false)
       })
-  }, [loadRows])
+  }, [loadRows, t])
 
   const handleConfirmDelete = React.useCallback(() => {
     if (!pendingDeleteRow || deleting) return
@@ -321,24 +321,24 @@ export function WorkspacesPageClient() {
         await loadRows(false)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("workspacesDialog.deleteFailed")
         setError(message)
       })
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, loadRows, pendingDeleteRow])
+  }, [deleting, loadRows, pendingDeleteRow, t])
 
   const columns = React.useMemo(
     () =>
       createColumns<WorkspaceRow>({
-        columns: workspaceColumns,
+        columns: getWorkspaceColumns(t),
         actionItems: [
           {
             label: (
               <>
                 <IconPencil className="size-4" />
-                编辑
+                {t("workspacesDialog.edit")}
               </>
             ),
             onSelect: (row) => {
@@ -349,7 +349,7 @@ export function WorkspacesPageClient() {
             label: (
               <>
                 <IconTrash className="size-4" />
-                删除
+                {t("workspacesDialog.delete")}
               </>
             ),
             variant: "destructive",
@@ -360,7 +360,7 @@ export function WorkspacesPageClient() {
           },
         ],
       }),
-    [openEditDialog]
+    [openEditDialog, t]
   )
 
   const isEditMode = dialogMode === "edit"
@@ -368,16 +368,16 @@ export function WorkspacesPageClient() {
   const handleNextStep = React.useCallback(() => {
     if (submitting || loadingEditData) return
 
-    const nameError = validateWorkspaceName(workspaceName.trim())
+    const nameError = validateWorkspaceName(workspaceName.trim(), t)
     setCreateNameInvalid(Boolean(nameError))
     setCreateNameError(nameError)
 
-    const ownerError = workspaceOwner.trim() ? null : "请输入负责人"
+    const ownerError = workspaceOwner.trim() ? null : t("workspacesDialog.ownerRequired")
     setCreateOwnerError(ownerError)
 
     if (nameError || ownerError) return
     setCreateStep("advanced")
-  }, [loadingEditData, submitting, workspaceName, workspaceOwner])
+  }, [loadingEditData, submitting, workspaceName, workspaceOwner, t])
 
   const handleCreateSubmit = React.useCallback(() => {
     if (submitting || loadingEditData) return
@@ -391,7 +391,7 @@ export function WorkspacesPageClient() {
 
     if (createYamlMode) {
       try {
-        const parsed = parseWorkspaceYamlText(createYamlText)
+        const parsed = parseWorkspaceYamlText(createYamlText, t)
         nextName = parsed.name.trim()
         nextDescription = parsed.description.trim()
         nextOwner = parsed.owner.trim()
@@ -407,14 +407,14 @@ export function WorkspacesPageClient() {
         setAnnotationEntries(nextAnnotationEntries)
         setCreateYamlError(null)
       } catch (error) {
-        setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+        setCreateYamlError(error instanceof Error ? error.message : t("workspacesDialog.yamlParseFailed"))
         return
       }
     }
 
     setSubmitError(null)
 
-    const nameError = validateWorkspaceName(nextName)
+    const nameError = validateWorkspaceName(nextName, t)
     setCreateNameInvalid(Boolean(nameError))
     setCreateNameError(nameError)
     if (nameError) {
@@ -422,7 +422,7 @@ export function WorkspacesPageClient() {
       return
     }
 
-    const ownerError = nextOwner ? null : "请输入负责人"
+    const ownerError = nextOwner ? null : t("workspacesDialog.ownerRequired")
     setCreateOwnerError(ownerError)
     if (ownerError) {
       if (createYamlMode) setCreateYamlError(ownerError)
@@ -430,7 +430,7 @@ export function WorkspacesPageClient() {
     }
 
     if (isEditMode && editingName && nextName !== editingName) {
-      const lockedNameError = "编辑模式不允许修改名称"
+      const lockedNameError = t("workspacesDialog.nameLocked")
       setCreateNameInvalid(true)
       setCreateNameError(lockedNameError)
       if (createYamlMode) setCreateYamlError(lockedNameError)
@@ -465,7 +465,7 @@ export function WorkspacesPageClient() {
         await loadRows(false)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : isEditMode ? "保存失败" : "创建失败"
+        const message = e instanceof Error ? e.message : isEditMode ? t("workspacesDialog.saveFailed") : t("workspacesDialog.createFailed")
         setSubmitError(message)
         if (createYamlMode) setCreateYamlError(message)
       })
@@ -484,6 +484,7 @@ export function WorkspacesPageClient() {
     metadataEnabled,
     resetCreateState,
     submitting,
+    t,
     workspaceDescription,
     workspaceName,
     workspaceOwner,
@@ -511,7 +512,7 @@ export function WorkspacesPageClient() {
 
   const confirmCreateYamlMode = React.useCallback(() => {
     try {
-      const parsed = parseWorkspaceYamlText(createYamlText)
+      const parsed = parseWorkspaceYamlText(createYamlText, t)
       setWorkspaceName(parsed.name)
       setWorkspaceDescription(parsed.description)
       setWorkspaceOwner(parsed.owner)
@@ -521,9 +522,9 @@ export function WorkspacesPageClient() {
       setCreateYamlError(null)
       setCreateYamlMode(false)
     } catch (error) {
-      setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      setCreateYamlError(error instanceof Error ? error.message : t("workspacesDialog.yamlParseFailed"))
     }
-  }, [createYamlText])
+  }, [createYamlText, t])
 
   if (error) {
     return (
@@ -542,10 +543,10 @@ export function WorkspacesPageClient() {
     return row.name.toLowerCase().includes(query)
   })
 
-  const dialogTitle = isEditMode ? "编辑企业空间" : "创建企业空间"
+  const dialogTitle = isEditMode ? t("workspacesDialog.editTitle") : t("workspacesDialog.createTitle")
   const dialogDescription = isEditMode
-    ? "编辑企业空间并更新基础归属信息。"
-    : "创建企业空间并录入基础归属信息。"
+    ? t("workspacesDialog.editDesc")
+    : t("workspacesDialog.createDesc")
 
   return (
     <>
@@ -554,8 +555,8 @@ export function WorkspacesPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除企业空间"
-        description={pendingDeleteRow ? `确定删除企业空间 ${pendingDeleteRow.name} 吗？` : ""}
+        title={t("workspacesDialog.deleteTitle")}
+        description={pendingDeleteRow ? t("workspacesDialog.deleteDesc", { name: pendingDeleteRow.name }) : ""}
         deleting={deleting}
         onConfirm={handleConfirmDelete}
       />
@@ -580,7 +581,7 @@ export function WorkspacesPageClient() {
               </DialogHeader>
               <div className="me-20 flex h-full items-center">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                  <span className="text-sm font-medium">编辑 YAML</span>
+                  <span className="text-sm font-medium">{t("workspacesDialog.yamlMode")}</span>
                   <Switch
                     checked={createYamlMode}
                     onCheckedChange={(checked) => {
@@ -592,7 +593,7 @@ export function WorkspacesPageClient() {
                       cancelCreateYamlMode()
                     }}
                     disabled={submitting || loadingEditData}
-                    aria-label="编辑 YAML"
+                    aria-label={t("workspacesDialog.yamlMode")}
                   />
                 </div>
               </div>
@@ -603,8 +604,8 @@ export function WorkspacesPageClient() {
                 items={[
                   {
                     id: "basic",
-                    title: "基本信息",
-                    status: createStep === "basic" ? "当前" : "已设置",
+                    title: t("workspacesDialog.basicInfo"),
+                    status: createStep === "basic" ? t("workspacesDialog.current") : t("workspacesDialog.configured"),
                     active: createStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: submitting || loadingEditData,
@@ -615,13 +616,13 @@ export function WorkspacesPageClient() {
                   },
                   {
                     id: "advanced",
-                    title: "高级设置",
+                    title: t("workspacesDialog.advancedSettings"),
                     status:
                       createStep === "advanced"
-                        ? "当前"
+                        ? t("workspacesDialog.current")
                         : hasUserProvidedMetadata(labelEntries, annotationEntries)
-                          ? "已设置"
-                          : "未设置",
+                          ? t("workspacesDialog.configured")
+                          : t("workspacesDialog.notConfigured"),
                     active: createStep === "advanced",
                     icon: <IconPencil className="size-4" />,
                     disabled: submitting || loadingEditData,
@@ -659,12 +660,12 @@ export function WorkspacesPageClient() {
               ) : createStep === "basic" ? (
                 <div className="p-6">
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">基本信息</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">填写企业空间名称、负责人与描述信息。</p>
+                    <h3 className="text-[15px] font-semibold">{t("workspacesDialog.basicInfo")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("workspacesDialog.basicInfoDesc")}</p>
                   </div>
                   <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Field data-invalid={createNameInvalid}>
-                      <FieldLabel htmlFor="workspace-create-name">名称</FieldLabel>
+                      <FieldLabel htmlFor="workspace-create-name">{t("workspacesDialog.name")}</FieldLabel>
                       <Input
                         id="workspace-create-name"
                         value={workspaceName}
@@ -674,7 +675,7 @@ export function WorkspacesPageClient() {
                           if (createNameError) setCreateNameError(null)
                           if (submitError) setSubmitError(null)
                         }}
-                        placeholder="请输入企业空间名称"
+                        placeholder={t("workspacesDialog.namePlaceholder")}
                         autoComplete="off"
                         aria-invalid={createNameInvalid}
                         disabled={submitting || loadingEditData || isEditMode}
@@ -682,12 +683,12 @@ export function WorkspacesPageClient() {
                       {createNameError ? (
                         <FieldError>{createNameError}</FieldError>
                       ) : (
-                        <FieldDescription>{WORKSPACE_NAME_RULE_MESSAGE}</FieldDescription>
+                        <FieldDescription>{t("workspacesDialog.nameRule")}</FieldDescription>
                       )}
                     </Field>
 
                     <Field data-invalid={Boolean(createOwnerError)}>
-                      <FieldLabel htmlFor="workspace-create-owner">负责人</FieldLabel>
+                      <FieldLabel htmlFor="workspace-create-owner">{t("workspacesDialog.owner")}</FieldLabel>
                       <Input
                         id="workspace-create-owner"
                         value={workspaceOwner}
@@ -696,7 +697,7 @@ export function WorkspacesPageClient() {
                           if (createOwnerError) setCreateOwnerError(null)
                           if (submitError) setSubmitError(null)
                         }}
-                        placeholder="请输入负责人"
+                        placeholder={t("workspacesDialog.ownerPlaceholder")}
                         autoComplete="off"
                         aria-invalid={Boolean(createOwnerError)}
                         disabled={submitting || loadingEditData}
@@ -704,12 +705,12 @@ export function WorkspacesPageClient() {
                       {createOwnerError ? (
                         <FieldError>{createOwnerError}</FieldError>
                       ) : (
-                        <FieldDescription>{WORKSPACE_OWNER_RULE_MESSAGE}</FieldDescription>
+                        <FieldDescription>{t("workspacesDialog.ownerRule")}</FieldDescription>
                       )}
                     </Field>
 
                     <Field className="md:col-span-2">
-                      <FieldLabel htmlFor="workspace-create-description">描述</FieldLabel>
+                      <FieldLabel htmlFor="workspace-create-description">{t("workspacesDialog.description")}</FieldLabel>
                       <Textarea
                         id="workspace-create-description"
                         value={workspaceDescription}
@@ -717,20 +718,20 @@ export function WorkspacesPageClient() {
                           setWorkspaceDescription(event.target.value)
                           if (submitError) setSubmitError(null)
                         }}
-                        placeholder="请输入描述"
+                        placeholder={t("workspacesDialog.descriptionPlaceholder")}
                         maxLength={256}
                         className="min-h-28"
                         disabled={submitting || loadingEditData}
                       />
-                      <FieldDescription>描述将写入资源注解 description，最长 256 个字符。</FieldDescription>
+                      <FieldDescription>{t("workspacesDialog.descriptionRule")}</FieldDescription>
                     </Field>
                   </FieldGroup>
                 </div>
               ) : (
                 <div className="p-6">
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">高级设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">配置企业空间标签与注解。</p>
+                    <h3 className="text-[15px] font-semibold">{t("workspacesDialog.advancedSettings")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("workspacesDialog.advancedSettingsDesc")}</p>
                   </div>
                   <ResourceMetadataEditor
                     checked={metadataEnabled}
@@ -756,30 +757,30 @@ export function WorkspacesPageClient() {
               {createYamlMode ? (
                 <div className="flex w-full items-center justify-between gap-3">
                   <Button type="button" variant="outline" onClick={cancelCreateYamlMode} disabled={submitting || loadingEditData}>
-                    取消
+                    {t("workspacesDialog.cancel")}
                   </Button>
                   <Button type="button" onClick={confirmCreateYamlMode} disabled={submitting || loadingEditData}>
-                    确认保存
+                    {t("workspacesDialog.confirm")}
                   </Button>
                 </div>
               ) : createStep === "basic" ? (
                 <div className="flex w-full items-center justify-between gap-3">
                   <DialogClose asChild>
                     <Button type="button" variant="outline" disabled={submitting || loadingEditData}>
-                      取消
+                      {t("workspacesDialog.cancel")}
                     </Button>
                   </DialogClose>
                   <Button type="button" disabled={submitting || loadingEditData} onClick={handleNextStep}>
-                    下一步
+                    {t("workspacesDialog.nextStep")}
                   </Button>
                 </div>
               ) : (
                 <div className="flex w-full items-center justify-between gap-3">
                   <Button type="button" variant="outline" disabled={submitting || loadingEditData} onClick={() => setCreateStep("basic")}>
-                    上一步
+                    {t("workspacesDialog.previousStep")}
                   </Button>
                   <Button type="button" onClick={handleCreateSubmit} disabled={submitting || loadingEditData}>
-                    {submitting ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                    {submitting ? (isEditMode ? t("workspacesDialog.saving") : t("workspacesDialog.creating")) : isEditMode ? t("workspacesDialog.save") : t("workspacesDialog.create")}
                   </Button>
                 </div>
               )}
@@ -797,7 +798,7 @@ export function WorkspacesPageClient() {
           <Input
             value={nameQuery}
             onChange={(event) => setNameQuery(event.target.value)}
-            placeholder="名称"
+            placeholder={t("workspacesDialog.searchPlaceholder")}
             className="h-9 w-40"
           />
         }

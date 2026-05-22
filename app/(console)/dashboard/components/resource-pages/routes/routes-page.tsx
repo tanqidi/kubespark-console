@@ -158,33 +158,33 @@ function asNumber(value: unknown): number | null {
   return null
 }
 
-function validateRouteName(name: string): string | null {
+function validateRouteName(name: string, t: (key: string) => string): string | null {
   const value = name.trim().toLowerCase()
-  if (!value) return "请输入名称"
-  if (value.length > 253) return NAME_RULE_MESSAGE
-  if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(value)) return NAME_RULE_MESSAGE
+  if (!value) return t("routesDialog.nameRequired")
+  if (value.length > 253) return t("routesDialog.nameRule")
+  if (!/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(value)) return t("routesDialog.nameRule")
   return null
 }
 
-function validateHost(host: string): string | null {
+function validateHost(host: string, t: (key: string) => string): string | null {
   const value = host.trim()
-  if (!value) return "请输入域名"
+  if (!value) return t("routesDialog.hostRequired")
   return null
 }
 
-function validatePath(path: string): string | null {
+function validatePath(path: string, t: (key: string) => string): string | null {
   const value = path.trim()
-  if (!value) return "请输入路径"
-  if (!value.startsWith("/")) return "路径必须以 / 开头"
+  if (!value) return t("routesDialog.pathRequired")
+  if (!value.startsWith("/")) return t("routesDialog.pathMustStartWithSlash")
   return null
 }
 
-function validateServicePortText(portText: string): string | null {
+function validateServicePortText(portText: string, t: (key: string) => string): string | null {
   const value = portText.trim()
-  if (!value || !/^\d+$/.test(value)) return "服务端口必须是 1-65535 的整数"
+  if (!value || !/^\d+$/.test(value)) return t("routesDialog.portRequired")
   const port = Number(value)
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    return "服务端口必须是 1-65535 的整数"
+    return t("routesDialog.portRequired")
   }
   return null
 }
@@ -755,21 +755,21 @@ export function RoutesPageClient() {
   ])
 
   const validateBasicStep = React.useCallback(() => {
-    const nameError = validateRouteName(createName)
-    const namespaceError = createNamespace.trim() ? null : "请选择项目"
+    const nameError = validateRouteName(createName, t)
+    const namespaceError = createNamespace.trim() ? null : t("routesDialog.namespaceRequired")
     setCreateNameError(nameError)
     setCreateNamespaceError(namespaceError)
     return !nameError && !namespaceError
-  }, [createName, createNamespace])
+  }, [createName, createNamespace, t])
 
   const validateRuleStep = React.useCallback(() => {
-    const hostError = validateHost(createHost)
-    const pathError = validatePath(createPath)
-    const serviceError = createServiceName.trim() ? null : "请选择服务"
-    const servicePortError = validateServicePortText(createServicePort)
+    const hostError = validateHost(createHost, t)
+    const pathError = validatePath(createPath, t)
+    const serviceError = createServiceName.trim() ? null : t("routesDialog.serviceRequired")
+    const servicePortError = validateServicePortText(createServicePort, t)
     const tlsSecretError =
       createProtocol === "HTTPS" && !createTlsSecretName.trim()
-        ? "请选择 HTTPS 保密字典"
+        ? t("routesDialog.pleaseSelectSecret")
         : null
     const normalizedHost = createHost.trim().toLowerCase()
     const duplicateHost = createRules.some((rule, index) => {
@@ -777,7 +777,7 @@ export function RoutesPageClient() {
       return rule.host.trim().toLowerCase() === normalizedHost
     })
     const duplicateHostError = duplicateHost
-      ? `域名 ${createHost.trim()} 重复，请更换后重试`
+      ? t("routesDialog.duplicateHost", { host: createHost.trim() })
       : null
     setCreateHostError(hostError)
     setCreatePathError(pathError)
@@ -786,7 +786,7 @@ export function RoutesPageClient() {
     setCreateTlsSecretError(tlsSecretError)
     if (!hostError && duplicateHostError) setCreateHostError(duplicateHostError)
     return !hostError && !pathError && !serviceError && !servicePortError && !tlsSecretError && !duplicateHostError
-  }, [createHost, createPath, createProtocol, createRules, createServiceName, createServicePort, createTlsSecretName, editingRuleIndex])
+  }, [createHost, createPath, createProtocol, createRules, createServiceName, createServicePort, createTlsSecretName, editingRuleIndex, t])
 
   const beginEditRule = React.useCallback(() => {
     setCreateSubmitError(null)
@@ -835,10 +835,10 @@ export function RoutesPageClient() {
   const saveRuleDraft = React.useCallback((options?: { stayInEdit?: boolean }) => {
     setCreateSubmitError(null)
     setRuleRowErrorMap({})
-    const hostError = validateHost(createHost)
+    const hostError = validateHost(createHost, t)
     const tlsSecretError =
       createProtocol === "HTTPS" && !createTlsSecretName.trim()
-        ? "请选择 HTTPS 保密字典"
+        ? t("routesDialog.pleaseSelectSecret")
         : null
     setCreateHostError(hostError)
     setCreateTlsSecretError(tlsSecretError)
@@ -861,14 +861,14 @@ export function RoutesPageClient() {
       const rule = createRules[index]
       if (!rule) continue
       const nextErrors: RuleRowErrors = {}
-      const pathError = validatePath(rule.path)
+      const pathError = validatePath(rule.path, t)
       if (pathError) {
         nextErrors.path = pathError
       }
       if (!rule.serviceName.trim()) {
-        nextErrors.service = "请选择服务"
+        nextErrors.service = t("routesDialog.serviceRequired")
       }
-      const portError = validateServicePortText(rule.servicePort)
+      const portError = validateServicePortText(rule.servicePort, t)
       if (portError) {
         nextErrors.servicePort = portError
       }
@@ -886,11 +886,11 @@ export function RoutesPageClient() {
       if (firstIndex !== undefined) {
         rowErrors[firstIndex] = {
           ...(rowErrors[firstIndex] ?? {}),
-          path: "路径重复",
+          path: t("routesDialog.duplicatePath"),
         }
         rowErrors[index] = {
           ...(rowErrors[index] ?? {}),
-          path: "路径重复",
+          path: t("routesDialog.duplicatePath"),
         }
       } else {
         hostPathSet.set(pathKey, index)
@@ -919,7 +919,7 @@ export function RoutesPageClient() {
     setCreateRuleViewMode(options?.stayInEdit ? "edit" : "list")
     setEditingRuleIndex(null)
     return true
-  }, [activeHostSourceKey, createHost, createProtocol, createRules, createTlsSecretName])
+  }, [activeHostSourceKey, createHost, createProtocol, createRules, createTlsSecretName, t])
 
   const addPathRule = React.useCallback(() => {
     setCreateRules((current) => [
@@ -955,13 +955,13 @@ export function RoutesPageClient() {
           namespace: createNamespace.trim(),
         })
         if (exists) {
-          setCreateNameError("路由名称已存在，请更换后重试")
+          setCreateNameError(t("routesDialog.routeExists"))
           return
         }
         setRuleSaveAttempted(false)
         setCreateStep("rule")
       } catch (checkError) {
-        setCreateSubmitError(checkError instanceof Error ? checkError.message : "路由名称校验失败，请稍后重试")
+        setCreateSubmitError(checkError instanceof Error ? checkError.message : t("routesDialog.routeValidationFailed"))
       } finally {
         setCheckingCreateNext(false)
       }
@@ -1044,20 +1044,20 @@ export function RoutesPageClient() {
         setCreateRuleViewMode("list")
         setCreateYamlError(null)
       } catch (parseError) {
-        setCreateYamlError(parseError instanceof Error ? parseError.message : "YAML 解析失败")
+        setCreateYamlError(parseError instanceof Error ? parseError.message : t("routesDialog.yamlParseFailed"))
         return
       }
     }
 
-    const nameError = validateRouteName(draft.name)
-    const namespaceError = draft.namespace.trim() ? null : "请选择项目"
+    const nameError = validateRouteName(draft.name, t)
+    const namespaceError = draft.namespace.trim() ? null : t("routesDialog.namespaceRequired")
     const normalizedRules = draft.rules.map((rule) => normalizeRuleItem(rule))
-    const hostError = normalizedRules.length === 0 ? ROUTE_RULE_REQUIRED_MESSAGE : null
+    const hostError = normalizedRules.length === 0 ? t("routesDialog.ruleRequired") : null
     const hasInvalidRule = normalizedRules.some((rule) => {
-      if (validateHost(rule.host)) return true
-      if (validatePath(rule.path)) return true
+      if (validateHost(rule.host, t)) return true
+      if (validatePath(rule.path, t)) return true
       if (!rule.serviceName) return true
-      if (validateServicePortText(rule.servicePort)) return true
+      if (validateServicePortText(rule.servicePort, t)) return true
       if (rule.protocol === "HTTPS" && !rule.tlsSecretName) return true
       return false
     })
@@ -1076,7 +1076,7 @@ export function RoutesPageClient() {
     const pathError = hostError
       ? null
       : hasInvalidRule
-          ? "存在未完整填写的路由规则"
+          ? t("routesDialog.incompleteRules")
           : null
     const serviceError = null
     const servicePortError = null
@@ -1227,9 +1227,9 @@ export function RoutesPageClient() {
       setCreateYamlError(null)
       setCreateYamlMode(false)
     } catch (parseError: unknown) {
-      setCreateYamlError(parseError instanceof Error ? parseError.message : "YAML 解析失败")
+      setCreateYamlError(parseError instanceof Error ? parseError.message : t("routesDialog.yamlParseFailed"))
     }
-  }, [createYamlText, editingRouteRef, isEditMode])
+  }, [createYamlText, editingRouteRef, isEditMode, t])
 
   const handleViewYaml = React.useCallback((row: RouteRow) => {
     setYamlOpen(true)
@@ -1249,7 +1249,7 @@ export function RoutesPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("routesDialog.loadYamlFailed")
         setYamlError(message)
         console.error("[Routes] view yaml request failed", {
           ingress: { name: row.name, namespace: row.namespace },
@@ -1578,16 +1578,16 @@ export function RoutesPageClient() {
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
-                <DialogTitle>{isEditMode ? "编辑应用路由" : "创建应用路由"}</DialogTitle>
+                <DialogTitle>{isEditMode ? t("routesDialog.editTitle") : t("routesDialog.createTitle")}</DialogTitle>
                 <DialogDescription>
                   {isEditMode
-                    ? "编辑 Kubernetes Ingress 的访问规则与高级配置。"
-                    : "使用 Kubernetes Ingress 创建应用访问路由。"}
+                    ? t("routesDialog.editDesc")
+                    : t("routesDialog.createDesc")}
                 </DialogDescription>
               </DialogHeader>
               <div className="h-full flex items-center me-20">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                  <span className="text-sm font-medium">编辑 YAML</span>
+                  <span className="text-sm font-medium">{t("routesDialog.yamlMode")}</span>
                   <Switch
                     checked={createYamlMode}
                     onCheckedChange={(checked) => {
@@ -1599,7 +1599,7 @@ export function RoutesPageClient() {
                       cancelCreateYamlMode()
                     }}
                     disabled={creating || checkingCreateNext}
-                    aria-label="编辑 YAML"
+                    aria-label={t("routesDialog.yamlMode")}
                   />
                 </div>
               </div>
@@ -1610,13 +1610,13 @@ export function RoutesPageClient() {
                 items={[
                   {
                     id: "basic",
-                    title: "基本信息",
+                    title: t("routesDialog.basicInfo"),
                     status:
                       createStep === "basic"
-                        ? "当前"
+                        ? t("routesDialog.current")
                         : createName.trim() && createNamespace.trim()
-                          ? "已设置"
-                          : "未设置",
+                          ? t("routesDialog.configured")
+                          : t("routesDialog.notConfigured"),
                     active: createStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: !canNavigateCreateSteps,
@@ -1624,13 +1624,13 @@ export function RoutesPageClient() {
                   },
                   {
                     id: "rule",
-                    title: "路由规则",
+                    title: t("routesDialog.routeRules"),
                     status:
                       createStep === "rule"
-                        ? "当前"
+                        ? t("routesDialog.current")
                         : hasConfiguredRule
-                          ? "已设置"
-                          : "未设置",
+                          ? t("routesDialog.configured")
+                          : t("routesDialog.notConfigured"),
                     active: createStep === "rule",
                     icon: <IconRoute2 className="size-4" />,
                     disabled: !canNavigateCreateSteps,
@@ -1638,13 +1638,13 @@ export function RoutesPageClient() {
                   },
                   {
                     id: "advanced",
-                    title: "高级设置",
+                    title: t("routesDialog.advancedSettings"),
                     status:
                       createStep === "advanced"
-                        ? "当前"
+                        ? t("routesDialog.current")
                         : hasMetadataConfigured
-                          ? "已设置"
-                          : "未设置",
+                          ? t("routesDialog.configured")
+                          : t("routesDialog.notConfigured"),
                     active: createStep === "advanced",
                     icon: <IconAdjustments className="size-4" />,
                     disabled: !canNavigateCreateSteps,
@@ -1680,14 +1680,14 @@ export function RoutesPageClient() {
               ) : createStep === "basic" ? (
                 <div>
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">基本信息</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">填写路由名称、项目和描述信息。</p>
+                    <h3 className="text-[15px] font-semibold">{t("routesDialog.basicInfo")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("routesDialog.basicInfoDesc")}</p>
                   </div>
                   <FieldGroup className="grid gap-6 md:grid-cols-2">
                     <Field data-invalid={Boolean(createNameError)}>
-                      <FieldLabel htmlFor="route-create-name">名称</FieldLabel>
-                      <Input id="route-create-name" value={createName} onChange={(event) => { setCreateName(event.target.value); if (createNameError) setCreateNameError(null) }} placeholder="请输入路由名称" autoComplete="off" aria-invalid={Boolean(createNameError)} disabled={creating || isEditMode} />
-                      {createNameError ? (<FieldError>{createNameError}</FieldError>) : (<FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>)}
+                      <FieldLabel htmlFor="route-create-name">{t("routesDialog.name")}</FieldLabel>
+                      <Input id="route-create-name" value={createName} onChange={(event) => { setCreateName(event.target.value); if (createNameError) setCreateNameError(null) }} placeholder={t("routesDialog.namePlaceholder")} autoComplete="off" aria-invalid={Boolean(createNameError)} disabled={creating || isEditMode} />
+                      {createNameError ? (<FieldError>{createNameError}</FieldError>) : (<FieldDescription>{t("routesDialog.nameRule")}</FieldDescription>)}
                     </Field>
 
                     <ProjectNamespaceField
@@ -1700,24 +1700,24 @@ export function RoutesPageClient() {
                         if (createNamespaceError) setCreateNamespaceError(null)
                       }}
                       error={createNamespaceError}
-                      description="选择要创建路由的项目。"
+                      description={t("routesDialog.namespaceSelect")}
                       disabled={creating || isEditMode}
                       contentContainer={createDialogPopupLayerRef}
                     />
 
                     <Field className="md:col-span-2">
-                      <FieldLabel htmlFor="route-create-description">描述</FieldLabel>
-                      <Textarea id="route-create-description" value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} placeholder="请输入描述" maxLength={256} className="min-h-24" disabled={creating} />
-                      <FieldDescription>描述将写入资源注解 description，最长 256 个字符。</FieldDescription>
+                      <FieldLabel htmlFor="route-create-description">{t("routesDialog.description")}</FieldLabel>
+                      <Textarea id="route-create-description" value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} placeholder={t("routesDialog.descriptionPlaceholder")} maxLength={256} className="min-h-24" disabled={creating} />
+                      <FieldDescription>{t("routesDialog.descriptionHint")}</FieldDescription>
                     </Field>
                   </FieldGroup>
                 </div>
               ) : createStep === "rule" ? (
                 <div>
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">路由规则</h3>
+                    <h3 className="text-[15px] font-semibold">{t("routesDialog.routeRules")}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      配置域名、路径与后端服务映射关系。
+                      {t("routesDialog.routeRulesDesc")}
                     </p>
                   </div>
                   {createRuleViewMode === "list" ? (
@@ -1750,7 +1750,7 @@ export function RoutesPageClient() {
                                       disabled={creating}
                                     >
                                       <IconPencil data-icon="inline-start" />
-                                      编辑
+                                      {t("routesDialog.edit")}
                                     </Button>
                                     <Button
                                       type="button"
@@ -1760,7 +1760,7 @@ export function RoutesPageClient() {
                                       disabled={creating}
                                     >
                                       <IconTrash data-icon="inline-start" />
-                                      删除
+                                      {t("routesDialog.delete")}
                                     </Button>
                                   </ItemActions>
                                 </Item>
@@ -1773,10 +1773,10 @@ export function RoutesPageClient() {
                               }`}
                             >
                               <div className={ruleSaveAttempted ? "text-sm font-semibold text-destructive" : "text-sm font-semibold"}>
-                                暂无路由规则
+                                {t("routesDialog.noRouteRules")}
                               </div>
                               <div className={ruleSaveAttempted ? "mt-1 text-sm text-destructive" : "mt-1 text-sm text-muted-foreground"}>
-                                {ROUTE_RULE_REQUIRED_MESSAGE}
+                                {t("routesDialog.ruleRequired")}
                               </div>
                             </div>
                           )}
@@ -1787,9 +1787,9 @@ export function RoutesPageClient() {
                             onClick={beginEditRule}
                             disabled={creating}
                           >
-                            <span className="text-sm font-semibold">添加路由规则</span>
+                            <span className="text-sm font-semibold">{t("routesDialog.addRouteRule")}</span>
                             <span className="mt-1 text-sm text-muted-foreground">
-                              添加域名、路径和后端服务映射。
+                              {t("routesDialog.addRouteRuleDesc")}
                             </span>
                           </button>
                         </div>
@@ -1799,10 +1799,10 @@ export function RoutesPageClient() {
                     <>
                       <FieldGroup className="grid gap-6 md:grid-cols-2">
                         <Field data-invalid={Boolean(createHostError)}>
-                          <FieldLabel htmlFor="route-create-host">域名</FieldLabel>
+                          <FieldLabel htmlFor="route-create-host">{t("routesDialog.host")}</FieldLabel>
                                 <InputGroup>
                                   <InputGroupAddon>
-                                    <InputGroupText>域名</InputGroupText>
+                                    <InputGroupText>{t("routesDialog.host")}</InputGroupText>
                                   </InputGroupAddon>
                                   <InputGroupInput
                               id="route-create-host"
@@ -1820,7 +1820,7 @@ export function RoutesPageClient() {
                           {createHostError ? <FieldError>{createHostError}</FieldError> : null}
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="route-create-protocol">协议</FieldLabel>
+                          <FieldLabel htmlFor="route-create-protocol">{t("routesDialog.protocol")}</FieldLabel>
                           <Select
                             value={createProtocol}
                             onValueChange={(value) => {
@@ -1844,7 +1844,7 @@ export function RoutesPageClient() {
 
                         {createProtocol === "HTTPS" ? (
                           <Field className="md:col-span-2" data-invalid={Boolean(createTlsSecretError)}>
-                            <FieldLabel htmlFor="route-create-secret">保密字典</FieldLabel>
+                            <FieldLabel htmlFor="route-create-secret">{t("routesDialog.secret")}</FieldLabel>
                             <Select
                               value={createTlsSecretName}
                               onValueChange={(value) => {
@@ -1854,7 +1854,7 @@ export function RoutesPageClient() {
                               disabled={creating}
                             >
                               <SelectTrigger id="route-create-secret" aria-invalid={Boolean(createTlsSecretError)}>
-                                <SelectValue placeholder="请选择 Secret" />
+                                <SelectValue placeholder={t("routesDialog.pleaseSelectSecret")} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
@@ -1866,7 +1866,7 @@ export function RoutesPageClient() {
                                     ))
                                   ) : (
                                     <SelectItem value="__none__" disabled>
-                                      当前项目暂无可选 Secret
+                                      {t("routesDialog.noSecretAvailable")}
                                     </SelectItem>
                                   )}
                                 </SelectGroup>
@@ -1877,7 +1877,7 @@ export function RoutesPageClient() {
                         ) : null}
 
                         <Field className="md:col-span-2">
-                          <FieldLabel>路径</FieldLabel>
+                          <FieldLabel>{t("routesDialog.path")}</FieldLabel>
                           {currentHostPathRuleIndexes.length > 0 ? (
                             <div className="mt-3 flex flex-col gap-2">
                               {currentHostPathRuleIndexes.map((ruleIndex) => {
@@ -1897,7 +1897,7 @@ export function RoutesPageClient() {
                                   <div className="flex flex-col gap-1">
                                     <InputGroup>
                                       <InputGroupAddon>
-                                        <InputGroupText>路径</InputGroupText>
+                                        <InputGroupText>{t("routesDialog.path")}</InputGroupText>
                                       </InputGroupAddon>
                                       <InputGroupInput
                                         value={rule.path}
@@ -1963,8 +1963,8 @@ export function RoutesPageClient() {
                                           })
                                         }
                                       }}
-                                      placeholder="服务"
-                                      emptyText="当前项目暂无可选服务"
+                                      placeholder={t("routesDialog.service")}
+                                      emptyText={t("routesDialog.noServiceAvailable")}
                                       className="w-full"
                                       ariaInvalid={Boolean(serviceErrorMessage)}
                                       disabled={creating}
@@ -2028,7 +2028,7 @@ export function RoutesPageClient() {
                                       disabled={creating}
                                     >
                                       <ComboboxInput
-                                        placeholder="端口"
+                                        placeholder={t("routesDialog.port")}
                                         className="w-full"
                                         inputMode="numeric"
                                         pattern="[0-9]*"
@@ -2040,7 +2040,7 @@ export function RoutesPageClient() {
                                         container={createDialogPopupLayerRef}
                                         className="pointer-events-auto"
                                       >
-                                        <ComboboxEmpty>未找到端口，可直接输入</ComboboxEmpty>
+                                        <ComboboxEmpty>{t("routesDialog.noPortFound")}</ComboboxEmpty>
                                         <ComboboxList>
                                           {(item, index) => (
                                             <ComboboxItem key={`${item}-${index}`} value={item}>
@@ -2062,7 +2062,7 @@ export function RoutesPageClient() {
                                     disabled={creating}
                                   >
                                     <IconTrash data-icon="inline-start" />
-                                    删除
+                                    {t("routesDialog.delete")}
                                   </Button>
                                 </div>
                               )})}
@@ -2071,7 +2071,7 @@ export function RoutesPageClient() {
                           <div className="mt-3 flex justify-end">
                             <Button type="button" variant="outline" onClick={addPathRule} disabled={creating}>
                               <IconPlus data-icon="inline-start" />
-                              添加
+                              {t("routesDialog.add")}
                             </Button>
                           </div>
                         </Field>
@@ -2082,9 +2082,9 @@ export function RoutesPageClient() {
               ) : (
                 <div>
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">高级设置</h3>
+                    <h3 className="text-[15px] font-semibold">{t("routesDialog.advancedSettings")}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      补充标签与注解信息，便于检索、分类和后续治理。
+                      {t("routesDialog.advancedSettingsDesc")}
                     </p>
                   </div>
                   <FieldGroup className="grid gap-6 md:grid-cols-2">
@@ -2112,16 +2112,16 @@ export function RoutesPageClient() {
               <div className="flex w-full items-center justify-between gap-3">
                 {createStep === "rule" && !createYamlMode && createRuleViewMode === "edit" ? (
                   <Button type="button" variant="outline" onClick={cancelEditRule} disabled={creating}>
-                    取消
+                    {t("routesDialog.cancel")}
                   </Button>
                 ) : createYamlMode || createStep === "basic" ? (
                   createYamlMode ? (
-                    <Button type="button" variant="outline" disabled={creating || checkingCreateNext} onClick={cancelCreateYamlMode}>取消</Button>
+                    <Button type="button" variant="outline" disabled={creating || checkingCreateNext} onClick={cancelCreateYamlMode}>{t("routesDialog.cancel")}</Button>
                   ) : (
-                    <DialogClose asChild><Button type="button" variant="outline" disabled={creating || checkingCreateNext}>取消</Button></DialogClose>
+                    <DialogClose asChild><Button type="button" variant="outline" disabled={creating || checkingCreateNext}>{t("routesDialog.cancel")}</Button></DialogClose>
                   )
                 ) : (
-                  <Button type="button" variant="outline" onClick={() => setCreateStep(createStep === "advanced" ? "rule" : "basic")} disabled={creating || checkingCreateNext}>上一步</Button>
+                  <Button type="button" variant="outline" onClick={() => setCreateStep(createStep === "advanced" ? "rule" : "basic")} disabled={creating || checkingCreateNext}>{t("routesDialog.previousStep")}</Button>
                 )}
 
                 {createStep === "rule" && !createYamlMode && createRuleViewMode === "edit" ? (
@@ -2131,18 +2131,18 @@ export function RoutesPageClient() {
                     disabled={creating}
                     className="bg-black text-white hover:bg-black/90"
                   >
-                    确认保存
+                    {t("routesDialog.confirmSave")}
                   </Button>
                 ) : createYamlMode || createStep === "advanced" ? (
                   createYamlMode ? (
-                    <Button type="button" onClick={confirmCreateYamlMode} disabled={creating || checkingCreateNext}>确认保存</Button>
+                    <Button type="button" onClick={confirmCreateYamlMode} disabled={creating || checkingCreateNext}>{t("routesDialog.confirmSave")}</Button>
                   ) : (
                     <Button type="button" onClick={() => void handleCreateSubmit()} disabled={creating || checkingCreateNext}>
-                      {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                      {creating ? (isEditMode ? t("routesDialog.saving") : t("routesDialog.creating")) : isEditMode ? t("routesDialog.save") : t("routesDialog.create")}
                     </Button>
                   )
                 ) : (
-                  <Button type="button" onClick={() => void handleCreateNext()} disabled={creating || checkingCreateNext}>{checkingCreateNext && createStep === "basic" ? "校验中..." : "下一步"}</Button>
+                  <Button type="button" onClick={() => void handleCreateNext()} disabled={creating || checkingCreateNext}>{checkingCreateNext && createStep === "basic" ? t("routesDialog.checking") : t("routesDialog.nextStep")}</Button>
                 )}
               </div>
             </DialogFooter>
@@ -2156,8 +2156,8 @@ export function RoutesPageClient() {
         onOpenChange={(open) => {
           if (!open) setPendingDeleteRuleHostKey(null)
         }}
-        title="删除路由规则"
-        description="确定删除该路由规则吗？"
+        title={t("routesDialog.deleteRouteRule")}
+        description={t("routesDialog.confirmDeleteRouteRule")}
         deleting={false}
         onConfirm={handleConfirmDeleteRuleItem}
       />
@@ -2166,8 +2166,8 @@ export function RoutesPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除应用路由"
-        description={pendingDeleteRow ? `确定删除应用路由 ${pendingDeleteRow.name} 吗？` : ""}
+        title={t("routesDialog.deleteRoute")}
+        description={pendingDeleteRow ? t("routesDialog.confirmDeleteRoute", { name: pendingDeleteRow.name }) : ""}
         deleting={deleting}
         onConfirm={handleConfirmDelete}
       />

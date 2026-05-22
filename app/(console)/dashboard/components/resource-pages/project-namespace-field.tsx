@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "@/app/lib/i18n"
 
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { FilterCombobox, type FilterComboboxOption } from "@/components/ui/filter-combobox"
@@ -27,19 +28,23 @@ export function ProjectNamespaceField({
   error,
   description,
   disabled = false,
-  placeholder = "请选择项目",
-  emptyText = "未找到项目",
+  placeholder,
+  emptyText,
   contentContainer,
 }: ProjectNamespaceFieldProps) {
+  const t = useTranslations()
+  const defaultPlaceholder = t("search.namespacePlaceholder")
+  const defaultEmptyText = `${t("search.notFound")} ${t("search.namespace")}`
+  
   return (
     <Field data-invalid={Boolean(error)}>
-      <FieldLabel htmlFor={id}>项目</FieldLabel>
+      <FieldLabel htmlFor={id}>{t("keyValueDialog.namespace")}</FieldLabel>
       <FilterCombobox
         options={options}
         value={value}
         onValueChange={onValueChange}
-        placeholder={placeholder}
-        emptyText={emptyText}
+        placeholder={placeholder || defaultPlaceholder}
+        emptyText={emptyText || defaultEmptyText}
         className="w-full"
         ariaInvalid={Boolean(error)}
         disabled={disabled}
