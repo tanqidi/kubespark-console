@@ -506,6 +506,13 @@ export function JobsPageClient() {
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<JobRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
+  // 先获取翻译的字符串，避免在 React 元素内直接调用 t 函数导致菜单问题
+  const viewYamlText = t("actions.viewYaml")
+  const viewDetailsText = t("actions.details")
+  const editText = t("actions.edit")
+  const deleteText = t("actions.delete")
+  const apiRequestFailedText = t("actions.apiRequestFailed")
+
   const handleViewYaml = React.useCallback((row: JobRow) => {
     const resource = JOB_RESOURCE_BY_KIND[row.kind]
     const yamlOptions =
@@ -520,7 +527,7 @@ export function JobsPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes ${row.kind}（${row.namespace}/${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("actions.viewYamlSubtitleWithName", { kind: row.kind, namespace: row.namespace, name: row.name }))
 
     void fetchNamespacedResourceYaml(resource, row.namespace, row.name, yamlOptions)
       .then(({ payload, text }) => {
@@ -553,7 +560,7 @@ export function JobsPageClient() {
     setDescribeError(null)
     setDescribeLoading(true)
     setDescribeContent("")
-    setDescribeSubtitle(`查看 Kubernetes ${row.kind}（${row.namespace}/${row.name}）的详情内容。`)
+    setDescribeSubtitle(t("actions.viewDetailsSubtitleWithName", { kind: row.kind, namespace: row.namespace, name: row.name }))
 
     void fetchResourceDescribe("batch", "v1", resource, row.name, row.namespace)
       .then(({ text }) => {
@@ -650,16 +657,16 @@ export function JobsPageClient() {
               <DropdownMenuGroup>
                 <DropdownMenuItem onSelect={() => handleViewYaml(current)}>
                   <IconEye className="size-4" />
-                  {t("actions.viewYaml")}
+                  {viewYamlText}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => handleViewDescribe(current)}>
                   <IconInfoCircle className="size-4" />
-                  {t("actions.details")}
+                  {viewDetailsText}
                 </DropdownMenuItem>
                 {current.kind === "CronJob" ? (
                   <DropdownMenuItem onSelect={() => handleEdit(current)}>
                     <IconPencil className="size-4" />
-                    {t("actions.edit")}
+                    {editText}
                   </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuSeparator />
@@ -668,7 +675,7 @@ export function JobsPageClient() {
                   onSelect={() => requestDelete(current)}
                 >
                   <IconTrash className="size-4" />
-                  {t("actions.delete")}
+                  {deleteText}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -678,7 +685,7 @@ export function JobsPageClient() {
     }
 
     return [...baseColumns, actionColumn]
-  }, [handleEdit, handleViewDescribe, handleViewYaml, requestDelete, t])
+  }, [handleEdit, handleViewDescribe, handleViewYaml, requestDelete, viewYamlText, viewDetailsText, editText, deleteText, t])
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
     if (!silent) {
@@ -701,14 +708,14 @@ export function JobsPageClient() {
     } catch (e: unknown) {
       if (!silent) {
         setRows([])
-        setError(e instanceof Error ? e.message : "API request failed")
+        setError(e instanceof Error ? e.message : apiRequestFailedText)
       } else {
         console.error("[Jobs] polling refresh failed", e)
       }
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [])
+  }, [apiRequestFailedText])
 
   const handleCreateSubmit = React.useCallback(
     async (payload: Parameters<typeof createJob>[0]) => {
@@ -849,10 +856,12 @@ export function JobsPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title={t("actions.deleteJobTitle")}
+        title={pendingDeleteRow?.kind === "CronJob" ? t("actions.deleteCronJobTitle") : t("actions.deleteJobTitle")}
         description={
           pendingDeleteRow
-            ? `确定删除任务 ${pendingDeleteRow.name} 吗？`
+            ? (pendingDeleteRow.kind === "CronJob" 
+              ? t("actions.deleteCronJobDescription", { name: pendingDeleteRow.name })
+              : t("actions.deleteJobDescription", { name: pendingDeleteRow.name }))
             : ""
         }
         deleting={deleting}

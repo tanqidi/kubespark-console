@@ -154,6 +154,8 @@
     "viewDetailsSubtitleWithName": "View Kubernetes {kind} ({namespace}/{name}) details.",
     "deleteJobTitle": "Delete Job",
     "deleteJobDescription": "Are you sure you want to delete job {name}?",
+    "deleteCronJobTitle": "Delete CronJob",
+    "deleteCronJobDescription": "Are you sure you want to delete CronJob {name}?",
     "deleteWorkloadTitle": "Delete Workload",
     "deleteWorkloadDescription": "Are you sure you want to delete workload {name}?",
     "cluster": "Cluster",

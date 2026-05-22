@@ -153,6 +153,8 @@
     "viewDetailsSubtitleWithName": "查看 Kubernetes {kind}（{namespace}/{name}）的详情内容。",
     "deleteJobTitle": "删除任务",
     "deleteJobDescription": "确定删除任务 {name} 吗？",
+    "deleteCronJobTitle": "删除定时任务",
+    "deleteCronJobDescription": "确定删除定时任务 {name} 吗？",
     "deleteWorkloadTitle": "删除工作负载",
     "deleteWorkloadDescription": "确定删除工作负载 {name} 吗？",
     "cluster": "集群",

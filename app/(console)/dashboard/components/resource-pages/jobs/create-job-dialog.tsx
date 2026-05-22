@@ -303,7 +303,7 @@ export function CreateJobDialog({
         const message =
           error instanceof Error && error.message
             ? error.message
-            : "?? PVC ?????????"
+            : t("jobDialog.loadPvcFailed")
         setPersistentVolumeNameError(message)
         setPersistentVolumeNameOptions([])
       })
