@@ -585,7 +585,16 @@
     "confirmDeleteConfigMount": "确定删除配置字典或保密字典 {name} 吗？",
     "unnamedConfig": "未命名配置",
     "loadConfigFailed": "加载配置字典/保密字典失败",
-    "loadPvcFailed": "加载 PVC 失败"
+    "loadPvcFailed": "加载 PVC 失败",
+    "yamlInvalidFormat": "YAML 内容格式无效",
+    "yamlKindMustBe": "YAML 资源类型必须是 {kind}",
+    "pleaseEnterPortName": "请输入端口名称",
+    "pleaseEnterContainerPort": "请输入容器端口",
+    "containerPortRange": "容器端口需为 0-65535 的数字",
+    "pleaseEnterSchedule": "请输入定时计划",
+    "createJobFailed": "创建任务失败，请稍后重试",
+    "createCronJobFailed": "创建定时任务失败，请稍后重试",
+    "labelsAnnotationsHint": "补充标签与注解信息，便于检索、分类和后续治理。"
   },
   "podDialog": {
     "basicInfo": "基本信息",

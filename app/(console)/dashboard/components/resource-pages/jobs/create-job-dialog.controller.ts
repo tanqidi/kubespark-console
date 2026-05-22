@@ -13,9 +13,7 @@ import type {
 } from "@/app/(console)/dashboard/components/resource-pages/jobs/create-job-dialog.logic"
 import {
   CONTAINER_PORT_PROTOCOL_SET,
-  CRON_SCHEDULE_REQUIRED_MESSAGE,
   DEFAULT_CRON_SCHEDULE,
-  POD_REQUIRED_MESSAGE,
   STEP_ORDER,
   buildAutoPortName,
   buildJobYamlText,
@@ -156,7 +154,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       resolveContainerNameFromImage,
       resolveDuplicateContainerEnvNameIds,
       toDnsLabelFragment,
-      validateContainerPorts,
+      validateContainerPorts: (ports: any) => validateContainerPorts(ports, t),
     },
   })
 
@@ -439,9 +437,9 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
   const runPodValidation = React.useCallback(() => {
     if (configuredContainers.length > 0) return true
-    setSubmitError(POD_REQUIRED_MESSAGE)
+    setSubmitError(t("jobDialog.podRequired"))
     return false
-  }, [configuredContainers.length])
+  }, [configuredContainers.length, t])
 
   const lockedIdentity = React.useMemo(
     () =>
@@ -631,15 +629,15 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       }
 
       try {
-        const parsed = parseJobYamlText(kind, yamlText)
+        const parsed = parseJobYamlText(kind, yamlText, t)
         applySnapshot(withLockedIdentity(parsed))
         setYamlError(null)
         setYamlMode(false)
       } catch (error) {
-        setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+        setYamlError(error instanceof Error ? error.message : t("jobDialog.yamlParseFailed"))
       }
     },
-    [applySnapshot, getSnapshot, isBusy, kind, withLockedIdentity, yamlText]
+    [applySnapshot, getSnapshot, isBusy, kind, t, withLockedIdentity, yamlText]
   )
 
   const enterYamlMode = React.useCallback((configMounts?: JobConfigInput[]) => {
@@ -653,22 +651,22 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
   const confirmYamlMode = React.useCallback(() => {
     try {
-      const source = withLockedIdentity(parseJobYamlText(kind, yamlText))
+      const source = withLockedIdentity(parseJobYamlText(kind, yamlText, t))
       applySnapshot(source)
       setYamlError(null)
       setYamlMode(false)
     } catch (error) {
-      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      setYamlError(error instanceof Error ? error.message : t("jobDialog.yamlParseFailed"))
     }
-  }, [applySnapshot, kind, withLockedIdentity, yamlText])
+  }, [applySnapshot, kind, t, withLockedIdentity, yamlText])
 
   const runBasicValidation = React.useCallback(async (source?: Pick<JobDialogSnapshot, "name" | "namespace" | "schedule">) => {
     const nextName = (lockedIdentity?.name ?? source?.name ?? name).trim().toLowerCase()
     const nextNamespace = (lockedIdentity?.namespace ?? source?.namespace ?? namespace).trim()
     const nextSchedule = kind === "CronJob" ? (source?.schedule ?? schedule).trim() : ""
-    const nextNameError = validateName(nextName)
-    const nextNamespaceError = nextNamespace ? null : "请选择项目"
-    const nextScheduleError = kind === "CronJob" && !nextSchedule ? CRON_SCHEDULE_REQUIRED_MESSAGE : null
+    const nextNameError = validateName(nextName, t)
+    const nextNamespaceError = nextNamespace ? null : t("jobDialog.pleaseSelectNamespace")
+    const nextScheduleError = kind === "CronJob" && !nextSchedule ? t("jobDialog.pleaseEnterSchedule") : null
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
     setScheduleError(nextScheduleError)
@@ -701,12 +699,12 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       namespace: nextNamespace,
     })
     if (exists) {
-      setNameError(kind === "CronJob" ? "定时任务名称已存在，请更换后重试" : "任务名称已存在，请更换后重试")
+      setNameError(kind === "CronJob" ? t("jobDialog.cronJobExists") : t("jobDialog.jobExists"))
       return false
     }
 
     return true
-  }, [isEditMode, kind, lockedIdentity?.name, lockedIdentity?.namespace, name, namespace, schedule])
+  }, [isEditMode, kind, lockedIdentity?.name, lockedIdentity?.namespace, name, namespace, schedule, t])
 
   const goNext = React.useCallback(async () => {
     if (isBusy || isFinalStep || isEditingPodView || yamlMode) return
@@ -718,7 +716,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
         const passed = await runBasicValidation()
         if (!passed) return
       } catch (error) {
-        setNameError(error instanceof Error ? error.message : "名称校验失败")
+        setNameError(error instanceof Error ? error.message : t("jobDialog.nameValidationFailed"))
         return
       } finally {
         setCheckingNext(false)
@@ -742,6 +740,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
     yamlMode,
     runBasicValidation,
     runPodValidation,
+    t,
   ])
 
   const handleCreate = React.useCallback(
@@ -754,11 +753,11 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
         let source = getSnapshot()
         if (yamlMode) {
           try {
-            source = withLockedIdentity(parseJobYamlText(kind, yamlText))
+            source = withLockedIdentity(parseJobYamlText(kind, yamlText, t))
             applySnapshot(source)
             setYamlError(null)
           } catch (error) {
-            setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+            setYamlError(error instanceof Error ? error.message : t("jobDialog.yamlParseFailed"))
             return
           }
         }
@@ -767,13 +766,13 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
         const normalizedNamespace = (lockedIdentity?.namespace ?? source.namespace).trim()
         const normalizedDescription = source.description.trim()
         const normalizedSchedule = kind === "CronJob" ? source.schedule.trim() : ""
-        const nextNameError = validateName(normalizedName)
-        const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
-        const nextScheduleError = kind === "CronJob" && !normalizedSchedule ? CRON_SCHEDULE_REQUIRED_MESSAGE : null
+        const nextNameError = validateName(normalizedName, t)
+        const nextNamespaceError = normalizedNamespace ? null : t("jobDialog.pleaseSelectNamespace")
+        const nextScheduleError = kind === "CronJob" && !normalizedSchedule ? t("jobDialog.pleaseEnterSchedule") : null
         const nextDescriptionError =
           normalizedDescription.length <= DESCRIPTION_MAX_LENGTH
             ? null
-            : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
+            : t("jobDialog.descriptionTooLong", { maxLength: DESCRIPTION_MAX_LENGTH.toString() })
         setNameError(nextNameError)
         setNamespaceError(nextNamespaceError)
         setScheduleError(nextScheduleError)
@@ -795,7 +794,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
           })
           if (exists) {
             const existsError =
-              kind === "CronJob" ? "定时任务名称已存在，请更换后重试" : "任务名称已存在，请更换后重试"
+              kind === "CronJob" ? t("jobDialog.cronJobExists") : t("jobDialog.jobExists")
             setNameError(existsError)
             if (yamlMode) {
               setYamlError(existsError)
@@ -1011,7 +1010,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
 
         onOpenChange(false)
       } catch (error) {
-        setSubmitError(resolveSubmitErrorMessage(error, kind))
+        setSubmitError(resolveSubmitErrorMessage(error, kind, t))
       } finally {
         setCreating(false)
       }
@@ -1027,6 +1026,7 @@ export function useCreateJobDialogController(props: CreateJobDialogProps) {
       lockedIdentity?.namespace,
       onOpenChange,
       onSubmit,
+      t,
       withLockedIdentity,
       yamlMode,
       yamlText,

@@ -33,8 +33,6 @@ import type {
 import {
   MonacoEditor,
   MONACO_OPTIONS,
-  NAME_RULE_MESSAGE,
-  POD_REQUIRED_MESSAGE,
   normalizeIntegerInput,
   resolveStepDescription,
 } from "@/app/(console)/dashboard/components/resource-pages/jobs/create-job-dialog.logic"
@@ -911,7 +909,7 @@ export function CreateJobDialog({
                     items={configuredContainers}
                     isBusy={isBusy}
                     submitError={submitError}
-                    podRequiredMessage={POD_REQUIRED_MESSAGE}
+                    podRequiredMessage={t("jobDialog.podRequired")}
                     onAdd={addContainer}
                     onEdit={beginEditContainer}
                     onRequestDelete={setPendingDeleteContainerId}
@@ -1358,7 +1356,7 @@ export function CreateJobDialog({
               <div>
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">{t("jobDialog.advancedSettings")}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep, t)}</p>
                 </div>
                 <FieldGroup className="grid gap-4 md:grid-cols-2">
                   <Field className="md:col-span-2">
@@ -1379,7 +1377,7 @@ export function CreateJobDialog({
               </div>
             )}
 
-            {submitError && !(isPodStep && submitError === POD_REQUIRED_MESSAGE) ? (
+            {submitError && !(isPodStep && submitError === t("jobDialog.podRequired")) ? (
               <FieldError className="mt-4">{submitError}</FieldError>
             ) : null}
           </div>

@@ -3,6 +3,7 @@
 import type { EditorProps } from "@monaco-editor/react"
 import dynamic from "next/dynamic"
 import type { JobCreateKind } from "@/app/lib/kubespark/jobs"
+import type { useTranslations } from "@/app/lib/i18n"
 import type {
   ContainerDraft,
   ContainerEnvVarSource,
@@ -328,7 +329,6 @@ export const NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 export const POD_REQUIRED_MESSAGE = "请至少添加一个容器配置后再进入下一步"
 export const DEFAULT_CRON_SCHEDULE = "0 0 1 * *"
-export const CRON_SCHEDULE_REQUIRED_MESSAGE = "请输入定时计划"
 
 export type JobDialogSnapshot = {
   name: string
@@ -1225,12 +1225,13 @@ export function buildJobYamlText(
   })
 }
 
-export function parseJobYamlText(kind: JobCreateKind, yamlText: string): JobDialogSnapshot {
+export function parseJobYamlText(kind: JobCreateKind, yamlText: string, t?: ReturnType<typeof useTranslations>): JobDialogSnapshot {
   const root = asObject(parse(yamlText))
-  if (Object.keys(root).length === 0) throw new Error("YAML 内容格式无效")
+  if (Object.keys(root).length === 0) 
+    throw new Error(t ? t("jobDialog.yamlInvalidFormat") : "YAML 内容格式无效")
   const actualKind = asString(root.kind).trim()
   if (actualKind && actualKind !== kind) {
-    throw new Error(`YAML 资源类型必须是 ${kind}`)
+    throw new Error(t ? t("jobDialog.yamlKindMustBe", { kind }) : `YAML 资源类型必须是 ${kind}`)
   }
 
   const metadata = asObject(root.metadata)
@@ -1504,7 +1505,7 @@ export function resolveDuplicateContainerEnvNameIds(entries: ContainerDraft["env
     .flat()
 }
 
-export function validateContainerPorts(ports: ContainerPortDraft[]): ContainerPortFieldErrors {
+export function validateContainerPorts(ports: ContainerPortDraft[], t?: ReturnType<typeof useTranslations>): ContainerPortFieldErrors {
   if (ports.length === 0) return {}
 
   const errors: ContainerPortFieldErrors = {}
@@ -1515,16 +1516,16 @@ export function validateContainerPorts(ports: ContainerPortDraft[]): ContainerPo
     const rowError: { name?: string; containerPort?: string } = {}
 
     if (!name) {
-      rowError.name = "请输入端口名称"
+      rowError.name = t ? t("jobDialog.pleaseEnterPortName") : "请输入端口名称"
     }
     if (!containerPort) {
-      rowError.containerPort = "请输入容器端口"
+      rowError.containerPort = t ? t("jobDialog.pleaseEnterContainerPort") : "请输入容器端口"
     } else if (!/^\d+$/.test(containerPort)) {
-      rowError.containerPort = "容器端口需为 0-65535 的数字"
+      rowError.containerPort = t ? t("jobDialog.containerPortRange") : "容器端口需为 0-65535 的数字"
     } else {
       const parsed = Number(containerPort)
       if (!Number.isFinite(parsed) || parsed < 0 || parsed > 65535) {
-        rowError.containerPort = "容器端口需为 0-65535 的数字"
+        rowError.containerPort = t ? t("jobDialog.containerPortRange") : "容器端口需为 0-65535 的数字"
       }
     }
 
@@ -1572,29 +1573,35 @@ export function replaceProtocolPrefixInName(
   return `${resolveProtocolNamePrefix(nextProtocol)}-${tail}`
 }
 
-export function validateName(value: string): string | null {
+export function validateName(value: string, t?: ReturnType<typeof useTranslations>): string | null {
   const next = value.trim().toLowerCase()
-  if (!next) return "请输入名称"
-  if (next.length > 253) return NAME_RULE_MESSAGE
+  if (!next) return t ? t("jobDialog.pleaseEnterName") : "请输入名称"
+  if (next.length > 253) return t ? t("jobDialog.nameRule") : NAME_RULE_MESSAGE
   if (!/^[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?$/.test(next)) {
-    return NAME_RULE_MESSAGE
+    return t ? t("jobDialog.nameRule") : NAME_RULE_MESSAGE
   }
   return null
 }
 
-export function resolveSubmitErrorMessage(error: unknown, kind: JobCreateKind): string {
+export function resolveSubmitErrorMessage(error: unknown, kind: JobCreateKind, t?: ReturnType<typeof useTranslations>): string {
   const raw = error instanceof Error ? error.message : ""
   const text = raw.toLowerCase()
   if (text.includes("already exists") || text.includes("状态码 409")) {
-    return kind === "CronJob" ? "定时任务名称已存在，请更换后重试" : "任务名称已存在，请更换后重试"
+    return t 
+      ? (kind === "CronJob" ? t("jobDialog.cronJobExists") : t("jobDialog.jobExists"))
+      : (kind === "CronJob" ? "定时任务名称已存在，请更换后重试" : "任务名称已存在，请更换后重试")
   }
-  return raw || (kind === "CronJob" ? "创建定时任务失败，请稍后重试" : "创建任务失败，请稍后重试")
+  return raw || (
+    t 
+      ? (kind === "CronJob" ? t("jobDialog.createCronJobFailed") : t("jobDialog.createJobFailed"))
+      : (kind === "CronJob" ? "创建定时任务失败，请稍后重试" : "创建任务失败，请稍后重试")
+  )
 }
 
-export function resolveStepDescription(step: CreateStep): string {
+export function resolveStepDescription(step: CreateStep, t?: ReturnType<typeof useTranslations>): string {
   switch (step) {
     case "advanced":
-      return "补充标签与注解信息，便于检索、分类和后续治理。"
+      return t ? t("jobDialog.labelsAnnotationsHint") : "补充标签与注解信息，便于检索、分类和后续治理。"
     default:
       return ""
   }

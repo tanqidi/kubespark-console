@@ -585,7 +585,16 @@
     "confirmDeleteConfigMount": "Are you sure you want to delete config map or secret {name}?",
     "unnamedConfig": "Unnamed Config",
     "loadConfigFailed": "Failed to load config map or secret",
-    "loadPvcFailed": "Failed to load PVC"
+    "loadPvcFailed": "Failed to load PVC",
+    "yamlInvalidFormat": "Invalid YAML content format",
+    "yamlKindMustBe": "YAML resource type must be {kind}",
+    "pleaseEnterPortName": "Please enter port name",
+    "pleaseEnterContainerPort": "Please enter container port",
+    "containerPortRange": "Container port must be a number between 0-65535",
+    "pleaseEnterSchedule": "Please enter cron schedule",
+    "createJobFailed": "Failed to create job, please try again later",
+    "createCronJobFailed": "Failed to create cron job, please try again later",
+    "labelsAnnotationsHint": "Add label and annotation information for easier search, classification, and governance."
   },
   "podDialog": {
     "basicInfo": "Basic Information",
