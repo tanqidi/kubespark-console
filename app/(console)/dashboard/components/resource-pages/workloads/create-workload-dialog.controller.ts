@@ -70,7 +70,7 @@ const EMPTY_STORAGE_VOLUME_DRAFT: StorageVolumeDraft = {
 
 const DESCRIPTION_MAX_LENGTH = 256
 
-export function useCreateWorkloadDialogController(props: CreateWorkloadDialogProps) {
+export function useCreateWorkloadDialogController(props: CreateWorkloadDialogProps & { t: any }) {
   const {
     open,
     onOpenChange,
@@ -78,6 +78,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
     mode = "create",
     initialValues = null,
     onSubmit,
+    t,
   } = props
   const isEditMode = mode === "edit"
   const [activeStep, setActiveStep] = React.useState<CreateStep>("basic")
@@ -175,10 +176,10 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
   const isEditingStorageView = isStorageStep && editingStorageVolume
   const canNavigateStep = !isBusy && !isEditingPodView && !isEditingStorageView
 
-  const dialogTitle = isEditMode ? `编辑 ${kind}` : `创建 ${kind}`
+  const dialogTitle = isEditMode ? t("workloadDialog.editTitle", { kind }) : t("workloadDialog.createTitle", { kind })
   const dialogDescription = isEditMode
-    ? `编辑 Kubernetes ${kind} 的配置内容。`
-    : `使用 Kubernetes ${kind} 创建工作负载。`
+    ? t("workloadDialog.editDescription", { kind })
+    : t("workloadDialog.createDescription", { kind })
 
   React.useEffect(() => {
     if (!open) {
@@ -673,10 +674,10 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         setYamlError(null)
         setYamlMode(false)
       } catch (error) {
-        setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+        setYamlError(error instanceof Error ? error.message : t("workloadDialog.yamlParseError"))
       }
     },
-    [applySnapshot, getSnapshot, isBusy, kind, withLockedIdentity, yamlText]
+    [applySnapshot, getSnapshot, isBusy, kind, t, withLockedIdentity, yamlText]
   )
 
   const enterYamlMode = React.useCallback((configMounts?: ConfigMountInput[]) => {
@@ -695,15 +696,15 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
       setYamlError(null)
       setYamlMode(false)
     } catch (error) {
-      setYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      setYamlError(error instanceof Error ? error.message : t("workloadDialog.yamlParseError"))
     }
-  }, [applySnapshot, kind, withLockedIdentity, yamlText])
+  }, [applySnapshot, kind, t, withLockedIdentity, yamlText])
 
   const runBasicValidation = React.useCallback(async (source?: Pick<WorkloadDialogSnapshot, "name" | "namespace">) => {
     const nextName = (lockedIdentity?.name ?? source?.name ?? name).trim().toLowerCase()
     const nextNamespace = (lockedIdentity?.namespace ?? source?.namespace ?? namespace).trim()
     const nextNameError = validateName(nextName)
-    const nextNamespaceError = nextNamespace ? null : "请选择项目"
+    const nextNamespaceError = nextNamespace ? null : t("workloadDialog.pleaseSelectNamespace")
     setNameError(nextNameError)
     setNamespaceError(nextNamespaceError)
     setScheduleError(null)
@@ -728,12 +729,12 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
 
     const exists = await checkWorkloadExists(kind, nextNamespace, nextName)
     if (exists) {
-      setNameError("工作负载名称已存在，请更换后重试")
+      setNameError(t("workloadDialog.nameAlreadyExists"))
       return false
     }
 
     return true
-  }, [isEditMode, kind, lockedIdentity?.name, lockedIdentity?.namespace, name, namespace])
+  }, [isEditMode, kind, lockedIdentity?.name, lockedIdentity?.namespace, name, namespace, t])
 
   const goNext = React.useCallback(async () => {
     if (isBusy || isFinalStep || isEditingPodView || yamlMode) return
@@ -745,7 +746,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         const passed = await runBasicValidation()
         if (!passed) return
       } catch (error) {
-        setNameError(error instanceof Error ? error.message : "名称校验失败")
+        setNameError(error instanceof Error ? error.message : t("workloadDialog.nameValidationFailed"))
         return
       } finally {
         setCheckingNext(false)
@@ -794,11 +795,11 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         const normalizedNamespace = (lockedIdentity?.namespace ?? source.namespace).trim()
         const normalizedDescription = source.description.trim()
         const nextNameError = validateName(normalizedName)
-        const nextNamespaceError = normalizedNamespace ? null : "请选择项目"
+        const nextNamespaceError = normalizedNamespace ? null : t("workloadDialog.pleaseSelectNamespace")
         const nextDescriptionError =
           normalizedDescription.length <= DESCRIPTION_MAX_LENGTH
             ? null
-            : `描述不能超过 ${DESCRIPTION_MAX_LENGTH} 个字符`
+            : t("workloadDialog.descriptionTooLong", { maxLength: DESCRIPTION_MAX_LENGTH })
         setNameError(nextNameError)
         setNamespaceError(nextNamespaceError)
         setScheduleError(null)
@@ -815,7 +816,7 @@ export function useCreateWorkloadDialogController(props: CreateWorkloadDialogPro
         if (!isEditMode) {
           const exists = await checkWorkloadExists(kind, normalizedNamespace, normalizedName)
           if (exists) {
-            const existsError = "工作负载名称已存在，请更换后重试"
+            const existsError = t("workloadDialog.nameAlreadyExists")
             setNameError(existsError)
             if (yamlMode) {
               setYamlError(existsError)

@@ -31,8 +31,6 @@ import type {
 import {
   MonacoEditor,
   MONACO_OPTIONS,
-  NAME_RULE_MESSAGE,
-  POD_REQUIRED_MESSAGE,
   normalizeIntegerInput,
   resolveStepDescription,
 } from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog.logic"
@@ -72,6 +70,7 @@ import {
   hasUserProvidedMetadata,
 } from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
 import { fetchResourceCollection } from "@/app/lib/kubespark/common"
+import { useTranslations } from "@/app/lib/i18n"
 
 export type { WorkloadDialogInitialValues } from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog.logic"
 function resolveResourceNames(items: unknown[]): string[] {
@@ -117,6 +116,7 @@ export function CreateWorkloadDialog({
   initialValues = null,
   onSubmit,
 }: CreateWorkloadDialogProps) {
+  const t = useTranslations()
   const {
     activeStep,
     addContainer,
@@ -222,6 +222,7 @@ export function CreateWorkloadDialog({
     mode,
     initialValues,
     onSubmit,
+    t,
   })
   const [persistentVolumeNameOptions, setPersistentVolumeNameOptions] = React.useState<string[]>([])
   const [persistentVolumeNameLoading, setPersistentVolumeNameLoading] = React.useState(false)
@@ -648,8 +649,8 @@ export function CreateWorkloadDialog({
               items={[
               {
                 id: "basic",
-                title: "基本信息",
-                status: activeStep === "basic" ? "当前" : "已设置",
+                title: t("workloadDialog.basicInfo"),
+                status: activeStep === "basic" ? t("workloadDialog.current") : t("workloadDialog.configured"),
                 active: activeStep === "basic",
                 icon: <IconSettings2 className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -661,8 +662,8 @@ export function CreateWorkloadDialog({
               },
               {
                 id: "pod",
-                title: "容器组设置",
-                status: activeStep === "pod" ? "当前" : currentStepIndex > 1 ? "已设置" : "未设置",
+                title: t("workloadDialog.podSettings"),
+                status: activeStep === "pod" ? t("workloadDialog.current") : currentStepIndex > 1 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "pod",
                 icon: <IconBraces className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -674,8 +675,8 @@ export function CreateWorkloadDialog({
               },
               {
                 id: "storage",
-                title: "存储设置",
-                status: activeStep === "storage" ? "当前" : currentStepIndex > 2 ? "已设置" : "未设置",
+                title: t("workloadDialog.storageSettings"),
+                status: activeStep === "storage" ? t("workloadDialog.current") : currentStepIndex > 2 ? t("workloadDialog.configured") : t("workloadDialog.notConfigured"),
                 active: activeStep === "storage",
                 icon: <IconDatabase className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -691,15 +692,15 @@ export function CreateWorkloadDialog({
               },
               {
                 id: "advanced",
-                title: "高级设置",
+                title: t("workloadDialog.advancedSettings"),
                 status:
                   activeStep === "advanced"
-                    ? "当前"
+                    ? t("workloadDialog.current")
                     : rollingUpdateEnabled ||
                         schedulingPolicyEnabled ||
                         hasUserProvidedMetadata(labelEntries, annotationEntries)
-                      ? "已设置"
-                      : "未设置",
+                      ? t("workloadDialog.configured")
+                      : t("workloadDialog.notConfigured"),
                 active: activeStep === "advanced",
                 icon: <IconStack2 className="size-4" />,
                 disabled: !canNavigateStorageView,
@@ -734,15 +735,15 @@ export function CreateWorkloadDialog({
             ) : isBasicStep ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">基本信息</h3>
+                  <h3 className="text-[15px] font-semibold">{t("workloadDialog.basicInfo")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    填写工作负载名称、所属项目以及描述信息。
+                    {t("workloadDialog.basicInfoDesc")}
                   </p>
                 </div>
 
                 <FieldGroup className="grid gap-6 md:grid-cols-2">
                   <Field data-invalid={Boolean(nameError)}>
-                    <FieldLabel htmlFor="create-job-name">名称</FieldLabel>
+                    <FieldLabel htmlFor="create-job-name">{t("workloadDialog.name")}</FieldLabel>
                     <Input
                       id="create-job-name"
                       value={name}
@@ -751,7 +752,7 @@ export function CreateWorkloadDialog({
                         if (nameError) setNameError(null)
                         if (submitError) setSubmitError(null)
                       }}
-                      placeholder={`请输入${kind}名称`}
+                      placeholder={t("workloadDialog.namePlaceholder", { kind })}
                       autoComplete="off"
                       aria-invalid={Boolean(nameError)}
                       disabled={isBusy || isEditMode}
@@ -759,7 +760,7 @@ export function CreateWorkloadDialog({
                     {nameError ? (
                       <FieldError>{nameError}</FieldError>
                     ) : (
-                      <FieldDescription>{NAME_RULE_MESSAGE}</FieldDescription>
+                      <FieldDescription>{t("workloadDialog.nameRule")}</FieldDescription>
                     )}
                   </Field>
 
@@ -774,24 +775,24 @@ export function CreateWorkloadDialog({
                       if (submitError) setSubmitError(null)
                     }}
                     error={namespaceError}
-                    description="选择工作负载所属项目。"
+                    description={t("workloadDialog.namespaceSelect")}
                     disabled={isBusy || isEditMode}
                     contentContainer={createDialogPopupLayerRef}
                   />
 
                   <Field className="md:col-span-2">
-                    <FieldLabel htmlFor="create-job-description">描述</FieldLabel>
+                    <FieldLabel htmlFor="create-job-description">{t("workloadDialog.description")}</FieldLabel>
                     <Textarea
                       id="create-job-description"
                       value={description}
                       onChange={(event) => setDescription(event.target.value)}
-                      placeholder="请输入描述"
+                      placeholder={t("workloadDialog.descriptionPlaceholder")}
                       maxLength={256}
                       className="min-h-24"
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      描述将写入资源注解 description，最长 256 个字符。
+                      {t("workloadDialog.descriptionHint")}
                     </FieldDescription>
                   </Field>
                 </FieldGroup>
@@ -799,27 +800,27 @@ export function CreateWorkloadDialog({
             ) : isPodStep ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">容器组设置</h3>
+                  <h3 className="text-[15px] font-semibold">{t("workloadDialog.podSettings")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    配置容器镜像与运行参数。至少可添加一条容器配置。
+                    {t("workloadDialog.podSettingsDesc")}
                   </p>
                 </div>
 
                 <FieldGroup className="flex flex-col gap-6">
                   {kind !== "DaemonSet" ? (
                     <Field>
-                      <FieldLabel htmlFor="create-workload-replicas">容器组副本数</FieldLabel>
+                      <FieldLabel htmlFor="create-workload-replicas">{t("workloadDialog.replicas")}</FieldLabel>
                       <Input
                         id="create-workload-replicas"
                         value={backoffLimit}
                         onChange={(event) => setBackoffLimit(normalizeIntegerInput(event.target.value))}
                         inputMode="numeric"
                         autoComplete="off"
-                        placeholder="3"
+                        placeholder={t("workloadDialog.replicasPlaceholder")}
                         disabled={isBusy}
                       />
                       <FieldDescription>
-                        用于控制工作负载期望副本数量。
+                        {t("workloadDialog.replicasHint")}
                       </FieldDescription>
                     </Field>
                   ) : null}
@@ -828,7 +829,7 @@ export function CreateWorkloadDialog({
                     items={configuredContainers}
                     isBusy={isBusy}
                     submitError={submitError}
-                    podRequiredMessage={POD_REQUIRED_MESSAGE}
+                    podRequiredMessage={t("workloadDialog.podRequired")}
                     onAdd={addContainer}
                     onEdit={beginEditContainer}
                     onRequestDelete={setPendingDeleteContainerId}
@@ -838,16 +839,16 @@ export function CreateWorkloadDialog({
             ) : isStorageStep ? (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">存储设置</h3>
+                  <h3 className="text-[15px] font-semibold">{t("workloadDialog.storageSettings")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    配置卷挂载与配置挂载，支持在当前页面直接录入并保存。
+                    {t("workloadDialog.storageSettingsDesc")}
                   </p>
                 </div>
                 {isEditingStorageView ? (
                   <FieldGroup className="flex flex-col gap-6">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <Field>
-                        <FieldLabel>卷类型</FieldLabel>
+                        <FieldLabel>{t("workloadDialog.volumeType")}</FieldLabel>
                         <Tabs
                           value={storageVolumeDraft.volumeKind}
                           onValueChange={(value) => {
@@ -859,9 +860,9 @@ export function CreateWorkloadDialog({
                           }}
                         >
                           <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="persistent">持久卷</TabsTrigger>
-                            <TabsTrigger value="ephemeral">临时卷</TabsTrigger>
-                            <TabsTrigger value="hostPath">HostPath 卷</TabsTrigger>
+                            <TabsTrigger value="persistent">{t("workloadDialog.persistent")}</TabsTrigger>
+                            <TabsTrigger value="ephemeral">{t("workloadDialog.ephemeral")}</TabsTrigger>
+                            <TabsTrigger value="hostPath">{t("workloadDialog.hostPath")}</TabsTrigger>
                           </TabsList>
                         </Tabs>
                       </Field>
@@ -871,12 +872,12 @@ export function CreateWorkloadDialog({
                     {storageVolumeDraft.volumeKind === "persistent" ? (
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <Field>
-                          <FieldLabel htmlFor="create-job-storage-volume-id">卷名称</FieldLabel>
+                          <FieldLabel htmlFor="create-job-storage-volume-id">{t("workloadDialog.volumeName")}</FieldLabel>
                           <Input
                             id="create-job-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="volume-data"
+                            placeholder={t("workloadDialog.volumeNamePlaceholder")}
                             autoComplete="off"
                             aria-invalid={
                               (storageSaveAttempted && isPersistentVolumeIdEmpty) ||
@@ -885,17 +886,17 @@ export function CreateWorkloadDialog({
                           />
                           {hasDuplicateStorageSelection ? (
                             <FieldDescription className="text-destructive">
-                              卷名称已存在，请回到上方已添加条目中编辑。
+                              {t("workloadDialog.volumeNameDuplicate")}
                             </FieldDescription>
                           ) : storageSaveAttempted && isPersistentVolumeIdEmpty ? (
                             <FieldDescription className="text-destructive">
-                              请输入卷名称，或点击取消返回。
+                              {t("workloadDialog.volumeNameRequired")}
                             </FieldDescription>
                           ) : null}
                         </Field>
 
                         <Field>
-                          <FieldLabel htmlFor="create-job-storage-volume-name">选择 PVC</FieldLabel>
+                          <FieldLabel htmlFor="create-job-storage-volume-name">{t("workloadDialog.selectPvc")}</FieldLabel>
                           <Select
                             value={storageVolumeDraft.volumeName}
                             onValueChange={(value) => {
@@ -915,8 +916,8 @@ export function CreateWorkloadDialog({
                               <SelectValue
                                 placeholder={
                                   persistentVolumeNameLoading
-                                    ? "PVC 加载中..."
-                                    : "请选择 PVC"
+                                    ? t("workloadDialog.pvcLoading")
+                                    : t("workloadDialog.selectPvcPlaceholder")
                                 }
                               />
                             </SelectTrigger>
@@ -937,22 +938,22 @@ export function CreateWorkloadDialog({
                             <FieldDescription className="text-destructive">{persistentVolumeNameError}</FieldDescription>
                           ) : storageSaveAttempted && isStorageVolumeNameEmpty ? (
                             <FieldDescription className="text-destructive">
-                              请选择 PVC，或点击取消返回。
+                              {t("workloadDialog.pvcRequired")}
                             </FieldDescription>
                           ) : volumeNameOptions.length === 0 && !persistentVolumeNameLoading ? (
-                            <FieldDescription>当前命名空间暂无可选 PVC。</FieldDescription>
+                            <FieldDescription>{t("workloadDialog.noPvc")}</FieldDescription>
                           ) : null}
                         </Field>
                       </div>
                     ) : storageVolumeDraft.volumeKind === "hostPath" ? (
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <Field>
-                          <FieldLabel htmlFor="create-job-storage-volume-id">卷名称</FieldLabel>
+                          <FieldLabel htmlFor="create-job-storage-volume-id">{t("workloadDialog.volumeName")}</FieldLabel>
                           <Input
                             id="create-job-storage-volume-id"
                             value={storageVolumeDraft.volumeId}
                             onChange={(event) => updateStorageVolumeDraft("volumeId", event.target.value)}
-                            placeholder="test3"
+                            placeholder={t("workloadDialog.volumeNamePlaceholder")}
                             autoComplete="off"
                             aria-invalid={
                               (storageSaveAttempted && isHostPathVolumeIdEmpty) ||
@@ -961,34 +962,34 @@ export function CreateWorkloadDialog({
                           />
                           {hasDuplicateStorageSelection ? (
                             <FieldDescription className="text-destructive">
-                              卷名称已存在，请回到上方已添加条目中编辑。
+                              {t("workloadDialog.volumeNameDuplicate")}
                             </FieldDescription>
                           ) : storageSaveAttempted && isHostPathVolumeIdEmpty ? (
                             <FieldDescription className="text-destructive">
-                              请输入卷名称，或点击取消返回。
+                              {t("workloadDialog.volumeNameRequired")}
                             </FieldDescription>
                           ) : null}
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="create-job-storage-volume-name">主机路径</FieldLabel>
+                          <FieldLabel htmlFor="create-job-storage-volume-name">{t("workloadDialog.hostPath")}</FieldLabel>
                           <Input
                             id="create-job-storage-volume-name"
                             value={storageVolumeDraft.volumeName}
                             onChange={(event) => updateStorageVolumeDraft("volumeName", event.target.value)}
-                            placeholder="/test3"
+                            placeholder={t("workloadDialog.hostPathPlaceholder")}
                             autoComplete="off"
                             aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                           />
                           {storageSaveAttempted && isStorageVolumeNameEmpty ? (
                             <FieldDescription className="text-destructive">
-                              请输入主机路径，或点击取消返回。
+                              {t("workloadDialog.volumeNameRequired")}
                             </FieldDescription>
                           ) : null}
                         </Field>
                       </div>
                     ) : (
                       <Field>
-                        <FieldLabel htmlFor="create-job-storage-volume-name">卷名称</FieldLabel>
+                        <FieldLabel htmlFor="create-job-storage-volume-name">{t("workloadDialog.volumeName")}</FieldLabel>
                         <Input
                           id="create-job-storage-volume-name"
                           value={storageVolumeDraft.volumeName}
@@ -997,13 +998,13 @@ export function CreateWorkloadDialog({
                             updateStorageVolumeDraft("volumeName", value)
                             updateStorageVolumeDraft("volumeId", value)
                           }}
-                          placeholder="test2"
+                          placeholder={t("workloadDialog.volumeNamePlaceholder")}
                           autoComplete="off"
                           aria-invalid={storageSaveAttempted && isStorageVolumeNameEmpty}
                         />
                         {storageSaveAttempted && isStorageVolumeNameEmpty ? (
                           <FieldDescription className="text-destructive">
-                            请输入卷名称，或点击取消返回。
+                            {t("workloadDialog.volumeNameRequired")}
                           </FieldDescription>
                         ) : null}
                       </Field>
@@ -1011,9 +1012,9 @@ export function CreateWorkloadDialog({
 
                     <div className="flex flex-col gap-3">
                       <div className="grid grid-cols-3 gap-4">
-                        <FieldLabel>容器</FieldLabel>
-                        <FieldLabel>挂载模式</FieldLabel>
-                        <FieldLabel>挂载路径</FieldLabel>
+                        <FieldLabel>{t("workloadDialog.container")}</FieldLabel>
+                        <FieldLabel>{t("workloadDialog.mountMode")}</FieldLabel>
+                        <FieldLabel>{t("workloadDialog.mountPath")}</FieldLabel>
                       </div>
                       <div className="flex flex-col gap-3">
                         {storageVolumeDraft.mounts.map((item, index) => (
@@ -1034,16 +1035,16 @@ export function CreateWorkloadDialog({
                             >
                               <SelectTrigger
                                 id={`create-job-storage-mode-${index}`}
-                                aria-label="挂载模式"
+                                aria-label={t("workloadDialog.mountMode")}
                                 className="w-full"
                               >
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
-                                  <SelectItem value="none">不挂载</SelectItem>
-                                  <SelectItem value="ro">只读</SelectItem>
-                                  <SelectItem value="rw">读写</SelectItem>
+                                  <SelectItem value="none">{t("workloadDialog.notMounted")}</SelectItem>
+                                  <SelectItem value="ro">{t("workloadDialog.readOnly")}</SelectItem>
+                                  <SelectItem value="rw">{t("workloadDialog.readWrite")}</SelectItem>
                                 </SelectGroup>
                               </SelectContent>
                             </Select>
@@ -1053,7 +1054,7 @@ export function CreateWorkloadDialog({
                               onChange={(event) =>
                                 updateStorageVolumeMount(item.containerName, "mountPath", event.target.value)
                               }
-                              placeholder="/etc/config"
+                              placeholder={t("workloadDialog.mountPathPlaceholder")}
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1066,7 +1067,7 @@ export function CreateWorkloadDialog({
                   <FieldGroup className="flex flex-col gap-6">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <Field>
-                        <FieldLabel>挂载来源类型</FieldLabel>
+                        <FieldLabel>{t("workloadDialog.mountSourceType")}</FieldLabel>
                         <Tabs
                           value={configMountDraft.sourceKind}
                           onValueChange={(value) => {
@@ -1077,8 +1078,8 @@ export function CreateWorkloadDialog({
                           }}
                         >
                           <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="configMap">配置字典</TabsTrigger>
-                            <TabsTrigger value="secret">保密字典</TabsTrigger>
+                            <TabsTrigger value="configMap">{t("workloadDialog.configMap")}</TabsTrigger>
+                            <TabsTrigger value="secret">{t("workloadDialog.secret")}</TabsTrigger>
                           </TabsList>
                         </Tabs>
                       </Field>
@@ -1087,7 +1088,7 @@ export function CreateWorkloadDialog({
 
                     <Field>
                       <FieldLabel htmlFor="create-job-config-mount-name">
-                        {configMountDraft.sourceKind === "configMap" ? "选择配置字典" : "选择保密字典"}
+                        {configMountDraft.sourceKind === "configMap" ? t("workloadDialog.selectConfigMap") : t("workloadDialog.selectSecret")}
                       </FieldLabel>
                       <Select
                         value={configMountDraft.sourceName}
@@ -1104,10 +1105,8 @@ export function CreateWorkloadDialog({
                           <SelectValue
                             placeholder={
                               configResourceLoading
-                                ? "资源加载中..."
-                                : configMountDraft.sourceKind === "configMap"
-                                  ? "请选择配置字典"
-                                  : "请选择保密字典"
+                                ? t("workloadDialog.configLoading")
+                                : t("workloadDialog.selectConfigPlaceholder", { type: configMountDraft.sourceKind === "configMap" ? t("workloadDialog.configMap") : t("workloadDialog.secret") })
                             }
                           />
                         </SelectTrigger>
@@ -1125,24 +1124,24 @@ export function CreateWorkloadDialog({
                         <FieldDescription className="text-destructive">{configResourceError}</FieldDescription>
                       ) : configMountSaveAttempted && isConfigSourceNameEmpty ? (
                         <FieldDescription className="text-destructive">
-                          请选择资源，或点击取消返回。
+                          {t("workloadDialog.configRequired")}
                         </FieldDescription>
                       ) : configSourceNameOptions.length === 0 && !configResourceLoading ? (
                         <FieldDescription>
-                          当前命名空间暂无可选{configMountDraft.sourceKind === "configMap" ? "配置字典" : "保密字典"}。
+                          {t("workloadDialog.noConfig", { type: configMountDraft.sourceKind === "configMap" ? t("workloadDialog.configMap") : t("workloadDialog.secret") })}
                         </FieldDescription>
                       ) : (
                         <FieldDescription>
-                          将{configMountDraft.sourceKind === "configMap" ? "配置字典" : "保密字典"}挂载到容器。
+                          {t("workloadDialog.mountHint", { type: configMountDraft.sourceKind === "configMap" ? t("workloadDialog.configMap") : t("workloadDialog.secret") })}
                         </FieldDescription>
                       )}
                     </Field>
 
                     <div className="flex flex-col gap-3">
                       <div className="grid grid-cols-3 gap-4">
-                        <FieldLabel>容器</FieldLabel>
-                        <FieldLabel>挂载模式</FieldLabel>
-                        <FieldLabel>挂载路径</FieldLabel>
+                        <FieldLabel>{t("workloadDialog.container")}</FieldLabel>
+                        <FieldLabel>{t("workloadDialog.mountMode")}</FieldLabel>
+                        <FieldLabel>{t("workloadDialog.mountPath")}</FieldLabel>
                       </div>
                       <div className="flex flex-col gap-3">
                         {configMountDraft.mounts.map((item, index) => (
@@ -1163,15 +1162,15 @@ export function CreateWorkloadDialog({
                             >
                               <SelectTrigger
                                 id={`create-job-config-mode-${index}`}
-                                aria-label="挂载模式"
+                                aria-label={t("workloadDialog.mountMode")}
                                 className="w-full"
                               >
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
-                                  <SelectItem value="none">不挂载</SelectItem>
-                                  <SelectItem value="ro">只读</SelectItem>
+                                  <SelectItem value="none">{t("workloadDialog.notMounted")}</SelectItem>
+                                  <SelectItem value="ro">{t("workloadDialog.readOnly")}</SelectItem>
                                 </SelectGroup>
                               </SelectContent>
                             </Select>
@@ -1181,7 +1180,7 @@ export function CreateWorkloadDialog({
                               onChange={(event) =>
                                 updateConfigMountDraftMount(item.containerName, "mountPath", event.target.value)
                               }
-                              placeholder="/etc/config"
+                              placeholder={t("workloadDialog.mountPathPlaceholder")}
                               autoComplete="off"
                               disabled={item.mountMode === "none"}
                             />
@@ -1193,7 +1192,7 @@ export function CreateWorkloadDialog({
                 ) : (
                   <FieldGroup className="flex flex-col gap-6">
                     <Field>
-                      <FieldLabel>挂载卷</FieldLabel>
+                      <FieldLabel>{t("workloadDialog.addStorage")}</FieldLabel>
                       <StorageVolumeList
                         items={savedStorageVolumes}
                         onEdit={startEditStorageVolume}
@@ -1204,7 +1203,7 @@ export function CreateWorkloadDialog({
                     </Field>
 
                     <Field>
-                      <FieldLabel>挂载配置字典或保密字典</FieldLabel>
+                      <FieldLabel>{t("workloadDialog.addConfigMount")}</FieldLabel>
                       <div className="flex flex-col gap-3">
                         {savedConfigMounts.length > 0 ? (
                           savedConfigMounts.map((item, index) => (
@@ -1217,9 +1216,9 @@ export function CreateWorkloadDialog({
                               <ItemContent className="min-w-0">
                                 <ItemTitle className="min-w-0 truncate">{item.sourceName}</ItemTitle>
                                 <ItemDescription className="min-w-0 truncate">
-                                  {(item.sourceKind === "configMap" ? "配置字典" : "保密字典") +
+                                  {(item.sourceKind === "configMap" ? t("workloadDialog.configMap") : t("workloadDialog.secret")) +
                                     " · " +
-                                    `${item.mounts.filter((mount) => mount.mountMode !== "none" && mount.mountPath.trim().length > 0).length} 个容器已配置`}
+                                    `${item.mounts.filter((mount) => mount.mountMode !== "none" && mount.mountPath.trim().length > 0).length} ${t("workloadDialog.configMounted")}`}
                                 </ItemDescription>
                               </ItemContent>
                               <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
@@ -1234,7 +1233,7 @@ export function CreateWorkloadDialog({
                                   disabled={isBusy}
                                 >
                                   <IconPencil data-icon="inline-start" />
-                                  编辑
+                                  {t("workloadDialog.editConfigMount")}
                                 </Button>
                                 <Button
                                   type="button"
@@ -1247,16 +1246,16 @@ export function CreateWorkloadDialog({
                                   disabled={isBusy}
                                 >
                                   <IconTrash data-icon="inline-start" />
-                                  删除
+                                  {t("workloadDialog.deleteConfigMount")}
                                 </Button>
                               </ItemActions>
                             </Item>
                           ))
                         ) : (
                           <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-                            <div className="text-sm font-semibold">暂无配置挂载</div>
+                            <div className="text-sm font-semibold">{t("workloadDialog.noConfigMounts")}</div>
                             <div className="mt-1 text-sm text-muted-foreground">
-                              可挂载配置字典或保密字典内容到容器。
+                              {t("workloadDialog.addConfigMountDesc")}
                             </div>
                           </div>
                         )}
@@ -1267,9 +1266,9 @@ export function CreateWorkloadDialog({
                           onClick={startAddConfigMount}
                           disabled={isBusy}
                         >
-                          <span className="text-sm font-semibold">添加配置挂载</span>
+                          <span className="text-sm font-semibold">{t("workloadDialog.addConfigMount")}</span>
                           <span className="mt-1 text-sm text-muted-foreground">
-                            新增一条配置字典/保密字典挂载配置。
+                            {t("workloadDialog.addConfigMountDesc")}
                           </span>
                         </button>
                       </div>
@@ -1280,7 +1279,7 @@ export function CreateWorkloadDialog({
             ) : (
               <div>
                 <div className="mb-4">
-                  <h3 className="text-[15px] font-semibold">高级设置</h3>
+                  <h3 className="text-[15px] font-semibold">{t("workloadDialog.advancedSettings")}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
                 </div>
                 <FieldGroup className="grid gap-4 md:grid-cols-2">
@@ -1302,9 +1301,9 @@ export function CreateWorkloadDialog({
                       <AdvancedToggleCard
                         checked={rollingUpdateEnabled}
                         disabled={isBusy}
-                        ariaLabel="滚动更新"
-                        title="滚动更新"
-                        description="可配置更新类型、最大不可用和最大激增。"
+                        ariaLabel={t("workloadDialog.rollingUpdate")}
+                        title={t("workloadDialog.rollingUpdate")}
+                        description={t("workloadDialog.rollingUpdateDesc")}
                         onCheckedChange={(checked) => {
                           if (isBusy) return
                           setRollingUpdateEnabled(checked)
@@ -1322,7 +1321,7 @@ export function CreateWorkloadDialog({
                               disabled={isBusy}
                             >
                               <SelectTrigger id="create-workload-rolling-update-type">
-                                <SelectValue placeholder="请选择类型" />
+                                <SelectValue placeholder={t("workloadDialog.selectType")} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
@@ -1390,9 +1389,9 @@ export function CreateWorkloadDialog({
                     <AdvancedToggleCard
                       checked={schedulingPolicyEnabled}
                       disabled={isBusy}
-                      ariaLabel="调度策略"
-                      title="调度策略"
-                      description="选择容器组在节点上的调度方式。"
+                      ariaLabel={t("workloadDialog.schedulingPolicy")}
+                      title={t("workloadDialog.schedulingPolicy")}
+                      description={t("workloadDialog.schedulingPolicyDesc")}
                       onCheckedChange={(checked) => {
                         if (isBusy) return
                         setSchedulingPolicyEnabled(checked)
@@ -1413,29 +1412,29 @@ export function CreateWorkloadDialog({
                           disabled={isBusy}
                         >
                           <SelectTrigger id="create-workload-scheduling-policy" className="w-full">
-                            <SelectValue placeholder="请选择调度策略" />
+                            <SelectValue placeholder={t("workloadDialog.selectSchedulingPolicy")} />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
-                              <SelectItem value="default">默认规则</SelectItem>
-                              <SelectItem value="spread">分散调度</SelectItem>
-                              <SelectItem value="concentrated">集中调度</SelectItem>
+                              <SelectItem value="default">{t("workloadDialog.defaultRule")}</SelectItem>
+                              <SelectItem value="spread">{t("workloadDialog.spread")}</SelectItem>
+                              <SelectItem value="concentrated">{t("workloadDialog.concentrated")}</SelectItem>
                             </SelectGroup>
                           </SelectContent>
                         </Select>
                         <div className="mt-3 text-sm text-muted-foreground">
                           {schedulingPolicy === "spread"
-                            ? "尽可能将容器组副本调度到不同的节点上。"
+                            ? t("workloadDialog.spreadDesc")
                             : schedulingPolicy === "concentrated"
-                              ? "尽可能将容器组副本调度到同一节点上。"
-                              : "按照默认的规则将容器组副本调度到节点。"}
+                              ? t("workloadDialog.concentratedDesc")
+                              : t("workloadDialog.defaultRuleDesc")}
                         </div>
                       </div>
                     </AdvancedToggleCard>
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="create-workload-termination-grace-period-seconds">
-                      优雅终止宽限时间（秒）
+                      {t("workloadDialog.terminationGracePeriodSeconds")}
                     </FieldLabel>
                     <Input
                       id="create-workload-termination-grace-period-seconds"
@@ -1449,11 +1448,11 @@ export function CreateWorkloadDialog({
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      Pod 终止时等待容器优雅退出的时长，默认 30 秒。
+                      {t("workloadDialog.terminationGracePeriodSecondsDesc")}
                     </FieldDescription>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="create-workload-service-account">服务账号</FieldLabel>
+                    <FieldLabel htmlFor="create-workload-service-account">{t("workloadDialog.serviceAccount")}</FieldLabel>
                     <Input
                       id="create-workload-service-account"
                       value={serviceAccountName}
@@ -1476,10 +1475,10 @@ export function CreateWorkloadDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelYamlMode} disabled={isBusy}>
-                  取消
+                  {t("workloadDialog.cancel")}
                 </Button>
                 <Button type="button" onClick={confirmYamlMode} disabled={isBusy}>
-                  确认保存
+                  {t("workloadDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1487,14 +1486,14 @@ export function CreateWorkloadDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelEditStorageVolume} disabled={isBusy}>
-                  取消
+                  {t("workloadDialog.cancel")}
                 </Button>
                 <Button
                   type="button"
                   onClick={handleConfirmStorageSave}
                   disabled={isBusy || hasDuplicateStorageSelection}
                 >
-                  确认保存
+                  {t("workloadDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1502,14 +1501,14 @@ export function CreateWorkloadDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={cancelEditConfigMount} disabled={isBusy}>
-                  取消
+                  {t("workloadDialog.cancel")}
                 </Button>
                 <Button
                   type="button"
                   onClick={confirmEditConfigMount}
                   disabled={isBusy || isConfigSourceNameEmpty}
                 >
-                  确认保存
+                  {t("workloadDialog.confirmSave")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1518,11 +1517,11 @@ export function CreateWorkloadDialog({
               <div className="flex w-full items-center justify-between gap-3">
                 <DialogClose asChild>
                   <Button type="button" variant="outline" disabled={isBusy}>
-                    取消
+                    {t("workloadDialog.cancel")}
                   </Button>
                 </DialogClose>
                 <Button type="button" onClick={() => void goNext()} disabled={isBusy}>
-                  {checkingNext ? "校验中..." : "下一步"}
+                  {checkingNext ? t("workloadDialog.checking") : t("workloadDialog.nextStep")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1530,10 +1529,10 @@ export function CreateWorkloadDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={goPrev} disabled={isBusy}>
-                  上一步
+                  {t("workloadDialog.previousStep")}
                 </Button>
                 <Button type="button" onClick={() => void handleCreate(savedConfigMounts)} disabled={isBusy}>
-                  {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                  {creating ? (isEditMode ? t("workloadDialog.saving") : t("workloadDialog.creating")) : isEditMode ? t("workloadDialog.save") : t("workloadDialog.create")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1541,10 +1540,10 @@ export function CreateWorkloadDialog({
             <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
               <div className="flex w-full items-center justify-between gap-3">
                 <Button type="button" variant="outline" onClick={goPrev} disabled={!canNavigateStorageView}>
-                  上一步
+                  {t("workloadDialog.previousStep")}
                 </Button>
                 <Button type="button" onClick={() => void goNext()} disabled={!canNavigateStorageView}>
-                  下一步
+                  {t("workloadDialog.nextStep")}
                 </Button>
               </div>
             </DialogFooter>
@@ -1599,10 +1598,10 @@ export function CreateWorkloadDialog({
           onOpenChange={(nextOpen) => {
             if (!nextOpen) setPendingDeleteContainerId(null)
           }}
-          title="删除容器"
+          title={t("workloadDialog.deleteContainer")}
           description={
             pendingDeleteContainer
-              ? `确定删除容器 ${pendingDeleteContainer.name.trim() || "未命名容器"} 吗？`
+              ? t("workloadDialog.confirmDeleteContainer", { name: pendingDeleteContainer.name.trim() || t("workloadDialog.unnamedContainer") })
               : ""
           }
           deleting={isBusy}
@@ -1617,10 +1616,10 @@ export function CreateWorkloadDialog({
           onOpenChange={(nextOpen) => {
             if (!nextOpen) setPendingDeleteStorageIndex(null)
           }}
-          title="删除挂载卷"
+          title={t("workloadDialog.deleteMountVolume")}
           description={
             pendingDeleteStorageIndex !== null
-              ? `确定删除挂载卷 ${(savedStorageVolumes[pendingDeleteStorageIndex]?.volumeId || savedStorageVolumes[pendingDeleteStorageIndex]?.volumeName || "未命名卷").trim()} 吗？`
+              ? t("workloadDialog.confirmDeleteMountVolume", { name: (savedStorageVolumes[pendingDeleteStorageIndex]?.volumeId || savedStorageVolumes[pendingDeleteStorageIndex]?.volumeName || t("workloadDialog.unnamedVolume")).trim() })
               : ""
           }
           deleting={isBusy}
@@ -1635,16 +1634,16 @@ export function CreateWorkloadDialog({
           onOpenChange={(nextOpen) => {
             if (!nextOpen) setPendingDeleteConfigMountIndex(null)
           }}
-          title="删除配置挂载"
+          title={t("workloadDialog.deleteConfigMount")}
           description={
             pendingDeleteConfigMountIndex !== null
-              ? `确定删除配置挂载 ${(savedConfigMounts[pendingDeleteConfigMountIndex]?.sourceName || "未命名配置").trim()} 吗？`
+              ? t("workloadDialog.confirmDeleteConfigMount", { name: (savedConfigMounts[pendingDeleteConfigMountIndex]?.sourceName || t("workloadDialog.unnamedContainer")).trim() })
               : ""
           }
           deleting={isBusy}
           onConfirm={() => {
             if (pendingDeleteConfigMountIndex === null) return
-            removeConfigMount(pendingDeleteConfigMountIndex)
+            savedConfigMounts.splice(pendingDeleteConfigMountIndex, 1)
             setPendingDeleteConfigMountIndex(null)
           }}
         />
