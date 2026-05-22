@@ -15,6 +15,7 @@ export type ResourceDocumentType =
   | "statefulset"
   | "daemonset"
   | "namespace"
+  | "workspace"
 export type ResourceDocumentOutput = "yaml" | "json"
 export type ResourceDocumentLanguage = "yaml" | "json"
 
@@ -684,6 +685,28 @@ function normalizeNamespaceDocument(payload: unknown): JsonObject {
   return normalized
 }
 
+function normalizeWorkspaceDocument(payload: unknown): JsonObject {
+  const root = asObject(payload)
+  const metadata = normalizeManifestMetadata(root.metadata)
+
+  const normalized: JsonObject = {
+    kind: asNonEmptyString(root.kind) ?? "Workspace",
+    apiVersion: asNonEmptyString(root.apiVersion) ?? "tanqidi.com/v1alpha1",
+  }
+
+  if (Object.keys(metadata).length > 0) normalized.metadata = metadata
+  if ("spec" in root) normalized.spec = root.spec
+
+  Object.keys(root).forEach((key) => {
+    if (key === "kind" || key === "apiVersion" || key === "metadata" || key === "spec" || key === "status") {
+      return
+    }
+    normalized[key] = root[key]
+  })
+
+  return normalized
+}
+
 function normalizeDocumentByType(type: ResourceDocumentType, payload: unknown): unknown {
   if (type === "pod") return normalizePodDocument(payload)
   if (type === "job") return normalizeJobDocument(payload)
@@ -699,6 +722,7 @@ function normalizeDocumentByType(type: ResourceDocumentType, payload: unknown): 
   if (type === "statefulset") return normalizeStatefulSetDocument(payload)
   if (type === "daemonset") return normalizeDaemonSetDocument(payload)
   if (type === "namespace") return normalizeNamespaceDocument(payload)
+  if (type === "workspace") return normalizeWorkspaceDocument(payload)
   return payload
 }
 

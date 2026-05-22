@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import type { EditorProps } from "@monaco-editor/react"
-import { IconPencil, IconSettings2, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconPencil, IconSettings2, IconTrash } from "@tabler/icons-react"
 import dynamic from "next/dynamic"
 import { parse, stringify } from "yaml"
 
@@ -26,6 +26,7 @@ import {
   deleteWorkspace,
   fetchWorkspaceDetail,
   fetchWorkspaceRows,
+  fetchWorkspaceYaml,
   updateWorkspace,
   type WorkspaceRow,
 } from "@/app/lib/kubespark/workspaces"
@@ -44,6 +45,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { useTranslations } from "@/app/lib/i18n"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -188,6 +190,12 @@ export function WorkspacesPageClient() {
   const [submitting, setSubmitting] = React.useState(false)
   const [loadingEditData, setLoadingEditData] = React.useState(false)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
+  
+  const [yamlOpen, setYamlOpen] = React.useState(false)
+  const [yamlContent, setYamlContent] = React.useState("")
+  const [yamlLoading, setYamlLoading] = React.useState(false)
+  const [yamlError, setYamlError] = React.useState<string | null>(null)
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
 
   const [workspaceName, setWorkspaceName] = React.useState("")
   const [workspaceDescription, setWorkspaceDescription] = React.useState("")
@@ -312,6 +320,34 @@ export function WorkspacesPageClient() {
       })
   }, [loadRows, t])
 
+  const handleViewYaml = React.useCallback((row: WorkspaceRow) => {
+    setYamlOpen(true)
+    setYamlError(null)
+    setYamlLoading(true)
+    setYamlContent("")
+    setYamlSubtitle(t("workspacesDialog.yamlSubtitleWithName", { name: row.name }))
+
+    void fetchWorkspaceYaml(row.name)
+      .then(({ payload, text }) => {
+        setYamlContent(text)
+        console.log("[Workspaces] view yaml response", {
+          workspace: { name: row.name },
+          result: payload,
+        })
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : t("workspacesDialog.loadYamlFailed")
+        setYamlError(message)
+        console.error("[Workspaces] view yaml request failed", {
+          workspace: { name: row.name },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setYamlLoading(false)
+      })
+  }, [t])
+
   const handleConfirmDelete = React.useCallback(() => {
     if (!pendingDeleteRow || deleting) return
     setDeleting(true)
@@ -338,6 +374,17 @@ export function WorkspacesPageClient() {
           {
             label: (
               <>
+                <IconEye className="size-4" />
+                {t("workspacesDialog.viewYaml")}
+              </>
+            ),
+            onSelect: (row) => {
+              handleViewYaml(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconPencil className="size-4" />
                 {t("workspacesDialog.edit")}
               </>
@@ -361,7 +408,7 @@ export function WorkspacesPageClient() {
           },
         ],
       }),
-    [openEditDialog, t]
+    [handleViewYaml, openEditDialog, t]
   )
 
   const isEditMode = dialogMode === "edit"
@@ -560,6 +607,16 @@ export function WorkspacesPageClient() {
         description={pendingDeleteRow ? t("workspacesDialog.deleteDesc", { name: pendingDeleteRow.name }) : ""}
         deleting={deleting}
         onConfirm={handleConfirmDelete}
+      />
+      <MonacoViewerDialog
+        title={t("workspacesDialog.viewYamlTitle")}
+        subtitle={yamlSubtitle}
+        open={yamlOpen}
+        onOpenChange={setYamlOpen}
+        value={yamlContent}
+        language="yaml"
+        loading={yamlLoading}
+        error={yamlError}
       />
 
       <Dialog

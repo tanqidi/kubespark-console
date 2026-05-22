@@ -7,6 +7,7 @@ import {
   fetchResourceCollection,
 } from "./common"
 import { formatAge, resolveDescriptionFromAnnotations, resolveUpdatedAt } from "./utils"
+import { buildResourceDocument } from "./resource-document"
 
 type JsonObject = Record<string, unknown>
 
@@ -206,5 +207,31 @@ export async function updateWorkspace(name: string, input: UpsertWorkspaceInput)
 export async function deleteWorkspace(name: string): Promise<void> {
   const targetName = normalizeWorkspaceName(name)
   return deleteResource(WORKSPACE_GVR.group, WORKSPACE_GVR.version, WORKSPACE_GVR.resource, targetName)
+}
+
+export type WorkspaceYamlResult = {
+  requestUrl: string
+  payload: unknown
+  text: string
+}
+
+export async function fetchWorkspaceYaml(name: string): Promise<WorkspaceYamlResult> {
+  const targetName = normalizeWorkspaceName(name)
+  const { requestUrl, payload } = await fetchResourceByName<RawWorkspace>(
+    WORKSPACE_GVR.group,
+    WORKSPACE_GVR.version,
+    WORKSPACE_GVR.resource,
+    targetName
+  )
+  const { text } = buildResourceDocument({
+    type: "workspace",
+    payload,
+    output: "yaml",
+  })
+  return {
+    requestUrl,
+    payload,
+    text,
+  }
 }
 
