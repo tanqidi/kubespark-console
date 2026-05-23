@@ -43,6 +43,7 @@ import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
+import { useTranslations } from "@/app/lib/i18n"
 
 type PipelineRunsPageClientProps = {
   pipelineName: string
@@ -129,17 +130,17 @@ function parsePipelineRunYamlText(
   pipelineName: string
 ): { repository: string; droneYaml: string } {
   const normalized = yamlText.trim()
-  if (!normalized) throw new Error("请输入 YAML 内容")
+  if (!normalized) throw new Error("yamlRequired")
 
   const parsed = parseYaml(normalized)
   const root =
     typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null
-  if (!root) throw new Error("YAML 内容格式无效")
+  if (!root) throw new Error("yamlInvalid")
 
   const kind = typeof root.kind === "string" ? root.kind.trim() : ""
-  if (kind && kind !== "PipelineRun") throw new Error("YAML 资源类型必须是 PipelineRun")
+  if (kind && kind !== "PipelineRun") throw new Error("yamlKindMustBePipelineRun")
 
   const metadata =
     typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
@@ -166,7 +167,7 @@ function parsePipelineRunYamlText(
 
   const refName = typeof pipelineRef.name === "string" ? pipelineRef.name.trim() : ""
   if (refName && refName !== pipelineName) {
-    throw new Error(`pipelineRef.name 必须为当前流水线：${pipelineName}`)
+    throw new Error("pipelineRefNameMustBeCurrent")
   }
 
   const namespace = typeof data.namespace === "string" ? data.namespace.trim() : ""
@@ -314,20 +315,8 @@ function syncDroneYamlBranch(yamlText: string, branch: string): string {
   }
 }
 
-const pipelineRunColumns: ColumnConfig<PipelineRunRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "phase", label: "状态", render: "status" },
-  { key: "buildNumber", label: "构建号" },
-  { key: "branch", label: "分支" },
-  { key: "triggerTime", label: "触发时间" },
-]
-
 export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientProps) {
+  const t = useTranslations()
   const normalizedPipelineName = pipelineName.trim()
   const [rows, setRows] = React.useState<PipelineRunRow[]>([])
   const [error, setError] = React.useState<string | null>(null)
@@ -355,13 +344,13 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [yamlContent, setYamlContent] = React.useState("")
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 PipelineRun 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState(t("pipelineRuns.viewYamlSubtitleDefault"))
   const [logOpen, setLogOpen] = React.useState(false)
   const [logLoading, setLogLoading] = React.useState(false)
   const [logError, setLogError] = React.useState<string | null>(null)
   const [logContent, setLogContent] = React.useState("")
   const [logRealtime, setLogRealtime] = React.useState(false)
-  const [logTitle, setLogTitle] = React.useState("查看日志")
+  const [logTitle, setLogTitle] = React.useState(t("pipelineRuns.viewLogsTitle"))
   const [logSubtitle, setLogSubtitle] = React.useState("")
   const [currentLogBuildNumber, setCurrentLogBuildNumber] = React.useState("")
   const [currentLogRepository, setCurrentLogRepository] = React.useState("")
@@ -381,12 +370,12 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         setRows(items)
         if (!silent) setError(null)
       } catch (e: unknown) {
-        if (!silent) setError(e instanceof Error ? e.message : "加载运行记录失败")
+        if (!silent) setError(e instanceof Error ? e.message : "loadPipelineRunsFailed")
       } finally {
         if (!silent) setLoading(false)
       }
     },
-    [normalizedPipelineName]
+    [normalizedPipelineName, t]
   )
 
   React.useEffect(() => {
@@ -451,17 +440,17 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     const source = runRepository.trim()
     const { namespace, repo } = splitRepository(source)
     if (!source) {
-      setRunError("请先在流水线中配置代码仓库（owner/repo）")
+      setRunError(t("pipelineRuns.repoRequired"))
       return
     }
     if (!namespace || !repo) {
-      setRunError("代码仓库注解格式无效，需为 owner/repo")
+      setRunError(t("pipelineRuns.repoFormatInvalid"))
       return
     }
 
     const normalizedBranch = runBranch.trim()
     if (!normalizedBranch) {
-      setRunBranchError("请输入分支名称")
+      setRunBranchError(t("pipelineRuns.branchRequired"))
       return
     }
 
@@ -492,12 +481,12 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         void loadRows(true)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "触发流水线运行失败"
+        const message = e instanceof Error ? e.message : t("pipelineRuns.triggerFailed")
         setRunError(message)
         setError(message)
         setRunning(false)
       })
-  }, [loadRows, normalizedPipelineName, runBranch, runDroneYaml, runRepository, runRepositoryLoading, running])
+  }, [loadRows, normalizedPipelineName, runBranch, runDroneYaml, runRepository, runRepositoryLoading, running, t])
 
   const handleViewLogs = React.useCallback(
     (row: PipelineRunRow) => {
@@ -510,10 +499,10 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       if (!repository || repository === "-") {
         setLogOpen(true)
       setLogLoading(false)
-      setLogError("无法获取仓库信息")
+      setLogError(t("pipelineRuns.getRepoInfoFailed"))
       setLogContent("")
-      setLogTitle("查看日志")
-      setLogSubtitle(`查看 Drone PipelineRun（${row.name}）的日志内容。`)
+      setLogTitle(t("pipelineRuns.viewLogsTitle"))
+      setLogSubtitle(t("pipelineRuns.viewLogsSubtitleNoRepo", { name: row.name }))
       setLogRealtime(true)
       setCurrentLogBuildNumber(buildNumber)
       setCurrentLogRepository("")
@@ -535,8 +524,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       setLogLoading(true)
       setLogError(null)
       setLogContent("")
-      setLogTitle("查看日志")
-      setLogSubtitle(`查看 Drone PipelineRun（${displayPath}）的日志内容。`)
+      setLogTitle(t("pipelineRuns.viewLogsTitle"))
+      setLogSubtitle(t("pipelineRuns.viewLogsSubtitle", { name: displayPath }))
       setLogRealtime(true)
       setCurrentLogBuildNumber(buildNumber)
       setCurrentLogRepository(repository)
@@ -551,13 +540,13 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         setCurrentLogStep(firstStep.number)
         void fetchDroneBuildLogs(repository, buildNumber, firstStage.number, firstStep.number)
           .then((logs) => {
-            setLogContent(logs || "(无日志输出)")
+            setLogContent(logs || t("pipelineRuns.noLogsOutput"))
             setLogError(null)
           })
           .catch((e: unknown) => {
-            const errorMessage = e instanceof Error ? e.message : "获取日志失败"
+            const errorMessage = e instanceof Error ? e.message : t("pipelineRuns.loadLogsFailed")
             if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
-              setLogContent("日志正在处理中...")
+              setLogContent(t("pipelineRuns.logsProcessing"))
               setLogError(null)
             } else {
               setLogError(errorMessage)
@@ -569,13 +558,13 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       } else {
         void fetchDroneBuildLogs(repository, buildNumber)
           .then((logs) => {
-            setLogContent(logs || "(无日志输出)")
+            setLogContent(logs || t("pipelineRuns.noLogsOutput"))
             setLogError(null)
           })
           .catch((e: unknown) => {
-            const errorMessage = e instanceof Error ? e.message : "获取日志失败"
+            const errorMessage = e instanceof Error ? e.message : t("pipelineRuns.loadLogsFailed")
             if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
-              setLogContent("日志正在处理中...")
+              setLogContent(t("pipelineRuns.logsProcessing"))
               setLogError(null)
             } else {
               setLogError(errorMessage)
@@ -586,7 +575,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           })
       }
     },
-    []
+    [t]
   )
 
   const handleDownloadLogs = React.useCallback(() => {
@@ -614,13 +603,13 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
 
       void fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, stage, step)
         .then((logs) => {
-          setLogContent(logs || "(无日志输出)")
+          setLogContent(logs || t("pipelineRuns.noLogsOutput"))
           setLogError(null)
         })
         .catch((e: unknown) => {
-          const errorMessage = e instanceof Error ? e.message : "获取日志失败"
+          const errorMessage = e instanceof Error ? e.message : t("pipelineRuns.loadLogsFailed")
           if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
-            setLogContent("日志正在处理中...")
+            setLogContent(t("pipelineRuns.logsProcessing"))
             setLogError(null)
           } else {
             setLogError(errorMessage)
@@ -630,7 +619,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           setLogLoading(false)
         })
     },
-    [currentLogBuildNumber, currentLogRepository]
+    [currentLogBuildNumber, currentLogRepository, t]
   )
 
   React.useEffect(() => {
@@ -641,13 +630,13 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         await Promise.all([
           fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, currentLogStage, currentLogStep)
             .then((logs) => {
-              setLogContent(logs || "(无日志输出)")
+              setLogContent(logs || t("pipelineRuns.noLogsOutput"))
               setLogError(null)
             })
             .catch((e: unknown) => {
-              const errorMessage = e instanceof Error ? e.message : "获取日志失败"
+              const errorMessage = e instanceof Error ? e.message : t("pipelineRuns.loadLogsFailed")
               if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
-                setLogContent("日志正在处理中...")
+                setLogContent(t("pipelineRuns.logsProcessing"))
                 setLogError(null)
               }
             }),
@@ -667,18 +656,29 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     return () => {
       window.clearInterval(timer)
     }
-  }, [logOpen, logRealtime, currentLogBuildNumber, currentLogRepository, currentLogStage, currentLogStep])
+  }, [logOpen, logRealtime, currentLogBuildNumber, currentLogRepository, currentLogStage, currentLogStep, t])
 
   const columns = React.useMemo(
     () =>
       createColumns<PipelineRunRow>({
-        columns: pipelineRunColumns,
+        columns: [
+          {
+            key: "name",
+            label: t("table.columns.name"),
+            enableHiding: false,
+            cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+          },
+          { key: "phase", label: t("table.columns.status"), render: "status" },
+          { key: "buildNumber", label: t("pipelineRuns.columns.buildNumber") },
+          { key: "branch", label: t("pipelineRuns.columns.branch") },
+          { key: "triggerTime", label: t("pipelineRuns.columns.triggerTime") },
+        ],
         actionItems: [
           {
             label: (
               <>
                 <IconEye className="size-4" />
-                查看 YAML
+                {t("pipelineRuns.viewYaml")}
               </>
             ),
             onSelect: (row) => {
@@ -689,7 +689,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
               setYamlLoading(true)
               setYamlError(null)
               setYamlContent("")
-              setYamlSubtitle(`查看 PipelineRun（${name}）的 YAML 内容。`)
+              setYamlSubtitle(t("pipelineRuns.viewYamlSubtitle", { name }))
 
               void fetchResourceByName<unknown>("tanqidi.com", "v1alpha1", "pipelineruns", name)
                 .then(({ payload }) => {
@@ -703,7 +703,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                   )
                 })
                 .catch((e: unknown) => {
-                  setYamlError(e instanceof Error ? e.message : "加载 YAML 失败")
+                  const errMsg = e instanceof Error ? e.message : "loadYamlFailed"
+                  setYamlError(errMsg)
                 })
                 .finally(() => {
                   setYamlLoading(false)
@@ -714,7 +715,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
             label: (
               <>
                 <IconFileText className="size-4" />
-                日志
+                {t("pipelineRuns.logs")}
               </>
             ),
             onSelect: handleViewLogs,
@@ -724,7 +725,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
             label: (
               <>
                 <IconTrash className="size-4" />
-                删除
+                {t("common.delete")}
               </>
             ),
             variant: "destructive",
@@ -735,7 +736,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           },
         ],
       }),
-    [handleViewLogs]
+    [handleViewLogs, t]
   )
 
   const handleDeleteSelectedRows = React.useCallback(
@@ -754,13 +755,13 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           void loadRows(false)
         })
         .catch((e: unknown) => {
-          setError(e instanceof Error ? e.message : "删除运行记录失败")
+          setError(e instanceof Error ? e.message : t("pipelineRuns.deleteFailed"))
         })
         .finally(() => {
           setDeleting(false)
         })
     },
-    [deleting, loadRows]
+    [deleting, loadRows, t]
   )
 
   const handleConfirmDelete = React.useCallback(() => {
@@ -777,12 +778,12 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         void loadRows(false)
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "删除运行记录失败")
+        setError(e instanceof Error ? e.message : t("pipelineRuns.deleteFailed"))
       })
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, loadRows, pendingDeleteRow])
+  }, [deleting, loadRows, pendingDeleteRow, t])
 
   const query = nameQuery.trim().toLowerCase()
   const filteredRows = rows.filter((row) => {
@@ -794,7 +795,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>加载失败</AlertTitle>
+          <AlertTitle>{t("common.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -806,9 +807,9 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       <MonacoViewerDialog
         open={yamlOpen}
         onOpenChange={setYamlOpen}
-        title="查看 YAML"
+        title={t("pipelineRuns.viewYaml")}
         subtitle={yamlSubtitle}
-        value={yamlLoading ? "加载中..." : yamlContent}
+        value={yamlLoading ? t("pipelineRuns.loading") : yamlContent}
         language="yaml"
         error={yamlError}
       />
@@ -853,7 +854,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
               })
             )
             if (!runRepository.trim()) {
-              setRunError("请先在流水线中配置代码仓库（owner/repo）")
+              setRunError(t("pipelineRuns.repoRequired"))
             }
           }
         }}
@@ -866,13 +867,13 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between border-b bg-muted/15">
               <DialogHeader className="px-6 py-4">
-                <DialogTitle>立即运行</DialogTitle>
-                <DialogDescription>创建一次 PipelineRun，可按需覆盖 .drone.yml</DialogDescription>
+                <DialogTitle>{t("pipelineRuns.runDialogTitle")}</DialogTitle>
+                <DialogDescription>{t("pipelineRuns.runDialogDesc")}</DialogDescription>
               </DialogHeader>
               <div className="me-20 flex h-full items-center">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                    <span className="text-sm font-medium">编辑 YAML</span>
+                    <span className="text-sm font-medium">{t("pipelineRuns.editYaml")}</span>
                     <Switch
                       checked={runYamlMode}
                       onCheckedChange={(checked) => {
@@ -891,11 +892,11 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                         if (checked) setRunDroneYamlMode(false)
                       }}
                       disabled={running || runRepositoryLoading}
-                      aria-label="编辑 YAML"
+                      aria-label={t("pipelineRuns.editYaml")}
                     />
                   </div>
                   <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                    <span className="text-sm font-medium">编辑 .drone.yml</span>
+                    <span className="text-sm font-medium">{t("pipelineRuns.editDroneYml")}</span>
                     <Switch
                       checked={runDroneYamlMode}
                       onCheckedChange={(checked) => {
@@ -907,7 +908,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                         if (checked) setRunYamlMode(false)
                       }}
                       disabled={running || runRepositoryLoading}
-                      aria-label="编辑 .drone.yml"
+                      aria-label={t("pipelineRuns.editDroneYml")}
                     />
                   </div>
                 </div>
@@ -918,8 +919,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                 items={[
                   {
                     id: "basic",
-                    title: "基本信息",
-                    status: runStep === "basic" ? "当前" : "已设置",
+                    title: t("common.basicInfo"),
+                    status: runStep === "basic" ? t("common.current") : t("common.configured"),
                     active: runStep === "basic",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: running || runRepositoryLoading,
@@ -930,8 +931,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                   },
                   {
                     id: "advanced",
-                    title: "高级设置",
-                    status: runStep === "advanced" ? "当前" : "已设置",
+                    title: t("common.advancedSettings"),
+                    status: runStep === "advanced" ? t("common.current") : t("common.configured"),
                     active: runStep === "advanced",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: running || runRepositoryLoading,
@@ -948,17 +949,17 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                 runStep === "basic" ? (
                   <>
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">运行参数</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">指定本次运行使用的参数，流水线将从该仓库获取代码并执行</p>
+                    <h3 className="text-[15px] font-semibold">{t("pipelineRuns.runParams")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("pipelineRuns.runParamsDesc")}</p>
                   </div>
                   <FieldGroup className="grid grid-cols-1 gap-4">
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                       <Field>
-                        <FieldLabel htmlFor="pipeline-run-repository">代码仓库</FieldLabel>
+                        <FieldLabel htmlFor="pipeline-run-repository">{t("pipelineRuns.codeRepository")}</FieldLabel>
                         <Input
                           id="pipeline-run-repository"
                           value={runRepository}
-                          placeholder={runRepositoryLoading ? "读取中..." : "owner/repo"}
+                          placeholder={runRepositoryLoading ? t("pipelineRuns.reading") : "owner/repo"}
                           autoComplete="off"
                           disabled
                           readOnly
@@ -966,7 +967,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                         <FieldDescription>要构建的 Drone 仓库（owner/repo）</FieldDescription>
                       </Field>
                       <Field data-invalid={Boolean(runBranchError)}>
-                        <FieldLabel htmlFor="pipeline-run-branch">分支</FieldLabel>
+                        <FieldLabel htmlFor="pipeline-run-branch">{t("pipelineRuns.branch")}</FieldLabel>
                         <Input
                           id="pipeline-run-branch"
                           value={runBranch}
@@ -974,7 +975,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                             setRunBranch(event.target.value)
                             if (runBranchError) setRunBranchError(null)
                           }}
-                          placeholder="请输入分支名称"
+                          placeholder={t("pipelineRuns.branchRequired")}
                           autoComplete="off"
                           aria-invalid={Boolean(runBranchError)}
                           disabled={running || runRepositoryLoading}
@@ -987,24 +988,24 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                       </Field>
                     </div>
                     <Field>
-                      <FieldLabel htmlFor="pipeline-run-description">描述</FieldLabel>
+                      <FieldLabel htmlFor="pipeline-run-description">{t("pipelineRuns.description")}</FieldLabel>
                       <Textarea
                         id="pipeline-run-description"
                         value={runDescription}
                         onChange={(event) => setRunDescription(event.target.value)}
-                        placeholder="请输入描述"
+                        placeholder={t("pipelineRuns.descriptionPlaceholder")}
                         className="min-h-28"
                         maxLength={256}
                         disabled={running || runRepositoryLoading}
                       />
-                      <FieldDescription>描述信息仅用于本次运行说明，最长 256 个字符</FieldDescription>
+                      <FieldDescription>{t("pipelineRuns.descriptionDesc")}</FieldDescription>
                     </Field>
                   </FieldGroup>
                   {runError ? <FieldError className="mt-3">{runError}</FieldError> : null}
                   </>
                 ) : (
                   <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-slate-300/80 bg-muted/10">
-                    <p className="text-sm text-muted-foreground">高级设置能力敬请期待。</p>
+                    <p className="text-sm text-muted-foreground">{t("pipelineRuns.advancedSettingsComingSoon")}</p>
                   </div>
                 )
               ) : runYamlMode ? (
@@ -1025,7 +1026,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                           }}
                           options={MONACO_OPTIONS}
                           height="100%"
-                          loading={<div className="p-3 text-xs text-slate-300">编辑器加载中...</div>}
+                          loading={<div className="p-3 text-xs text-slate-300">{t("keyValueDialog.editorLoading")}</div>}
                         />
                       </div>
                       {runYamlError ? <FieldError className="mt-3">{runYamlError}</FieldError> : null}
@@ -1047,7 +1048,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                           onChange={(value) => setRunDroneYamlDraft(value ?? "")}
                           options={MONACO_OPTIONS}
                           height="100%"
-                          loading={<div className="p-3 text-xs text-slate-300">编辑器加载中...</div>}
+                          loading={<div className="p-3 text-xs text-slate-300">{t("keyValueDialog.editorLoading")}</div>}
                         />
                       </div>
                     </Field>
@@ -1059,7 +1060,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
               <div className="flex w-full items-center justify-between gap-3">
                 <DialogClose asChild>
                   <Button type="button" variant="outline" disabled={running || runRepositoryLoading}>
-                    取消
+                    {t("common.cancel")}
                   </Button>
                 </DialogClose>
                 {runYamlMode ? (
@@ -1075,12 +1076,12 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                         setRunError(null)
                         setRunYamlMode(false)
                       } catch (e: unknown) {
-                        setRunYamlError(e instanceof Error ? e.message : "YAML 解析失败")
+                        setRunYamlError(e instanceof Error ? e.message : t("pipelineRuns.yamlParseFailed"))
                       }
                     }}
                     disabled={running || runRepositoryLoading}
                   >
-                    确认保存
+                    {t("common.confirmSave")}
                   </Button>
                 ) : runDroneYamlMode ? (
                   <Button
@@ -1091,11 +1092,11 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                     }}
                     disabled={running || runRepositoryLoading}
                   >
-                    确认保存
+                    {t("common.confirmSave")}
                   </Button>
                 ) : (
                   <Button type="button" onClick={() => void handleRun()} disabled={running || runRepositoryLoading}>
-                    {runRepositoryLoading ? "读取中..." : running ? "触发中..." : "立即运行"}
+                    {runRepositoryLoading ? t("pipelineRuns.reading") : running ? t("pipelineRuns.triggering") : t("pipelineRuns.runNow")}
                   </Button>
                 )}
               </div>
@@ -1105,8 +1106,8 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       </Dialog>
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
-        title="删除运行记录"
-        description={pendingDeleteRow ? `确定删除运行记录 ${pendingDeleteRow.name} 吗？` : ""}
+        title={t("pipelineRuns.deleteTitle")}
+        description={pendingDeleteRow ? t("pipelineRuns.deleteDesc", { name: pendingDeleteRow.name }) : ""}
         deleting={deleting}
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
@@ -1123,12 +1124,12 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
             <Input
               value={nameQuery}
               onChange={(event) => setNameQuery(event.target.value)}
-              placeholder="名称"
+              placeholder={t("pipelineRuns.searchPlaceholder")}
               className="h-9 w-40"
             />
             <Button type="button" variant="outline" size="sm" onClick={() => setRunDialogOpen(true)} disabled={running}>
               <IconPlayerPlay className="size-4" />
-              立即运行
+              {t("pipelineRuns.runNow")}
             </Button>
           </div>
         }
