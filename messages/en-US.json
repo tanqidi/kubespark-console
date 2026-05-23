@@ -51,6 +51,7 @@
     "overview": "Overview",
     "nodes": "Nodes",
     "projects": "Projects",
+    "pipelineProjects": "Pipeline Projects",
     "pipelines": "Pipelines",
     "workspaces": "Enterprise Workspaces",
     "workloadsGroup": "Application Workloads",

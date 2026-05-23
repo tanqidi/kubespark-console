@@ -51,6 +51,7 @@
     "overview": "概览",
     "nodes": "节点",
     "projects": "项目",
+    "pipelineProjects": "流水线项目",
     "pipelines": "流水线",
     "workspaces": "企业空间",
     "workloadsGroup": "应用负载",
@@ -128,7 +129,14 @@
     "create": "创建",
     "delete": "删除",
     "batchDelete": "批量删除",
-    "batchDeleteDesc": "此操作不可撤销，将删除已选中的 {count} 条数据。"
+    "batchDeleteDesc": "此操作不可撤销，将删除已选中的 {count} 条数据。",
+    "actions": {
+      "logs": "日志",
+      "terminal": "终端"
+    },
+    "alerts": {
+      "loadFailed": "加载失败"
+    }
   },
   "pods": {
     "viewYamlSubtitle": "查看 Kubernetes Pod（{namespace}/{name}）的 YAML 内容。",
@@ -246,45 +254,6 @@
     "deleteWorkloadDescription": "确定删除工作负载 {name} 吗？",
     "cluster": "集群",
     "dev": "开发测试"
-  },
-  "table": {
-    "columns": {
-      "name": "名称",
-      "status": "状态",
-      "namespace": "项目",
-      "node": "节点",
-      "ip": "IP",
-      "role": "角色",
-      "group": "组",
-      "kind": "类型",
-      "type": "类型",
-      "pods": "容器组",
-      "age": "存活时间",
-      "updatedAt": "更新时间",
-      "duration": "持续时间",
-      "retry": "重试",
-      "workspace": "工作空间",
-      "internalAccess": "内部访问",
-      "externalAccess": "外部访问",
-      "scope": "范围",
-      "versions": "版本"
-    },
-    "customizeColumns": "自定义列",
-    "create": "创建",
-    "actions": {
-      "logs": "日志",
-      "terminal": "终端"
-    },
-    "alerts": {
-      "loadFailed": "加载失败"
-    },
-    "filters": {
-      "namespace": "项目",
-      "name": "名称",
-      "noNamespaces": "暂无项目",
-      "group": "组",
-      "scope": "范围"
-    }
   },
   "dialogs": {
     "viewYaml": {

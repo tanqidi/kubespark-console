@@ -69,12 +69,12 @@ function buildCrumbs(pathname: string, kind: string, t: (key: string) => string)
   // /dashboard/projects/devops/:projectName/:pipelineName
   //   -> "控制台 > 项目 > {projectName} > {pipelineName}"
   if (tail[0] === "projects" && tail[1] === "devops" && tail[2]) {
-    const projectName = decodeSegment(tail[2])
-    result.push({ href: "/dashboard/projects", label: t("workspaces.development") })
+    const projectName = decodeSegment(tail[2]);
+    result.push({ href: "/dashboard/projects", label: t("menu.pipelineProjects") });
     result.push({
       href: `/dashboard/projects/devops/${tail[2]}`,
       label: projectName,
-    })
+    });
 
     if (tail[3]) {
       result.push({
