@@ -1,6 +1,7 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
+import { useTranslations } from "@/app/lib/i18n"
 
 import {
   AlertDialog,
@@ -28,6 +29,7 @@ export function DeleteConfirmDialog({
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
 }) {
+  const t = useTranslations()
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent size="sm">
@@ -39,7 +41,7 @@ export function DeleteConfirmDialog({
           <AlertDialogCancel
             disabled={deleting}
           >
-            取消
+            {t("actions.cancel")}
           </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
@@ -49,7 +51,7 @@ export function DeleteConfirmDialog({
               onConfirm()
             }}
           >
-            {deleting ? "删除中..." : "删除"}
+            {deleting ? t("deleteConfirmDialog.deleting") : t("actions.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

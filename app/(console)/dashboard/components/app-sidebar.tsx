@@ -19,7 +19,7 @@ import {
 
 const data = {
   user: {
-    name: "KubeSpark 管理员",
+    name: "KubeSpark",
     email: "admin@kubespark.local",
     avatar: "",
   },

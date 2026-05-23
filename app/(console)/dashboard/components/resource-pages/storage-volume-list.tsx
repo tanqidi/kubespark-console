@@ -1,6 +1,7 @@
 "use client"
 
 import { IconPencil, IconTrash } from "@tabler/icons-react"
+import { useTranslations } from "@/app/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 
@@ -30,6 +31,7 @@ export function StorageVolumeList({
   onAdd,
   disabled = false,
 }: StorageVolumeListProps) {
+  const t = useTranslations()
   return (
     <div className="flex flex-col gap-3">
       {items.length > 0 ? (
@@ -38,7 +40,7 @@ export function StorageVolumeList({
             (item) => item.mountMode !== "none" && item.mountPath.trim().length > 0
           ).length
           const storageDisplayName =
-            storageItem.volumeId.trim() || storageItem.volumeName.trim() || "未命名卷"
+            storageItem.volumeId.trim() || storageItem.volumeName.trim() || t("storageVolumeList.unnamedVolume")
 
           return (
             <Item
@@ -51,12 +53,12 @@ export function StorageVolumeList({
                 <ItemTitle className="min-w-0 truncate">{storageDisplayName}</ItemTitle>
                 <ItemDescription className="min-w-0 truncate">
                   {(storageItem.volumeKind === "persistent"
-                    ? "持久卷"
+                    ? t("storageVolumeList.persistentVolume")
                     : storageItem.volumeKind === "ephemeral"
-                      ? "临时卷"
-                      : "HostPath 卷") +
+                      ? t("storageVolumeList.ephemeralVolume")
+                      : t("storageVolumeList.hostPathVolume")) +
                     " · " +
-                    `${mountedContainerCount} 个容器已配置`}
+                    t("storageVolumeList.mountedContainers", { count: mountedContainerCount })}
                 </ItemDescription>
               </ItemContent>
               <ItemActions className="pointer-events-none gap-1 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100">
@@ -71,7 +73,7 @@ export function StorageVolumeList({
                   disabled={disabled}
                 >
                   <IconPencil data-icon="inline-start" />
-                  编辑
+                  {t("storageVolumeList.edit")}
                 </Button>
                 <Button
                   type="button"
@@ -84,7 +86,7 @@ export function StorageVolumeList({
                   disabled={disabled}
                 >
                   <IconTrash data-icon="inline-start" />
-                  删除
+                  {t("storageVolumeList.delete")}
                 </Button>
               </ItemActions>
             </Item>
@@ -92,9 +94,9 @@ export function StorageVolumeList({
         })
       ) : (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center">
-          <div className="text-sm font-semibold">暂无挂载卷配置</div>
+          <div className="text-sm font-semibold">{t("storageVolumeList.noMountVolumes")}</div>
           <div className="mt-1 text-sm text-muted-foreground">
-            可添加持久卷、临时卷或 HostPath 卷。
+            {t("storageVolumeList.addMountVolumeHint")}
           </div>
         </div>
       )}
@@ -105,8 +107,8 @@ export function StorageVolumeList({
         onClick={onAdd}
         disabled={disabled}
       >
-        <span className="text-sm font-semibold">添加挂载卷</span>
-        <span className="mt-1 text-sm text-muted-foreground">新增一条卷挂载配置。</span>
+        <span className="text-sm font-semibold">{t("storageVolumeList.addMountVolume")}</span>
+        <span className="mt-1 text-sm text-muted-foreground">{t("storageVolumeList.addMountVolumeDesc")}</span>
       </button>
     </div>
   )

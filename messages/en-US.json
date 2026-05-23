@@ -133,6 +133,22 @@
   "nodes": {
     "describeSubtitle": "View Kubernetes Node ({name}) details."
   },
+  "deleteConfirmDialog": {
+    "deleting": "Deleting..."
+  },
+  "storageVolumeList": {
+    "unnamedVolume": "Unnamed Volume",
+    "persistentVolume": "Persistent Volume",
+    "ephemeralVolume": "Ephemeral Volume",
+    "hostPathVolume": "HostPath Volume",
+    "mountedContainers": "{count} containers configured",
+    "edit": "Edit",
+    "delete": "Delete",
+    "noMountVolumes": "No mount volumes configured",
+    "addMountVolumeHint": "You can add persistent, ephemeral, or HostPath volumes.",
+    "addMountVolume": "Add Mount Volume",
+    "addMountVolumeDesc": "Add a new volume mount configuration."
+  },
   "actions": {
     "details": "Details",
     "edit": "Edit",
@@ -1209,6 +1225,18 @@
     "pullPolicyDescIfNotPresent": "If the desired image exists locally, prefer local image.",
     "pullPolicyDescAlways": "Always try to pull new image when pod is created and updated.",
     "pullPolicyDescNever": "Only use local images. If desired image doesn't exist locally, container will fail."
+  },
+  "containerListPanel": {
+    "container": "Containers",
+    "unnamedContainer": "Unnamed Container",
+    "initContainer": "Init Container",
+    "workContainer": "Work Container",
+    "edit": "Edit",
+    "delete": "Delete",
+    "noContainer": "No container configuration",
+    "clickAddContainer": "Click \"Add Container\" below to enter image information.",
+    "addContainer": "Add Container",
+    "addContainerDesc": "Add a new container image configuration."
   },
   "workloads": {
     "describeSubtitle": "View details of Kubernetes {kind} ({namespace}/{name}).",

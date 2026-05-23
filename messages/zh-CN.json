@@ -133,6 +133,22 @@
   "nodes": {
     "describeSubtitle": "查看 Kubernetes Node ({name}) 的详情内容。"
   },
+  "deleteConfirmDialog": {
+    "deleting": "删除中..."
+  },
+  "storageVolumeList": {
+    "unnamedVolume": "未命名卷",
+    "persistentVolume": "持久卷",
+    "ephemeralVolume": "临时卷",
+    "hostPathVolume": "HostPath 卷",
+    "mountedContainers": "{count} 个容器已配置",
+    "edit": "编辑",
+    "delete": "删除",
+    "noMountVolumes": "暂无挂载卷配置",
+    "addMountVolumeHint": "可添加持久卷、临时卷或 HostPath 卷。",
+    "addMountVolume": "添加挂载卷",
+    "addMountVolumeDesc": "新增一条卷挂载配置。"
+  },
   "actions": {
     "details": "详情",
     "edit": "编辑",
@@ -1210,6 +1226,18 @@
     "pullPolicyDescIfNotPresent": "如果本地存在所需的镜像，则优先使用本地镜像。",
     "pullPolicyDescAlways": "在容器组创建及更新时，每次都尝试拉取新的镜像。",
     "pullPolicyDescNever": "仅使用本地镜像。如果本地不存在所需的镜像，则会导致容器异常。"
+  },
+  "containerListPanel": {
+    "container": "容器",
+    "unnamedContainer": "未命名容器",
+    "initContainer": "初始化容器",
+    "workContainer": "工作容器",
+    "edit": "编辑",
+    "delete": "删除",
+    "noContainer": "暂无容器配置",
+    "clickAddContainer": "点击下方“添加容器”录入镜像信息。",
+    "addContainer": "添加容器",
+    "addContainerDesc": "新增一条容器镜像配置。"
   },
   "workloads": {
     "describeSubtitle": "查看 Kubernetes {kind}（{namespace}/{name}）的详情内容。",
