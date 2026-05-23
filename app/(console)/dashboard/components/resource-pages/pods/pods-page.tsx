@@ -543,10 +543,10 @@ export function PodsPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title={t("dialogs.delete.title")}
+        title={t("actions.deletePodTitle")}
         description={
           pendingDeleteRow
-            ? t("dialogs.delete.description", { name: pendingDeleteRow.name })
+            ? t("actions.deletePodDescription", { name: pendingDeleteRow.name })
             : ""
         }
         deleting={deleting}

@@ -278,6 +278,8 @@
     "deleteCronJobDescription": "Are you sure you want to delete CronJob {name}?",
     "deleteWorkloadTitle": "Delete Workload",
     "deleteWorkloadDescription": "Are you sure you want to delete workload {name}?",
+    "deletePodTitle": "Delete Pod",
+    "deletePodDescription": "Are you sure you want to delete Pod {name}?",
     "cluster": "Cluster",
     "dev": "Development"
   },

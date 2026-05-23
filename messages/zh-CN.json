@@ -271,6 +271,8 @@
     "deleteCronJobDescription": "确定删除定时任务 {name} 吗？",
     "deleteWorkloadTitle": "删除工作负载",
     "deleteWorkloadDescription": "确定删除工作负载 {name} 吗？",
+    "deletePodTitle": "删除 Pod",
+    "deletePodDescription": "确定删除 Pod {name} 吗？",
     "cluster": "集群",
     "dev": "开发测试"
   },
