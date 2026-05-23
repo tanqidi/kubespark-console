@@ -595,6 +595,18 @@
     "portSelectorRow": "行",
     "pleaseAddPortConfigFirst": "请先添加端口配置，添加端口后每行需完整填写三项。"
   },
+  "workloadPickerDialog": {
+    "title": "指定工作负载",
+    "description": "点击列表行即可选择并回填标签选择器。",
+    "loading": "加载中...",
+    "cancel": "取消",
+    "deployment": "部署",
+    "statefulSet": "有状态副本集",
+    "daemonSet": "守护进程集",
+    "name": "名称",
+    "namespace": "命名空间",
+    "searchPlaceholder": "名称"
+  },
   "jobDialog": {
     "basicInfo": "基本信息",
     "basicInfoDesc": "填写任务名称、所属项目以及描述信息。",

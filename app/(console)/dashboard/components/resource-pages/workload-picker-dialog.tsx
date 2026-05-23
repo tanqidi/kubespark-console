@@ -15,6 +15,7 @@ import {
   type WorkloadResourceRow,
   type WorkloadSelectorPair,
 } from "@/app/lib/kubespark/resource-rows"
+import { useTranslations } from "@/app/lib/i18n"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -43,25 +44,13 @@ type WorkloadPickerDialogProps = {
   onPick: (value: PickedWorkload) => void
 }
 
-const workloadColumns: ColumnConfig<WorkloadResourceRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "status", label: "状态", render: "status" },
-  { key: "namespace", label: "命名空间" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
-
 export function WorkloadPickerDialog({
   open,
   onOpenChange,
   namespace,
   onPick,
 }: WorkloadPickerDialogProps) {
+  const t = useTranslations()
   const [rows, setRows] = React.useState<WorkloadResourceRow[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -127,24 +116,33 @@ export function WorkloadPickerDialog({
     [onOpenChange, onPick]
   )
 
-  const columns = React.useMemo(
-    () =>
-      createColumns<WorkloadResourceRow>({
-        columns: workloadColumns,
-        includeSelect: true,
-        includeActions: false,
-      }),
-    []
-  )
+  const columns = React.useMemo(() => {
+    const workloadColumns: ColumnConfig<WorkloadResourceRow>[] = [
+      {
+        key: "name",
+        label: t("workloadPickerDialog.name"),
+        enableHiding: false,
+        cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+      },
+      { key: "namespace", label: t("table.columns.namespace") },
+      { key: "age", label: t("table.columns.age") },
+      { key: "updatedAt", label: t("table.columns.updatedAt") },
+    ]
+    return createColumns<WorkloadResourceRow>({
+      columns: workloadColumns,
+      includeSelect: true,
+      includeActions: false,
+    })
+  }, [t])
 
   const isBusy = loading
 
   const toolbarStart = (
     <Tabs value={kindFilter} onValueChange={(value) => setKindFilter(value as WorkloadKind)} className="w-fit">
       <TabsList>
-        <TabsTrigger value="Deployment">部署</TabsTrigger>
-        <TabsTrigger value="StatefulSet">有状态副本集</TabsTrigger>
-        <TabsTrigger value="DaemonSet">守护进程集</TabsTrigger>
+        <TabsTrigger value="Deployment">{t("workloadPickerDialog.deployment")}</TabsTrigger>
+        <TabsTrigger value="StatefulSet">{t("workloadPickerDialog.statefulSet")}</TabsTrigger>
+        <TabsTrigger value="DaemonSet">{t("workloadPickerDialog.daemonSet")}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -153,7 +151,7 @@ export function WorkloadPickerDialog({
     <Input
       value={nameQuery}
       onChange={(event) => setNameQuery(event.target.value)}
-      placeholder="名称"
+      placeholder={t("workloadPickerDialog.searchPlaceholder")}
       className="h-9 w-40"
       disabled={isBusy}
     />
@@ -168,8 +166,8 @@ export function WorkloadPickerDialog({
         className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
       >
         <DialogHeader className="border-b bg-muted/15 px-6 py-5 pr-20">
-          <DialogTitle>指定工作负载</DialogTitle>
-          <DialogDescription>点击列表行即可选择并回填标签选择器。</DialogDescription>
+          <DialogTitle>{t("workloadPickerDialog.title")}</DialogTitle>
+          <DialogDescription>{t("workloadPickerDialog.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-auto py-1">
@@ -186,7 +184,7 @@ export function WorkloadPickerDialog({
             showColumnCustomizer={false}
           />
           {loading ? (
-            <p className="mt-3 text-sm text-muted-foreground">加载中...</p>
+            <p className="mt-3 text-sm text-muted-foreground">{t("workloadPickerDialog.loading")}</p>
           ) : null}
 
           {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
@@ -196,7 +194,7 @@ export function WorkloadPickerDialog({
           <div className="flex w-full items-center justify-start gap-3">
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={isBusy}>
-                取消
+                {t("workloadPickerDialog.cancel")}
               </Button>
             </DialogClose>
           </div>

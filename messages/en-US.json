@@ -602,6 +602,18 @@
     "portSelectorRow": "Row",
     "pleaseAddPortConfigFirst": "Please add port configuration first. Each row must have all three fields filled in completely after adding ports."
   },
+  "workloadPickerDialog": {
+    "title": "Specify Workload",
+    "description": "Click on a list row to select and auto-fill the label selector.",
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "deployment": "Deployment",
+    "statefulSet": "StatefulSet",
+    "daemonSet": "DaemonSet",
+    "name": "Name",
+    "namespace": "Namespace",
+    "searchPlaceholder": "Name"
+  },
   "jobDialog": {
     "basicInfo": "Basic Information",
     "basicInfoDesc": "Fill in the job name, project, and description.",
