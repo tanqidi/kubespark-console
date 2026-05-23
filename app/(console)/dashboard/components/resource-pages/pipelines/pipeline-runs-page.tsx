@@ -42,6 +42,7 @@ import { LogViewerDialog } from "@/app/(console)/dashboard/components/resource-p
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 type PipelineRunsPageClientProps = {
   pipelineName: string
@@ -390,14 +391,9 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
 
   React.useEffect(() => {
     void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      window.clearInterval(timer)
-    }
   }, [loadRows])
+
+  useIntervalRefresh(() => loadRows(true), 3000)
 
   React.useEffect(() => {
     let cancelled = false

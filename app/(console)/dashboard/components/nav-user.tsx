@@ -89,9 +89,9 @@ export function NavUser({
       );
 
       if (!preferred) {
-        throw new Error(t("terminal.podNotFound", { 
-          target: "kubespark/kubespark-terminal-*", 
-          deployment: "kubespark/kubespark-terminal" 
+        throw new Error(t("terminal.podNotFound", {
+          target: "kubespark/kubespark-terminal-*",
+          deployment: "kubespark/kubespark-terminal"
         }));
       }
 
@@ -161,14 +161,14 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              {/*<DropdownMenuItem>
                 <IconUserCircle />
                 {t("nav.account")}
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <IconNotification />
                 {t("nav.notifications")}
-              </DropdownMenuItem>
+              </DropdownMenuItem>*/}
               <DropdownMenuItem onClick={() => void handleOpenTerminal()} disabled={openingTerminal}>
                 <IconTerminal2 />
                 {t("nav.terminal")}

@@ -85,7 +85,8 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { useTranslations } from "@/app/lib/i18n"
+import { useTranslations } from "@/app/lib/i18n";
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh";
 
 type RouteRow = RouteResourceRow
 type RouteCreateStep = "basic" | "rule" | "advanced"
@@ -1468,42 +1469,32 @@ export function RoutesPageClient() {
     [handleViewYaml, requestDelete, requestEdit, t]
   )
 
-  React.useEffect(() => {
-    let cancelled = false
-
-    const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const mapped = await fetchRouteRows()
-        if (cancelled) return
-        setRows(mapped)
-        setError(null)
-      } catch (loadError: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setRows([])
-          setError(resolveErrorMessage(loadError))
-        } else {
-          console.error("[Routes] polling refresh failed", loadError)
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
+  const loadRows = React.useCallback(async (silent: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
     }
-
-    void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
+    try {
+      const mapped = await fetchRouteRows()
+      setRows(mapped)
+      setError(null)
+    } catch (loadError: unknown) {
+      if (!silent) {
+        setRows([])
+        setError(resolveErrorMessage(loadError))
+      } else {
+        console.error("[Routes] polling refresh failed", loadError)
+      }
+    } finally {
+      if (!silent) setLoading(false)
     }
   }, [])
+
+  React.useEffect(() => {
+    void loadRows(false)
+  }, [loadRows])
+
+  useIntervalRefresh(() => loadRows(true), 3000)
 
   const listNamespaceOptions = React.useMemo(
     () =>

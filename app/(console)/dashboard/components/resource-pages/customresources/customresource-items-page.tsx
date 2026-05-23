@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { useTranslations } from "@/app/lib/i18n"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 type CustomResourceItemsPageClientProps = {
   definitionName: string
@@ -164,14 +165,9 @@ export function CustomResourceItemsPageClient({ definitionName }: CustomResource
 
   React.useEffect(() => {
     void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      window.clearInterval(timer)
-    }
   }, [loadRows])
+
+  useIntervalRefresh(() => loadRows(true), 3000)
 
   const handleDeleteSelectedRows = React.useCallback(
     (selectedRows: CustomResourceItemRow[]) => {

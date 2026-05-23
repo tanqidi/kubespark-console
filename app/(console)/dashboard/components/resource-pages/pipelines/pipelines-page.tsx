@@ -66,6 +66,7 @@ import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -510,15 +511,13 @@ export function PipelinesPageClient({
     })()
 
     void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
 
     return () => {
       cancelled = true
-      window.clearInterval(timer)
     }
   }, [loadRows, normalizedPipelineProjectName])
+
+  useIntervalRefresh(() => loadRows(true), 3000)
 
   React.useEffect(() => {
     let cancelled = false
