@@ -125,11 +125,25 @@
       "status": "Status",
       "kind": "Kind"
     },
-    "customizeColumns": "Custom Columns",
+    "customizeColumns": "Customize columns",
     "create": "Create",
     "delete": "Delete",
     "batchDelete": "Batch Delete",
-    "batchDeleteDesc": "This operation cannot be undone. It will delete the selected {count} items."
+    "batchDeleteDesc": "This operation cannot be undone. It will delete the selected {count} items.",
+    "actions": {
+      "logs": "Logs",
+      "terminal": "Terminal"
+    },
+    "alerts": {
+      "loadFailed": "Load failed"
+    },
+    "filters": {
+      "namespace": "Namespace",
+      "name": "Name",
+      "noNamespaces": "No namespaces",
+      "group": "Group",
+      "scope": "Scope"
+    }
   },
   "pods": {
     "viewYamlSubtitle": "View Kubernetes Pod ({namespace}/{name}) YAML content.",
@@ -247,45 +261,6 @@
     "deleteWorkloadDescription": "Are you sure you want to delete workload {name}?",
     "cluster": "Cluster",
     "dev": "Development"
-  },
-  "table": {
-    "columns": {
-      "name": "Name",
-      "status": "Status",
-      "namespace": "Namespace",
-      "node": "Node",
-      "ip": "IP",
-      "role": "Role",
-      "group": "Group",
-      "kind": "Type",
-      "type": "Type",
-      "pods": "Pods",
-      "age": "Age",
-      "updatedAt": "Updated",
-      "duration": "Duration",
-      "retry": "Retry",
-      "workspace": "Workspace",
-      "internalAccess": "Internal Access",
-      "externalAccess": "External Access",
-      "scope": "Scope",
-      "versions": "Versions"
-    },
-    "customizeColumns": "Customize columns",
-    "create": "Create",
-    "actions": {
-      "logs": "Logs",
-      "terminal": "Terminal"
-    },
-    "alerts": {
-      "loadFailed": "Load failed"
-    },
-    "filters": {
-      "namespace": "Namespace",
-      "name": "Name",
-      "noNamespaces": "No namespaces",
-      "group": "Group",
-      "scope": "Scope"
-    }
   },
   "dialogs": {
     "viewYaml": {
