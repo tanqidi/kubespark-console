@@ -265,7 +265,9 @@
       "retry": "Retry",
       "workspace": "Workspace",
       "internalAccess": "Internal Access",
-      "externalAccess": "External Access"
+      "externalAccess": "External Access",
+      "scope": "Scope",
+      "versions": "Versions"
     },
     "customizeColumns": "Customize columns",
     "create": "Create",
@@ -279,7 +281,9 @@
     "filters": {
       "namespace": "Namespace",
       "name": "Name",
-      "noNamespaces": "No namespaces"
+      "noNamespaces": "No namespaces",
+      "group": "Group",
+      "scope": "Scope"
     }
   },
   "dialogs": {

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import * as React from "react"
 import { usePathname, useSearchParams } from "next/navigation"
+import { useTranslations } from "@/app/lib/i18n"
 
 import {
   Breadcrumb,
@@ -17,26 +18,6 @@ type Crumb = {
   label: string
 }
 
-const SEGMENT_LABELS: Record<string, string> = {
-  nodes: "节点",
-  projects: "项目",
-  pipelines: "流水线",
-  workspaces: "企业空间",
-  workloads: "工作负载",
-  jobs: "任务",
-  pods: "容器组",
-  services: "服务",
-  routes: "应用路由",
-  configmaps: "配置字典",
-  secrets: "保密字典",
-  serviceaccounts: "服务账号",
-  customresources: "自定义资源",
-  volumes: "持久卷声明",
-  storageclasses: "存储类",
-  devops: "流水线项目",
-  namespaces: "命名空间",
-}
-
 function decodeSegment(value: string) {
   try {
     return decodeURIComponent(value)
@@ -45,17 +26,36 @@ function decodeSegment(value: string) {
   }
 }
 
-function segmentToLabel(segment: string) {
-  return SEGMENT_LABELS[segment] ?? decodeSegment(segment)
+function segmentToLabel(segment: string, t: (key: string) => string) {
+  const translationMap: Record<string, string> = {
+    nodes: t("menu.nodes"),
+    projects: t("menu.projects"),
+    pipelines: t("menu.pipelines"),
+    workspaces: t("menu.workspaces"),
+    workloads: t("menu.workloads"),
+    jobs: t("menu.jobs"),
+    pods: t("menu.pods"),
+    services: t("menu.services"),
+    routes: t("menu.routes"),
+    configmaps: t("menu.configmaps"),
+    secrets: t("menu.secrets"),
+    serviceaccounts: t("menu.serviceaccounts"),
+    customresources: t("menu.customresources"),
+    volumes: t("menu.volumes"),
+    storageclasses: t("menu.storageclasses"),
+    devops: t("workspaces.development"),
+    namespaces: t("projects.namespaces"),
+  }
+  return translationMap[segment] ?? decodeSegment(segment)
 }
 
-function workloadKindToLabel(kind: string): string {
-  if (kind === "StatefulSet") return "有状态副本集"
-  if (kind === "DaemonSet") return "守护进程集"
-  return "部署"
+function workloadKindToLabel(kind: string, t: (key: string) => string): string {
+  if (kind === "StatefulSet") return t("workloads.statefulSet")
+  if (kind === "DaemonSet") return t("workloads.daemonSet")
+  return t("workloads.deployment")
 }
 
-function buildCrumbs(pathname: string, kind: string): Crumb[] {
+function buildCrumbs(pathname: string, kind: string, t: (key: string) => string): Crumb[] {
   const segments = pathname.split("/").filter(Boolean)
   if (segments[0] !== "dashboard") {
     return []
@@ -70,7 +70,7 @@ function buildCrumbs(pathname: string, kind: string): Crumb[] {
   //   -> "控制台 > 项目 > {projectName} > {pipelineName}"
   if (tail[0] === "projects" && tail[1] === "devops" && tail[2]) {
     const projectName = decodeSegment(tail[2])
-    result.push({ href: "/dashboard/projects", label: "流水线项目" })
+    result.push({ href: "/dashboard/projects", label: t("workspaces.development") })
     result.push({
       href: `/dashboard/projects/devops/${tail[2]}`,
       label: projectName,
@@ -89,7 +89,7 @@ function buildCrumbs(pathname: string, kind: string): Crumb[] {
   // /dashboard/projects/namespaces/:namespaceName -> "控制台 > 项目 > {namespaceName}"
   if (tail[0] === "projects" && tail[1] === "namespaces" && tail[2]) {
     const namespaceName = decodeSegment(tail[2])
-    result.push({ href: "/dashboard/projects", label: "项目" })
+    result.push({ href: "/dashboard/projects", label: t("menu.projects") })
     result.push({
       href: `/dashboard/projects/namespaces/${tail[2]}`,
       label: namespaceName,
@@ -102,7 +102,7 @@ function buildCrumbs(pathname: string, kind: string): Crumb[] {
     return [
       {
         href: `/dashboard/workloads/${tail[1]}/${tail[2]}?kind=${encodeURIComponent(kind || "Deployment")}`,
-        label: workloadKindToLabel(kind),
+        label: workloadKindToLabel(kind, t),
       },
       {
         href: `/dashboard/workloads/${tail[1]}/${tail[2]}`,
@@ -111,21 +111,32 @@ function buildCrumbs(pathname: string, kind: string): Crumb[] {
     ]
   }
 
+  // /dashboard/customresources/:resourceName -> "控制台 > 自定义资源 > {resourceName}"
+  if (tail[0] === "customresources" && tail[1]) {
+    result.push({ href: "/dashboard/customresources", label: t("menu.customresources") })
+    result.push({
+      href: `/dashboard/customresources/${tail[1]}`,
+      label: decodeSegment(tail[1]),
+    })
+    return result
+  }
+
   let href = "/dashboard"
   for (let index = 0; index < tail.length; index += 1) {
     const segment = tail[index]
     href += `/${segment}`
-    result.push({ href, label: segmentToLabel(segment) })
+    result.push({ href, label: segmentToLabel(segment, t) })
   }
 
   return result
 }
 
 export function HeaderBreadcrumb() {
+  const t = useTranslations()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const kind = searchParams.get("kind") ?? "Deployment"
-  const crumbs = React.useMemo(() => buildCrumbs(pathname, kind), [pathname, kind])
+  const crumbs = React.useMemo(() => buildCrumbs(pathname, kind, t), [pathname, kind, t])
   const segments = React.useMemo(() => pathname.split("/").filter(Boolean), [pathname])
   const isTopLevelModulePage =
     segments[0] === "dashboard" &&

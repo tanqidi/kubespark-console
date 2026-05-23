@@ -265,7 +265,9 @@
       "retry": "重试",
       "workspace": "工作空间",
       "internalAccess": "内部访问",
-      "externalAccess": "外部访问"
+      "externalAccess": "外部访问",
+      "scope": "范围",
+      "versions": "版本"
     },
     "customizeColumns": "自定义列",
     "create": "创建",
@@ -279,7 +281,9 @@
     "filters": {
       "namespace": "项目",
       "name": "名称",
-      "noNamespaces": "暂无项目"
+      "noNamespaces": "暂无项目",
+      "group": "组",
+      "scope": "范围"
     }
   },
   "dialogs": {
