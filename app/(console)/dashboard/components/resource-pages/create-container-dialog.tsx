@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { IconFileText, IconKey, IconTrash, IconX } from "@tabler/icons-react"
+import { useTranslations } from "@/app/lib/i18n"
 import { type ContainerPortFieldErrors } from "@/app/lib/kubespark/form-validation"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -48,9 +49,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
-  CONTAINER_EXTENSION_OPTIONS,
-  HEALTH_CHECK_SECTIONS,
-  LIFECYCLE_SECTIONS,
+  getContainerExtensionOptions,
+  getHealthCheckSections,
+  getLifecycleSections,
   createDefaultLifecyclePopoverOpenState,
   createDefaultLifecycleState,
   createDefaultProbePopoverOpenState,
@@ -172,6 +173,8 @@ export function CreateContainerDialog({
   onCancel,
   onConfirm,
 }: CreateContainerDialogProps) {
+  const t = useTranslations()
+
   const {
     cancelLifecycleEdit,
     cancelProbeEdit,
@@ -232,6 +235,10 @@ export function CreateContainerDialog({
   )
   const [resourceEnabled, setResourceEnabled] = useState(resourceEnabledFromData)
 
+  const containerExtensionOptions = getContainerExtensionOptions(t)
+  const healthCheckSections = getHealthCheckSections(t)
+  const lifecycleSections = getLifecycleSections(t)
+
   if (!container) return null
 
   return (
@@ -252,28 +259,28 @@ export function CreateContainerDialog({
         className="flex h-[90vh] min-h-[90vh] max-h-[90vh] w-[min(90vw,130vh)] flex-col overflow-hidden p-0 sm:max-w-270"
       >
         <DialogHeader className="shrink-0 border-b bg-muted/15 px-6 py-5 pr-20">
-          <DialogTitle>录入容器</DialogTitle>
-          <DialogDescription>填写镜像、容器名称、容器类型和拉取策略。</DialogDescription>
+          <DialogTitle>{t("containerDialog.title")}</DialogTitle>
+          <DialogDescription>{t("containerDialog.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-2">
           <FieldGroup className="flex flex-col gap-5">
             <div className="rounded-md border bg-card">
               <div className="border-b bg-muted/80 px-4 py-3">
-                <div className="text-sm font-semibold">基础信息</div>
+                <div className="text-sm font-semibold">{t("containerDialog.basicInfo")}</div>
                 <div className="mt-1 text-sm text-muted-foreground">
-                  填写容器的基础信息，包括镜像、容器名称、类型和拉取策略。
+                  {t("containerDialog.basicInfoDesc")}
                 </div>
               </div>
               <div className="grid gap-5 p-4">
                 <div className="grid gap-5 md:grid-cols-2">
                   <Field data-invalid={Boolean(imageError)}>
-                    <FieldLabel htmlFor={`${container.id}-image`}>镜像</FieldLabel>
+                    <FieldLabel htmlFor={`${container.id}-image`}>{t("containerDialog.image")}</FieldLabel>
                     <Input
                       id={`${container.id}-image`}
                       value={container.image}
                       onChange={(event) => onChange("image", event.target.value)}
-                      placeholder="nginx:1.27"
+                      placeholder={t("containerDialog.imagePlaceholder")}
                       aria-invalid={Boolean(imageError)}
                       autoComplete="off"
                       disabled={isBusy}
@@ -281,29 +288,29 @@ export function CreateContainerDialog({
                     {imageError ? (
                       <FieldError>{imageError}</FieldError>
                     ) : (
-                      <FieldDescription>请输入完整镜像地址，例如 `repo/name:tag`。</FieldDescription>
+                      <FieldDescription>{t("containerDialog.imageHint")}</FieldDescription>
                     )}
                   </Field>
 
                   <Field>
-                    <FieldLabel htmlFor={`${container.id}-name`}>容器名称</FieldLabel>
+                    <FieldLabel htmlFor={`${container.id}-name`}>{t("containerDialog.containerName")}</FieldLabel>
                     <Input
                       id={`${container.id}-name`}
                       value={container.name}
                       onChange={(event) => onChange("name", event.target.value)}
-                      placeholder="worker"
+                      placeholder={t("containerDialog.containerNamePlaceholder")}
                       autoComplete="off"
                       disabled={isBusy}
                     />
                     <FieldDescription>
-                      留空时会基于镜像地址自动生成。
+                      {t("containerDialog.containerNameHint")}
                     </FieldDescription>
                   </Field>
                 </div>
 
                 <div className="grid gap-5 md:grid-cols-2">
                   <Field>
-                    <FieldLabel htmlFor={`${container.id}-pull-policy`}>镜像拉取策略</FieldLabel>
+                    <FieldLabel htmlFor={`${container.id}-pull-policy`}>{t("containerDialog.imagePullPolicy")}</FieldLabel>
                     <Select
                       value={container.imagePullPolicy}
                       onValueChange={(value) => {
@@ -318,19 +325,19 @@ export function CreateContainerDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="IfNotPresent">优先使用本地镜像</SelectItem>
-                          <SelectItem value="Always">每次都拉取镜像</SelectItem>
-                          <SelectItem value="Never">仅使用本地镜像</SelectItem>
+                          <SelectItem value="IfNotPresent">{t("containerDialog.preferLocal")}</SelectItem>
+                          <SelectItem value="Always">{t("containerDialog.alwaysPull")}</SelectItem>
+                          <SelectItem value="Never">{t("containerDialog.localOnly")}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FieldDescription>
-                      {resolveImagePullPolicyDescription(container.imagePullPolicy)}
+                      {resolveImagePullPolicyDescription(t, container.imagePullPolicy)}
                     </FieldDescription>
                   </Field>
 
                   <Field>
-                    <FieldLabel htmlFor={`${container.id}-type`}>容器类型</FieldLabel>
+                    <FieldLabel htmlFor={`${container.id}-type`}>{t("containerDialog.containerType")}</FieldLabel>
                     <Select
                       value={container.type}
                       onValueChange={(value) => {
@@ -345,8 +352,8 @@ export function CreateContainerDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="container">工作容器</SelectItem>
-                          <SelectItem value="initContainer">初始化容器</SelectItem>
+                          <SelectItem value="container">{t("containerDialog.workContainer")}</SelectItem>
+                          <SelectItem value="initContainer">{t("containerDialog.initContainer")}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
@@ -357,8 +364,8 @@ export function CreateContainerDialog({
 
             <div className="rounded-md border bg-card">
               <div className="border-b bg-muted/80 px-4 py-3">
-                <div className="text-sm font-semibold">端口设置</div>
-                <div className="mt-1 text-sm text-muted-foreground">设置用于访问容器的端口。</div>
+                <div className="text-sm font-semibold">{t("containerDialog.portSettings")}</div>
+                <div className="mt-1 text-sm text-muted-foreground">{t("containerDialog.portSettingsDesc")}</div>
               </div>
               <div className="p-4">
                 <FieldGroup className="flex flex-col gap-3">
@@ -374,7 +381,7 @@ export function CreateContainerDialog({
                               disabled={isBusy}
                             >
                               <SelectTrigger className="w-full">
-                                <SelectValue placeholder="协议" />
+                                <SelectValue placeholder={t("containerDialog.protocol")} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectGroup>
@@ -388,7 +395,7 @@ export function CreateContainerDialog({
                           <Field>
                             <InputGroup>
                               <InputGroupAddon>
-                                <InputGroupText>名称</InputGroupText>
+                                <InputGroupText>{t("containerDialog.name")}</InputGroupText>
                               </InputGroupAddon>
                               <InputGroupInput
                                 id={`${container.id}-port-${item.id}-name`}
@@ -405,7 +412,7 @@ export function CreateContainerDialog({
                           <Field>
                             <InputGroup>
                               <InputGroupAddon>
-                                <InputGroupText>容器端口</InputGroupText>
+                                <InputGroupText>{t("containerDialog.containerPort")}</InputGroupText>
                               </InputGroupAddon>
                               <InputGroupInput
                                 id={`${container.id}-port-${item.id}-container-port`}
@@ -435,7 +442,7 @@ export function CreateContainerDialog({
                             disabled={isBusy}
                           >
                             <IconTrash data-icon="inline-start" />
-                            删除
+                            {t("containerDialog.delete")}
                           </Button>
                         </div>
                       )
@@ -444,7 +451,7 @@ export function CreateContainerDialog({
 
                   <div className="flex justify-end">
                     <Button type="button" variant="outline" onClick={onAddPort} disabled={isBusy}>
-                      添加端口
+                      {t("containerDialog.addPort")}
                     </Button>
                   </div>
                 </FieldGroup>
@@ -454,9 +461,9 @@ export function CreateContainerDialog({
             <AdvancedToggleCard
               checked={resourceEnabled}
               disabled={isBusy}
-              ariaLabel="资源设置"
-              title="资源设置"
-              description="设置容器的资源上限与资源预留。"
+              ariaLabel={t("containerDialog.resourceSettings")}
+              title={t("containerDialog.resourceSettings")}
+              description={t("containerDialog.resourceSettingsDesc")}
               onCheckedChange={(nextValue) => {
                 setResourceEnabled(nextValue)
                 if (!nextValue) {
@@ -470,7 +477,7 @@ export function CreateContainerDialog({
               <div className="grid gap-3 md:grid-cols-2">
                 <InputGroup>
                   <InputGroupAddon>
-                    <InputGroupText>CPU 预留</InputGroupText>
+                    <InputGroupText>{t("containerDialog.cpuRequest")}</InputGroupText>
                   </InputGroupAddon>
                   <InputGroupInput
                     id={`${container.id}-cpu-request`}
@@ -481,13 +488,13 @@ export function CreateContainerDialog({
                     disabled={isBusy}
                   />
                   <InputGroupAddon align="inline-end">
-                    <InputGroupText>Core</InputGroupText>
+                    <InputGroupText>{t("containerDialog.unitCore")}</InputGroupText>
                   </InputGroupAddon>
                 </InputGroup>
 
                 <InputGroup>
                   <InputGroupAddon>
-                    <InputGroupText>CPU 限制</InputGroupText>
+                    <InputGroupText>{t("containerDialog.cpuLimit")}</InputGroupText>
                   </InputGroupAddon>
                   <InputGroupInput
                     id={`${container.id}-cpu-limit`}
@@ -498,13 +505,13 @@ export function CreateContainerDialog({
                     disabled={isBusy}
                   />
                   <InputGroupAddon align="inline-end">
-                    <InputGroupText>Core</InputGroupText>
+                    <InputGroupText>{t("containerDialog.unitCore")}</InputGroupText>
                   </InputGroupAddon>
                 </InputGroup>
 
                 <InputGroup>
                   <InputGroupAddon>
-                    <InputGroupText>内存预留</InputGroupText>
+                    <InputGroupText>{t("containerDialog.memoryRequest")}</InputGroupText>
                   </InputGroupAddon>
                   <InputGroupInput
                     id={`${container.id}-memory-request`}
@@ -517,13 +524,13 @@ export function CreateContainerDialog({
                     disabled={isBusy}
                   />
                   <InputGroupAddon align="inline-end">
-                    <InputGroupText>Mi</InputGroupText>
+                    <InputGroupText>{t("containerDialog.unitMi")}</InputGroupText>
                   </InputGroupAddon>
                 </InputGroup>
 
                 <InputGroup>
                   <InputGroupAddon>
-                    <InputGroupText>内存上限</InputGroupText>
+                    <InputGroupText>{t("containerDialog.memoryLimit")}</InputGroupText>
                   </InputGroupAddon>
                   <InputGroupInput
                     id={`${container.id}-memory-limit`}
@@ -536,14 +543,14 @@ export function CreateContainerDialog({
                     disabled={isBusy}
                   />
                   <InputGroupAddon align="inline-end">
-                    <InputGroupText>Mi</InputGroupText>
+                    <InputGroupText>{t("containerDialog.unitMi")}</InputGroupText>
                   </InputGroupAddon>
                 </InputGroup>
               </div>
             </AdvancedToggleCard>
 
             <div className="space-y-3">
-              {CONTAINER_EXTENSION_OPTIONS.map((option) => {
+              {containerExtensionOptions.map((option) => {
                     const checked =
                       option.key === "syncHostTimezone"
                         ? container.syncHostTimezone
@@ -592,30 +599,30 @@ export function CreateContainerDialog({
                           <div className="basis-full">
                             <FieldGroup className="flex flex-col gap-4">
                               <Field>
-                                <FieldLabel htmlFor={`${container.id}-startup-command`}>命令</FieldLabel>
+                                <FieldLabel htmlFor={`${container.id}-startup-command`}>{t("containerDialog.command")}</FieldLabel>
                                 <Textarea
                                   id={`${container.id}-startup-command`}
                                   value={container.command}
                                   onChange={(event) => onChange("command", event.target.value)}
-                                  placeholder="/bin/sh"
+                                  placeholder={t("containerDialog.commandPlaceholder")}
                                   className="min-h-20"
                                   disabled={isBusy}
                                 />
-                                <FieldDescription>容器的启动命令。</FieldDescription>
+                                <FieldDescription>{t("containerDialog.commandDesc")}</FieldDescription>
                               </Field>
 
                               <Field>
-                                <FieldLabel htmlFor={`${container.id}-startup-args`}>参数</FieldLabel>
+                                <FieldLabel htmlFor={`${container.id}-startup-args`}>{t("containerDialog.args")}</FieldLabel>
                                 <Textarea
                                   id={`${container.id}-startup-args`}
                                   value={container.args}
                                   onChange={(event) => onChange("args", event.target.value)}
-                                  placeholder="-c,while true; do echo hello; sleep 10;done"
+                                  placeholder={t("containerDialog.argsPlaceholder")}
                                   className="min-h-20"
                                   disabled={isBusy}
                                 />
                                 <FieldDescription>
-                                  容器启动命令的参数。如有多个参数请使用半角逗号（,）分隔。
+                                  {t("containerDialog.argsDesc")}
                                 </FieldDescription>
                               </Field>
                             </FieldGroup>
@@ -625,7 +632,7 @@ export function CreateContainerDialog({
                         {option.key === "healthCheck" && checked ? (
                           <div className="basis-full">
                             <div className="flex flex-col gap-6">
-                              {HEALTH_CHECK_SECTIONS.map((section) => {
+                              {healthCheckSections.map((section) => {
                                 const sectionState = probeState[section.key]
                                 const draftFieldError = probeDraftFieldErrors[section.key]
                                 const draft = sectionState.draft
@@ -648,7 +655,7 @@ export function CreateContainerDialog({
                                               isBusy && "pointer-events-none opacity-60"
                                             )}
                                           >
-                                            {sectionState.enabled ? resolveProbeSummary(draft) : "添加探针"}
+                                            {sectionState.enabled ? resolveProbeSummary(t, draft) : t("containerDialog.addProbe")}
                                             {sectionState.enabled ? (
                                               <Button
                                                 type="button"
@@ -667,7 +674,7 @@ export function CreateContainerDialog({
                                                 disabled={isBusy}
                                               >
                                                 <IconX className="size-4" />
-                                                <span className="sr-only">清空探针</span>
+                                                <span className="sr-only">{t("containerDialog.clearProbe")}</span>
                                               </Button>
                                             ) : null}
                                           </div>
@@ -685,9 +692,9 @@ export function CreateContainerDialog({
                                             }}
                                           >
                                             <TabsList className="grid w-full grid-cols-3">
-                                              <TabsTrigger value="http">HTTP 请求</TabsTrigger>
-                                              <TabsTrigger value="command">命令</TabsTrigger>
-                                              <TabsTrigger value="tcp">TCP 端口</TabsTrigger>
+                                              <TabsTrigger value="http">{t("containerDialog.httpRequest")}</TabsTrigger>
+                                              <TabsTrigger value="command">{t("containerDialog.commandProbe")}</TabsTrigger>
+                                              <TabsTrigger value="tcp">{t("containerDialog.tcpPort")}</TabsTrigger>
                                             </TabsList>
                                           </Tabs>
 
@@ -716,7 +723,7 @@ export function CreateContainerDialog({
                                               </div>
                                               <InputGroup>
                                                 <InputGroupAddon>
-                                                  <InputGroupText>路径</InputGroupText>
+                                                  <InputGroupText>{t("containerDialog.path")}</InputGroupText>
                                                 </InputGroupAddon>
                                                 <InputGroupInput
                                                   value={draft.httpPath}
@@ -730,7 +737,7 @@ export function CreateContainerDialog({
                                               <div className="flex flex-col gap-1">
                                                 <InputGroup>
                                                   <InputGroupAddon>
-                                                    <InputGroupText>端口</InputGroupText>
+                                                    <InputGroupText>{t("containerDialog.port")}</InputGroupText>
                                                   </InputGroupAddon>
                                                   <InputGroupInput
                                                     value={draft.httpPort}
@@ -759,7 +766,7 @@ export function CreateContainerDialog({
                                             <div className="flex flex-col gap-1">
                                               <InputGroup>
                                                 <InputGroupAddon>
-                                                  <InputGroupText>命令</InputGroupText>
+                                                  <InputGroupText>{t("containerDialog.command")}</InputGroupText>
                                                 </InputGroupAddon>
                                                 <InputGroupInput
                                                   value={draft.command}
@@ -781,7 +788,7 @@ export function CreateContainerDialog({
                                             <div className="flex flex-col gap-1">
                                               <InputGroup>
                                                 <InputGroupAddon>
-                                                  <InputGroupText>TCP 端口</InputGroupText>
+                                                  <InputGroupText>{t("containerDialog.tcpPort")}</InputGroupText>
                                                 </InputGroupAddon>
                                                 <InputGroupInput
                                                   value={draft.tcpPort}
@@ -808,7 +815,7 @@ export function CreateContainerDialog({
                                           <div className="grid gap-3 md:grid-cols-3">
                                             <InputGroup>
                                               <InputGroupAddon>
-                                                <InputGroupText>初始延迟（s）</InputGroupText>
+                                                <InputGroupText>{t("containerDialog.initialDelay")}</InputGroupText>
                                               </InputGroupAddon>
                                               <InputGroupInput
                                                 value={draft.initialDelaySeconds}
@@ -826,7 +833,7 @@ export function CreateContainerDialog({
                                             </InputGroup>
                                             <InputGroup>
                                               <InputGroupAddon>
-                                                <InputGroupText>超时时间（s）</InputGroupText>
+                                                <InputGroupText>{t("containerDialog.timeout")}</InputGroupText>
                                               </InputGroupAddon>
                                               <InputGroupInput
                                                 value={draft.timeoutSeconds}
@@ -844,7 +851,7 @@ export function CreateContainerDialog({
                                             </InputGroup>
                                             <InputGroup>
                                               <InputGroupAddon>
-                                                <InputGroupText>检查间隔（s）</InputGroupText>
+                                                <InputGroupText>{t("containerDialog.interval")}</InputGroupText>
                                               </InputGroupAddon>
                                               <InputGroupInput
                                                 value={draft.periodSeconds}
@@ -862,7 +869,7 @@ export function CreateContainerDialog({
                                             </InputGroup>
                                             <InputGroup>
                                               <InputGroupAddon>
-                                                <InputGroupText>成功阈值</InputGroupText>
+                                                <InputGroupText>{t("containerDialog.successThreshold")}</InputGroupText>
                                               </InputGroupAddon>
                                               <InputGroupInput
                                                 value={draft.successThreshold}
@@ -880,7 +887,7 @@ export function CreateContainerDialog({
                                             </InputGroup>
                                             <InputGroup>
                                               <InputGroupAddon>
-                                                <InputGroupText>失败阈值</InputGroupText>
+                                                <InputGroupText>{t("containerDialog.failureThreshold")}</InputGroupText>
                                               </InputGroupAddon>
                                               <InputGroupInput
                                                 value={draft.failureThreshold}
@@ -906,14 +913,14 @@ export function CreateContainerDialog({
                                                 onClick={() => cancelProbeEdit(section.key)}
                                                 disabled={isBusy}
                                               >
-                                                取消
+                                                {t("containerDialog.cancel")}
                                               </Button>
                                               <Button
                                                 type="button"
                                                 onClick={() => confirmProbeEdit(section.key)}
                                                 disabled={isBusy}
                                               >
-                                                确定
+                                                {t("containerDialog.confirm")}
                                               </Button>
                                             </div>
                                           </div>
@@ -931,7 +938,7 @@ export function CreateContainerDialog({
                         {option.key === "lifecycle" && checked ? (
                           <div className="basis-full">
                             <div className="flex flex-col gap-6">
-                              {LIFECYCLE_SECTIONS.map((section) => {
+                              {lifecycleSections.map((section) => {
                                 const sectionState = lifecycleState[section.key]
                                 const draftFieldError = lifecycleDraftFieldErrors[section.key]
                                 const draft = sectionState.draft
@@ -955,8 +962,8 @@ export function CreateContainerDialog({
                                             )}
                                           >
                                             {sectionState.enabled
-                                              ? resolveLifecycleSummary(draft)
-                                              : "添加动作"}
+                                              ? resolveLifecycleSummary(t, draft)
+                                              : t("containerDialog.addAction")}
                                             {sectionState.enabled ? (
                                               <Button
                                                 type="button"
@@ -975,7 +982,7 @@ export function CreateContainerDialog({
                                                 disabled={isBusy}
                                               >
                                                 <IconX className="size-4" />
-                                                <span className="sr-only">清空动作</span>
+                                                <span className="sr-only">{t("containerDialog.clearAction")}</span>
                                               </Button>
                                             ) : null}
                                           </div>
@@ -993,15 +1000,15 @@ export function CreateContainerDialog({
                                               }}
                                             >
                                               <TabsList className="grid w-full grid-cols-3">
-                                                <TabsTrigger value="http">HTTP 请求</TabsTrigger>
-                                                <TabsTrigger value="command">命令</TabsTrigger>
-                                                <TabsTrigger value="tcp">TCP 端口</TabsTrigger>
+                                                <TabsTrigger value="http">{t("containerDialog.httpRequest")}</TabsTrigger>
+                                                <TabsTrigger value="command">{t("containerDialog.commandAction")}</TabsTrigger>
+                                                <TabsTrigger value="tcp">{t("containerDialog.tcpAction")}</TabsTrigger>
                                               </TabsList>
                                             </Tabs>
 
                                             {draft.mode === "http" ? (
                                               <div className="space-y-3">
-                                                <div className="text-sm">路径</div>
+                                                <div className="text-sm">{t("containerDialog.path")}</div>
                                                 <div className="grid gap-3 md:grid-cols-3">
                                                   <Select
                                                     value={draft.httpScheme}
@@ -1062,7 +1069,7 @@ export function CreateContainerDialog({
 
                                             {draft.mode === "command" ? (
                                               <div className="space-y-3">
-                                                <div className="text-sm">命令</div>
+                                                <div className="text-sm">{t("containerDialog.command")}</div>
                                                 <Input
                                                   value={draft.command}
                                                   onChange={(event) =>
@@ -1084,7 +1091,7 @@ export function CreateContainerDialog({
 
                                             {draft.mode === "tcp" ? (
                                               <div className="space-y-3">
-                                                <div className="text-sm">TCP 端口</div>
+                                                <div className="text-sm">{t("containerDialog.tcpPort")}</div>
                                                 <Input
                                                   value={draft.tcpPort}
                                                   onChange={(event) =>
@@ -1114,14 +1121,14 @@ export function CreateContainerDialog({
                                                 onClick={() => cancelLifecycleEdit(section.key)}
                                                 disabled={isBusy}
                                               >
-                                                取消
+                                                {t("containerDialog.cancel")}
                                               </Button>
                                               <Button
                                                 type="button"
                                                 onClick={() => confirmLifecycleEdit(section.key)}
                                                 disabled={isBusy}
                                               >
-                                                确定
+                                                {t("containerDialog.confirm")}
                                               </Button>
                                             </div>
                                           </div>
@@ -1188,16 +1195,16 @@ export function CreateContainerDialog({
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectGroup>
-                                          <SelectItem value="custom">自定义</SelectItem>
-                                          <SelectItem value="configMap">来自配置字典</SelectItem>
-                                          <SelectItem value="secret">来自保密字典</SelectItem>
+                                          <SelectItem value="custom">{t("containerDialog.custom")}</SelectItem>
+                                          <SelectItem value="configMap">{t("containerDialog.fromConfigMap")}</SelectItem>
+                                          <SelectItem value="secret">{t("containerDialog.fromSecret")}</SelectItem>
                                         </SelectGroup>
                                       </SelectContent>
                                     </Select>
                                     <div className="flex min-w-0 flex-col gap-1">
                                       <InputGroup>
                                         <InputGroupAddon>
-                                          <InputGroupText>键</InputGroupText>
+                                          <InputGroupText>{t("containerDialog.key")}</InputGroupText>
                                         </InputGroupAddon>
                                         <InputGroupInput
                                           id={`${container.id}-env-${item.id}-name`}
@@ -1210,13 +1217,13 @@ export function CreateContainerDialog({
                                         />
                                       </InputGroup>
                                       {envDuplicateIdSet.has(item.id) ? (
-                                        <p className="text-xs text-destructive">环境变量名称重复</p>
+                                        <p className="text-xs text-destructive">{t("containerDialog.duplicateEnvName")}</p>
                                       ) : null}
                                     </div>
                                     {item.source === "custom" ? (
                                       <InputGroup>
                                         <InputGroupAddon>
-                                          <InputGroupText>值</InputGroupText>
+                                          <InputGroupText>{t("containerDialog.value")}</InputGroupText>
                                         </InputGroupAddon>
                                         <InputGroupInput
                                           value={item.value}
@@ -1242,8 +1249,8 @@ export function CreateContainerDialog({
                                             <SelectValue
                                               placeholder={
                                                 item.source === "configMap"
-                                                  ? "选择配置字典"
-                                                  : "选择保密字典"
+                                                  ? t("containerDialog.selectConfigMap")
+                                                  : t("containerDialog.selectSecret")
                                               }
                                             />
                                           </SelectTrigger>
@@ -1258,8 +1265,8 @@ export function CreateContainerDialog({
                                               ) : (
                                                 <SelectItem value="__empty__" disabled>
                                                   {item.source === "configMap"
-                                                    ? "当前项目暂无配置字典"
-                                                    : "当前项目暂无保密字典"}
+                                                    ? t("containerDialog.noConfigMapInProject")
+                                                    : t("containerDialog.noSecretInProject")}
                                                 </SelectItem>
                                               )}
                                             </SelectGroup>
@@ -1280,7 +1287,7 @@ export function CreateContainerDialog({
                                           disabled={isBusy || !item.sourceResource}
                                         >
                                           <SelectTrigger className="w-full min-w-0">
-                                            <SelectValue placeholder="选择资源中的键" />
+                                            <SelectValue placeholder={t("containerDialog.selectKey")} />
                                           </SelectTrigger>
                                           <SelectContent>
                                             <SelectGroup>
@@ -1292,7 +1299,7 @@ export function CreateContainerDialog({
                                                 ))
                                               ) : (
                                                 <SelectItem value="__empty__" disabled>
-                                                  {item.sourceResource ? "该资源暂无可选键" : "请先选择资源"}
+                                                  {item.sourceResource ? t("containerDialog.noKeysInResource") : t("containerDialog.selectResourceFirst")}
                                                 </SelectItem>
                                               )}
                                             </SelectGroup>
@@ -1308,14 +1315,14 @@ export function CreateContainerDialog({
                                       disabled={isBusy}
                                     >
                                       <IconTrash data-icon="inline-start" />
-                                      删除
+                                      {t("containerDialog.delete")}
                                     </Button>
                                   </div>
                                     )
                                   })()
                                 ))
                               ) : (
-                                <FieldDescription>暂无环境变量，点击右下角添加。</FieldDescription>
+                                <FieldDescription>{t("containerDialog.noEnvVars")}</FieldDescription>
                               )}
                               <div className="flex justify-end gap-2">
 
@@ -1325,7 +1332,7 @@ export function CreateContainerDialog({
                                   onClick={() => onAddEnv()}
                                   disabled={isBusy}
                                 >
-                                  添加环境变量
+                                  {t("containerDialog.addEnvVar")}
                                 </Button>
 
                                 <Popover open={envBatchPopoverOpen} onOpenChange={setEnvBatchPopoverOpen}>
@@ -1335,7 +1342,7 @@ export function CreateContainerDialog({
                                         variant="outline"
                                         disabled={isBusy}
                                     >
-                                      批量引用
+                                      {t("containerDialog.batchImport")}
                                     </Button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[520px] p-3" align="end">
@@ -1353,14 +1360,14 @@ export function CreateContainerDialog({
                                           className="w-full"
                                       >
                                         <TabsList className="grid w-full grid-cols-2">
-                                          <TabsTrigger value="configMap">配置字典</TabsTrigger>
-                                          <TabsTrigger value="secret">保密字典</TabsTrigger>
+                                          <TabsTrigger value="configMap">{t("containerDialog.fromConfigMap")}</TabsTrigger>
+                                          <TabsTrigger value="secret">{t("containerDialog.fromSecret")}</TabsTrigger>
                                         </TabsList>
                                       </Tabs>
 
                                       <div className="space-y-2">
                                         <div className="text-sm font-medium">
-                                          {envBatchSource === "configMap" ? "配置字典" : "保密字典"}
+                                          {envBatchSource === "configMap" ? t("containerDialog.fromConfigMap") : t("containerDialog.fromSecret")}
                                         </div>
                                         <Select
                                             value={envBatchResourceName}
@@ -1374,8 +1381,8 @@ export function CreateContainerDialog({
                                             <SelectValue
                                                 placeholder={
                                                   envBatchSource === "configMap"
-                                                      ? "选择配置字典"
-                                                      : "选择保密字典"
+                                                      ? t("containerDialog.selectConfigMap")
+                                                      : t("containerDialog.selectSecret")
                                                 }
                                             />
                                           </SelectTrigger>
@@ -1390,8 +1397,8 @@ export function CreateContainerDialog({
                                               ) : (
                                                   <SelectItem value="__empty__" disabled>
                                                     {envBatchSource === "configMap"
-                                                        ? "当前项目暂无配置字典"
-                                                        : "当前项目暂无保密字典"}
+                                                        ? t("containerDialog.noConfigMapInProject")
+                                                        : t("containerDialog.noSecretInProject")}
                                                   </SelectItem>
                                               )}
                                             </SelectGroup>
@@ -1401,7 +1408,7 @@ export function CreateContainerDialog({
 
                                       <div className="space-y-2">
                                         <div className="flex items-center justify-between">
-                                          <div className="text-sm font-medium">键</div>
+                                          <div className="text-sm font-medium">{t("containerDialog.key")}</div>
                                           <button
                                               type="button"
                                               className="text-sm text-primary hover:underline"
@@ -1412,7 +1419,7 @@ export function CreateContainerDialog({
                                                   )
                                               }
                                           >
-                                            {envBatchAllChecked ? "取消全选" : "选择全部"}
+                                            {envBatchAllChecked ? t("containerDialog.deselectAll") : t("containerDialog.selectAll")}
                                           </button>
                                         </div>
                                         <div className="max-h-56 overflow-y-auto rounded-md bg-muted/40 p-2">
@@ -1437,8 +1444,8 @@ export function CreateContainerDialog({
                                           ) : (
                                               <div className="px-2 py-4 text-sm text-muted-foreground">
                                                 {envBatchResourceName
-                                                    ? "该资源暂无可选键。"
-                                                    : "请先选择资源。"}
+                                                    ? t("containerDialog.noKeysInSelectedResource")
+                                                    : t("containerDialog.pleaseSelectResourceFirst")}
                                               </div>
                                           )}
                                         </div>
@@ -1454,7 +1461,7 @@ export function CreateContainerDialog({
                                           }}
                                           disabled={isBusy}
                                       >
-                                        取消
+                                        {t("containerDialog.cancel")}
                                       </Button>
                                       <Button
                                           type="button"
@@ -1465,7 +1472,7 @@ export function CreateContainerDialog({
                                               envBatchSelectedKeys.length === 0
                                           }
                                       >
-                                        确定
+                                        {t("containerDialog.confirm")}
                                       </Button>
                                     </div>
                                   </PopoverContent>
@@ -1480,12 +1487,12 @@ export function CreateContainerDialog({
                           <div className="basis-full">
                             <div className="space-y-4">
                               <div className="space-y-3">
-                                <p className="text-sm text-foreground">访问控制</p>
+                                <p className="text-sm text-foreground">{t("containerDialog.accessControl")}</p>
                                 <div className="space-y-3 rounded-md border bg-background p-3">
                                   <Field orientation="horizontal" >
                                     <FieldContent>
-                                      <FieldTitle>特权模式</FieldTitle>
-                                      <FieldDescription>允许容器以特权方式运行进程。</FieldDescription>
+                                      <FieldTitle>{t("containerDialog.privileged")}</FieldTitle>
+                                      <FieldDescription>{t("containerDialog.privilegedDesc")}</FieldDescription>
                                     </FieldContent>
                                     <Switch
                                       checked={securityContextDraft.privileged}
@@ -1500,8 +1507,8 @@ export function CreateContainerDialog({
                                   </Field>
                                   <Field orientation="horizontal" className="mt-4">
                                     <FieldContent>
-                                      <FieldTitle>允许特权提升</FieldTitle>
-                                      <FieldDescription>允许进程获得比父进程更高权限。</FieldDescription>
+                                      <FieldTitle>{t("containerDialog.allowPrivilegeEscalation")}</FieldTitle>
+                                      <FieldDescription>{t("containerDialog.allowPrivilegeEscalationDesc")}</FieldDescription>
                                     </FieldContent>
                                     <Switch
                                       checked={securityContextDraft.allowPrivilegeEscalation}
@@ -1516,8 +1523,8 @@ export function CreateContainerDialog({
                                   </Field>
                                   <Field orientation="horizontal" className="mt-4">
                                     <FieldContent>
-                                      <FieldTitle>根目录只读</FieldTitle>
-                                      <FieldDescription>将容器根文件系统挂载为只读。</FieldDescription>
+                                      <FieldTitle>{t("containerDialog.readOnlyRoot")}</FieldTitle>
+                                      <FieldDescription>{t("containerDialog.readOnlyRootDesc")}</FieldDescription>
                                     </FieldContent>
                                     <Switch
                                       checked={securityContextDraft.readOnlyRootFilesystem}
@@ -1534,12 +1541,12 @@ export function CreateContainerDialog({
                               </div>
 
                               <div className="space-y-3">
-                                <p className="text-sm text-foreground">用户和用户组</p>
+                                <p className="text-sm text-foreground">{t("containerDialog.userGroup")}</p>
                                 <div className="space-y-4 rounded-md border bg-background p-3">
                                   <Field orientation="horizontal">
                                     <FieldContent>
-                                      <FieldTitle>仅允许非 root 运行</FieldTitle>
-                                      <FieldDescription>开启后会拒绝 root 用户运行容器。</FieldDescription>
+                                      <FieldTitle>{t("containerDialog.nonRootOnly")}</FieldTitle>
+                                      <FieldDescription>{t("containerDialog.nonRootOnlyDesc")}</FieldDescription>
                                     </FieldContent>
                                     <Switch
                                       checked={securityContextDraft.runAsNonRoot}
@@ -1554,7 +1561,7 @@ export function CreateContainerDialog({
                                   </Field>
                                   <div className="grid gap-3 md:grid-cols-2">
                                     <Field>
-                                      <FieldLabel htmlFor={`${container.id}-security-run-as-user`}>用户 UID</FieldLabel>
+                                      <FieldLabel htmlFor={`${container.id}-security-run-as-user`}>{t("containerDialog.userUid")}</FieldLabel>
                                       <Input
                                         id={`${container.id}-security-run-as-user`}
                                         value={securityContextDraft.runAsUser}
@@ -1564,7 +1571,7 @@ export function CreateContainerDialog({
                                             runAsUser: normalizeIdentityInput(event.target.value),
                                           })
                                         }
-                                        placeholder="1000"
+                                        placeholder={t("containerDialog.userUidPlaceholder")}
                                         inputMode="numeric"
                                         maxLength={10}
                                         autoComplete="off"
@@ -1573,7 +1580,7 @@ export function CreateContainerDialog({
                                     </Field>
                                     <Field>
                                       <FieldLabel htmlFor={`${container.id}-security-run-as-group`}>
-                                        用户组 GID
+                                        {t("containerDialog.groupGid")}
                                       </FieldLabel>
                                       <Input
                                         id={`${container.id}-security-run-as-group`}
@@ -1584,7 +1591,7 @@ export function CreateContainerDialog({
                                             runAsGroup: normalizeIdentityInput(event.target.value),
                                           })
                                         }
-                                        placeholder="1000"
+                                        placeholder={t("containerDialog.groupGidPlaceholder")}
                                         inputMode="numeric"
                                         maxLength={10}
                                         autoComplete="off"
@@ -1607,10 +1614,10 @@ export function CreateContainerDialog({
         <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
           <div className="flex w-full items-center justify-between gap-3">
             <Button type="button" variant="outline" onClick={onCancel} disabled={isBusy}>
-              取消
+              {t("containerDialog.cancel")}
             </Button>
             <Button type="button" onClick={onConfirm} disabled={isBusy}>
-              确认保存
+              {t("containerDialog.confirmSave")}
             </Button>
           </div>
         </DialogFooter>

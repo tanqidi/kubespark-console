@@ -80,12 +80,12 @@ export function WorkloadsPageClient() {
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Kubernetes 工作负载的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
   const [describeOpen, setDescribeOpen] = React.useState(false)
   const [describeContent, setDescribeContent] = React.useState("")
   const [describeLoading, setDescribeLoading] = React.useState(false)
   const [describeError, setDescribeError] = React.useState<string | null>(null)
-  const [describeSubtitle, setDescribeSubtitle] = React.useState("查看 Kubernetes 工作负载的详情内容。")
+  const [describeSubtitle, setDescribeSubtitle] = React.useState("")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<WorkloadRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -125,20 +125,20 @@ export function WorkloadsPageClient() {
     setDescribeError(null)
     setDescribeLoading(true)
     setDescribeContent("")
-    setDescribeSubtitle(`查看 Kubernetes ${row.kind}（${row.namespace}/${row.name}）的详情内容。`)
+    setDescribeSubtitle(t("workloads.describeSubtitle", { kind: row.kind, namespace: row.namespace, name: row.name }))
 
     void fetchResourceDescribe("apps", "v1", resource, row.name, row.namespace)
       .then(({ text }) => {
-        setDescribeContent(text || "(无详情输出)")
+        setDescribeContent(text || t("workloads.noDescribeOutput"))
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载详情失败"
+        const message = e instanceof Error ? e.message : t("workloads.loadDescribeFailed")
         setDescribeError(message)
       })
       .finally(() => {
         setDescribeLoading(false)
       })
-  }, [])
+  }, [t])
 
   const handleCreateSubmit = React.useCallback(
     async (payload: Parameters<typeof createWorkload>[0]) => {
@@ -162,7 +162,7 @@ export function WorkloadsPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes ${row.kind}（${row.namespace}/${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("workloads.yamlSubtitle", { kind: row.kind, namespace: row.namespace, name: row.name }))
 
     void fetchNamespacedResourceYaml(resource, row.namespace, row.name, {
       documentType: WORKLOAD_DOCUMENT_BY_KIND[row.kind],
@@ -177,7 +177,7 @@ export function WorkloadsPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("workloads.loadYamlFailed")
         setYamlError(message)
         console.error("[Workloads] view yaml request failed", {
           kind: row.kind,
@@ -189,7 +189,7 @@ export function WorkloadsPageClient() {
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const requestDelete = React.useCallback((row: WorkloadRow) => {
     setPendingDeleteRow(row)
@@ -206,10 +206,10 @@ export function WorkloadsPageClient() {
         setEditDialogOpen(true)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载工作负载详情失败"
+        const message = e instanceof Error ? e.message : t("workloads.loadWorkloadFailed")
         setError(message)
       })
-  }, [])
+  }, [t])
 
   const handleConfirmDelete = React.useCallback(() => {
     if (!pendingDeleteRow || deleting) return
@@ -220,7 +220,7 @@ export function WorkloadsPageClient() {
         setPendingDeleteRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("workloads.deleteFailed")
         setError(message)
         console.error("[Workloads] delete request failed", {
           kind: pendingDeleteRow.kind,
@@ -231,18 +231,18 @@ export function WorkloadsPageClient() {
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeleteRow])
+  }, [deleting, pendingDeleteRow, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: WorkloadRow[]) => {
     if (selectedRows.length === 0) return
     void Promise.all(
       selectedRows.map((row) => deleteWorkload(row.kind, row.namespace, row.name))
     ).catch((e: unknown) => {
-      const message = e instanceof Error ? e.message : "删除失败"
+      const message = e instanceof Error ? e.message : t("workloads.deleteFailed")
       setError(message)
       console.error("[Workloads] bulk delete request failed", e)
     })
-  }, [])
+  }, [t])
 
   const columns = React.useMemo(
     () =>
@@ -421,7 +421,7 @@ export function WorkloadsPageClient() {
         title={t("actions.deleteWorkloadTitle")}
         description={
           pendingDeleteRow
-            ? `确定删除工作负载 ${pendingDeleteRow.name} 吗？`
+            ? t("workloads.deleteConfirm", { name: pendingDeleteRow.name })
             : ""
         }
         deleting={deleting}

@@ -102,7 +102,7 @@ export function NodesPageClient() {
     }
   }, [loadRows])
 
-  const columns = React.useMemo(() => getNodeColumns(t), [])
+  const columns = React.useMemo(() => getNodeColumns(t), [t])
   const actionItems = React.useMemo(
     () => [
       {

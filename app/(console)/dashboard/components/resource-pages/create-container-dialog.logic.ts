@@ -4,6 +4,88 @@ export type ContainerPortProtocol =
   | "UDP"
   | "SCTP"
 
+export function getContainerExtensionOptions(t: (key: string) => string): Array<{
+  key: ContainerExtensionOptionKey
+  title: string
+  description: string
+}> {
+  return [
+    {
+      key: "healthCheck",
+      title: t("containerDialog.healthCheck"),
+      description: t("containerDialog.healthCheckDesc"),
+    },
+    {
+      key: "lifecycle",
+      title: t("containerDialog.lifecycle"),
+      description: t("containerDialog.lifecycleDesc"),
+    },
+    {
+      key: "startupCommand",
+      title: t("containerDialog.startupCommand"),
+      description: t("containerDialog.startupCommandDesc"),
+    },
+    {
+      key: "env",
+      title: t("containerDialog.env"),
+      description: t("containerDialog.envDesc"),
+    },
+    {
+      key: "securityContext",
+      title: t("containerDialog.securityContext"),
+      description: t("containerDialog.securityContextDesc"),
+    },
+    {
+      key: "syncHostTimezone",
+      title: t("containerDialog.syncHostTimezone"),
+      description: t("containerDialog.syncHostTimezoneDesc"),
+    },
+  ]
+}
+
+export function getHealthCheckSections(t: (key: string) => string): Array<{
+  key: ProbeSectionKey
+  title: string
+  description: string
+}> {
+  return [
+    {
+      key: "liveness",
+      title: t("containerDialog.liveness"),
+      description: t("containerDialog.livenessDesc"),
+    },
+    {
+      key: "readiness",
+      title: t("containerDialog.readiness"),
+      description: t("containerDialog.readinessDesc"),
+    },
+    {
+      key: "startup",
+      title: t("containerDialog.startup"),
+      description: t("containerDialog.startupDesc"),
+    },
+  ]
+}
+
+export function getLifecycleSections(t: (key: string) => string): Array<{
+  key: LifecycleSectionKey
+  title: string
+  description: string
+}> {
+  return [
+    {
+      key: "postStart",
+      title: t("containerDialog.postStart"),
+      description: t("containerDialog.postStartDesc"),
+    },
+    {
+      key: "preStop",
+      title: t("containerDialog.preStop"),
+      description: t("containerDialog.preStopDesc"),
+    },
+  ]
+}
+
 export type ContainerPortDraft = {
   id: string
   protocol: ContainerPortProtocol
@@ -360,17 +442,17 @@ export function normalizePortInput(value: string): string {
   return String(parsed)
 }
 
-export function resolveImagePullPolicyDescription(value: "Always" | "IfNotPresent" | "Never"): string {
+export function resolveImagePullPolicyDescription(t: (key: string) => string, value: "Always" | "IfNotPresent" | "Never"): string {
   if (value === "Always") {
-    return "在容器组创建及更新时，每次都尝试拉取新的镜像。"
+    return t("containerDialog.pullPolicyDescAlways")
   }
   if (value === "Never") {
-    return "仅使用本地镜像。如果本地不存在所需的镜像，则会导致容器异常。"
+    return t("containerDialog.pullPolicyDescNever")
   }
-  return "如果本地存在所需的镜像，则优先使用本地镜像。"
+  return t("containerDialog.pullPolicyDescIfNotPresent")
 }
 
-export function resolveProbeSummary(draft: ContainerProbeDraft): string {
+export function resolveProbeSummary(t: (key: string) => string, draft: ContainerProbeDraft): string {
   if (draft.mode === "http") {
     const pathValue = draft.httpPath.trim() || "/"
     const normalizedPath = pathValue.startsWith("/") ? pathValue : `/${pathValue}`
@@ -379,13 +461,13 @@ export function resolveProbeSummary(draft: ContainerProbeDraft): string {
   }
   if (draft.mode === "tcp") {
     const port = draft.tcpPort.trim() || "-"
-    return `TCP ${port}`
+    return `${t("containerDialog.tcpProbe")} ${port}`
   }
   const command = draft.command.trim()
-  return command ? `命令：${command}` : "命令探针"
+  return command ? `${t("containerDialog.commandProbeSummary")}${command}` : t("containerDialog.commandProbe")
 }
 
-export function resolveLifecycleSummary(draft: ContainerLifecycleActionDraft): string {
+export function resolveLifecycleSummary(t: (key: string) => string, draft: ContainerLifecycleActionDraft): string {
   if (draft.mode === "http") {
     const pathValue = draft.httpPath.trim() || "/"
     const normalizedPath = pathValue.startsWith("/") ? pathValue : `/${pathValue}`
@@ -394,10 +476,10 @@ export function resolveLifecycleSummary(draft: ContainerLifecycleActionDraft): s
   }
   if (draft.mode === "tcp") {
     const port = draft.tcpPort.trim() || "-"
-    return `TCP ${port}`
+    return `${t("containerDialog.tcpAction")} ${port}`
   }
   const command = draft.command.trim()
-  return command ? `命令：${command}` : "命令动作"
+  return command ? `${t("containerDialog.commandActionSummary")}${command}` : t("containerDialog.commandAction")
 }
 
 export function resolveDuplicateEnvNameIds(entries: ContainerEnvVarDraft[]): string[] {
