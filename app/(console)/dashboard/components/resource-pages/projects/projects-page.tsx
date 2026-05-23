@@ -1589,7 +1589,6 @@ export function ProjectsPageClient() {
                         description={createDescription}
                         setDescription={setCreateDescription}
                         disabled={creating}
-                        titleText="统一管理项目的标签与注解信息。"
                       />
                     </Field>
                   </FieldGroup>
@@ -1956,7 +1955,6 @@ export function ProjectsPageClient() {
                         description={pipelineProjectCreateDescription}
                         setDescription={setPipelineProjectCreateDescription}
                         disabled={pipelineProjectCreating}
-                        titleText="统一管理流水线项目的标签与注解信息。"
                       />
                     </Field>
                   </FieldGroup>

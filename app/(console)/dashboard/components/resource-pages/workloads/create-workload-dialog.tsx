@@ -1311,7 +1311,7 @@ export function CreateWorkloadDialog({
               <div>
                 <div className="mb-4">
                   <h3 className="text-[15px] font-semibold">{t("workloadDialog.advancedSettings")}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{resolveStepDescription(activeStep)}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{t(resolveStepDescription(activeStep))}</p>
                 </div>
                 <FieldGroup className="grid gap-4 md:grid-cols-2">
                   <Field className="md:col-span-2">

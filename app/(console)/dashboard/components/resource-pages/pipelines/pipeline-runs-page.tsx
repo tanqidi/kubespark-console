@@ -344,13 +344,13 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
   const [yamlContent, setYamlContent] = React.useState("")
-  const [yamlSubtitle, setYamlSubtitle] = React.useState(t("pipelineRuns.viewYamlSubtitleDefault"))
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
   const [logOpen, setLogOpen] = React.useState(false)
   const [logLoading, setLogLoading] = React.useState(false)
   const [logError, setLogError] = React.useState<string | null>(null)
   const [logContent, setLogContent] = React.useState("")
   const [logRealtime, setLogRealtime] = React.useState(false)
-  const [logTitle, setLogTitle] = React.useState(t("pipelineRuns.viewLogsTitle"))
+  const [logTitle, setLogTitle] = React.useState("")
   const [logSubtitle, setLogSubtitle] = React.useState("")
   const [currentLogBuildNumber, setCurrentLogBuildNumber] = React.useState("")
   const [currentLogRepository, setCurrentLogRepository] = React.useState("")
@@ -375,7 +375,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         if (!silent) setLoading(false)
       }
     },
-    [normalizedPipelineName, t]
+    [normalizedPipelineName]
   )
 
   React.useEffect(() => {
@@ -626,6 +626,9 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     if (!logOpen || !logRealtime || !currentLogBuildNumber || !currentLogRepository) return
 
     const timer = window.setInterval(async () => {
+      const hasOpenMenu = document.querySelector('[data-state="open"]') !== null
+      if (hasOpenMenu) return
+
       try {
         await Promise.all([
           fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, currentLogStage, currentLogStep)
@@ -964,7 +967,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                           disabled
                           readOnly
                         />
-                        <FieldDescription>要构建的 Drone 仓库（owner/repo）</FieldDescription>
+                        <FieldDescription>{t("pipelineRuns.droneRepoDesc")}</FieldDescription>
                       </Field>
                       <Field data-invalid={Boolean(runBranchError)}>
                         <FieldLabel htmlFor="pipeline-run-branch">{t("pipelineRuns.branch")}</FieldLabel>
@@ -983,7 +986,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
                         {runBranchError ? (
                           <FieldError>{runBranchError}</FieldError>
                         ) : (
-                          <FieldDescription>要构建的 Git 分支</FieldDescription>
+                          <FieldDescription>{t("pipelineRuns.gitBranchDesc")}</FieldDescription>
                         )}
                       </Field>
                     </div>

@@ -20,7 +20,8 @@
     "advancedSettingsDesc": "补充标签注解与键值配置。",
     "descriptionMaxLength": "将写入资源注解 description，最长 {max} 个字符。",
     "loadFailed": "加载失败",
-    "loadYamlFailed": "加载 YAML 失败"
+    "loadYamlFailed": "加载 YAML 失败",
+    "delete": "删除"
   },
   "login": {
     "title": "登录到您的账户",
@@ -381,6 +382,7 @@
     "storageSettings": "存储设置",
     "storageSettingsDesc": "配置卷挂载与配置挂载，支持在当前页面直接录入并保存。",
     "advancedSettings": "高级设置",
+    "advancedSettingsDesc": "配置服务账号、优雅终止时间等高级参数。",
     "current": "当前",
     "configured": "已设置",
     "notConfigured": "未设置",
@@ -614,7 +616,9 @@
     "serviceNameConflictEdit": "服务名称冲突，请稍后重试",
     "createServiceFailed": "创建服务失败，请稍后重试",
     "portSelectorRow": "行",
-    "pleaseAddPortConfigFirst": "请先添加端口配置，添加端口后每行需完整填写三项。"
+    "pleaseAddPortConfigFirst": "请先添加端口配置，添加端口后每行需完整填写三项。",
+    "deleteTitle": "删除服务",
+    "deleteDesc": "确定删除服务 {name} 吗？"
   },
   "workloadPickerDialog": {
     "title": "指定工作负载",
@@ -676,8 +680,11 @@
     "yamlRequired": "请输入 YAML 内容",
     "yamlInvalid": "YAML 内容格式无效",
     "yamlKindMustBePipeline": "YAML 资源类型必须是 Pipeline",
+    "yamlKindMustBePipelineRun": "YAML 资源类型必须是 PipelineRun",
+    "pipelineRefNameMustBeCurrent": "pipelineRef.name 必须为当前流水线",
     "yamlParseFailed": "YAML 解析失败",
     "createPipelineFailed": "创建流水线失败，请稍后重试",
+    "loadPipelineRunsFailed": "加载运行记录失败",
     "keyValueConfigTitle": "变量配置",
     "keyValueConfigDescEdit": "维护流水线运行所需的键值变量或秘钥参数，值为空则跳过修改。",
     "keyDuplicate": "变量键重复：{key}"
@@ -717,7 +724,9 @@
     "runParams": "运行参数",
     "runParamsDesc": "指定本次运行使用的参数，流水线将从该仓库获取代码并执行",
     "codeRepository": "代码仓库",
+    "droneRepoDesc": "要构建的 Drone 仓库（owner/repo）",
     "branch": "分支",
+    "gitBranchDesc": "要构建的 Git 分支",
     "branchRequired": "请输入分支名称",
     "description": "描述",
     "descriptionPlaceholder": "请输入描述",

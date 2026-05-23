@@ -467,10 +467,10 @@ export function ServicesPageClient() {
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDeleteRow(null)
         }}
-        title="删除服务"
+        title={t("serviceDialog.deleteTitle")}
         description={
           pendingDeleteRow
-            ? `确定删除服务 ${pendingDeleteRow.name} 吗？`
+            ? t("serviceDialog.deleteDesc", { name: pendingDeleteRow.name })
             : ""
         }
         deleting={deleting}

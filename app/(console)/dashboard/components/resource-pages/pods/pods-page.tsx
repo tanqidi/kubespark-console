@@ -546,7 +546,7 @@ export function PodsPageClient() {
         title={t("dialogs.delete.title")}
         description={
           pendingDeleteRow
-            ? `${t("dialogs.delete.description")} ${pendingDeleteRow.name} 吗？`
+            ? t("dialogs.delete.description", { name: pendingDeleteRow.name })
             : ""
         }
         deleting={deleting}

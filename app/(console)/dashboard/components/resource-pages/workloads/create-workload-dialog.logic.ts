@@ -1653,7 +1653,7 @@ export function resolveSubmitErrorMessage(error: unknown, kind: WorkloadCreateKi
 export function resolveStepDescription(step: CreateStep): string {
   switch (step) {
     case "advanced":
-      return "配置服务账号、优雅终止时间等高级参数。"
+      return "workloadDialog.advancedSettingsDesc"
     default:
       return ""
   }

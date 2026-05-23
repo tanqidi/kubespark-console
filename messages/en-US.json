@@ -20,7 +20,8 @@
     "advancedSettingsDesc": "Supplement label annotations and key-value configuration.",
     "descriptionMaxLength": "Will be written to resource annotation description, up to {max} characters.",
     "loadFailed": "Load Failed",
-    "loadYamlFailed": "Load YAML Failed"
+    "loadYamlFailed": "Load YAML Failed",
+    "delete": "Delete"
   },
   "login": {
     "title": "Sign in to your account",
@@ -388,6 +389,7 @@
     "storageSettings": "Storage Settings",
     "storageSettingsDesc": "Configure volume mounts and config mounts. Supports direct input and saving on this page.",
     "advancedSettings": "Advanced Settings",
+    "advancedSettingsDesc": "Configure service account, graceful termination time, and other advanced parameters.",
     "current": "Current",
     "configured": "Configured",
     "notConfigured": "Not configured",
@@ -621,7 +623,9 @@
     "serviceNameConflictEdit": "Service name conflict, please try again later.",
     "createServiceFailed": "Failed to create service, please try again later.",
     "portSelectorRow": "Row",
-    "pleaseAddPortConfigFirst": "Please add port configuration first. Each row must have all three fields filled in completely after adding ports."
+    "pleaseAddPortConfigFirst": "Please add port configuration first. Each row must have all three fields filled in completely after adding ports.",
+    "deleteTitle": "Delete Service",
+    "deleteDesc": "Are you sure you want to delete service {name}?"
   },
   "workloadPickerDialog": {
     "title": "Specify Workload",
@@ -683,8 +687,11 @@
     "yamlRequired": "Please enter YAML content",
     "yamlInvalid": "Invalid YAML content format",
     "yamlKindMustBePipeline": "YAML resource type must be Pipeline",
+    "yamlKindMustBePipelineRun": "YAML resource type must be PipelineRun",
+    "pipelineRefNameMustBeCurrent": "pipelineRef.name must be the current pipeline",
     "yamlParseFailed": "YAML parsing failed",
     "createPipelineFailed": "Failed to create pipeline, please try again later",
+    "loadPipelineRunsFailed": "Failed to load pipeline runs",
     "keyValueConfigTitle": "Variable Configuration",
     "keyValueConfigDescEdit": "Maintain key-value variables or secret parameters required for pipeline operation. Skip modification if value is empty.",
     "keyDuplicate": "Duplicate variable key: {key}"
@@ -724,7 +731,9 @@
     "runParams": "Run Parameters",
     "runParamsDesc": "Specify parameters for this run, the pipeline will fetch code from this repository and execute",
     "codeRepository": "Code Repository",
+    "droneRepoDesc": "Drone repository to build (owner/repo)",
     "branch": "Branch",
+    "gitBranchDesc": "Git branch to build",
     "branchRequired": "Please enter branch name",
     "description": "Description",
     "descriptionPlaceholder": "Enter description",

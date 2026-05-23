@@ -227,10 +227,10 @@ export function WorkspacesPageClient() {
     } catch (e: unknown) {
       if (!silent) {
         setRows([])
-        setError(e instanceof Error ? e.message : t("workspacesDialog.loadFailed"))
+        setError(e instanceof Error ? e.message : "加载失败")
       }
     }
-  }, [t])
+  }, [])
 
   React.useEffect(() => {
     void loadRows(false)
