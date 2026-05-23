@@ -4,6 +4,7 @@ import "./globals.css";
 import { ActiveThemeProvider } from "@/components/active-theme";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { LocaleProvider } from "@/app/lib/i18n";
 
 export const metadata: Metadata = {
   title: "KubeSpark Dashboard Scaffold",
@@ -18,7 +19,9 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <ActiveThemeProvider initialTheme="default">
-            {children}
+            <LocaleProvider>
+              {children}
+            </LocaleProvider>
             <Toaster />
           </ActiveThemeProvider>
         </ThemeProvider>

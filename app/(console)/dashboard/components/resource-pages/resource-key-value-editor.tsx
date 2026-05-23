@@ -5,6 +5,7 @@ import { IconTrash } from "@tabler/icons-react"
 
 import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
 import type { MetadataEntry } from "@/app/(console)/dashboard/components/resource-pages/resource-metadata-editor"
+import { useTranslations } from "@/app/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { FieldLabel } from "@/components/ui/field"
 import {
@@ -41,6 +42,8 @@ export function ResourceKeyValueEditor({
   title = "变量配置",
   description = "维护流水线运行所需的键值变量或秘钥参数，值为空则跳过修改。",
 }: ResourceKeyValueEditorProps) {
+  const t = useTranslations()
+
   return (
     <AdvancedToggleCard
       checked={checked}
@@ -59,7 +62,7 @@ export function ResourceKeyValueEditor({
       }}
     >
       <div>
-        <FieldLabel className="mb-2">键值</FieldLabel>
+        <FieldLabel className="mb-2">{t("keyValueDialog.keyValue")}</FieldLabel>
         <div className="space-y-3">
           {entries.map((entry, index) => (
             <div
@@ -68,7 +71,7 @@ export function ResourceKeyValueEditor({
             >
               <InputGroup>
                 <InputGroupAddon>
-                  <InputGroupText>键</InputGroupText>
+                  <InputGroupText>{t("keyValueDialog.key")}</InputGroupText>
                 </InputGroupAddon>
                 <InputGroupInput
                   value={entry.key}
@@ -87,7 +90,7 @@ export function ResourceKeyValueEditor({
               </InputGroup>
               <InputGroup>
                 <InputGroupAddon>
-                  <InputGroupText>值</InputGroupText>
+                  <InputGroupText>{t("keyValueDialog.value")}</InputGroupText>
                 </InputGroupAddon>
                 <InputGroupInput
                   value={entry.value}
@@ -122,10 +125,10 @@ export function ResourceKeyValueEditor({
                   }}
                   disabled={disabled}
                   className="shrink-0"
-                  aria-label="删除键值"
+                  aria-label={t("keyValueDialog.delete")}
                 >
                   <IconTrash data-icon="inline-start" />
-                  删除
+                  {t("keyValueDialog.delete")}
                 </Button>
                 {resolveEntryStatus ? (
                   <span className="text-xs text-muted-foreground">{resolveEntryStatus(entry, index) ?? ""}</span>
@@ -140,7 +143,7 @@ export function ResourceKeyValueEditor({
               onClick={() => setEntries((current) => [...current, { key: "", value: "" }])}
               disabled={disabled}
             >
-              添加
+              {t("keyValueDialog.add")}
             </Button>
           </div>
         </div>
