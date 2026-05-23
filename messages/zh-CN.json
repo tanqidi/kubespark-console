@@ -131,7 +131,17 @@
     "batchDeleteDesc": "此操作不可撤销，将删除已选中的 {count} 条数据。"
   },
   "nodes": {
-    "describeSubtitle": "查看 Kubernetes Node ({name}) 的详情内容。"
+    "describeSubtitle": "查看 Kubernetes Node ({name}) 的详情内容。",
+    "status": {
+      "ready": "就绪",
+      "unschedulable": "不可调度",
+      "offline": "离线"
+    },
+    "role": {
+      "controlPlane": "控制平面",
+      "worker": "工作节点",
+      "unknown": "未知"
+    }
   },
   "deleteConfirmDialog": {
     "deleting": "删除中..."
@@ -148,6 +158,18 @@
     "addMountVolumeHint": "可添加持久卷、临时卷或 HostPath 卷。",
     "addMountVolume": "添加挂载卷",
     "addMountVolumeDesc": "新增一条卷挂载配置。"
+  },
+  "resourceMetadataEditor": {
+    "title": "标签注解",
+    "description": "统一管理资源的标签与注解信息，便于检索、分类和后续治理。",
+    "labels": "标签",
+    "annotations": "注解",
+    "key": "键",
+    "value": "值",
+    "add": "添加",
+    "delete": "删除",
+    "deleteLabel": "删除标签",
+    "deleteAnnotation": "删除注解"
   },
   "actions": {
     "details": "详情",

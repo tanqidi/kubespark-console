@@ -806,7 +806,6 @@ export function WorkspacesPageClient() {
                     description={workspaceDescription}
                     setDescription={setWorkspaceDescription}
                     disabled={submitting || loadingEditData}
-                    titleText="统一管理企业空间的标签与注解信息。"
                   />
                 </div>
               )}

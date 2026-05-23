@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { IconTrash } from "@tabler/icons-react"
+import { useTranslations } from "@/app/lib/i18n"
 
 import { AdvancedToggleCard } from "@/app/(console)/dashboard/components/resource-pages/advanced-toggle-card"
 import { Button } from "@/components/ui/button"
@@ -67,8 +68,11 @@ export function ResourceMetadataEditor({
   description,
   setDescription,
   disabled = false,
-  titleText = "统一管理路由的标签与注解信息。",
+  titleText,
 }: ResourceMetadataEditorProps) {
+  const t = useTranslations()
+  const metadataTitle = titleText || t("resourceMetadataEditor.description")
+
   React.useEffect(() => {
     const descriptionText = description.trim()
     setAnnotations((current) => {
@@ -101,9 +105,9 @@ export function ResourceMetadataEditor({
     <AdvancedToggleCard
       checked={checked}
       disabled={disabled}
-      ariaLabel="标签注解"
-      title="标签注解"
-      description={titleText}
+      ariaLabel={t("resourceMetadataEditor.title")}
+      title={t("resourceMetadataEditor.title")}
+      description={metadataTitle}
       onCheckedChange={(nextChecked) => {
         if (disabled) return
         if (nextChecked) {
@@ -123,7 +127,7 @@ export function ResourceMetadataEditor({
       }}
     >
       <div>
-        <FieldLabel className="mb-2">标签</FieldLabel>
+        <FieldLabel className="mb-2">{t("resourceMetadataEditor.labels")}</FieldLabel>
         <div className="space-y-3">
           {labels.map((entry, index) => (
             <div
@@ -132,7 +136,7 @@ export function ResourceMetadataEditor({
             >
               <InputGroup>
                 <InputGroupAddon>
-                  <InputGroupText>键</InputGroupText>
+                  <InputGroupText>{t("resourceMetadataEditor.key")}</InputGroupText>
                 </InputGroupAddon>
                 <InputGroupInput
                   value={entry.key}
@@ -151,7 +155,7 @@ export function ResourceMetadataEditor({
               </InputGroup>
               <InputGroup>
                 <InputGroupAddon>
-                  <InputGroupText>值</InputGroupText>
+                  <InputGroupText>{t("resourceMetadataEditor.value")}</InputGroupText>
                 </InputGroupAddon>
                 <InputGroupInput
                   value={entry.value}
@@ -181,10 +185,10 @@ export function ResourceMetadataEditor({
                 }}
                 disabled={disabled}
                 className="shrink-0"
-                aria-label="删除标签"
+                aria-label={t("resourceMetadataEditor.deleteLabel")}
               >
                 <IconTrash data-icon="inline-start" />
-                删除
+                {t("resourceMetadataEditor.delete")}
               </Button>
             </div>
           ))}
@@ -195,14 +199,14 @@ export function ResourceMetadataEditor({
               onClick={() => setLabels((current) => [...current, { key: "", value: "" }])}
               disabled={disabled}
             >
-              添加
+              {t("resourceMetadataEditor.add")}
             </Button>
           </div>
         </div>
       </div>
 
       <div>
-        <FieldLabel className="mb-2">注解</FieldLabel>
+        <FieldLabel className="mb-2">{t("resourceMetadataEditor.annotations")}</FieldLabel>
         <div className="space-y-3">
           {annotations.map((entry, index) => (
             <div
@@ -211,7 +215,7 @@ export function ResourceMetadataEditor({
             >
               <InputGroup>
                 <InputGroupAddon>
-                  <InputGroupText>键</InputGroupText>
+                  <InputGroupText>{t("resourceMetadataEditor.key")}</InputGroupText>
                 </InputGroupAddon>
                 <InputGroupInput
                   value={entry.key}
@@ -233,7 +237,7 @@ export function ResourceMetadataEditor({
               </InputGroup>
               <InputGroup>
                 <InputGroupAddon>
-                  <InputGroupText>值</InputGroupText>
+                  <InputGroupText>{t("resourceMetadataEditor.value")}</InputGroupText>
                 </InputGroupAddon>
                 <InputGroupInput
                   value={entry.value}
@@ -266,10 +270,10 @@ export function ResourceMetadataEditor({
                 }}
                 disabled={disabled}
                 className="shrink-0"
-                aria-label="删除注解"
+                aria-label={t("resourceMetadataEditor.deleteAnnotation")}
               >
                 <IconTrash data-icon="inline-start" />
-                删除
+                {t("resourceMetadataEditor.delete")}
               </Button>
             </div>
           ))}
@@ -280,7 +284,7 @@ export function ResourceMetadataEditor({
               onClick={() => setAnnotations((current) => [...current, { key: "", value: "" }])}
               disabled={disabled}
             >
-              添加
+              {t("resourceMetadataEditor.add")}
             </Button>
           </div>
         </div>

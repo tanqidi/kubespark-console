@@ -144,8 +144,8 @@ export async function fetchNodeResourceRows(): Promise<NodeResourceRow[]> {
       name: node.name,
       description: node.description,
       ip: node.ip,
-      status: statusLabel(node.status),
-      role: roleLabel(node.role),
+      status: node.status, // Return raw key instead of translated label
+      role: node.role, // Return raw key instead of translated label
       cpuUsage: formatCpuUsage(0, node.cpuTotal),
       memoryUsage: formatMemUsage(0, node.memoryTotal),
       pods: node.podsTotal ? `${usedPods}/${node.podsTotal}` : `${usedPods}/-`,

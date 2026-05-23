@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { IconInfoCircle } from "@tabler/icons-react"
+import { IconCircleCheckFilled, IconLoader, IconInfoCircle } from "@tabler/icons-react"
+import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import {
@@ -13,6 +15,23 @@ import { DescribeViewerDialog } from "@/app/(console)/dashboard/components/resou
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { useTranslations } from "@/app/lib/i18n"
+
+const HEALTHY_STATUS_SET = new Set<string>([
+  "done",
+  "running",
+  "succeeded",
+  "success",
+  "successful",
+  "normal",
+  "ready",
+  "bound",
+  "active",
+  "available",
+  "healthy",
+  "completed",
+  "online",
+  "true",
+])
 
 type NodeRow = NodeResourceRow
 
@@ -29,8 +48,33 @@ function getNodeColumns(t: (key: string) => string) {
         </div>
       ),
     },
-    { key: "status", label: t("table.columns.status"), render: "status" },
-    { key: "role", label: t("table.columns.role") },
+    { 
+      key: "status", 
+      label: t("table.columns.status"), 
+      cell: (value: unknown) => {
+        const key = String(value ?? "-")
+        const text = t(`nodes.status.${key}`)
+        const isHealthy = HEALTHY_STATUS_SET.has(key)
+        const statusClassName = isHealthy
+          ? "text-muted-foreground"
+          : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
+        return (
+          <Badge variant="outline" className={cn("px-1.5", statusClassName)}>
+            {isHealthy ? (
+              <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
+            ) : (
+              <IconLoader className="text-amber-500 dark:text-amber-300" />
+            )}
+            {text}
+          </Badge>
+        )
+      }
+    },
+    { 
+      key: "role", 
+      label: t("table.columns.role"),
+      cell: (value: unknown) => t(`nodes.role.${String(value)}`)
+    },
     { key: "pods", label: t("table.columns.pods") },
     { key: "age", label: t("table.columns.age") },
     { key: "updatedAt", label: t("table.columns.updatedAt") },

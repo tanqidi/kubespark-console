@@ -131,7 +131,17 @@
     "batchDeleteDesc": "This operation cannot be undone. It will delete the selected {count} items."
   },
   "nodes": {
-    "describeSubtitle": "View Kubernetes Node ({name}) details."
+    "describeSubtitle": "View Kubernetes Node ({name}) details.",
+    "status": {
+      "ready": "Ready",
+      "unschedulable": "Unschedulable",
+      "offline": "Offline"
+    },
+    "role": {
+      "controlPlane": "Control Plane",
+      "worker": "Worker",
+      "unknown": "Unknown"
+    }
   },
   "deleteConfirmDialog": {
     "deleting": "Deleting..."
@@ -148,6 +158,18 @@
     "addMountVolumeHint": "You can add persistent, ephemeral, or HostPath volumes.",
     "addMountVolume": "Add Mount Volume",
     "addMountVolumeDesc": "Add a new volume mount configuration."
+  },
+  "resourceMetadataEditor": {
+    "title": "Labels & Annotations",
+    "description": "Manage labels and annotations for resources for easy retrieval, categorization, and governance.",
+    "labels": "Labels",
+    "annotations": "Annotations",
+    "key": "Key",
+    "value": "Value",
+    "add": "Add",
+    "delete": "Delete",
+    "deleteLabel": "Delete label",
+    "deleteAnnotation": "Delete annotation"
   },
   "actions": {
     "details": "Details",
