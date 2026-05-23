@@ -15,6 +15,7 @@ import { DescribeViewerDialog } from "@/app/(console)/dashboard/components/resou
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { useTranslations } from "@/app/lib/i18n"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 const HEALTHY_STATUS_SET = new Set<string>([
   "done",
@@ -137,14 +138,9 @@ export function NodesPageClient() {
 
   React.useEffect(() => {
     void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      window.clearInterval(timer)
-    }
   }, [loadRows])
+
+  useIntervalRefresh(() => loadRows(true), 3000)
 
   const columns = React.useMemo(() => getNodeColumns(t), [t])
   const actionItems = React.useMemo(

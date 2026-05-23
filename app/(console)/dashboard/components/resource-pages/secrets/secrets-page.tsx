@@ -29,6 +29,7 @@ import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { useTranslations } from "@/app/lib/i18n"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 type SecretRow = SecretResourceRow
 type JsonObject = Record<string, unknown>
@@ -349,23 +350,10 @@ export function SecretsPageClient() {
   )
 
   React.useEffect(() => {
-    let cancelled = false
-
-    const loadRows = async (silent: boolean) => {
-      await refreshRows(silent)
-      if (cancelled) return
-    }
-
-    void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
+    void refreshRows(false)
   }, [refreshRows])
+
+  useIntervalRefresh(() => refreshRows(true), 3000)
 
   // if (loading) return <ResourceLoadingState /> // kept for potential future use
   if (error) {

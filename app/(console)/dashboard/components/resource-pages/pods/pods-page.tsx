@@ -34,6 +34,7 @@ import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { useTranslations } from "@/app/lib/i18n"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 type PodRow = PodResourceRow
 
@@ -379,64 +380,40 @@ export function PodsPageClient() {
     [handleOpenTerminal, handleViewDescribe, handleViewLogs, handleViewYaml, requestDelete, t]
   )
 
-  const refreshRows = React.useCallback(async () => {
-    const [mapped, namespacesResult] = await Promise.all([
-      fetchPodResourceRows(),
-      fetchNamespaces().catch(() => []),
-    ])
-    setRows(mapped)
-    setCreateNamespaceOptions(
-      namespacesResult
-        .map((item) => ({ id: item.name, name: item.name }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-    )
-    setError(null)
+  const loadRows = React.useCallback(async (silent: boolean = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
+    try {
+      const [mapped, namespacesResult] = await Promise.all([
+        fetchPodResourceRows(),
+        fetchNamespaces().catch(() => []),
+      ])
+      setRows(mapped)
+      setCreateNamespaceOptions(
+        namespacesResult
+          .map((item) => ({ id: item.name, name: item.name }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
+      setError(null)
+    } catch (e: unknown) {
+      if (!silent) {
+        setRows([])
+        setError(e instanceof Error ? e.message : "API request failed")
+      } else {
+        console.error("[Pods] polling refresh failed", e)
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
   }, [])
 
   React.useEffect(() => {
-    let cancelled = false
-
-    const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const [mapped, namespacesResult] = await Promise.all([
-          fetchPodResourceRows(),
-          fetchNamespaces().catch(() => []),
-        ])
-        if (cancelled) return
-        setRows(mapped)
-        setCreateNamespaceOptions(
-          namespacesResult
-            .map((item) => ({ id: item.name, name: item.name }))
-            .sort((a, b) => a.name.localeCompare(b.name))
-        )
-        setError(null)
-      } catch (e: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setRows([])
-          setError(e instanceof Error ? e.message : "API request failed")
-        } else {
-          console.error("[Pods] polling refresh failed", e)
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
-    }
-
     void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
+  }, [loadRows])
 
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
-  }, [refreshRows])
+  useIntervalRefresh(() => loadRows(true), 3000)
 
   const namespaceOptions = React.useMemo(
     () =>

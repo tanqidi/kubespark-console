@@ -47,6 +47,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { useTranslations } from "@/app/lib/i18n"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -232,24 +233,10 @@ export function WorkspacesPageClient() {
   }, [t])
 
   React.useEffect(() => {
-    let cancelled = false
+    void loadRows(false)
+  }, [loadRows])
 
-    // 初始加载
-    void (async () => {
-      if (cancelled) return
-      await loadRows(false)
-    })()
-
-    const timer = window.setInterval(() => {
-      if (cancelled) return
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
-  }, []) // 空依赖，只执行一次
+  useIntervalRefresh(() => loadRows(true), 3000)
 
   const resetCreateState = React.useCallback(() => {
     setDialogMode("create")

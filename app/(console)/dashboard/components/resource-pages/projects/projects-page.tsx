@@ -72,6 +72,7 @@ import { Input } from "@/components/ui/input"
 import { FilterCombobox, type FilterComboboxOption } from "@/components/ui/filter-combobox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useTranslations } from "@/app/lib/i18n"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -1283,12 +1284,7 @@ export function ProjectsPageClient() {
   React.useEffect(() => {
     let cancelled = false
 
-    const loadRows = async (silent: boolean) => {
-      if (cancelled) return
-      await refreshRows(silent)
-    }
-
-    void loadRows(false)
+    void refreshRows(false)
     void fetchWorkspaceRows(500)
       .then((items) => {
         if (cancelled) return
@@ -1303,15 +1299,13 @@ export function ProjectsPageClient() {
         if (cancelled) return
         console.error("[Projects] load workspace options failed", e)
       })
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
 
     return () => {
       cancelled = true
-      window.clearInterval(timer)
     }
   }, [refreshRows])
+
+  useIntervalRefresh(() => refreshRows(true), 3000)
 
   const query = nameQuery.trim().toLowerCase()
   const selectedWorkspace = workspaceQuery.trim()

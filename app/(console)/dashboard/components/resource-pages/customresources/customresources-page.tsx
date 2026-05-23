@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { useTranslations } from "@/app/lib/i18n"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 type CustomResourceRow = CustomResourceDefinitionRow
 
@@ -199,40 +200,31 @@ export function CustomResourcesPageClient() {
     [actionItems, t]
   )
 
-  React.useEffect(() => {
-    let cancelled = false
-
-    const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const mapped = await fetchCustomResourceDefinitionRows()
-        if (cancelled) return
-        setRows(mapped)
-        setError(null)
-      } catch (e: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setRows([])
-          setError(e instanceof Error ? e.message : "API request failed")
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
+  const loadRows = React.useCallback(async (silent: boolean = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
     }
-
-    void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
+    try {
+      const mapped = await fetchCustomResourceDefinitionRows()
+      setRows(mapped)
+      setError(null)
+    } catch (e: unknown) {
+      if (!silent) {
+        setRows([])
+        setError(e instanceof Error ? e.message : "API request failed")
+      }
+    } finally {
+      if (!silent) setLoading(false)
     }
   }, [])
+
+  // Initial load
+  React.useEffect(() => {
+    void loadRows(false)
+  }, [loadRows])
+
+  useIntervalRefresh(() => loadRows(true), 3000)
 
   const groupOptions = React.useMemo(
     () =>

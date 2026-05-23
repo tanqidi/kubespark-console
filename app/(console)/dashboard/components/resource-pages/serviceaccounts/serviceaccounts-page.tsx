@@ -22,6 +22,7 @@ import { MonacoViewerDialog } from "@/components/ui/monaco-viewer-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { useTranslations } from "@/app/lib/i18n"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 type ServiceAccountRow = ServiceAccountResourceRow
 
@@ -143,48 +144,38 @@ export function ServiceAccountsPageClient() {
     [handleViewYaml, requestDelete, t]
   )
 
-  React.useEffect(() => {
-    let cancelled = false
-
-    const loadRows = async (silent: boolean) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
-      try {
-        const [mapped, namespaces] = await Promise.all([
-          fetchServiceAccountRows(),
-          fetchNamespaces(),
-        ])
-        if (cancelled) return
-        setRows(mapped)
-        setNamespaceOptions(
-          namespaces
-            .map((item) => ({ id: item.name, name: item.name }))
-            .sort((a, b) => a.name.localeCompare(b.name))
-        )
-        setError(null)
-      } catch (e: unknown) {
-        if (cancelled) return
-        if (!silent) {
-          setRows([])
-          setError(e instanceof Error ? e.message : "API request failed")
-        }
-      } finally {
-        if (!silent && !cancelled) setLoading(false)
-      }
+  const loadRows = React.useCallback(async (silent: boolean = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
     }
-
-    void loadRows(false)
-    const timer = window.setInterval(() => {
-      void loadRows(true)
-    }, 3000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
+    try {
+      const [mapped, namespaces] = await Promise.all([
+        fetchServiceAccountRows(),
+        fetchNamespaces(),
+      ])
+      setRows(mapped)
+      setNamespaceOptions(
+        namespaces
+          .map((item) => ({ id: item.name, name: item.name }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
+      setError(null)
+    } catch (e: unknown) {
+      if (!silent) {
+        setRows([])
+        setError(e instanceof Error ? e.message : "API request failed")
+      }
+    } finally {
+      if (!silent) setLoading(false)
     }
   }, [])
+
+  React.useEffect(() => {
+    void loadRows(false)
+  }, [loadRows])
+
+  useIntervalRefresh(() => loadRows(true), 3000)
 
   if (error) {
     return (

@@ -31,6 +31,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useTranslations } from "@/app/lib/i18n"
+import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
 
 type WorkloadRow = WorkloadResourceRow
 
@@ -301,17 +302,10 @@ export function WorkloadsPageClient() {
   )
 
   React.useEffect(() => {
-    let cancelled = false
-
-    const loadRows = async (silent: boolean) => {
-      await refreshRows(silent)
-      if (cancelled) return
-    }
-
-    void loadRows(false)
-    // 移除定时刷新，避免导致弹出菜单自动关闭
-    // 如需定时刷新，可以在没有对话框或菜单打开时暂停刷新
+    void refreshRows(false)
   }, [refreshRows])
+
+  useIntervalRefresh(() => refreshRows(true), 3000)
 
   const namespaceOptions = React.useMemo(
     () =>

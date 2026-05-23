@@ -71,6 +71,51 @@ export type ActionMenuItem<TData> = {
   disabled?: boolean | ((row: TData) => boolean)
 }
 
+function ActionMenuCell<TData>({
+  row,
+  actionItems,
+}: {
+  row: { original: TData; id: string }
+  actionItems: ActionMenuItem<TData>[]
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          className="flex size-8 text-muted-foreground data-[state=open]:bg-muted focus-visible:ring-0 focus-visible:border-transparent"
+          size="icon"
+        >
+          <IconDotsVertical />
+          <span className="sr-only">Open menu</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-32">
+        <DropdownMenuGroup>
+          {actionItems.map((item, index) => {
+            const isDisabled = typeof item.disabled === "function" 
+              ? item.disabled(row.original) 
+              : !!item.disabled
+            
+            return (
+              <React.Fragment key={`action-${index}`}>
+                {item.withSeparator ? <DropdownMenuSeparator /> : null}
+                <DropdownMenuItem
+                  variant={item.variant}
+                  disabled={isDisabled}
+                  onSelect={() => item.onSelect?.(row.original)}
+                >
+                  {item.label}
+                </DropdownMenuItem>
+              </React.Fragment>
+            )
+          })}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 const HEALTHY_STATUS_SET = new Set<string>([
   "done",
   "running",
@@ -261,40 +306,7 @@ export function createColumns<TData extends Record<string, unknown>>(
                 <span className="sr-only">Open menu</span>
               </Button>
           ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                      variant="ghost"
-                      className="flex size-8 text-muted-foreground data-[state=open]:bg-muted focus-visible:ring-0 focus-visible:border-transparent"
-                      size="icon"
-                  >
-                    <IconDotsVertical />
-                    <span className="sr-only">Open menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-32">
-                  <DropdownMenuGroup>
-                    {visibleActionItems.map((item, index) => {
-                        const isDisabled = typeof item.disabled === "function" 
-                          ? item.disabled(row.original) 
-                          : !!item.disabled
-                        
-                        return (
-                          <React.Fragment key={`action-${index}`}>
-                            {item.withSeparator ? <DropdownMenuSeparator /> : null}
-                            <DropdownMenuItem
-                                variant={item.variant}
-                                disabled={isDisabled}
-                                onSelect={() => item.onSelect?.(row.original)}
-                            >
-                              {item.label}
-                            </DropdownMenuItem>
-                          </React.Fragment>
-                        )
-                    })}
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <ActionMenuCell row={row} actionItems={visibleActionItems} />
           ),
       enableSorting: false,
       enableHiding: false,
