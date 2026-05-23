@@ -67,6 +67,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useIntervalRefresh } from "@/app/(console)/dashboard/hooks/use-interval-refresh"
+import { useTranslations } from "@/app/lib/i18n"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -102,18 +103,6 @@ const PIPELINE_NAME_RULE_MESSAGE =
   "名称只能包含小写字母、数字、短横线（-）和点（.），必须以字母或数字开头和结尾，最长 253 个字符。"
 const CODE_REPOSITORY_ANNOTATION_KEY = "tanqidi.com/code-repository"
 const DRONE_YAML_ANNOTATION_KEY = "tanqidi.com/drone-yaml"
-
-const pipelineColumns: ColumnConfig<PipelineRow>[] = [
-  {
-    key: "name",
-    label: "名称",
-    enableHiding: false,
-    cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
-  },
-  { key: "workspace", label: "企业空间" },
-  { key: "age", label: "运行时间" },
-  { key: "updatedAt", label: "更新时间" },
-]
 
 function validatePipelineName(name: string): string | null {
   if (!name) return "请输入流水线名称"
@@ -277,6 +266,7 @@ export function PipelinesPageClient({
   pipelineProjectName,
   detailBasePath = "/dashboard/pipelines",
 }: PipelinesPageClientProps = {}) {
+  const t = useTranslations()
   const normalizedPipelineProjectName = pipelineProjectName?.trim() ?? ""
 
   const [rows, setRows] = React.useState<PipelineRow[]>([])
@@ -288,7 +278,7 @@ export function PipelinesPageClient({
   const [yamlContent, setYamlContent] = React.useState("")
   const [yamlLoading, setYamlLoading] = React.useState(false)
   const [yamlError, setYamlError] = React.useState<string | null>(null)
-  const [yamlSubtitle, setYamlSubtitle] = React.useState("查看 Pipeline 的 YAML 内容。")
+  const [yamlSubtitle, setYamlSubtitle] = React.useState("")
 
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PipelineRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
@@ -714,7 +704,7 @@ export function PipelinesPageClient({
     }
 
     if (isEditMode && editingName && nextName !== editingName) {
-      const lockedNameError = "编辑模式不支持修改流水线名称"
+      const lockedNameError = t("pipelines.editNameLocked")
       setCreateNameInvalid(true)
       setCreateNameError(lockedNameError)
       if (createYamlMode) setCreateYamlError(lockedNameError)
@@ -828,14 +818,14 @@ export function PipelinesPageClient({
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Pipeline（${pipelineName}）的 YAML 内容。`)
+    setYamlSubtitle(`${t("pipelines.viewYaml")} (${pipelineName})`)
 
     void fetchPipelineYaml(pipelineName)
       .then((text) => {
         setYamlContent(text)
       })
       .catch((e: unknown) => {
-        setYamlError(e instanceof Error ? e.message : "加载 YAML 失败")
+        setYamlError(e instanceof Error ? e.message : t("common.loadYamlFailed"))
       })
       .finally(() => {
         setYamlLoading(false)
@@ -856,13 +846,13 @@ export function PipelinesPageClient({
           await loadRows(false)
         })
         .catch((e: unknown) => {
-          setError(e instanceof Error ? e.message : "删除流水线失败")
+          setError(e instanceof Error ? e.message : t("pipelines.deleteFailed"))
         })
         .finally(() => {
           setDeleting(false)
         })
     },
-    [loadRows]
+    [loadRows, t]
   )
 
   const handleConfirmDelete = React.useCallback(() => {
@@ -877,12 +867,12 @@ export function PipelinesPageClient({
         await loadRows(false)
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "删除流水线失败")
+        setError(e instanceof Error ? e.message : t("pipelines.deleteFailed"))
       })
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, loadRows, pendingDeleteRow])
+  }, [deleting, loadRows, pendingDeleteRow, t])
 
   const handleConfirmDeleteSecret = React.useCallback(() => {
     if (deletingSecret) return
@@ -904,57 +894,66 @@ export function PipelinesPageClient({
         setKeyValueEnabled(items.length > 0)
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "删除变量失败")
+        setError(e instanceof Error ? e.message : t("pipelines.deleteSecretFailed"))
       })
       .finally(() => {
         setDeletingSecret(false)
       })
-  }, [codeRepository, deletingSecret, pendingDeleteSecretKey])
+  }, [codeRepository, deletingSecret, pendingDeleteSecretKey, t])
 
-  const columns = React.useMemo(
-    () =>
-      createColumns<PipelineRow>({
-        columns: pipelineColumns,
-        actionItems: [
-          {
-            label: (
-              <>
-                <IconEye className="size-4" />
-                查看 YAML
-              </>
-            ),
-            onSelect: (row) => {
-              handleViewYaml(row)
-            },
+  const columns = React.useMemo(() => {
+    const pipelineColumns: ColumnConfig<PipelineRow>[] = [
+      {
+        key: "name",
+        label: t("pipelines.columns.name"),
+        enableHiding: false,
+        cell: (_value, row) => renderNameDescriptionCell(row.name, row.description),
+      },
+      { key: "workspace", label: t("pipelines.columns.workspace") },
+      { key: "age", label: t("pipelines.columns.age") },
+      { key: "updatedAt", label: t("pipelines.columns.updatedAt") },
+    ]
+    return createColumns<PipelineRow>({
+      columns: pipelineColumns,
+      actionItems: [
+        {
+          label: (
+            <>
+              <IconEye className="size-4" />
+              {t("pipelines.viewYaml")}
+            </>
+          ),
+          onSelect: (row) => {
+            handleViewYaml(row)
           },
-          {
-            label: (
-              <>
-                <IconPencil className="size-4" />
-                编辑
-              </>
-            ),
-            onSelect: (row) => {
-              openEditDialog(row)
-            },
+        },
+        {
+          label: (
+            <>
+              <IconPencil className="size-4" />
+              {t("pipelines.edit")}
+            </>
+          ),
+          onSelect: (row) => {
+            openEditDialog(row)
           },
-          {
-            label: (
-              <>
-                <IconTrash className="size-4" />
-                删除
-              </>
-            ),
-            variant: "destructive",
-            withSeparator: true,
-            onSelect: (row) => {
-              setPendingDeleteRow(row)
-            },
+        },
+        {
+          label: (
+            <>
+              <IconTrash className="size-4" />
+              {t("pipelines.delete")}
+            </>
+          ),
+          variant: "destructive",
+          withSeparator: true,
+          onSelect: (row) => {
+            setPendingDeleteRow(row)
           },
-        ],
-      }),
-    [handleViewYaml, openEditDialog]
-  )
+        },
+      ],
+    })
+  }, [t, handleViewYaml, openEditDialog])
 
   const query = nameQuery.trim().toLowerCase()
   const filteredRows = rows.filter((row) => {
@@ -966,7 +965,7 @@ export function PipelinesPageClient({
     return (
       <div className="px-4 lg:px-6">
         <Alert variant="destructive">
-          <AlertTitle>加载失败</AlertTitle>
+          <AlertTitle>{t("common.loadFailed")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -974,24 +973,24 @@ export function PipelinesPageClient({
   }
 
   const isEditMode = createMode === "edit"
-  const dialogTitle = isEditMode ? "编辑流水线" : "创建流水线"
-  const dialogDescription = isEditMode ? "编辑流水线并更新基础信息。" : "创建流水线并配置基础信息。"
+  const dialogTitle = isEditMode ? t("pipelines.editTitle") : t("pipelines.createTitle")
+  const dialogDescription = isEditMode ? t("pipelines.editDesc") : t("pipelines.createDesc")
 
   return (
     <>
       <MonacoViewerDialog
         open={yamlOpen}
         onOpenChange={setYamlOpen}
-        title="查看 YAML"
+        title={t("pipelines.viewYaml")}
         subtitle={yamlSubtitle}
-        value={yamlLoading ? "加载中..." : yamlContent}
+        value={yamlLoading ? t("workloadPickerDialog.loading") : yamlContent}
         language="yaml"
         error={yamlError}
       />
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteRow)}
-        title="删除流水线"
-        description={pendingDeleteRow ? `确定删除流水线 ${pendingDeleteRow.name} 吗？` : ""}
+        title={t("pipelines.deleteTitle")}
+        description={pendingDeleteRow ? t("pipelines.deleteDesc").replace("{name}", pendingDeleteRow.name) : ""}
         deleting={deleting}
         onOpenChange={(open) => {
           if (!open) setPendingDeleteRow(null)
@@ -1000,8 +999,8 @@ export function PipelinesPageClient({
       />
       <DeleteConfirmDialog
         open={Boolean(pendingDeleteSecretKey)}
-        title="删除变量"
-        description={pendingDeleteSecretKey ? `确定删除变量 ${pendingDeleteSecretKey} 吗？` : ""}
+        title={t("pipelines.deleteSecretTitle")}
+        description={pendingDeleteSecretKey ? t("pipelines.deleteSecretDesc").replace("{name}", pendingDeleteSecretKey) : ""}
         deleting={deletingSecret}
         onOpenChange={(open) => {
           if (!open && !deletingSecret) setPendingDeleteSecretKey(null)
@@ -1031,37 +1030,37 @@ export function PipelinesPageClient({
               </DialogHeader>
               <div className="me-20 flex h-full items-center gap-3">
                 <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                  <span className="text-sm font-medium">编辑 YAML</span>
-                  <Switch
-                      checked={createYamlMode}
-                      onCheckedChange={(checked) => {
-                        if (creating) return
-                        if (checked) {
-                          enterCreateYamlMode()
-                        } else {
-                          cancelCreateYamlMode()
-                        }
-                      }}
-                      disabled={creating}
-                      aria-label="编辑 YAML"
-                  />
-                </div>
-                <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
-                  <span className="text-sm font-medium">编辑 .drone.yml</span>
-                  <Switch
-                      checked={createDroneYamlMode}
-                      onCheckedChange={(checked) => {
-                        if (creating) return
-                        if (checked) {
-                          enterCreateDroneYamlMode()
-                        } else {
-                          cancelCreateDroneYamlMode()
-                        }
-                      }}
-                      disabled={creating}
-                      aria-label="编辑 .drone.yml"
-                  />
-                </div>
+                    <span className="text-sm font-medium">{t("pipelines.editYaml")}</span>
+                    <Switch
+                        checked={createYamlMode}
+                        onCheckedChange={(checked) => {
+                          if (creating) return
+                          if (checked) {
+                            enterCreateYamlMode()
+                          } else {
+                            cancelCreateYamlMode()
+                          }
+                        }}
+                        disabled={creating}
+                        aria-label={t("pipelines.editYaml")}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 rounded-full border bg-background px-4 py-2">
+                    <span className="text-sm font-medium">{t("pipelines.editDroneYaml")}</span>
+                    <Switch
+                        checked={createDroneYamlMode}
+                        onCheckedChange={(checked) => {
+                          if (creating) return
+                          if (checked) {
+                            enterCreateDroneYamlMode()
+                          } else {
+                            cancelCreateDroneYamlMode()
+                          }
+                        }}
+                        disabled={creating}
+                        aria-label={t("pipelines.editDroneYaml")}
+                    />
+                  </div>
               </div>
             </div>
 
@@ -1070,8 +1069,8 @@ export function PipelinesPageClient({
                 items={[
                   {
                     id: "basic",
-                    title: "基本信息",
-                    status: createStep === "basic" ? "当前" : "已设置",
+                    title: t("common.basicInfo"),
+                    status: createStep === "basic" ? t("common.current") : t("common.configured"),
                     active: createStep === "basic",
                     icon: <IconSettings2 className="size-4"/>,
                     disabled: creating,
@@ -1082,14 +1081,14 @@ export function PipelinesPageClient({
                   },
                   {
                     id: "advanced",
-                    title: "高级设置",
+                    title: t("common.advancedSettings"),
                     status:
                         createStep === "advanced"
-                            ? "当前"
+                            ? t("common.current")
                             : hasUserProvidedMetadata(labelEntries, annotationEntries) ||
                                 hasUserProvidedKeyValues(keyValueEntries)
-                                ? "已设置"
-                                : "可选",
+                                ? t("common.configured")
+                                : t("common.optional"),
                     active: createStep === "advanced",
                     icon: <IconSettings2 className="size-4" />,
                     disabled: creating,
@@ -1142,12 +1141,12 @@ export function PipelinesPageClient({
               ) : createStep === "basic" ? (
                 <div className="p-6">
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">基本信息</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">填写流水线基础信息。</p>
+                    <h3 className="text-[15px] font-semibold">{t("common.basicInfo")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("pipelines.createDesc")}</p>
                   </div>
                   <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Field data-invalid={createNameInvalid}>
-                      <FieldLabel htmlFor="pipeline-create-name">名称</FieldLabel>
+                      <FieldLabel htmlFor="pipeline-create-name">{t("pipelines.columns.name")}</FieldLabel>
                       <Input
                         id="pipeline-create-name"
                         value={pipelineName}
@@ -1156,7 +1155,7 @@ export function PipelinesPageClient({
                           if (createNameInvalid) setCreateNameInvalid(false)
                           if (createNameError) setCreateNameError(null)
                         }}
-                        placeholder="请输入流水线名称"
+                        placeholder={t("pipelines.pipelineNameRequired")}
                         autoComplete="off"
                         aria-invalid={createNameInvalid}
                         disabled={creating || isEditMode}
@@ -1164,11 +1163,11 @@ export function PipelinesPageClient({
                       {createNameError ? (
                         <FieldError>{createNameError}</FieldError>
                       ) : (
-                        <FieldDescription>{PIPELINE_NAME_RULE_MESSAGE}</FieldDescription>
+                        <FieldDescription>{t("pipelines.pipelineNameRule")}</FieldDescription>
                       )}
                     </Field>
                     <Field data-invalid={Boolean(codeRepositoryError)}>
-                      <FieldLabel htmlFor="pipeline-create-repository">代码仓库</FieldLabel>
+                      <FieldLabel htmlFor="pipeline-create-repository">{t("pipelines.codeRepository")}</FieldLabel>
                       <Combobox
                         items={codeRepositoryOptions}
                         value={codeRepository.trim() ? codeRepository : null}
@@ -1186,7 +1185,7 @@ export function PipelinesPageClient({
                         disabled={creating || isEditMode}
                       >
                         <ComboboxInput
-                          placeholder="请选择代码仓库"
+                          placeholder={t("pipelines.codeRepositoryPlaceholder")}
                           className={cn(
                             "w-full",
                             codeRepositoryError
@@ -1217,31 +1216,31 @@ export function PipelinesPageClient({
                         <FieldError>{codeRepositoryError}</FieldError>
                       ) : (
                         <FieldDescription>
-                          请选择要构建的 Drone 仓库（owner/repo）。
+                          {t("pipelines.codeRepositoryPlaceholder")} (owner/repo)
                         </FieldDescription>
                       )}
                     </Field>
 
                     <Field className="md:col-span-2">
-                      <FieldLabel htmlFor="pipeline-create-description">描述</FieldLabel>
+                      <FieldLabel htmlFor="pipeline-create-description">{t("pipelines.pipelineDescription")}</FieldLabel>
                       <Textarea
                         id="pipeline-create-description"
                         value={pipelineDescription}
                         onChange={(event) => setPipelineDescription(event.target.value)}
-                        placeholder="请输入描述"
+                        placeholder={t("pipelines.pipelineDescriptionPlaceholder")}
                         maxLength={256}
                         className="min-h-28"
                         disabled={creating}
                       />
-                      <FieldDescription>描述将写入资源注解 description，最长 256 个字符。</FieldDescription>
+                      <FieldDescription>{t("pipelines.pipelineDescription")} {t("common.descriptionMaxLength", { max: 256 })}</FieldDescription>
                     </Field>
                   </FieldGroup>
                 </div>
               ) : (
                 <div className="p-6">
                   <div className="mb-4">
-                    <h3 className="text-[15px] font-semibold">高级设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">补充标签注解与键值配置。</p>
+                    <h3 className="text-[15px] font-semibold">{t("common.advancedSettings")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("common.advancedSettingsDesc")}</p>
                   </div>
                   <FieldGroup className="flex flex-col gap-4">
                     <Field>
@@ -1255,7 +1254,7 @@ export function PipelinesPageClient({
                         description={pipelineDescription}
                         setDescription={setPipelineDescription}
                         disabled={creating}
-                        titleText="统一管理流水线的标签与注解信息。"
+                        titleText={t("common.metadataEditorTitle")}
                       />
                     </Field>
                     <Field>
@@ -1347,7 +1346,7 @@ export function PipelinesPageClient({
           <Input
             value={nameQuery}
             onChange={(event) => setNameQuery(event.target.value)}
-            placeholder="名称"
+            placeholder={t("pipelines.searchPlaceholder")}
             className="h-9 w-40"
           />
         }
