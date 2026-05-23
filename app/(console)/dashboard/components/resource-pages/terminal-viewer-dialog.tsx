@@ -10,6 +10,7 @@ import {
 } from "@tabler/icons-react"
 import "@xterm/xterm/css/xterm.css"
 
+import { useTranslations } from "@/app/lib/i18n"
 import {
   Dialog,
   DialogContent,
@@ -99,10 +100,11 @@ export function TerminalViewerDialog({
   open,
   onOpenChange,
   title,
-  subtitle = "连接 Kubernetes Pod 终端会话。",
+  subtitle,
   wsUrl,
-  emptyMessage = "终端连接地址不可用。",
+  emptyMessage,
 }: TerminalViewerDialogProps) {
+  const t = useTranslations()
   const [terminalHost, setTerminalHost] = React.useState<HTMLDivElement | null>(null)
   const [fullscreen, setFullscreen] = React.useState(false)
   const terminalRef = React.useRef<Terminal | null>(null)
@@ -110,6 +112,8 @@ export function TerminalViewerDialog({
   const socketRef = React.useRef<WebSocket | null>(null)
   const fitTimerRefs = React.useRef<number[]>([])
   const [terminalReady, setTerminalReady] = React.useState(false)
+  const defaultSubtitle = t("terminal.subtitleFallback")
+  const defaultEmptyMessage = t("terminal.emptyMessage")
 
   const sendSocketMessage = React.useCallback((payload: unknown) => {
     const ws = socketRef.current
@@ -179,15 +183,15 @@ export function TerminalViewerDialog({
     fitAddonRef.current = fitAddon
     setTerminalReady(true)
     if (wsUrl) {
-      terminal.writeln("\x1b[1;36m正在连接终端...\x1b[0m")
+      terminal.writeln(`\x1b[1;36m${t("terminal.connecting")}\x1b[0m`)
     } else {
-      terminal.writeln(`\x1b[1;33m${emptyMessage}\x1b[0m`)
+      terminal.writeln(`\x1b[1;33m${emptyMessage || defaultEmptyMessage}\x1b[0m`)
     }
 
     return () => {
       disposeInput.dispose()
     }
-  }, [emptyMessage, open, sendSocketMessage, terminalHost, wsUrl])
+  }, [emptyMessage, defaultEmptyMessage, open, sendSocketMessage, terminalHost, wsUrl, t])
 
   React.useEffect(() => {
     if (!open || !terminalRef.current || !terminalHost) return
@@ -299,11 +303,11 @@ export function TerminalViewerDialog({
   const handleOpenInNewWindow = React.useCallback(() => {
     openTerminalStandalone({
       title,
-      subtitle,
+      subtitle: subtitle || defaultSubtitle,
       wsUrl,
-      emptyMessage,
+      emptyMessage: emptyMessage || defaultEmptyMessage,
     })
-  }, [emptyMessage, subtitle, title, wsUrl])
+  }, [emptyMessage, defaultEmptyMessage, subtitle, defaultSubtitle, title, wsUrl])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -320,7 +324,7 @@ export function TerminalViewerDialog({
         <div className="flex items-start justify-between border-b bg-muted/15">
           <DialogHeader className="px-6 py-4">
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>{subtitle}</DialogDescription>
+            <DialogDescription>{subtitle || defaultSubtitle}</DialogDescription>
           </DialogHeader>
           <div className="me-20 flex h-full items-center gap-3">
             <Button
@@ -329,11 +333,11 @@ export function TerminalViewerDialog({
               size="icon"
               className="rounded-full"
               onClick={handleOpenInNewWindow}
-              aria-label="新窗口打开"
-              title="新窗口打开"
+              aria-label={t("terminal.openInNewWindow")}
+              title={t("terminal.openInNewWindow")}
             >
               <IconExternalLink className="size-4" />
-              <span className="sr-only">新窗口打开</span>
+              <span className="sr-only">{t("terminal.openInNewWindow")}</span>
             </Button>
             <Button
               type="button"
@@ -343,11 +347,11 @@ export function TerminalViewerDialog({
                 fullscreen ? "border-black bg-black text-white hover:bg-black hover:text-white" : ""
               }`}
               onClick={() => setFullscreen((prev) => !prev)}
-              aria-label={fullscreen ? "退出全屏" : "全屏"}
-              title={fullscreen ? "退出全屏" : "全屏"}
+              aria-label={fullscreen ? t("terminal.exitFullscreen") : t("terminal.fullscreen")}
+              title={fullscreen ? t("terminal.exitFullscreen") : t("terminal.fullscreen")}
             >
               {fullscreen ? <IconArrowsMinimize /> : <IconArrowsMaximize />}
-              <span className="sr-only">{fullscreen ? "退出全屏" : "全屏"}</span>
+              <span className="sr-only">{fullscreen ? t("terminal.exitFullscreen") : t("terminal.fullscreen")}</span>
             </Button>
           </div>
         </div>

@@ -130,6 +130,19 @@
     "batchDelete": "Batch Delete",
     "batchDeleteDesc": "This operation cannot be undone. It will delete the selected {count} items."
   },
+  "pods": {
+    "viewYamlSubtitle": "View Kubernetes Pod ({namespace}/{name}) YAML content.",
+    "viewLogsSubtitle": "View Kubernetes Pod ({namespace}/{name}) logs.",
+    "viewDetailsSubtitle": "View Kubernetes Pod ({namespace}/{name}) details.",
+    "viewTerminalSubtitle": "Connect to Kubernetes Pod ({namespace}/{name}) terminal session.",
+    "loadYamlFailed": "Failed to load YAML",
+    "loadLogsFailed": "Failed to load logs",
+    "loadDetailsFailed": "Failed to load details",
+    "noOutput": "(No output)",
+    "noLogsOutput": "(No logs)",
+    "logStreamUnavailable": "Log stream unavailable",
+    "deleteFailed": "Delete failed"
+  },
   "nodes": {
     "describeSubtitle": "View Kubernetes Node ({name}) details.",
     "status": {
@@ -142,6 +155,31 @@
       "worker": "Worker",
       "unknown": "Unknown"
     }
+  },
+  "nav": {
+    "account": "Account",
+    "notifications": "Notifications",
+    "terminal": "Terminal",
+    "language": "Language",
+    "signOut": "Sign out"
+  },
+  "logout": {
+    "title": "Confirm Sign Out",
+    "description": "Signing out will clear your local login state and you will need to log in again to continue.",
+    "cancel": "Cancel",
+    "confirm": "Sign out"
+  },
+  "terminal": {
+    "title": "Cluster Terminal",
+    "subtitle": "Connect to Kubernetes Pod ({target}) terminal session.",
+    "subtitleFallback": "Connect to Kubernetes Pod (-) terminal session.",
+    "emptyMessage": "Terminal connection address not available.",
+    "connecting": "Connecting to terminal...",
+    "podNotFound": "No running Pod found: {target}, please check if {deployment} deployment is normal.",
+    "openFailed": "Failed to open terminal",
+    "openInNewWindow": "Open in new window",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen"
   },
   "deleteConfirmDialog": {
     "deleting": "Deleting..."
@@ -208,6 +246,56 @@
     "deleteWorkloadDescription": "Are you sure you want to delete workload {name}?",
     "cluster": "Cluster",
     "dev": "Development"
+  },
+  "table": {
+    "columns": {
+      "name": "Name",
+      "status": "Status",
+      "namespace": "Namespace",
+      "node": "Node",
+      "ip": "IP",
+      "role": "Role",
+      "group": "Group",
+      "kind": "Type",
+      "pods": "Pods",
+      "age": "Age",
+      "updatedAt": "Updated",
+      "duration": "Duration",
+      "retry": "Retry",
+      "workspace": "Workspace"
+    },
+    "customizeColumns": "Customize columns",
+    "create": "Create",
+    "actions": {
+      "logs": "Logs",
+      "terminal": "Terminal"
+    },
+    "alerts": {
+      "loadFailed": "Load failed"
+    },
+    "filters": {
+      "namespace": "Namespace",
+      "name": "Name",
+      "noNamespaces": "No namespaces"
+    }
+  },
+  "dialogs": {
+    "viewYaml": {
+      "title": "View YAML"
+    },
+    "viewDetails": {
+      "title": "View Details"
+    },
+    "viewLogs": {
+      "title": "View Logs"
+    },
+    "viewTerminal": {
+      "title": "Terminal"
+    },
+    "delete": {
+      "title": "Confirm Delete",
+      "description": "Are you sure you want to delete resource {name}?"
+    }
   },
   "search": {
     "namespace": "Namespace",

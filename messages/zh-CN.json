@@ -130,6 +130,19 @@
     "batchDelete": "批量删除",
     "batchDeleteDesc": "此操作不可撤销，将删除已选中的 {count} 条数据。"
   },
+  "pods": {
+    "viewYamlSubtitle": "查看 Kubernetes Pod（{namespace}/{name}）的 YAML 内容。",
+    "viewLogsSubtitle": "查看 Kubernetes Pod（{namespace}/{name}）的日志内容。",
+    "viewDetailsSubtitle": "查看 Kubernetes Pod（{namespace}/{name}）的详情内容。",
+    "viewTerminalSubtitle": "连接 Kubernetes Pod（{namespace}/{name}）的终端会话。",
+    "loadYamlFailed": "加载 YAML 失败",
+    "loadLogsFailed": "加载日志失败",
+    "loadDetailsFailed": "加载详情失败",
+    "noOutput": "(无详情输出)",
+    "noLogsOutput": "(无日志输出)",
+    "logStreamUnavailable": "日志流不可用",
+    "deleteFailed": "删除失败"
+  },
   "nodes": {
     "describeSubtitle": "查看 Kubernetes Node ({name}) 的详情内容。",
     "status": {
@@ -142,6 +155,31 @@
       "worker": "工作节点",
       "unknown": "未知"
     }
+  },
+  "nav": {
+    "account": "账户",
+    "notifications": "通知",
+    "terminal": "终端",
+    "language": "语言",
+    "signOut": "退出登录"
+  },
+  "logout": {
+    "title": "确认退出登录",
+    "description": "退出后将清除本地登录状态，需要重新登录才能继续操作。",
+    "cancel": "取消",
+    "confirm": "确定退出"
+  },
+  "terminal": {
+    "title": "集群终端",
+    "subtitle": "连接 Kubernetes Pod（{target}）的终端会话。",
+    "subtitleFallback": "连接 Kubernetes Pod（-）的终端会话。",
+    "emptyMessage": "终端连接地址不可用。",
+    "connecting": "正在连接终端...",
+    "podNotFound": "未找到运行中的 Pod：{target}, 请检查 {deployment} 部署是否正常。",
+    "openFailed": "打开终端失败",
+    "openInNewWindow": "新窗口打开",
+    "fullscreen": "全屏",
+    "exitFullscreen": "退出全屏"
   },
   "deleteConfirmDialog": {
     "deleting": "删除中..."
@@ -208,6 +246,56 @@
     "deleteWorkloadDescription": "确定删除工作负载 {name} 吗？",
     "cluster": "集群",
     "dev": "开发测试"
+  },
+  "table": {
+    "columns": {
+      "name": "名称",
+      "status": "状态",
+      "namespace": "项目",
+      "node": "节点",
+      "ip": "IP",
+      "role": "角色",
+      "group": "组",
+      "kind": "类型",
+      "pods": "容器组",
+      "age": "存活时间",
+      "updatedAt": "更新时间",
+      "duration": "持续时间",
+      "retry": "重试",
+      "workspace": "工作空间"
+    },
+    "customizeColumns": "自定义列",
+    "create": "创建",
+    "actions": {
+      "logs": "日志",
+      "terminal": "终端"
+    },
+    "alerts": {
+      "loadFailed": "加载失败"
+    },
+    "filters": {
+      "namespace": "项目",
+      "name": "名称",
+      "noNamespaces": "暂无项目"
+    }
+  },
+  "dialogs": {
+    "viewYaml": {
+      "title": "查看 YAML"
+    },
+    "viewDetails": {
+      "title": "查看详情"
+    },
+    "viewLogs": {
+      "title": "查看日志"
+    },
+    "viewTerminal": {
+      "title": "终端"
+    },
+    "delete": {
+      "title": "确认删除",
+      "description": "确定删除资源 {name} 吗？"
+    }
   },
   "search": {
     "namespace": "命名空间",

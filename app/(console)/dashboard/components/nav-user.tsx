@@ -13,7 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import { buildPodExecWsEndpoint, fetchPodResourceRows } from "@/app/lib/kubespark/pods";
-import { useLocale, type Locale } from "@/app/lib/i18n";
+import { useLocale, type Locale, useTranslations } from "@/app/lib/i18n";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,18 +59,15 @@ export function NavUser({
     avatar: string;
   };
 }) {
-  const resolveTerminalSubtitle = React.useCallback(
-    (target: string) => `连接 Kubernetes Pod（${target}）的终端会话。`,
-    []
-  );
   const { isMobile } = useSidebar();
   const router = useRouter();
   const { locale, setLocale } = useLocale();
+  const t = useTranslations();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false);
   const [terminalOpen, setTerminalOpen] = React.useState(false);
   const [terminalWsUrl, setTerminalWsUrl] = React.useState<string | null>(null);
-  const [terminalSubtitle, setTerminalSubtitle] = React.useState("连接 Kubernetes Pod（-）的终端会话。");
-  const [terminalEmptyMessage, setTerminalEmptyMessage] = React.useState("终端连接地址不可用。");
+  const [terminalSubtitle, setTerminalSubtitle] = React.useState(t("terminal.subtitleFallback"));
+  const [terminalEmptyMessage, setTerminalEmptyMessage] = React.useState(t("terminal.emptyMessage"));
   const [openingTerminal, setOpeningTerminal] = React.useState(false);
 
   const handleLogoutConfirm = React.useCallback(() => {
@@ -92,26 +89,29 @@ export function NavUser({
       );
 
       if (!preferred) {
-        throw new Error("未找到运行中的 Pod：kubespark/kubespark-terminal-*, 请检查 kubespark/kubespark-terminal 部署是否正常。");
+        throw new Error(t("terminal.podNotFound", { 
+          target: "kubespark/kubespark-terminal-*", 
+          deployment: "kubespark/kubespark-terminal" 
+        }));
       }
 
       const wsUrl = buildPodExecWsEndpoint(preferred.namespace, preferred.name, {
         command: ["/bin/sh"],
       });
-      setTerminalSubtitle(resolveTerminalSubtitle(`${preferred.namespace}/${preferred.name}`));
-      setTerminalEmptyMessage("终端连接地址不可用。");
+      setTerminalSubtitle(t("terminal.subtitle", { target: `${preferred.namespace}/${preferred.name}` }));
+      setTerminalEmptyMessage(t("terminal.emptyMessage"));
       setTerminalWsUrl(wsUrl);
       setTerminalOpen(true);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "打开终端失败";
-      setTerminalSubtitle(resolveTerminalSubtitle("-"));
+      const message = error instanceof Error ? error.message : t("terminal.openFailed");
+      setTerminalSubtitle(t("terminal.subtitleFallback"));
       setTerminalEmptyMessage(message);
       setTerminalWsUrl(null);
       setTerminalOpen(true);
     } finally {
       setOpeningTerminal(false);
     }
-  }, [openingTerminal, resolveTerminalSubtitle]);
+  }, [openingTerminal, t]);
 
   const handleLanguageChange = (newLocale: Locale) => {
     setLocale(newLocale);
@@ -163,20 +163,20 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <IconUserCircle />
-                {locale === "zh-CN" ? "账户" : "Account"}
+                {t("nav.account")}
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <IconNotification />
-                {locale === "zh-CN" ? "通知" : "Notifications"}
+                {t("nav.notifications")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => void handleOpenTerminal()} disabled={openingTerminal}>
                 <IconTerminal2 />
-                {locale === "zh-CN" ? "终端" : "Terminal"}
+                {t("nav.terminal")}
               </DropdownMenuItem>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <IconLanguage />
-                  {locale === "zh-CN" ? "语言" : "Language"}
+                  {t("nav.language")}
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
                   <DropdownMenuItem onClick={() => handleLanguageChange("zh-CN")}>
@@ -194,7 +194,7 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => setLogoutConfirmOpen(true)}>
                 <IconLogout />
-                {locale === "zh-CN" ? "退出登录" : "Sign out"}
+                {t("nav.signOut")}
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </DropdownMenuContent>
@@ -203,20 +203,18 @@ export function NavUser({
           <AlertDialogContent size="sm">
             <AlertDialogHeader>
               <AlertDialogTitle>
-                {locale === "zh-CN" ? "确认退出登录" : "Confirm Sign Out"}
+                {t("logout.title")}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {locale === "zh-CN"
-                  ? "退出后将清除本地登录状态，需要重新登录才能继续操作。"
-                  : "Signing out will clear your local login state and you will need to log in again to continue."}
+                {t("logout.description")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>
-                {locale === "zh-CN" ? "取消" : "Cancel"}
+                {t("logout.cancel")}
               </AlertDialogCancel>
               <AlertDialogAction onClick={handleLogoutConfirm}>
-                {locale === "zh-CN" ? "确定退出" : "Sign out"}
+                {t("logout.confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -227,7 +225,7 @@ export function NavUser({
             setTerminalOpen(open);
             if (!open) setTerminalWsUrl(null);
           }}
-          title={locale === "zh-CN" ? "集群终端" : "Cluster Terminal"}
+          title={t("terminal.title")}
           subtitle={terminalSubtitle}
           wsUrl={terminalWsUrl}
           emptyMessage={terminalEmptyMessage}

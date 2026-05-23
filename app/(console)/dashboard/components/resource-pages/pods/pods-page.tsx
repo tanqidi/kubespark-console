@@ -97,7 +97,7 @@ export function PodsPageClient() {
     setYamlError(null)
     setYamlLoading(true)
     setYamlContent("")
-    setYamlSubtitle(`查看 Kubernetes Pod（${row.namespace}/${row.name}）的 YAML 内容。`)
+    setYamlSubtitle(t("pods.viewYamlSubtitle", { namespace: row.namespace, name: row.name }))
 
     void fetchNamespacedPodYaml(row.namespace, row.name)
       .then(({ payload, text }) => {
@@ -108,7 +108,7 @@ export function PodsPageClient() {
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载 YAML 失败"
+        const message = e instanceof Error ? e.message : t("pods.loadYamlFailed")
         setYamlError(message)
         console.error("[Pods] view yaml request failed", {
           pod: { name: row.name, namespace: row.namespace },
@@ -118,12 +118,12 @@ export function PodsPageClient() {
       .finally(() => {
         setYamlLoading(false)
       })
-  }, [])
+  }, [t])
 
   const handleViewLogs = React.useCallback((row: PodRow) => {
     setLogsOpen(true)
     setLogsTitle(t("table.actions.logs"))
-    setLogsSubtitle(`查看 Kubernetes Pod（${row.namespace}/${row.name}）的日志内容。`)
+    setLogsSubtitle(t("pods.viewLogsSubtitle", { namespace: row.namespace, name: row.name }))
     setLogsTarget({ name: row.name, namespace: row.namespace })
     setLogsContent("")
   }, [t])
@@ -132,8 +132,8 @@ export function PodsPageClient() {
     const wsUrl = buildPodExecWsEndpoint(row.namespace, row.name, {
       command: ["/bin/sh"],
     })
-    setTerminalTitle(t("table.actions.terminal"))
-    setTerminalSubtitle(`连接 Kubernetes Pod（${row.namespace}/${row.name}）的终端会话。`)
+    setTerminalTitle(t("dialogs.viewTerminal.title"))
+    setTerminalSubtitle(t("pods.viewTerminalSubtitle", { namespace: row.namespace, name: row.name }))
     setTerminalWsUrl(wsUrl)
     setTerminalOpen(true)
   }, [t])
@@ -147,14 +147,14 @@ export function PodsPageClient() {
 
     void fetchNamespacedPodDescribe(row.namespace, row.name)
       .then(({ requestUrl, text }) => {
-        setDescribeContent(text || "(无详情输出)")
+        setDescribeContent(text || t("pods.noOutput"))
         console.log("[Pods] view describe response", {
           pod: { name: row.name, namespace: row.namespace },
           requestUrl,
         })
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "加载详情失败"
+        const message = e instanceof Error ? e.message : t("pods.loadDetailsFailed")
         setDescribeError(message)
         console.error("[Pods] view describe request failed", {
           pod: { name: row.name, namespace: row.namespace },
@@ -165,7 +165,7 @@ export function PodsPageClient() {
       .finally(() => {
         setDescribeLoading(false)
       })
-  }, [])
+  }, [t])
 
   React.useEffect(() => {
     if (!logsOpen || !logsTarget) return
@@ -181,11 +181,11 @@ export function PodsPageClient() {
       void fetchNamespacedPodLogs(logsTarget.namespace, logsTarget.name, { tailLines: 500 })
         .then(({ text }) => {
           if (controller.signal.aborted) return
-          setLogsContent(text || "(无日志输出)")
+          setLogsContent(text || t("pods.noLogsOutput"))
         })
         .catch((e: unknown) => {
           if (controller.signal.aborted) return
-          const message = e instanceof Error ? e.message : "加载日志失败"
+          const message = e instanceof Error ? e.message : t("pods.loadLogsFailed")
           setLogsError(message)
         })
         .finally(() => {
@@ -204,7 +204,7 @@ export function PodsPageClient() {
     void fetchTextStream(requestUrl, { signal: controller.signal })
       .then(async (response) => {
         if (!response.body) {
-          throw new Error("日志流不可用")
+          throw new Error(t("pods.logStreamUnavailable"))
         }
         const reader = response.body.getReader()
         const decoder = new TextDecoder("utf-8")
@@ -223,7 +223,7 @@ export function PodsPageClient() {
       })
       .catch((e: unknown) => {
         if (controller.signal.aborted) return
-        const message = e instanceof Error ? e.message : "加载日志失败"
+        const message = e instanceof Error ? e.message : t("pods.loadLogsFailed")
         setLogsError(message)
         setLogsLoading(false)
       })
@@ -231,7 +231,7 @@ export function PodsPageClient() {
     return () => {
       controller.abort()
     }
-  }, [logsOpen, logsTarget, realtimeLogs])
+  }, [logsOpen, logsTarget, realtimeLogs, t])
 
   React.useEffect(() => {
     return () => {
@@ -246,7 +246,7 @@ export function PodsPageClient() {
       .then(({ text }) => {
         const fileNameBase = logsTarget.name.trim() || "container-logs"
         const safeBase = fileNameBase.replace(/[\\/:*?"<>|]/g, "_")
-        const blob = new Blob([text || "(无日志输出)"], { type: "text/plain;charset=utf-8" })
+        const blob = new Blob([text || t("pods.noLogsOutput")], { type: "text/plain;charset=utf-8" })
         const url = URL.createObjectURL(blob)
         const link = document.createElement("a")
         link.href = url
@@ -257,13 +257,13 @@ export function PodsPageClient() {
         URL.revokeObjectURL(url)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "下载日志失败"
+        const message = e instanceof Error ? e.message : t("pods.loadLogsFailed")
         setLogsError(message)
       })
       .finally(() => {
         setLogsDownloading(false)
       })
-  }, [logsDownloading, logsTarget])
+  }, [logsDownloading, logsTarget, t])
 
   const requestDelete = React.useCallback((row: PodRow) => {
     setPendingDeleteRow(row)
@@ -278,7 +278,7 @@ export function PodsPageClient() {
         setPendingDeleteRow(null)
       })
       .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "删除失败"
+        const message = e instanceof Error ? e.message : t("pods.deleteFailed")
         setError(message)
         console.error("[Pods] delete request failed", {
           pod: { name: pendingDeleteRow.name, namespace: pendingDeleteRow.namespace },
@@ -288,18 +288,18 @@ export function PodsPageClient() {
       .finally(() => {
         setDeleting(false)
       })
-  }, [deleting, pendingDeleteRow])
+  }, [deleting, pendingDeleteRow, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: PodRow[]) => {
     if (selectedRows.length === 0) return
     void Promise.all(
       selectedRows.map((row) => deletePod(row.namespace, row.name))
     ).catch((e: unknown) => {
-      const message = e instanceof Error ? e.message : "删除失败"
+      const message = e instanceof Error ? e.message : t("pods.deleteFailed")
       setError(message)
       console.error("[Pods] bulk delete request failed", e)
     })
-  }, [])
+  }, [t])
 
   const columns = React.useMemo(
     () =>
@@ -522,7 +522,7 @@ export function PodsPageClient() {
       />
       <DescribeViewerDialog
         title={t("dialogs.viewDetails.title")}
-        subtitle={describeTarget ? `查看 Kubernetes Pod（${describeTarget.namespace}/${describeTarget.name}）的详情内容。` : ""}
+        subtitle={describeTarget ? t("pods.viewDetailsSubtitle", { namespace: describeTarget.namespace, name: describeTarget.name }) : ""}
         open={describeOpen}
         onOpenChange={(open) => {
           setDescribeOpen(open)
