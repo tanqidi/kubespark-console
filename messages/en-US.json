@@ -2,7 +2,25 @@
   "common": {
     "editYaml": "Edit YAML",
     "uploadYaml": "Upload YAML",
-    "downloadYaml": "Download YAML"
+    "downloadYaml": "Download YAML",
+    "cancel": "Cancel",
+    "confirmSave": "Confirm Save",
+    "nextStep": "Next",
+    "prevStep": "Previous",
+    "save": "Save",
+    "create": "Create",
+    "saving": "Saving...",
+    "creating": "Creating...",
+    "basicInfo": "Basic Information",
+    "advancedSettings": "Advanced Settings",
+    "current": "Current",
+    "configured": "Configured",
+    "optional": "Optional",
+    "metadataEditorTitle": "Unified management of resource labels and annotations.",
+    "advancedSettingsDesc": "Supplement label annotations and key-value configuration.",
+    "descriptionMaxLength": "Will be written to resource annotation description, up to {max} characters.",
+    "loadFailed": "Load Failed",
+    "loadYamlFailed": "Load YAML Failed"
   },
   "login": {
     "title": "Sign in to your account",
@@ -658,7 +676,15 @@
     "syncReposSuccess": "Repository sync successful",
     "syncReposFailed": "Repository sync failed",
     "noReposAvailable": "No code repositories available",
-    "syncing": "Syncing..."
+    "syncing": "Syncing...",
+    "yamlRequired": "Please enter YAML content",
+    "yamlInvalid": "Invalid YAML content format",
+    "yamlKindMustBePipeline": "YAML resource type must be Pipeline",
+    "yamlParseFailed": "YAML parsing failed",
+    "createPipelineFailed": "Failed to create pipeline, please try again later",
+    "keyValueConfigTitle": "Variable Configuration",
+    "keyValueConfigDescEdit": "Maintain key-value variables or secret parameters required for pipeline operation. Skip modification if value is empty.",
+    "keyDuplicate": "Duplicate variable key: {key}"
   },
   "jobDialog": {
     "basicInfo": "Basic Information",

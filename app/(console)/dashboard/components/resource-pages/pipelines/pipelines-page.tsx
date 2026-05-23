@@ -104,10 +104,10 @@ const PIPELINE_NAME_RULE_MESSAGE =
 const CODE_REPOSITORY_ANNOTATION_KEY = "tanqidi.com/code-repository"
 const DRONE_YAML_ANNOTATION_KEY = "tanqidi.com/drone-yaml"
 
-function validatePipelineName(name: string): string | null {
-  if (!name) return "请输入流水线名称"
-  if (name.length > 63) return PIPELINE_NAME_RULE_MESSAGE
-  if (!/^[a-z](?:[-a-z0-9]*[a-z0-9])?$/.test(name)) return PIPELINE_NAME_RULE_MESSAGE
+function validatePipelineName(name: string, t: (key: string) => string): string | null {
+  if (!name) return t("pipelines.pipelineNameRequired")
+  if (name.length > 63) return t("pipelines.pipelineNameRule")
+  if (!/^[a-z](?:[-a-z0-9]*[a-z0-9])?$/.test(name)) return t("pipelines.pipelineNameRule")
   return null
 }
 
@@ -174,17 +174,17 @@ function parsePipelineYamlText(yamlText: string): {
   pipelineProjectName: string
 } {
   const normalized = yamlText.trim()
-  if (!normalized) throw new Error("请输入 YAML 内容")
+  if (!normalized) throw new Error("yamlRequired")
 
   const parsed = parse(normalized)
   const root =
     typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null
-  if (!root) throw new Error("YAML 内容格式无效")
+  if (!root) throw new Error("yamlInvalid")
 
   const kind = typeof root.kind === "string" ? root.kind.trim() : ""
-  if (kind && kind !== "Pipeline") throw new Error("YAML 资源类型必须是 Pipeline")
+  if (kind && kind !== "Pipeline") throw new Error("yamlKindMustBePipeline")
 
   const metadata =
     typeof root.metadata === "object" && root.metadata !== null && !Array.isArray(root.metadata)
@@ -244,10 +244,10 @@ function resolveCreatePipelineErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : ""
   const text = raw.toLowerCase()
 
-  if (text.includes("already exists")) return "流水线名称已存在，请更换后重试"
-  if (text.includes("状态码 409") || text.includes("status 409")) return "流水线名称已存在，请更换后重试"
+  if (text.includes("already exists")) return "pipelineNameExists"
+  if (text.includes("状态码 409") || text.includes("status 409")) return "pipelineNameExists"
 
-  return raw || "创建流水线失败，请稍后重试"
+  return raw || "createPipelineFailed"
 }
 
 function isNameRelatedCreateError(error: unknown): boolean {
@@ -341,7 +341,7 @@ export function PipelinesPageClient({
   const clearRepositoryIfNotMatched = React.useCallback(() => {
     const current = codeRepository.trim()
     if (!current) {
-      setCodeRepositoryError("请选择代码仓库")
+      setCodeRepositoryError(t("pipelines.codeRepositoryRequired"))
       return
     }
     const normalizedCurrent = normalizeRepositoryValue(current)
@@ -350,33 +350,37 @@ export function PipelinesPageClient({
     )
     if (!matched) {
       setCodeRepository("")
-      setCodeRepositoryError("请选择代码仓库")
+      setCodeRepositoryError(t("pipelines.codeRepositoryRequired"))
       return
     }
     setCodeRepositoryError(null)
-  }, [codeRepository, codeRepositoryOptions, normalizeRepositoryValue])
+  }, [codeRepository, codeRepositoryOptions, normalizeRepositoryValue, t])
 
   const handleNextStep = React.useCallback(() => {
     if (creating) return
 
-    const nameError = validatePipelineName(pipelineName.trim())
+    const nameError = validatePipelineName(pipelineName.trim(), t)
+    let hasError = false
+
     if (nameError) {
       setCreateNameInvalid(true)
       setCreateNameError(nameError)
+      hasError = true
     } else {
       setCreateNameInvalid(false)
       setCreateNameError(null)
     }
 
     if (!codeRepository.trim()) {
-      setCodeRepositoryError("请选择代码仓库")
-      return
+      setCodeRepositoryError(t("pipelines.codeRepositoryRequired"))
+      hasError = true
+    } else {
+      setCodeRepositoryError(null)
     }
-    setCodeRepositoryError(null)
 
-    if (nameError) return
+    if (hasError) return
     setCreateStep("advanced")
-  }, [codeRepository, creating, pipelineName])
+  }, [codeRepository, creating, pipelineName, t])
 
   const enterCreateYamlMode = React.useCallback(() => {
     createYamlSnapshotRef.current = {
@@ -438,9 +442,10 @@ export function PipelinesPageClient({
       setCreateYamlError(null)
       setCreateYamlMode(false)
     } catch (error) {
-      setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+      const errorKey = error instanceof Error ? error.message : "yamlParseFailed"
+      setCreateYamlError(t(`pipelines.${errorKey}`) || t("common.loadYamlFailed"))
     }
-  }, [createYamlText])
+  }, [createYamlText, t])
 
   const enterCreateDroneYamlMode = React.useCallback(() => {
     createDroneYamlSnapshotRef.current = createDroneYamlText
@@ -636,10 +641,10 @@ export function PipelinesPageClient({
           setCreateDialogOpen(true)
         })
         .catch((e: unknown) => {
-          setError(e instanceof Error ? e.message : "加载流水线详情失败")
+          setError(e instanceof Error ? e.message : t("common.loadFailed"))
         })
     },
-    [resetCreateState, workspaceName]
+    [resetCreateState, workspaceName, t]
   )
 
   const handleCreateSubmit = React.useCallback(() => {
@@ -673,20 +678,21 @@ export function PipelinesPageClient({
         setAnnotationEntries(nextAnnotations)
         setCreateYamlError(null)
       } catch (error) {
-        setCreateYamlError(error instanceof Error ? error.message : "YAML 解析失败")
+        const errorKey = error instanceof Error ? error.message : "yamlParseFailed"
+        setCreateYamlError(t(`pipelines.${errorKey}`) || t("common.loadYamlFailed"))
         return
       }
     }
 
     if (!nextCodeRepository) {
-      const message = "请选择代码仓库"
+      const message = t("pipelines.codeRepositoryRequired")
       setCodeRepositoryError(message)
       setCreateStep("basic")
       if (createYamlMode) setCreateYamlError(message)
       return
     }
 
-    const nameError = validatePipelineName(nextName)
+    const nameError = validatePipelineName(nextName, t)
     if (nameError) {
       setCreateNameInvalid(true)
       setCreateNameError(nameError)
@@ -696,7 +702,7 @@ export function PipelinesPageClient({
     }
 
     if (!isEditMode && allPipelineNames.includes(nextName)) {
-      const duplicatedNameMessage = "流水线名称已存在，请更换后重试"
+      const duplicatedNameMessage = t("pipelines.pipelineNameExists")
       setCreateNameInvalid(true)
       setCreateNameError(duplicatedNameMessage)
       if (createYamlMode) setCreateYamlError(duplicatedNameMessage)
@@ -736,7 +742,7 @@ export function PipelinesPageClient({
           for (const entry of keyValueEntries) {
             const key = entry.key.trim()
             if (!key) continue
-            if (normalized.has(key)) throw new Error(`变量键重复：${key}`)
+            if (normalized.has(key)) throw new Error(t("pipelines.keyDuplicate", { key }))
             normalized.set(key, entry.value.trim())
           }
 
@@ -778,7 +784,8 @@ export function PipelinesPageClient({
         resetCreateState()
         await loadRows(false)
       } catch (e: unknown) {
-        const message = resolveCreatePipelineErrorMessage(e)
+        const messageKey = resolveCreatePipelineErrorMessage(e)
+        const message = t(`pipelines.${messageKey}`) || messageKey
         const isNameError = isNameRelatedCreateError(e)
         setCreateNameInvalid(isNameError)
         setCreateNameError(isNameError ? message : null)
@@ -808,6 +815,7 @@ export function PipelinesPageClient({
     resetCreateState,
     rows,
     workspaceName,
+    t,
   ])
 
   const handleViewYaml = React.useCallback((row: PipelineRow) => {
@@ -1094,7 +1102,8 @@ export function PipelinesPageClient({
                     disabled: creating,
                     onClick: () => {
                       if (creating) return
-                      setCreateStep("advanced")
+                      if (createStep === "advanced") return
+                      handleNextStep()
                     },
                   },
                 ]}
@@ -1277,11 +1286,11 @@ export function PipelinesPageClient({
                           setPendingDeleteSecretKey(key)
                         }}
                         disabled={!isEditMode || creating || droneSecretLoading}
-                        title="变量配置"
+                        title={t("pipelines.keyValueConfigTitle")}
                         description={
                           isEditMode
-                            ? "维护流水线运行所需的键值变量或秘钥参数，值为空则跳过修改。"
-                            : "该能力仅支持编辑流水线时使用，请从编辑状态进入后配置变量。"
+                            ? t("pipelines.keyValueConfigDescEdit")
+                            : t("pipelines.editYamlOnlyInEditMode")
                         }
                       />
                     </Field>
@@ -1299,34 +1308,34 @@ export function PipelinesPageClient({
                     disabled={creating}
                     onClick={createYamlMode ? cancelCreateYamlMode : cancelCreateDroneYamlMode}
                   >
-                    取消
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     type="button"
                     disabled={creating}
                     onClick={createYamlMode ? confirmCreateYamlMode : confirmCreateDroneYamlMode}
                   >
-                    确认保存
+                    {t("common.confirmSave")}
                   </Button>
                 </div>
               ) : createStep === "basic" ? (
                 <div className="flex w-full items-center justify-between gap-3">
                   <DialogClose asChild>
                     <Button type="button" variant="outline" disabled={creating}>
-                      取消
+                      {t("common.cancel")}
                     </Button>
                   </DialogClose>
                   <Button type="button" disabled={creating} onClick={handleNextStep}>
-                    下一步
+                    {t("common.nextStep")}
                   </Button>
                 </div>
               ) : (
                 <div className="flex w-full items-center justify-between gap-3">
                   <Button type="button" variant="outline" disabled={creating} onClick={() => setCreateStep("basic")}>
-                    上一步
+                    {t("common.prevStep")}
                   </Button>
                   <Button type="button" onClick={handleCreateSubmit} disabled={creating}>
-                    {creating ? (isEditMode ? "保存中..." : "创建中...") : isEditMode ? "保存" : "创建"}
+                    {creating ? (isEditMode ? t("common.saving") : t("common.creating")) : isEditMode ? t("common.save") : t("common.create")}
                   </Button>
                 </div>
               )}

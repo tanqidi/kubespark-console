@@ -2,7 +2,25 @@
   "common": {
     "editYaml": "编辑 YAML",
     "uploadYaml": "上传 YAML",
-    "downloadYaml": "下载 YAML"
+    "downloadYaml": "下载 YAML",
+    "cancel": "取消",
+    "confirmSave": "确认保存",
+    "nextStep": "下一步",
+    "prevStep": "上一步",
+    "save": "保存",
+    "create": "创建",
+    "saving": "保存中...",
+    "creating": "创建中...",
+    "basicInfo": "基本信息",
+    "advancedSettings": "高级设置",
+    "current": "当前",
+    "configured": "已设置",
+    "optional": "可选",
+    "metadataEditorTitle": "统一管理资源的标签与注解信息。",
+    "advancedSettingsDesc": "补充标签注解与键值配置。",
+    "descriptionMaxLength": "将写入资源注解 description，最长 {max} 个字符。",
+    "loadFailed": "加载失败",
+    "loadYamlFailed": "加载 YAML 失败"
   },
   "login": {
     "title": "登录到您的账户",
@@ -651,7 +669,15 @@
     "syncReposSuccess": "仓库同步成功",
     "syncReposFailed": "仓库同步失败",
     "noReposAvailable": "暂无可用代码仓库",
-    "syncing": "同步中..."
+    "syncing": "同步中...",
+    "yamlRequired": "请输入 YAML 内容",
+    "yamlInvalid": "YAML 内容格式无效",
+    "yamlKindMustBePipeline": "YAML 资源类型必须是 Pipeline",
+    "yamlParseFailed": "YAML 解析失败",
+    "createPipelineFailed": "创建流水线失败，请稍后重试",
+    "keyValueConfigTitle": "变量配置",
+    "keyValueConfigDescEdit": "维护流水线运行所需的键值变量或秘钥参数，值为空则跳过修改。",
+    "keyDuplicate": "变量键重复：{key}"
   },
   "jobDialog": {
     "basicInfo": "基本信息",
