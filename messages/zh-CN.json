@@ -257,12 +257,15 @@
       "role": "角色",
       "group": "组",
       "kind": "类型",
+      "type": "类型",
       "pods": "容器组",
       "age": "存活时间",
       "updatedAt": "更新时间",
       "duration": "持续时间",
       "retry": "重试",
-      "workspace": "工作空间"
+      "workspace": "工作空间",
+      "internalAccess": "内部访问",
+      "externalAccess": "外部访问"
     },
     "customizeColumns": "自定义列",
     "create": "创建",

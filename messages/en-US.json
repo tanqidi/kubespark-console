@@ -257,12 +257,15 @@
       "role": "Role",
       "group": "Group",
       "kind": "Type",
+      "type": "Type",
       "pods": "Pods",
       "age": "Age",
       "updatedAt": "Updated",
       "duration": "Duration",
       "retry": "Retry",
-      "workspace": "Workspace"
+      "workspace": "Workspace",
+      "internalAccess": "Internal Access",
+      "externalAccess": "External Access"
     },
     "customizeColumns": "Customize columns",
     "create": "Create",
