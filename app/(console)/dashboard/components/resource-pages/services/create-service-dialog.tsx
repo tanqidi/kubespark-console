@@ -1726,7 +1726,7 @@ export function CreateServiceDialog({
                                 : "text-muted-foreground"
                             }`}
                           >
-                            暂未指定工作负载，点击“指定工作负载”自动回填标签选择器。
+                            {t("serviceDialog.noWorkloadSpecified")}
                           </div>
                       )}
                       <div className="flex justify-end">
@@ -1898,7 +1898,7 @@ export function CreateServiceDialog({
                               : "text-muted-foreground"
                           }`}
                         >
-                          请先添加端口配置，添加端口后每行需完整填写三项。
+                          {t("serviceDialog.pleaseAddPortConfigFirst")}
                         </div>
                       )}
                       <div className="flex justify-end">
@@ -1914,9 +1914,9 @@ export function CreateServiceDialog({
           ) : (
             <div>
               <div className="mb-4">
-                <h3 className="text-[15px] font-semibold">高级设置</h3>
+                <h3 className="text-[15px] font-semibold">{t("serviceDialog.advancedSettings")}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  配置外部访问与会话保持策略。
+                  {t("serviceDialog.advancedSettingsDesc")}
                 </p>
               </div>
               <div className="flex flex-col gap-4">
@@ -1947,16 +1947,16 @@ export function CreateServiceDialog({
                       if (internalAccessMode === "headless" || isBusy) return
                       setEnableNodePort(checked === true)
                     }}
-                    aria-label="外部访问"
+                    aria-label={t("serviceDialog.externalAccessLabel")}
                     disabled={isBusy || internalAccessMode === "headless"}
                   />
                   <ItemContent>
-                    <ItemTitle>外部访问</ItemTitle>
+                    <ItemTitle>{t("serviceDialog.externalAccessLabel")}</ItemTitle>
                     <ItemDescription>
-                      启用后服务类型将设置为 NodePort，用于从集群外访问服务。
+                      {t("serviceDialog.externalAccessDesc")}
                       {internalAccessMode === "headless" ? (
                         <span className="font-semibold text-foreground">
-                          {" "}当前为无头服务模式，不能开启外部访问。
+                          {" "}{t("serviceDialog.headlessCannotEnableExternalAccess")}
                         </span>
                       ) : null}
                     </ItemDescription>
@@ -1979,13 +1979,13 @@ export function CreateServiceDialog({
                       if (isBusy) return
                       setEnableSessionAffinity(checked === true)
                     }}
-                    aria-label="会话保持"
+                    aria-label={t("serviceDialog.sessionAffinity")}
                     disabled={isBusy}
                   />
                   <ItemContent>
-                    <ItemTitle>会话保持</ItemTitle>
+                    <ItemTitle>{t("serviceDialog.sessionAffinity")}</ItemTitle>
                     <ItemDescription>
-                      开启后将同一客户端请求保持到同一后端 Pod（ClientIP）。
+                      {t("serviceDialog.sessionAffinityDesc")}
                     </ItemDescription>
                   </ItemContent>
                 </Item>

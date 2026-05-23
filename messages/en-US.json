@@ -599,7 +599,8 @@
     "sessionAffinityDesc": "When enabled, requests from the same client will be persisted to the same backend Pod (ClientIP).",
     "serviceNameConflictEdit": "Service name conflict, please try again later.",
     "createServiceFailed": "Failed to create service, please try again later.",
-    "portSelectorRow": "row"
+    "portSelectorRow": "Row",
+    "pleaseAddPortConfigFirst": "Please add port configuration first. Each row must have all three fields filled in completely after adding ports."
   },
   "jobDialog": {
     "basicInfo": "Basic Information",

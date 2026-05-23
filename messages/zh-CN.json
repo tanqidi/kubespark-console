@@ -592,7 +592,8 @@
     "sessionAffinityDesc": "开启后将同一客户端请求保持到同一后端 Pod（ClientIP）。",
     "serviceNameConflictEdit": "服务名称冲突，请稍后重试",
     "createServiceFailed": "创建服务失败，请稍后重试",
-    "portSelectorRow": "行"
+    "portSelectorRow": "行",
+    "pleaseAddPortConfigFirst": "请先添加端口配置，添加端口后每行需完整填写三项。"
   },
   "jobDialog": {
     "basicInfo": "基本信息",
