@@ -765,7 +765,23 @@ export async function deletePipelineRun(name: string): Promise<void> {
 	)
 }
 
-export async function fetchDroneBuildLogs(repository: string, buildNumber: string, stage?: number, step?: number): Promise<string> {
+export async function buildDroneBuildLogsStreamUrl(repository: string, buildNumber: string, stage?: number, step?: number): Promise<string> {
+	const { logsStreamURL } = await fetchDroneBuildLogURLs(repository, buildNumber, stage, step)
+	return logsStreamURL
+}
+
+export type DroneLogEntry = {
+	out: string
+	pos: number
+	time: number
+}
+
+export type DroneLogURLs = {
+	logsURL: string
+	logsStreamURL: string
+}
+
+export async function fetchDroneBuildLogURLs(repository: string, buildNumber: string, stage?: number, step?: number): Promise<DroneLogURLs> {
 	if (!repository) {
 		throw new Error("仓库信息未配置")
 	}
@@ -784,9 +800,35 @@ export async function fetchDroneBuildLogs(repository: string, buildNumber: strin
 		url += `&stage=${stage}&step=${step}`
 	}
 
-	const response = await fetchText(url)
-
+	const response = await fetchJsonDeduped<{ logsURL: string; logsStreamURL: string }>(url)
 	return response
+}
+
+export async function fetchDroneBuildLogs(repository: string, buildNumber: string, stage?: number, step?: number): Promise<DroneLogEntry[]> {
+	const { logsURL } = await fetchDroneBuildLogURLs(repository, buildNumber, stage, step)
+	
+	try {
+		const response = await fetch(logsURL)
+		if (!response.ok) {
+			if (response.status === 404) {
+				return []
+			}
+			throw new Error(`获取日志失败: ${response.status}`)
+		}
+		const text = await response.text()
+		const parsed = JSON.parse(text)
+		if (Array.isArray(parsed)) {
+			return parsed.map((item) => ({
+				out: typeof item.out === "string" ? item.out : "",
+				pos: typeof item.pos === "number" ? Math.trunc(item.pos) : 0,
+				time: typeof item.time === "number" ? Math.trunc(item.time) : 0,
+			}))
+		}
+	} catch (error) {
+		console.debug("获取 Drone 构建日志失败:", error)
+	}
+
+	return []
 }
 
 export async function fetchDroneBuildInfo(repository: string, buildNumber: string): Promise<PipelineRunStage[]> {

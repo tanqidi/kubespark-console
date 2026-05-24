@@ -19,6 +19,7 @@ import {
 	deletePipelineRun,
 	fetchDroneBuildInfo,
 	fetchDroneBuildLogs,
+	buildDroneBuildLogsStreamUrl,
 	fetchPipelineYaml,
 	fetchPipelineRunRows,
 	type PipelineRunRow,
@@ -357,6 +358,21 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [currentLogStages, setCurrentLogStages] = React.useState<PipelineRunStage[]>([])
   const [currentLogStage, setCurrentLogStage] = React.useState<number | undefined>(undefined)
   const [currentLogStep, setCurrentLogStep] = React.useState<number | undefined>(undefined)
+  // 现在这里存放的是 EventSource
+  const abortControllerRef = React.useRef<any | null>(null)
+  
+  // 监听 logOpen 变化，当关闭对话框时清理 EventSource
+  React.useEffect(() => {
+    if (!logOpen) {
+      // 关闭对话框，清理 EventSource
+      if (abortControllerRef.current) {
+        if (typeof abortControllerRef.current.close === 'function') {
+          abortControllerRef.current.close()
+        }
+        abortControllerRef.current = null
+      }
+    }
+  }, [logOpen])
 
   const loadRows = React.useCallback(
     async (silent: boolean) => {
@@ -488,6 +504,80 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       })
   }, [loadRows, normalizedPipelineName, runBranch, runDroneYaml, runRepository, runRepositoryLoading, running, t])
 
+  const connectToEventStream = React.useCallback(
+    async (repository: string, buildNumber: string, stage?: number, step?: number) => {
+      // 关闭之前的连接
+      if (abortControllerRef.current) {
+        // 这里 abortControllerRef.current 其实是 EventSource，我们把它 close 掉
+        if (typeof abortControllerRef.current.close === 'function') {
+          abortControllerRef.current.close()
+        }
+        abortControllerRef.current = null
+      }
+
+      try {
+        const streamUrl = await buildDroneBuildLogsStreamUrl(repository, buildNumber, stage, step)
+        
+        console.log("[logs] Connecting to EventSource:", streamUrl)
+        
+        // 使用 EventSource API（标准 SSE 连接）
+        const eventSource = new EventSource(streamUrl)
+        
+        abortControllerRef.current = eventSource
+
+        setLogError(null)
+
+        eventSource.onmessage = (event) => {
+          console.log("[logs] Message received:", event.data)
+          
+          if (event.data === 'eof') {
+            // Drone sends 'eof' to indicate stream completion
+            console.log("[logs] Received eof, closing connection")
+            eventSource.close()
+            if (abortControllerRef.current === eventSource) {
+              abortControllerRef.current = null
+            }
+            return
+          }
+          
+          // Parse JSON data (Drone format)
+          try {
+            const logEntry = JSON.parse(event.data)
+            if (logEntry.out) {
+              setLogContent((prev) => prev + logEntry.out)
+            }
+          } catch (e) {
+            // Fallback: treat as plain text
+            setLogContent((prev) => prev + event.data)
+          }
+        }
+
+        eventSource.onerror = (error) => {
+          console.error("[logs] EventSource error:", error)
+          // 注意：不要在这里调用 eventSource.close()，因为 retry: 0 会处理
+          // 但为了安全，我们还是主动关闭
+          try {
+            eventSource.close()
+          } catch (e) {
+            // ignore
+          }
+          if (abortControllerRef.current === eventSource) {
+            abortControllerRef.current = null
+          }
+        }
+
+        eventSource.onopen = () => {
+          console.log("[logs] EventSource opened")
+          setLogError(null)
+        }
+
+      } catch (e) {
+        console.error("Failed to create EventSource:", e)
+      }
+    },
+    []
+  )
+
   const handleViewLogs = React.useCallback(
     (row: PipelineRunRow) => {
       const buildNumber = row.buildNumber.trim()
@@ -498,17 +588,17 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       const repository = row.repository.trim()
       if (!repository || repository === "-") {
         setLogOpen(true)
-      setLogLoading(false)
-      setLogError(t("pipelineRuns.getRepoInfoFailed"))
-      setLogContent("")
-      setLogTitle(t("pipelineRuns.viewLogsTitle"))
-      setLogSubtitle(t("pipelineRuns.viewLogsSubtitleNoRepo", { name: row.name }))
-      setLogRealtime(true)
-      setCurrentLogBuildNumber(buildNumber)
-      setCurrentLogRepository("")
-      setCurrentLogStages([])
-      setCurrentLogStage(undefined)
-      setCurrentLogStep(undefined)
+        setLogLoading(false)
+        setLogError(t("pipelineRuns.getRepoInfoFailed"))
+        setLogContent("")
+        setLogTitle(t("pipelineRuns.viewLogsTitle"))
+        setLogSubtitle(t("pipelineRuns.viewLogsSubtitleNoRepo", { name: row.name }))
+        setLogRealtime(false)
+        setCurrentLogBuildNumber(buildNumber)
+        setCurrentLogRepository("")
+        setCurrentLogStages([])
+        setCurrentLogStage(undefined)
+        setCurrentLogStep(undefined)
         return
       }
 
@@ -526,7 +616,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       setLogContent("")
       setLogTitle(t("pipelineRuns.viewLogsTitle"))
       setLogSubtitle(t("pipelineRuns.viewLogsSubtitle", { name: displayPath }))
-      setLogRealtime(true)
+      setLogRealtime(false)
       setCurrentLogBuildNumber(buildNumber)
       setCurrentLogRepository(repository)
       setCurrentLogStages(row.stages || [])
@@ -538,44 +628,61 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         const firstStep = firstStage.steps[0]
         setCurrentLogStage(firstStage.number)
         setCurrentLogStep(firstStep.number)
-        void fetchDroneBuildLogs(repository, buildNumber, firstStage.number, firstStep.number)
+
+        // 1. 先尝试获取历史日志
+        fetchDroneBuildLogs(repository, buildNumber, firstStage.number, firstStep.number)
           .then((logs) => {
-            setLogContent(logs || t("pipelineRuns.noLogsOutput"))
-            setLogError(null)
-          })
-          .catch((e: unknown) => {
-            const errorMessage = e instanceof Error ? e.message : t("pipelineRuns.loadLogsFailed")
-            if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
+            if (logs && logs.length > 0) {
+              // 有历史日志，直接显示
+              setLogContent(logs.map((l) => l.out).join(""))
+              setLogError(null)
+              setLogLoading(false)
+            } else {
+              // 没有历史日志，走实时流
               setLogContent(t("pipelineRuns.logsProcessing"))
               setLogError(null)
-            } else {
-              setLogError(errorMessage)
+              setLogLoading(false)
+              setLogRealtime(true)
+              connectToEventStream(repository, buildNumber, firstStage.number, firstStep.number)
             }
           })
-          .finally(() => {
+          .catch((err) => {
+            console.log("[logs] 没有历史日志，走实时流:", err)
+            setLogContent(t("pipelineRuns.logsProcessing"))
+            setLogError(null)
             setLogLoading(false)
+            setLogRealtime(true)
+            connectToEventStream(repository, buildNumber, firstStage.number, firstStep.number)
           })
       } else {
-        void fetchDroneBuildLogs(repository, buildNumber)
+        // 1. 先尝试获取历史日志
+        fetchDroneBuildLogs(repository, buildNumber)
           .then((logs) => {
-            setLogContent(logs || t("pipelineRuns.noLogsOutput"))
-            setLogError(null)
-          })
-          .catch((e: unknown) => {
-            const errorMessage = e instanceof Error ? e.message : t("pipelineRuns.loadLogsFailed")
-            if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
+            if (logs && logs.length > 0) {
+              // 有历史日志，直接显示
+              setLogContent(logs.map((l) => l.out).join(""))
+              setLogError(null)
+              setLogLoading(false)
+            } else {
+              // 没有历史日志，走实时流
               setLogContent(t("pipelineRuns.logsProcessing"))
               setLogError(null)
-            } else {
-              setLogError(errorMessage)
+              setLogLoading(false)
+              setLogRealtime(true)
+              connectToEventStream(repository, buildNumber)
             }
           })
-          .finally(() => {
+          .catch((err) => {
+            console.log("[logs] 没有历史日志，走实时流:", err)
+            setLogContent(t("pipelineRuns.logsProcessing"))
+            setLogError(null)
             setLogLoading(false)
+            setLogRealtime(true)
+            connectToEventStream(repository, buildNumber)
           })
       }
     },
-    [t]
+    [t, connectToEventStream]
   )
 
   const handleDownloadLogs = React.useCallback(() => {
@@ -600,10 +707,19 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       setCurrentLogStep(step)
       setLogLoading(true)
       setLogError(null)
+      setLogContent("")
 
+      // 使用 EventStream 实时获取日志
+      connectToEventStream(currentLogRepository, currentLogBuildNumber, stage, step)
+      
+      // 同时也获取一次完整的历史日志
       void fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, stage, step)
         .then((logs) => {
-          setLogContent(logs || t("pipelineRuns.noLogsOutput"))
+          if (logs && logs.length > 0) {
+            setLogContent(logs.map((l) => l.out).join(""))
+          } else {
+            setLogContent(t("pipelineRuns.logsProcessing"))
+          }
           setLogError(null)
         })
         .catch((e: unknown) => {
@@ -619,47 +735,76 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
           setLogLoading(false)
         })
     },
-    [currentLogBuildNumber, currentLogRepository, t]
+    [currentLogBuildNumber, currentLogRepository, connectToEventStream, t]
   )
 
-  React.useEffect(() => {
-    if (!logOpen || !logRealtime || !currentLogBuildNumber || !currentLogRepository) return
+  // 防止重复连接的标记
+  const connectionKeyRef = React.useRef<string>("")
 
+  // 当打开日志窗口时建立连接
+  React.useEffect(() => {
+    // 生成连接的唯一 key，只有当真正需要改变时才重建连接
+    const connectionKey = `${currentLogRepository}-${currentLogBuildNumber}-${currentLogStage}-${currentLogStep}`
+
+    if (!logOpen || !logRealtime || !currentLogBuildNumber || !currentLogRepository) {
+      // 关闭连接
+      if (abortControllerRef.current) {
+        if (typeof abortControllerRef.current.close === 'function') {
+          abortControllerRef.current.close()
+        }
+        abortControllerRef.current = null
+      }
+      connectionKeyRef.current = ""
+      return
+    }
+
+    // 如果连接 key 没有变化，不重新建立连接
+    if (connectionKeyRef.current === connectionKey && abortControllerRef.current) {
+      return
+    }
+
+    // 关闭旧连接
+    if (abortControllerRef.current) {
+      if (typeof abortControllerRef.current.close === 'function') {
+        abortControllerRef.current.close()
+      }
+      abortControllerRef.current = null
+    }
+
+    // 记录新的 key
+    connectionKeyRef.current = connectionKey
+
+    // 建立连接
+    connectToEventStream(currentLogRepository, currentLogBuildNumber, currentLogStage, currentLogStep)
+
+    // 同时仍然定时获取阶段信息
     const timer = window.setInterval(async () => {
       const hasOpenMenu = document.querySelector('[data-state="open"]') !== null
       if (hasOpenMenu) return
 
       try {
-        await Promise.all([
-          fetchDroneBuildLogs(currentLogRepository, currentLogBuildNumber, currentLogStage, currentLogStep)
-            .then((logs) => {
-              setLogContent(logs || t("pipelineRuns.noLogsOutput"))
-              setLogError(null)
-            })
-            .catch((e: unknown) => {
-              const errorMessage = e instanceof Error ? e.message : t("pipelineRuns.loadLogsFailed")
-              if (errorMessage.includes("404") || errorMessage.includes("no rows in result set")) {
-                setLogContent(t("pipelineRuns.logsProcessing"))
-                setLogError(null)
-              }
-            }),
-          
-          fetchDroneBuildInfo(currentLogRepository, currentLogBuildNumber)
-            .then((stages) => {
-              if (stages.length > 0) {
-                setCurrentLogStages(stages)
-              }
-            })
-            .catch(() => {}),
-        ])
+        await fetchDroneBuildInfo(currentLogRepository, currentLogBuildNumber)
+          .then((stages) => {
+            if (stages.length > 0) {
+              setCurrentLogStages(stages)
+            }
+          })
+          .catch(() => {})
       } catch {
       }
     }, 2000)
 
     return () => {
       window.clearInterval(timer)
+      if (abortControllerRef.current) {
+        if (typeof abortControllerRef.current.close === 'function') {
+          abortControllerRef.current.close()
+        }
+        abortControllerRef.current = null
+      }
+      connectionKeyRef.current = ""
     }
-  }, [logOpen, logRealtime, currentLogBuildNumber, currentLogRepository, currentLogStage, currentLogStep, t])
+  }, [logOpen, logRealtime, currentLogBuildNumber, currentLogRepository, currentLogStage, currentLogStep, connectToEventStream])
 
   const columns = React.useMemo(
     () =>
