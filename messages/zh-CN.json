@@ -142,7 +142,12 @@
       "name": "名称",
       "namespace": "命名空间",
       "status": "状态",
-      "kind": "类型"
+      "kind": "类型",
+      "group": "分组",
+      "scope": "范围",
+      "noNamespaces": "无命名空间",
+      "noGroupFound": "无分组",
+      "noScopeFound": "无范围"
     },
     "customizeColumns": "自定义列",
     "create": "创建",
