@@ -85,7 +85,7 @@ export function useTranslations(namespace?: string) {
   const { locale } = useLocale();
   const currentMessages = getMessages(locale);
 
-  return function t(key: string, params?: Record<string, string>) {
+  return function t(key: string, params?: Record<string, string | number>) {
     const fullKey = namespace ? `${namespace}.${key}` : key;
     const keys = fullKey.split(".");
     let value: any = currentMessages;
@@ -100,7 +100,7 @@ export function useTranslations(namespace?: string) {
     }
 
     if (typeof value === "string" && params) {
-      return value.replace(/\{(\w+)\}/g, (_, k) => params[k] || `{${k}}`);
+      return value.replace(/\{(\w+)\}/g, (_, k) => String(params[k] ?? `{${k}}`));
     }
 
     return typeof value === "string" ? value : key;
