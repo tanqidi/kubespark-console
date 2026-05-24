@@ -5,6 +5,8 @@ import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
 import "@xterm/xterm/css/xterm.css"
 
+import { useTranslations } from "@/app/lib/i18n"
+
 const TERMINAL_THEME = {
   background: "#1e1e1e",
   foreground: "#d4d4d4",
@@ -28,15 +30,21 @@ type TerminalSessionPanelProps = {
 export function TerminalSessionPanel({
   active,
   wsUrl,
-  emptyMessage = "终端连接地址不可用。",
+  emptyMessage,
   className,
 }: TerminalSessionPanelProps) {
+  const t = useTranslations()
   const [terminalHost, setTerminalHost] = React.useState<HTMLDivElement | null>(null)
   const terminalRef = React.useRef<Terminal | null>(null)
   const fitAddonRef = React.useRef<FitAddon | null>(null)
   const socketRef = React.useRef<WebSocket | null>(null)
   const fitTimerRefs = React.useRef<number[]>([])
   const [terminalReady, setTerminalReady] = React.useState(false)
+  
+  // 使用 ref 存储翻译文本，避免在 useEffect 依赖中加入 t 函数
+  const translatedTextsRef = React.useRef({
+    connecting: t("terminal.connecting"),
+  })
 
   const sendSocketMessage = React.useCallback((payload: unknown) => {
     const ws = socketRef.current
@@ -106,7 +114,7 @@ export function TerminalSessionPanel({
     fitAddonRef.current = fitAddon
     setTerminalReady(true)
     if (wsUrl) {
-      terminal.writeln("\x1b[1;36m正在连接终端...\x1b[0m")
+      terminal.writeln(`\x1b[1;36m${translatedTextsRef.current.connecting}\x1b[0m`)
     } else {
       terminal.writeln(`\x1b[1;33m${emptyMessage}\x1b[0m`)
     }

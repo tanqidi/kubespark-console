@@ -112,8 +112,14 @@ export function TerminalViewerDialog({
   const socketRef = React.useRef<WebSocket | null>(null)
   const fitTimerRefs = React.useRef<number[]>([])
   const [terminalReady, setTerminalReady] = React.useState(false)
-  const defaultSubtitle = t("terminal.subtitleFallback")
-  const defaultEmptyMessage = t("terminal.emptyMessage")
+  
+  // 使用 ref 存储翻译文本，避免在 useEffect 依赖中加入 t 函数
+  const translatedTextsRef = React.useRef({
+    connecting: t("terminal.connecting"),
+    openInNewWindow: t("terminal.openInNewWindow"),
+    fullscreen: t("terminal.fullscreen"),
+    exitFullscreen: t("terminal.exitFullscreen"),
+  })
 
   const sendSocketMessage = React.useCallback((payload: unknown) => {
     const ws = socketRef.current
@@ -183,15 +189,15 @@ export function TerminalViewerDialog({
     fitAddonRef.current = fitAddon
     setTerminalReady(true)
     if (wsUrl) {
-      terminal.writeln(`\x1b[1;36m${t("terminal.connecting")}\x1b[0m`)
+      terminal.writeln(`\x1b[1;36m${translatedTextsRef.current.connecting}\x1b[0m`)
     } else {
-      terminal.writeln(`\x1b[1;33m${emptyMessage || defaultEmptyMessage}\x1b[0m`)
+      terminal.writeln(`\x1b[1;33m${emptyMessage}\x1b[0m`)
     }
 
     return () => {
       disposeInput.dispose()
     }
-  }, [emptyMessage, defaultEmptyMessage, open, sendSocketMessage, terminalHost, wsUrl, t])
+  }, [emptyMessage, open, sendSocketMessage, terminalHost, wsUrl])
 
   React.useEffect(() => {
     if (!open || !terminalRef.current || !terminalHost) return
@@ -303,11 +309,11 @@ export function TerminalViewerDialog({
   const handleOpenInNewWindow = React.useCallback(() => {
     openTerminalStandalone({
       title,
-      subtitle: subtitle || defaultSubtitle,
+      subtitle,
       wsUrl,
-      emptyMessage: emptyMessage || defaultEmptyMessage,
+      emptyMessage,
     })
-  }, [emptyMessage, defaultEmptyMessage, subtitle, defaultSubtitle, title, wsUrl])
+  }, [emptyMessage, subtitle, title, wsUrl])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -324,7 +330,7 @@ export function TerminalViewerDialog({
         <div className="flex items-start justify-between border-b bg-muted/15">
           <DialogHeader className="px-6 py-4">
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>{subtitle || defaultSubtitle}</DialogDescription>
+            <DialogDescription>{subtitle}</DialogDescription>
           </DialogHeader>
           <div className="me-20 flex h-full items-center gap-3">
             <Button
@@ -333,11 +339,11 @@ export function TerminalViewerDialog({
               size="icon"
               className="rounded-full"
               onClick={handleOpenInNewWindow}
-              aria-label={t("terminal.openInNewWindow")}
-              title={t("terminal.openInNewWindow")}
+              aria-label={translatedTextsRef.current.openInNewWindow}
+              title={translatedTextsRef.current.openInNewWindow}
             >
               <IconExternalLink className="size-4" />
-              <span className="sr-only">{t("terminal.openInNewWindow")}</span>
+              <span className="sr-only">{translatedTextsRef.current.openInNewWindow}</span>
             </Button>
             <Button
               type="button"
@@ -347,11 +353,11 @@ export function TerminalViewerDialog({
                 fullscreen ? "border-black bg-black text-white hover:bg-black hover:text-white" : ""
               }`}
               onClick={() => setFullscreen((prev) => !prev)}
-              aria-label={fullscreen ? t("terminal.exitFullscreen") : t("terminal.fullscreen")}
-              title={fullscreen ? t("terminal.exitFullscreen") : t("terminal.fullscreen")}
+              aria-label={fullscreen ? translatedTextsRef.current.exitFullscreen : translatedTextsRef.current.fullscreen}
+              title={fullscreen ? translatedTextsRef.current.exitFullscreen : translatedTextsRef.current.fullscreen}
             >
               {fullscreen ? <IconArrowsMinimize /> : <IconArrowsMaximize />}
-              <span className="sr-only">{fullscreen ? t("terminal.exitFullscreen") : t("terminal.fullscreen")}</span>
+              <span className="sr-only">{fullscreen ? translatedTextsRef.current.exitFullscreen : translatedTextsRef.current.fullscreen}</span>
             </Button>
           </div>
         </div>
@@ -364,4 +370,3 @@ export function TerminalViewerDialog({
     </Dialog>
   )
 }
-
