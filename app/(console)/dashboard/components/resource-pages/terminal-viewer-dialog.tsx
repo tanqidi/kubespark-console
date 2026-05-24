@@ -10,7 +10,7 @@ import {
 } from "@tabler/icons-react"
 import "@xterm/xterm/css/xterm.css"
 
-import { useTranslations } from "@/app/lib/i18n"
+import { useTranslations, useLocale } from "@/app/lib/i18n"
 import {
   Dialog,
   DialogContent,
@@ -105,6 +105,7 @@ export function TerminalViewerDialog({
   emptyMessage,
 }: TerminalViewerDialogProps) {
   const t = useTranslations()
+  const { locale } = useLocale()
   const [terminalHost, setTerminalHost] = React.useState<HTMLDivElement | null>(null)
   const [fullscreen, setFullscreen] = React.useState(false)
   const terminalRef = React.useRef<Terminal | null>(null)
@@ -113,13 +114,21 @@ export function TerminalViewerDialog({
   const fitTimerRefs = React.useRef<number[]>([])
   const [terminalReady, setTerminalReady] = React.useState(false)
   
-  // 使用 ref 存储翻译文本，避免在 useEffect 依赖中加入 t 函数
   const translatedTextsRef = React.useRef({
     connecting: t("terminal.connecting"),
     openInNewWindow: t("terminal.openInNewWindow"),
     fullscreen: t("terminal.fullscreen"),
     exitFullscreen: t("terminal.exitFullscreen"),
   })
+
+  React.useEffect(() => {
+    translatedTextsRef.current = {
+      connecting: t("terminal.connecting"),
+      openInNewWindow: t("terminal.openInNewWindow"),
+      fullscreen: t("terminal.fullscreen"),
+      exitFullscreen: t("terminal.exitFullscreen"),
+    }
+  }, [locale, t])
 
   const sendSocketMessage = React.useCallback((payload: unknown) => {
     const ws = socketRef.current

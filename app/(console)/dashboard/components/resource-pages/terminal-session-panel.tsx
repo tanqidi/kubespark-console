@@ -5,7 +5,7 @@ import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
 import "@xterm/xterm/css/xterm.css"
 
-import { useTranslations } from "@/app/lib/i18n"
+import { useTranslations, useLocale } from "@/app/lib/i18n"
 
 const TERMINAL_THEME = {
   background: "#1e1e1e",
@@ -34,6 +34,7 @@ export function TerminalSessionPanel({
   className,
 }: TerminalSessionPanelProps) {
   const t = useTranslations()
+  const { locale } = useLocale()
   const [terminalHost, setTerminalHost] = React.useState<HTMLDivElement | null>(null)
   const terminalRef = React.useRef<Terminal | null>(null)
   const fitAddonRef = React.useRef<FitAddon | null>(null)
@@ -41,10 +42,15 @@ export function TerminalSessionPanel({
   const fitTimerRefs = React.useRef<number[]>([])
   const [terminalReady, setTerminalReady] = React.useState(false)
   
-  // 使用 ref 存储翻译文本，避免在 useEffect 依赖中加入 t 函数
   const translatedTextsRef = React.useRef({
     connecting: t("terminal.connecting"),
   })
+
+  React.useEffect(() => {
+    translatedTextsRef.current = {
+      connecting: t("terminal.connecting"),
+    }
+  }, [locale, t])
 
   const sendSocketMessage = React.useCallback((payload: unknown) => {
     const ws = socketRef.current
