@@ -52,8 +52,9 @@ type LogViewerDialogProps = {
   onOpenChange: (open: boolean) => void
   title: string
   subtitle?: string
-  realtime: boolean
-  onRealtimeChange: (checked: boolean) => void
+  realtime?: boolean
+  onRealtimeChange?: (checked: boolean) => void
+  showRealtimeButton?: boolean
   loading?: boolean
   error?: string | null
   content: string
@@ -72,6 +73,7 @@ export function LogViewerDialog({
   subtitle = "展示最近日志输出。",
   realtime,
   onRealtimeChange,
+  showRealtimeButton = true,
   loading = false,
   error = null,
   content,
@@ -245,20 +247,22 @@ export function LogViewerDialog({
               {fullscreen ? <IconArrowsMinimize /> : <IconArrowsMaximize />}
               <span className="sr-only">{fullscreen ? "退出全屏" : "全屏"}</span>
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className={`rounded-full transition-colors ${
-                realtime ? "border-black bg-black text-white hover:bg-black hover:text-white" : ""
-              }`}
-              onClick={() => onRealtimeChange(!realtime)}
-              aria-label={realtime ? "停止实时日志" : "开启实时日志"}
-              title={realtime ? "停止实时日志" : "开启实时日志"}
-            >
-              {realtime ? <IconPlayerPause /> : <IconPlayerPlay />}
-              <span className="sr-only">{realtime ? "停止实时日志" : "开启实时日志"}</span>
-            </Button>
+            {showRealtimeButton && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className={`rounded-full transition-colors ${
+                  realtime ? "border-black bg-black text-white hover:bg-black hover:text-white" : ""
+                }`}
+                onClick={() => onRealtimeChange?.(!realtime)}
+                aria-label={realtime ? "停止实时日志" : "开启实时日志"}
+                title={realtime ? "停止实时日志" : "开启实时日志"}
+              >
+                {realtime ? <IconPlayerPause /> : <IconPlayerPlay />}
+                <span className="sr-only">{realtime ? "停止实时日志" : "开启实时日志"}</span>
+              </Button>
+            )}
           </div>
         </div>
         {stages.length > 0 && (

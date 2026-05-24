@@ -350,7 +350,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
   const [logLoading, setLogLoading] = React.useState(false)
   const [logError, setLogError] = React.useState<string | null>(null)
   const [logContent, setLogContent] = React.useState("")
-  const [logRealtime, setLogRealtime] = React.useState(false)
   const [logTitle, setLogTitle] = React.useState("")
   const [logSubtitle, setLogSubtitle] = React.useState("")
   const [currentLogBuildNumber, setCurrentLogBuildNumber] = React.useState("")
@@ -593,7 +592,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         setLogContent("")
         setLogTitle(t("pipelineRuns.viewLogsTitle"))
         setLogSubtitle(t("pipelineRuns.viewLogsSubtitleNoRepo", { name: row.name }))
-        setLogRealtime(false)
         setCurrentLogBuildNumber(buildNumber)
         setCurrentLogRepository("")
         setCurrentLogStages([])
@@ -616,7 +614,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       setLogContent("")
       setLogTitle(t("pipelineRuns.viewLogsTitle"))
       setLogSubtitle(t("pipelineRuns.viewLogsSubtitle", { name: displayPath }))
-      setLogRealtime(false)
       setCurrentLogBuildNumber(buildNumber)
       setCurrentLogRepository(repository)
       setCurrentLogStages(row.stages || [])
@@ -642,7 +639,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
               setLogContent(t("pipelineRuns.logsProcessing"))
               setLogError(null)
               setLogLoading(false)
-              setLogRealtime(true)
               connectToEventStream(repository, buildNumber, firstStage.number, firstStep.number)
             }
           })
@@ -651,7 +647,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
             setLogContent(t("pipelineRuns.logsProcessing"))
             setLogError(null)
             setLogLoading(false)
-            setLogRealtime(true)
             connectToEventStream(repository, buildNumber, firstStage.number, firstStep.number)
           })
       } else {
@@ -668,7 +663,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
               setLogContent(t("pipelineRuns.logsProcessing"))
               setLogError(null)
               setLogLoading(false)
-              setLogRealtime(true)
               connectToEventStream(repository, buildNumber)
             }
           })
@@ -677,7 +671,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
             setLogContent(t("pipelineRuns.logsProcessing"))
             setLogError(null)
             setLogLoading(false)
-            setLogRealtime(true)
             connectToEventStream(repository, buildNumber)
           })
       }
@@ -746,7 +739,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
     // 生成连接的唯一 key，只有当真正需要改变时才重建连接
     const connectionKey = `${currentLogRepository}-${currentLogBuildNumber}-${currentLogStage}-${currentLogStep}`
 
-    if (!logOpen || !logRealtime || !currentLogBuildNumber || !currentLogRepository) {
+    if (!logOpen || !currentLogBuildNumber || !currentLogRepository) {
       // 关闭连接
       if (abortControllerRef.current) {
         if (typeof abortControllerRef.current.close === 'function') {
@@ -804,7 +797,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
       }
       connectionKeyRef.current = ""
     }
-  }, [logOpen, logRealtime, currentLogBuildNumber, currentLogRepository, currentLogStage, currentLogStep, connectToEventStream])
+  }, [logOpen, currentLogBuildNumber, currentLogRepository, currentLogStage, currentLogStep, connectToEventStream])
 
   const columns = React.useMemo(
     () =>
@@ -966,8 +959,6 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         onOpenChange={setLogOpen}
         title={logTitle}
         subtitle={logSubtitle}
-        realtime={logRealtime}
-        onRealtimeChange={setLogRealtime}
         loading={logLoading}
         error={logError}
         content={logContent}
@@ -977,6 +968,7 @@ export function PipelineRunsPageClient({ pipelineName }: PipelineRunsPageClientP
         currentStage={currentLogStage}
         currentStep={currentLogStep}
         onStageStepChange={handleLogStageStepChange}
+        showRealtimeButton={false}
       />
       <Dialog
         open={runDialogOpen}
