@@ -113,6 +113,7 @@ export function TerminalSessionPanel({
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
     setTerminalReady(true)
+    terminal.focus()
     if (wsUrl) {
       terminal.writeln(`\x1b[1;36m${translatedTextsRef.current.connecting}\x1b[0m`)
     } else {

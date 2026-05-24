@@ -188,6 +188,7 @@ export function TerminalViewerDialog({
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
     setTerminalReady(true)
+    terminal.focus()
     if (wsUrl) {
       terminal.writeln(`\x1b[1;36m${translatedTextsRef.current.connecting}\x1b[0m`)
     } else {
@@ -297,6 +298,10 @@ export function TerminalViewerDialog({
   React.useEffect(() => {
     if (!open) return
     scheduleFit()
+    // 确保每次打开对话框时终端都能获得焦点
+    setTimeout(() => {
+      terminalRef.current?.focus()
+    }, 100)
   }, [fullscreen, open, scheduleFit])
 
   React.useEffect(() => {
