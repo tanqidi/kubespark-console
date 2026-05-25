@@ -90,6 +90,7 @@ export function PodsPageClient() {
   const [terminalSubtitle, setTerminalSubtitle] = React.useState("")
   const [terminalWsUrl, setTerminalWsUrl] = React.useState<string | null>(null)
   const logsAbortRef = React.useRef<AbortController | null>(null)
+  const logsConnectionKeyRef = React.useRef("")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<PodRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
 
@@ -169,7 +170,16 @@ export function PodsPageClient() {
   }, [t])
 
   React.useEffect(() => {
-    if (!logsOpen || !logsTarget) return
+    if (!logsOpen || !logsTarget) {
+      logsAbortRef.current?.abort()
+      logsAbortRef.current = null
+      logsConnectionKeyRef.current = ""
+      return
+    }
+
+    const connectionKey = `${logsTarget.namespace}/${logsTarget.name}:${realtimeLogs ? "follow" : "snapshot"}`
+    if (logsConnectionKeyRef.current === connectionKey && logsAbortRef.current) return
+    logsConnectionKeyRef.current = connectionKey
 
     logsAbortRef.current?.abort()
     const controller = new AbortController()
@@ -194,6 +204,9 @@ export function PodsPageClient() {
         })
       return () => {
         controller.abort()
+        if (logsAbortRef.current === controller) {
+          logsAbortRef.current = null
+        }
       }
     }
 
@@ -231,6 +244,9 @@ export function PodsPageClient() {
 
     return () => {
       controller.abort()
+      if (logsAbortRef.current === controller) {
+        logsAbortRef.current = null
+      }
     }
   }, [logsOpen, logsTarget, realtimeLogs, t])
 

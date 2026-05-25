@@ -120,7 +120,8 @@ export function LogViewerDialog({
     const initial = loading || Boolean(error) ? "" : (latestContentRef.current || "(无日志输出)")
     if (initial) terminal.write(toTerminalText(initial))
     lastRenderedRef.current = initial
-  }, [error, loading, terminalHost])
+    if (realtime) terminal.scrollToBottom()
+  }, [error, loading, realtime, terminalHost])
 
   const scheduleFit = React.useCallback(() => {
     const fitAddon = fitAddonRef.current
@@ -170,7 +171,6 @@ export function LogViewerDialog({
     const prev = lastRenderedRef.current
     if (next === prev) return
 
-    const nearBottom = term.buffer.active.baseY - term.buffer.active.viewportY <= 1
     scheduleFit()
     if (prev && next.startsWith(prev)) {
       const appendText = next.slice(prev.length)
@@ -181,7 +181,7 @@ export function LogViewerDialog({
     }
 
     lastRenderedRef.current = next
-    if (realtime && nearBottom) term.scrollToBottom()
+    if (realtime) term.scrollToBottom()
   }, [content, error, loading, open, realtime, scheduleFit])
 
   React.useEffect(() => {

@@ -47,9 +47,34 @@ async function proxyUpstream(req: NextRequest, method: string, context: RouteCon
     const cacheControl = res.headers.get("cache-control");
     if (contentType) responseHeaders.set("content-type", contentType);
     if (cacheControl) responseHeaders.set("cache-control", cacheControl);
+    if (contentType?.includes("text/plain")) {
+      responseHeaders.set("cache-control", cacheControl ? `${cacheControl}, no-transform` : "no-cache, no-transform");
+      responseHeaders.set("x-accel-buffering", "no");
+    }
 
-    // Stream upstream response body directly so follow/log endpoints can flush in real time.
-    return new NextResponse(res.body, {
+    const body = res.body
+      ? new ReadableStream({
+          async start(controller) {
+            const reader = res.body!.getReader();
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (value) controller.enqueue(value);
+              }
+            } finally {
+              reader.releaseLock();
+              controller.close();
+            }
+          },
+          cancel() {
+            void res.body?.cancel();
+          },
+        })
+      : null;
+
+    // Stream upstream response body chunk-by-chunk so follow/log endpoints can flush in real time.
+    return new NextResponse(body, {
       status: res.status,
       headers: responseHeaders,
     });
