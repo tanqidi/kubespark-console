@@ -486,7 +486,7 @@ export function PodsPageClient() {
         namespaceOptions={createNamespaceOptions}
         onSubmit={async (payload) => {
           await createPod(payload)
-          await refreshRows()
+          await loadRows(false)
         }}
       />
       <CreatePodDialog
@@ -500,7 +500,7 @@ export function PodsPageClient() {
         namespaceOptions={createNamespaceOptions}
         onSubmit={async (payload) => {
           await updatePod(payload)
-          await refreshRows()
+          await loadRows(false)
         }}
       />
       <MonacoViewerDialog
