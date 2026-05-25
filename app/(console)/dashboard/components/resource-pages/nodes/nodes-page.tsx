@@ -39,7 +39,7 @@ type NodeRow = NodeResourceRow
 function getNodeColumns(t: (key: string) => string) {
   return [
     {
-      key: "name",
+      key: "name" as const,
       label: t("table.columns.name"),
       enableHiding: false,
       cell: (_value: unknown, row: NodeRow) => (
@@ -50,7 +50,7 @@ function getNodeColumns(t: (key: string) => string) {
       ),
     },
     { 
-      key: "status", 
+      key: "status" as const, 
       label: t("table.columns.status"), 
       cell: (value: unknown) => {
         const key = String(value ?? "-")
@@ -72,13 +72,13 @@ function getNodeColumns(t: (key: string) => string) {
       }
     },
     { 
-      key: "role", 
+      key: "role" as const, 
       label: t("table.columns.role"),
       cell: (value: unknown) => t(`nodes.role.${String(value)}`)
     },
-    { key: "pods", label: t("table.columns.pods") },
-    { key: "age", label: t("table.columns.age") },
-    { key: "updatedAt", label: t("table.columns.updatedAt") },
+    { key: "pods" as const, label: t("table.columns.pods") },
+    { key: "age" as const, label: t("table.columns.age") },
+    { key: "updatedAt" as const, label: t("table.columns.updatedAt") },
   ]
 }
 
