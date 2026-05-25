@@ -42,15 +42,11 @@ async function proxyUpstream(req: NextRequest, method: string, context: RouteCon
       body: method === "GET" || method === "HEAD" ? undefined : await req.arrayBuffer(),
     });
 
-    // 透传所有响应头，特别是 SSE 相关的头
-    const responseHeaders = new Headers(res.headers);
-    
-    // 确保 SSE 响应能正确工作
-    if (responseHeaders.get("content-type")?.includes("text/event-stream")) {
-      responseHeaders.set("Cache-Control", "no-cache");
-      responseHeaders.set("Connection", "keep-alive");
-      responseHeaders.set("X-Accel-Buffering", "no");
-    }
+    const responseHeaders = new Headers();
+    const contentType = res.headers.get("content-type");
+    const cacheControl = res.headers.get("cache-control");
+    if (contentType) responseHeaders.set("content-type", contentType);
+    if (cacheControl) responseHeaders.set("cache-control", cacheControl);
 
     // Stream upstream response body directly so follow/log endpoints can flush in real time.
     return new NextResponse(res.body, {

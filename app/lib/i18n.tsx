@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, createContext, useContext, ReactNode } from "react";
+import { useCallback, useEffect, useState, createContext, useContext, ReactNode } from "react";
 import zhCN from "@/messages/zh-CN.json";
 import enUS from "@/messages/en-US.json";
 
@@ -28,7 +28,7 @@ export function getBrowserLocale(): Locale {
     return savedLocale;
   }
   
-  const browserLang = navigator.language || (navigator as any).userLanguage;
+  const browserLang = navigator.language || (navigator as Navigator & { userLanguage?: string }).userLanguage || "";
   if (browserLang.startsWith("zh")) return "zh-CN";
   return "en-US";
 }
@@ -48,9 +48,13 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const browserLocale = getBrowserLocale();
-    setLocale(browserLocale);
-    setIsHydrated(true);
+    const timer = window.setTimeout(() => {
+      const browserLocale = getBrowserLocale();
+      setLocale(browserLocale);
+      setIsHydrated(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   const handleSetLocale = (newLocale: Locale) => {
@@ -85,14 +89,14 @@ export function useTranslations(namespace?: string) {
   const { locale } = useLocale();
   const currentMessages = getMessages(locale);
 
-  return function t(key: string, params?: Record<string, string | number>) {
+  return useCallback(function t(key: string, params?: Record<string, string | number>) {
     const fullKey = namespace ? `${namespace}.${key}` : key;
     const keys = fullKey.split(".");
-    let value: any = currentMessages;
+    let value: unknown = currentMessages;
     
     for (const k of keys) {
       if (value && typeof value === "object" && k in value) {
-        value = value[k];
+        value = (value as Record<string, unknown>)[k];
       } else {
         value = key;
         break;
@@ -104,5 +108,5 @@ export function useTranslations(namespace?: string) {
     }
 
     return typeof value === "string" ? value : key;
-  };
+  }, [currentMessages, namespace]);
 }
