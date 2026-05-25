@@ -44,9 +44,9 @@ type TerminalViewerDialogProps = {
 
 function openTerminalStandalone(params: {
   title: string
-  subtitle: string
+  subtitle?: string
   wsUrl: string | null
-  emptyMessage: string
+  emptyMessage?: string
 }) {
   const sessionKey =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -307,7 +307,6 @@ export function TerminalViewerDialog({
   React.useEffect(() => {
     if (!open) return
     scheduleFit()
-    // 确保每次打开对话框时终端都能获得焦点
     setTimeout(() => {
       terminalRef.current?.focus()
     }, 100)
