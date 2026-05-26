@@ -6,16 +6,16 @@ const buildDir = path.join(__dirname, '../.next/static/chunks');
 
 const obfuscationOptions = {
   compact: true,
-  selfDefending: true,
+  selfDefending: false,
   stringArray: true,
   stringArrayEncoding: ['base64'],
-  stringArrayThreshold: 0.75,
+  stringArrayThreshold: 0.5,
   controlFlowFlattening: false,
   deadCodeInjection: false,
   renameGlobals: false,
   rotateStringArray: true,
   shuffleStringArray: true,
-  transformObjectKeys: true,
+  transformObjectKeys: false,
   unicodeEscapeSequence: false
 };
 
@@ -44,7 +44,7 @@ function obfuscateDirectory(dir) {
 
     if (stat.isDirectory()) {
       obfuscateDirectory(filePath);
-    } else if (file.endsWith('.js') && !file.includes('middleware') && !file.includes('polyfill')) {
+    } else if (file.endsWith('.js') && !file.includes('middleware') && !file.includes('polyfill') && !file.includes('turbopack')) {
       obfuscateFile(filePath);
     }
   });
