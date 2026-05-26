@@ -29,9 +29,7 @@ export function StepHeaderNav({ items, highlightByActiveOnly = false }: StepHead
                     const isDone =
                         !highlightByActiveOnly &&
                         activeIndex >= 0 &&
-                        index < activeIndex &&
-                        (item.status.includes("已") || 
-                         ["success", "completed", "passed", "configured"].includes(item.status.toLowerCase()))
+                        index < activeIndex
                     const isProgressed = item.active || isDone
                     const statusTone = item.active || isDone ? "bg-emerald-500" : "bg-muted-foreground/35"
                     const statusTextTone = item.active || isDone ? "text-foreground" : "text-muted-foreground"
