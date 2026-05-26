@@ -1488,5 +1488,21 @@
     "loadWorkloadFailed": "加载工作负载详情失败",
     "deleteFailed": "删除失败",
     "deleteConfirm": "确定删除工作负载 {name} 吗？"
+  },
+  "about": {
+    "title": "关于 KubeSpark",
+    "description": "控制台版本与项目信息",
+    "productName": "产品名称",
+    "productValue": "KubeSpark 控制台",
+    "currentVersion": "当前版本",
+    "acknowledgement": "致谢与缘起",
+    "ackParagraph1": "我们感谢 KubeSphere 在过去带来的启发与帮助。正因体验过其高效与清晰，我们希望把这些经过实践验证的产品方法延续下去，这也是 KubeSpark 的起点。",
+    "ackParagraph2": "对于后续变化，我们尊重其作为企业的选择。作为长期用户，我们也真实感受过社区在资料缺失阶段的使用不便。基于此，我们选择以公开、持续的方式，沉淀并分享有价值的经验与实践。",
+    "ackParagraph3": "KubeSpark 在界面交互与信息架构上参考了 KubeSphere 的设计思路；项目的前后端代码由作者基于 Codex 协作独立开发，未复制 KubeSphere 源代码。本项目长期以开源方式维护，主要用于学习、研究与社区交流；不提供商业化托管或 SaaS 服务。",
+    "ackParagraph4": "KubeSphere 相关名称、标识、商标及版权归其权利人所有。KubeSpark 与 KubeSphere 官方不存在隶属、授权或合作关系。如有表述不当，我们会及时沟通并尽快修正。相关意见可发送至作者邮箱：1330884822@qq.com。",
+    "projectLink": "项目地址",
+    "issuesLink": "问题反馈",
+    "authorLink": "关于作者",
+    "confirm": "我知道了"
   }
 }

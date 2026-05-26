@@ -1489,5 +1489,21 @@
     "loadWorkloadFailed": "Failed to load workload details",
     "deleteFailed": "Delete failed",
     "deleteConfirm": "Are you sure you want to delete workload {name}?"
+  },
+  "about": {
+    "title": "About KubeSpark",
+    "description": "Console version and project information",
+    "productName": "Product Name",
+    "productValue": "KubeSpark Console",
+    "currentVersion": "Current Version",
+    "acknowledgement": "Acknowledgements",
+    "ackParagraph1": "We thank KubeSphere for the inspiration and help it has brought in the past. Having experienced its efficiency and clarity, we hope to continue these proven product approaches, which is also the starting point of KubeSpark.",
+    "ackParagraph2": "For subsequent changes, we respect its choices as a company. As long-term users, we have also truly experienced the inconvenience caused by the lack of documentation in the community. Based on this, we have chosen to use an open and continuous approach to accumulate and share valuable experiences and practices.",
+    "ackParagraph3": "KubeSpark references KubeSphere's design ideas in interface interaction and information architecture; the front-end and back-end code of the project is independently developed by the author based on Codex collaboration, without copying KubeSphere source code. This project is maintained as open source for a long time, mainly used for learning, research and community communication; no commercial hosting or SaaS services are provided.",
+    "ackParagraph4": "KubeSphere related names, logos, trademarks and copyrights belong to their respective owners. KubeSpark has no affiliation, authorization or cooperative relationship with KubeSphere official. If there is any inappropriate expression, we will communicate and correct it as soon as possible. Related comments can be sent to the author's email: 1330884822@qq.com.",
+    "projectLink": "Project",
+    "issuesLink": "Issues",
+    "authorLink": "About Author",
+    "confirm": "Got it"
   }
 }
