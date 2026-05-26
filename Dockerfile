@@ -15,7 +15,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN npm run build:obfuscate
 
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
