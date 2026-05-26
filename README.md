@@ -1,46 +1,65 @@
-# kubespark-console 控制台（React + Next.js）
+# KubeSpark Console
 
-kubespark-console 是一个面向 Kubernetes 的可视化管理控制台，聚焦资源 CRUD 与 YAML 协同编辑。  
-当前已覆盖命名空间、Pod、Service、Job/CronJob 等常见资源的列表管理、创建/编辑与 YAML 查看能力；并在部分资源提供原生 `kubectl describe` 风格的“详情”查看能力。
+Kubernetes visual management console focusing on resource CRUD and collaborative YAML editing.
 
-## 界面预览
+## Features
 
-![工作负载-容器组列表](docs/img/img.png)
-![Service 可视化编辑](docs/img/img_1.png)
-![YAML 查看](docs/img/img_2.png)
-![CronJob 多步骤编辑](docs/img/img_3.png)
-![容器录入弹窗](docs/img/img_4.png)
-![实时容器日志](docs/img/img_5.png)
-![容器终端](docs/img/img_6.png)
+- Manage common resources: Namespaces, Pods, Services, Jobs, CronJobs, etc.
+- Create/Edit resources with visual form or YAML
+- View YAML and `kubectl describe` style details
+- Real-time container logs
+- Container terminal access
 
-## Kubernetes 部署
+## Screenshots
+
+![Pods List](docs/img/img.png)
+![Container Terminal](docs/img/img_6.png)
+![Service Edit](docs/img/img_1.png)
+![YAML View](docs/img/img_2.png)
+![CronJob Multi-step Edit](docs/img/img_3.png)
+![Container Input Dialog](docs/img/img_4.png)
+![Real-time Logs](docs/img/img_5.png)
+
+## Quick Start
+
+### Prerequisites
+
+- Kubernetes cluster
+- kubectl configured
+
+### Installation
+
 ```bash
-kubectl apply -f deployment/kubespark-rbac.yaml
-kubectl apply -f deployment/kubespark-secret.yaml
-kubectl apply -f deployment/kubespark-terminal.yaml
-kubectl apply -f deployment/kubespark.yaml
-kubectl apply -f deployment/kubespark-console.yaml
+cd deployment
+./install.sh
 ```
 
-### 2) dev 标签镜像更新说明（重要）
+### Install Drone CI/CD (Optional)
 
-当前处于快速迭代阶段，镜像统一使用 :dev 标签。即使配置了 imagePullPolicy: Always，已运行的 Pod 也不会自动替换为最新镜像。由于 GitHub Actions 会持续推送新镜像，建议你不定期执行以下命令，拉取并应用最新镜像，以便及时体验新功能与修复。
 ```bash
-kubectl rollout restart deployment/kubespark -n kubespark
-kubectl rollout restart deployment/kubespark-console -n kubespark
+cd deployment
+./install-drone-cicd.sh
 ```
 
-## Shell Recommendation
+### Uninstall
 
-为避免 Windows 终端编码乱码，建议按以下优先级使用：
+```bash
+cd deployment
+./uninstall.sh
+```
 
-1. PowerShell 7（推荐）  
-2. Git Bash（可选）
+### Access Console
 
-- PowerShell 7: `C:\Program Files\PowerShell\7\pwsh.exe`
-- Git Bash: `C:\Program Files\Git\bin\bash.exe`
+After installation, access at:
+```
+http://<node-ip>:30000
+```
 
-## Getting Started
+Default credentials:
+- Username: `admin`
+- Password: (set during installation)
+
+## Development
 
 ```bash
 npm install
@@ -49,24 +68,21 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### 自动刷新配置
+## Updating Images
 
-- 默认：3000ms 自动刷新（3 秒定时轮询）。
+Since images use the `:dev` tag, running pods won't automatically update to the latest version. GitHub Actions continuously pushes new images. To get the latest:
 
-### WebSocket 代理说明
+```bash
+kubectl rollout restart deployment/kubespark -n kubespark
+kubectl rollout restart deployment/kubespark-console -n kubespark
+```
 
-- 使用自定义 Node server：`server.js`（用于处理 WebSocket upgrade）。
-- 脚本：
-  - `npm run dev` -> `node server.js --dev`
-  - `npm run start` -> `node server.js --prod`
-- 代理规则：
-  - HTTP：`/api/kubespark/*`
-  - WS：`/api/kubespark-ws/*`
+## Shell Recommendation
 
-上游地址由 `KUBESPARK_API_BASE` 指定。
+For Windows:
+1. PowerShell 7 (Recommended)
+2. Git Bash
 
-## 社区交流
+## License
 
-欢迎加入 kubespark-console 用户交流群，反馈问题、交流使用经验与部署实践：
-
-- QQ 群：`1095765093`
+-

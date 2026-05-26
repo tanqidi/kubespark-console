@@ -46,11 +46,6 @@ spec:
                 secretKeyRef:
                   name: drone-secret
                   key: DRONE_SERVER_PROTO
-            - name: DRONE_USER_CREATE
-              valueFrom:
-                secretKeyRef:
-                  name: drone-secret
-                  key: DRONE_USER_CREATE
             - name: DRONE_YAML_ENDPOINT
               valueFrom:
                 secretKeyRef:
