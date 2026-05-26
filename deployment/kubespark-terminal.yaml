@@ -3,8 +3,6 @@ apiVersion: apps/v1
 metadata:
   name: kubespark-terminal
   namespace: kubespark
-  annotations:
-    description: 集群终端
 spec:
   selector:
     matchLabels:

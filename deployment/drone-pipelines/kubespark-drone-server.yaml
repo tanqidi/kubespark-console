@@ -3,8 +3,6 @@ apiVersion: apps/v1
 metadata:
   name: kubespark-drone-server
   namespace: kubespark
-  annotations:
-    deployment.kubernetes.io/revision: "13"
 spec:
   selector:
     matchLabels:

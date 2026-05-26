@@ -3,8 +3,6 @@ apiVersion: apps/v1
 metadata:
   name: kubespark-drone-runner
   namespace: kubespark
-  annotations:
-    deployment.kubernetes.io/revision: "11"
 spec:
   selector:
     matchLabels:
@@ -42,12 +40,12 @@ spec:
                 secretKeyRef:
                   name: drone-secret
                   key: DRONE_SERVER_PROTO
-            - name: HTTP_PROXY
-              value: http://172.31.0.1:7890
-            - name: HTTPS_PROXY
-              value: http://172.31.0.1:7890
-            - name: NO_PROXY
-              value: 127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local,kubernetes.default.svc,kubernetes.default
+#            - name: HTTP_PROXY
+#              value: http://172.31.0.1:7890
+#            - name: HTTPS_PROXY
+#              value: http://172.31.0.1:7890
+#            - name: NO_PROXY
+#              value: 127.0.0.1,localhost,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local,kubernetes.default.svc,kubernetes.default
           resources: {}
           volumeMounts:
             - name: host-time
