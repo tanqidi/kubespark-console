@@ -119,9 +119,46 @@ echo "Admin account information:"
 echo "  Username: admin"
 echo "  Password: $KUBESPARK_PASSWORD"
 echo ""
+
+# Get current host IP
+get_host_ip() {
+    # Try different methods to get the host IP
+    local ip=""
+    
+    # Method 1: hostname -I (Linux)
+    if command -v hostname >/dev/null 2>&1; then
+        ip=$(hostname -I | awk '{print $1}')
+    fi
+    
+    # Method 2: ip route (Linux)
+    if [ -z "$ip" ] && command -v ip >/dev/null 2>&1; then
+        ip=$(ip route get 1 2>/dev/null | awk '{print $7}' | head -n1)
+    fi
+    
+    # Method 3: ifconfig (older Linux)
+    if [ -z "$ip" ] && command -v ifconfig >/dev/null 2>&1; then
+        ip=$(ifconfig 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | head -n1)
+    fi
+    
+    # Method 4: default to localhost
+    if [ -z "$ip" ]; then
+        ip="127.0.0.1"
+    fi
+    
+    echo "$ip"
+}
+
+HOST_IP=$(get_host_ip)
+
+echo "Access KubeSpark Console at:"
+echo "  http://${HOST_IP}:30000"
+echo ""
 echo "Check deployment status:"
 echo "  kubectl get pods -n kubespark"
 echo ""
 echo "Check all resources:"
 echo "  kubectl get all -n kubespark"
+echo ""
+echo "To install Drone CI/CD, run:"
+echo "  ./install-drone-cicd.sh"
 echo ""
