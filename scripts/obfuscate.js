@@ -10,10 +10,8 @@ const obfuscationOptions = {
   stringArray: true,
   stringArrayEncoding: ['base64'],
   stringArrayThreshold: 0.75,
-  controlFlowFlattening: true,
-  controlFlowFlatteningThreshold: 0.75,
-  deadCodeInjection: true,
-  deadCodeInjectionThreshold: 0.4,
+  controlFlowFlattening: false,
+  deadCodeInjection: false,
   renameGlobals: false,
   rotateStringArray: true,
   shuffleStringArray: true,
@@ -39,11 +37,11 @@ function obfuscateDirectory(dir) {
   }
 
   const files = fs.readdirSync(dir);
-  
+
   files.forEach(file => {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
-    
+
     if (stat.isDirectory()) {
       obfuscateDirectory(filePath);
     } else if (file.endsWith('.js') && !file.includes('middleware') && !file.includes('polyfill')) {
