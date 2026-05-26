@@ -45,7 +45,7 @@ echo ""
 
 # Check if both are empty (auto-generate password)
 if [ -z "$KUBESPARK_PASSWORD" ] && [ -z "$KUBESPARK_PASSWORD_CONFIRM" ]; then
-    KUBESPARK_PASSWORD=$(generate_random_string 16)
+    KUBESPARK_PASSWORD=$(generate_random_string 32)
     echo "✓ Auto-generated password"
 elif [ "$KUBESPARK_PASSWORD" != "$KUBESPARK_PASSWORD_CONFIRM" ]; then
     echo "Error: Passwords do not match!"
