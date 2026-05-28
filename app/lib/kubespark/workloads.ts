@@ -3,6 +3,7 @@ import {
   buildResourceItemEndpoint,
   fetchJsonDeduped,
   fetchResourceCollection,
+  fetchResourceByName,
 } from "./common"
 
 export type WorkloadCreateKind = "Deployment" | "StatefulSet" | "DaemonSet"
@@ -31,6 +32,17 @@ export type UpdateWorkloadInput = {
   namespace: string
   name: string
   payload: Record<string, unknown>
+}
+
+type WorkloadResourcePayload = Record<string, unknown> & {
+  metadata?: Record<string, unknown>
+  spec?: Record<string, unknown> & {
+    template?: Record<string, unknown> & {
+      metadata?: Record<string, unknown> & {
+        annotations?: Record<string, string>
+      }
+    }
+  }
 }
 
 export async function checkWorkloadExists(
@@ -76,6 +88,46 @@ export async function updateWorkload(input: UpdateWorkloadInput): Promise<unknow
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input.payload),
+  })
+}
+
+export async function rolloutWorkload(input: {
+  kind: WorkloadCreateKind
+  namespace: string
+  name: string
+}): Promise<unknown> {
+  const gvr = WORKLOAD_GVR_BY_KIND[input.kind]
+  const { payload: current } = await fetchResourceByName<unknown>(
+    gvr.group,
+    gvr.version,
+    gvr.resource,
+    input.name,
+    { namespace: input.namespace }
+  )
+  const payload = JSON.parse(JSON.stringify(current)) as WorkloadResourcePayload
+  payload.metadata ??= {}
+  payload.spec ??= {}
+  payload.spec.template ??= {}
+  payload.spec.template.metadata ??= {}
+  payload.spec.template.metadata.annotations ??= {}
+
+  payload.metadata.name =
+    typeof payload.metadata.name === "string" && payload.metadata.name ? payload.metadata.name : input.name
+  payload.metadata.namespace =
+    typeof payload.metadata.namespace === "string" && payload.metadata.namespace
+      ? payload.metadata.namespace
+      : input.namespace
+  delete payload.metadata.managedFields
+  delete payload.status
+
+  payload.spec.template.metadata.annotations["kubectl.kubernetes.io/restartedAt"] =
+    new Date().toISOString()
+
+  return updateWorkload({
+    kind: input.kind,
+    namespace: input.namespace,
+    name: input.name,
+    payload,
   })
 }
 

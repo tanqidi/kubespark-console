@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { IconEye, IconInfoCircle, IconPencil, IconTrash } from "@tabler/icons-react"
+import { IconEye, IconInfoCircle, IconPencil, IconRefresh, IconTrash } from "@tabler/icons-react"
 
 import { DataTable } from "@/app/(console)/dashboard/components/data-table"
 import { CreateWorkloadDialog } from "@/app/(console)/dashboard/components/resource-pages/workloads/create-workload-dialog"
@@ -19,7 +19,7 @@ import {
   type WorkloadResourceRow,
 } from "@/app/lib/kubespark/resource-rows"
 import { deleteWorkload } from "@/app/lib/kubespark/resource-delete"
-import { createWorkload, updateWorkload } from "@/app/lib/kubespark/workloads"
+import { createWorkload, rolloutWorkload, updateWorkload } from "@/app/lib/kubespark/workloads"
 import { fetchResourceByName, fetchResourceDescribe } from "@/app/lib/kubespark/common"
 import { fetchNamespaces } from "@/app/lib/kubespark/projects"
 import { fetchNamespacedResourceYaml } from "@/app/lib/kubespark/resource-yaml"
@@ -89,6 +89,8 @@ export function WorkloadsPageClient() {
   const [describeSubtitle, setDescribeSubtitle] = React.useState("")
   const [pendingDeleteRow, setPendingDeleteRow] = React.useState<WorkloadRow | null>(null)
   const [deleting, setDeleting] = React.useState(false)
+  const [pendingRolloutRow, setPendingRolloutRow] = React.useState<WorkloadRow | null>(null)
+  const [rollingOut, setRollingOut] = React.useState(false)
 
   const refreshRows = React.useCallback(async (silent: boolean) => {
     if (!silent) {
@@ -196,6 +198,10 @@ export function WorkloadsPageClient() {
     setPendingDeleteRow(row)
   }, [])
 
+  const requestRollout = React.useCallback((row: WorkloadRow) => {
+    setPendingRolloutRow(row)
+  }, [])
+
   const handleEdit = React.useCallback((row: WorkloadRow) => {
     const resource = WORKLOAD_RESOURCE_BY_KIND[row.kind]
     void fetchResourceByName<unknown>("apps", "v1", resource, row.name, {
@@ -233,6 +239,33 @@ export function WorkloadsPageClient() {
         setDeleting(false)
       })
   }, [deleting, pendingDeleteRow, t])
+
+  const handleConfirmRollout = React.useCallback(() => {
+    if (!pendingRolloutRow || rollingOut) return
+    setRollingOut(true)
+
+    void rolloutWorkload({
+      kind: pendingRolloutRow.kind,
+      namespace: pendingRolloutRow.namespace,
+      name: pendingRolloutRow.name,
+    })
+      .then(async () => {
+        setPendingRolloutRow(null)
+        await refreshRows(false)
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : t("workloads.rolloutFailed")
+        setError(message)
+        console.error("[Workloads] rollout restart request failed", {
+          kind: pendingRolloutRow.kind,
+          workload: { name: pendingRolloutRow.name, namespace: pendingRolloutRow.namespace },
+          error: e,
+        })
+      })
+      .finally(() => {
+        setRollingOut(false)
+      })
+  }, [pendingRolloutRow, refreshRows, rollingOut, t])
 
   const handleDeleteSelectedRows = React.useCallback((selectedRows: WorkloadRow[]) => {
     if (selectedRows.length === 0) return
@@ -286,6 +319,22 @@ export function WorkloadsPageClient() {
           {
             label: (
               <>
+                <IconRefresh className="size-4" />
+                {t("actions.rollout")}
+              </>
+            ),
+            disabled: (row) =>
+              rollingOut &&
+              pendingRolloutRow?.kind === row.kind &&
+              pendingRolloutRow?.namespace === row.namespace &&
+              pendingRolloutRow?.name === row.name,
+            onSelect: (row) => {
+              requestRollout(row)
+            },
+          },
+          {
+            label: (
+              <>
                 <IconTrash className="size-4" />
                 {t("actions.delete")}
               </>
@@ -298,7 +347,7 @@ export function WorkloadsPageClient() {
           },
         ],
       }),
-    [handleEdit, handleViewDescribe, handleViewYaml, requestDelete, t]
+    [handleEdit, handleViewDescribe, handleViewYaml, pendingRolloutRow, requestDelete, requestRollout, rollingOut, t]
   )
 
   React.useEffect(() => {
@@ -420,6 +469,23 @@ export function WorkloadsPageClient() {
         }
         deleting={deleting}
         onConfirm={handleConfirmDelete}
+      />
+      <DeleteConfirmDialog
+        open={Boolean(pendingRolloutRow)}
+        onOpenChange={(open) => {
+          if (!open && !rollingOut) setPendingRolloutRow(null)
+        }}
+        title={t("workloads.rolloutTitle")}
+        description={
+          pendingRolloutRow
+            ? t("workloads.rolloutConfirm", { name: pendingRolloutRow.name })
+            : ""
+        }
+        deleting={rollingOut}
+        actionLabel={t("actions.rollout")}
+        pendingLabel={t("workloads.rollingOut")}
+        actionVariant="default"
+        onConfirm={handleConfirmRollout}
       />
       <DataTable
         data={filteredRows}

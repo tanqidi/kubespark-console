@@ -247,6 +247,7 @@
     "details": "Details",
     "edit": "Edit",
     "delete": "Delete",
+    "rollout": "Rollout",
     "viewYaml": "View YAML",
     "logs": "Logs",
     "terminal": "Terminal",
@@ -1488,6 +1489,10 @@
     "loadYamlFailed": "Failed to load YAML",
     "loadWorkloadFailed": "Failed to load workload details",
     "deleteFailed": "Delete failed",
+    "rolloutFailed": "Rollout failed",
+    "rolloutTitle": "Rollout Workload",
+    "rolloutConfirm": "Are you sure you want to roll out workload {name}? This will restart its pods.",
+    "rollingOut": "Rolling out...",
     "deleteConfirm": "Are you sure you want to delete workload {name}?"
   },
   "about": {

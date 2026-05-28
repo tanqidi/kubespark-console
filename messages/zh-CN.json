@@ -245,6 +245,7 @@
     "details": "详情",
     "edit": "编辑",
     "delete": "删除",
+    "rollout": "重建",
     "viewYaml": "查看 YAML",
     "logs": "日志",
     "terminal": "终端",
@@ -1487,6 +1488,10 @@
     "loadYamlFailed": "加载 YAML 失败",
     "loadWorkloadFailed": "加载工作负载详情失败",
     "deleteFailed": "删除失败",
+    "rolloutFailed": "重建失败",
+    "rolloutTitle": "重建工作负载",
+    "rolloutConfirm": "确定重建工作负载 {name} 吗？这会滚动重启其关联容器组。",
+    "rollingOut": "重建中...",
     "deleteConfirm": "确定删除工作负载 {name} 吗？"
   },
   "about": {
